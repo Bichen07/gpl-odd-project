@@ -2,13 +2,16 @@
 
 # nycu-odd-project
 
-dotenv="$(dirname $0)/.env"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+echo $SCRIPT_DIR
+dotenv=$SCRIPT_DIR/.env
+echo `cat $dotenv |xargs`
 if [ -f $dotenv ]
 then
     export $(cat $dotenv | xargs)
 fi
 
-export PROJECT_DIR=${HOME}/source_code/nycu-odd-project-release
+export PROJECT_DIR=${HOME}/source_code/gpl-odd-project
 
 VERSION_DETAILS_PATH="${PROJECT_DIR}/version_details.md"
 SDC_VERSION=$(grep -Po "\* sdc built from commit # \K[0-9a-z]*" $VERSION_DETAILS_PATH)

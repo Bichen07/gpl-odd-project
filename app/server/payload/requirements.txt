@@ -1,3 +1,0 @@
-umap-learn
-hdbscan
-litestar[standard]

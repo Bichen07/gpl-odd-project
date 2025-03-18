@@ -1,0 +1,27 @@
+version: "3"
+ 
+services:
+  payload:
+    container_name: gpl-odd-payloadcms
+    build:
+      context: .
+    restart: unless-stopped
+    volumes:
+      - ${HOST_DATA_MOUNT_PATH}/uploads:/data/uploads
+    ports:
+      - 3020:3000
+    depends_on:
+      - mongo
+    command: ["node", "dist/server.js"]
+ 
+  mongo:
+    container_name: gpl-odd-mongo
+    image: mongo:7.0.8
+    volumes:
+      - ${HOST_DATA_MOUNT_PATH}/db:/data/db
+    logging:
+      driver: none
+    # ports:
+    #   - 27018:27017
+    command:
+      - --storageEngine=wiredTiger
