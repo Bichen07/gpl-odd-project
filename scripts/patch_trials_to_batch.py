@@ -1,23 +1,10 @@
 import requests
 
-PAYLOAD_API = "https://lssvip-research-payload.chiu41.com/api"
-# batch_id = "678b17976b4a83255ebd8755"
-# batch_id = "678d0c572ed96a72d57d43b9"
-# batch_id = "678d9b132ed96a72d5a7c672"
-# batch_id = "67acb07c4f53fc9c6af207cf"
-# batch_id = "678b17976b4a83255ebd8755"
-# batch_id = "67bfca684f53fc9c6ac0c1f1"
-# batch_id = "67d0ef2c4f53fc9c6a7b8056"
-# batch_id = "67c804004f53fc9c6abcd84f"
-# batch_id = "67c85d5e4f53fc9c6ad87f66"
-# batch_id = "67d111ec4f53fc9c6a7ef9d8"
-# batch_id = "67d153794f53fc9c6a86068c"
-batch_id = "67d4e8354f53fc9c6ae1aa2e"
-
-# batch_id = "67c1d0c84f53fc9c6afdd7c6"
+PAYLOAD_API = "http://140.113.208.174:3020/api"
+batch_id = "67d93a2fd8da7e14046d3736"
 
 headers = {
-    "Authorization": "users API-Key {}".format("11ef564d-226b-44e2-b9ac-6995ef8b037b"),
+    "Authorization": "users API-Key {}".format("982febe9-b8d3-4e4d-8083-f611a9f2bf93"),
 }
 
 
