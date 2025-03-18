@@ -7,42 +7,7 @@
     <arg name="sim_with_external" default="false" />
 
     <arg name="sampling_suggestion_api" default="http://localhost:9009" />
-    <!-- <arg name="sampling_suggestion_api" default="http://192.168.0.177:9009" /> -->
-    <!-- <arg name="search_id" default="6622a8c63abf3eab7ce7b641" /> -->
-    <!-- <arg name="search_id" default="6628cd68e1363c6484fc7e56" /> -->
-    <!-- <arg name="search_id" default="662fceb105185defa9998a52" /> -->
-    <!-- <arg name="search_id" default="663ad93fbee9da7635cbaabe" /> -->
-    <!-- <arg name="search_id" default="6640d664eceffeb41b047bad" /> -->
-    <!-- <arg name="search_id" default="6641851175c12617a7898597" /> -->
-    <!-- <arg name="search_id" default="6641992b75c12617a78ae7d6" /> -->
-    <!-- <arg name="search_id" default="66425a05bcce06f8aff2ee32" /> -->
-    <!-- <arg name="search_id" default="664f1064a45c09cb1a3af48f" /> -->
-    <!-- <arg name="search_id" default="664f70c5c3f4a1bc6bd59d8b" /> -->
-    <!-- <arg name="search_id" default="665025b3b81c5c189a667bf8" /> -->
-    <!-- <arg name="search_id" default="665f3d85a34737577698df22" /> -->
-    <!-- <arg name="batch_id" default="6678be3b711f7470a0956690" /> -->
-    <!-- <arg name="batch_id" default="667ab8fe5ece766810677b06" /> -->
-    <!-- <arg name="batch_id" default="667ae2e57a7fda8cfab8c133" /> -->
-    <!-- <arg name="batch_id" default="6685ecfbc25c36e55b5570c9" /> -->
-    <!-- <arg name="batch_id" default="66948722ca90a30a352c3f10" /> -->
-
-    <!-- <arg name="batch_id" default="66b33556840605cf386ea226" /> -->
-    <!-- <arg name="batch_id" default="66dc58e3102508adc0bcb34d" /> -->
-
-    <!-- <arg name="batch_id" default="6781103f1a9ac48913a8ee80" /> -->
-    <!-- <arg name="batch_id" default="6782124f1a9ac48913a8f138" /> -->
-    <!-- 678d9b132ed96a72d5a7c672 -->
-    <!-- <arg name="batch_id" default="678b17976b4a83255ebd8755" /> -->
-    <!-- <arg name="batch_id" default="678d0c572ed96a72d57d43b9" /> -->
-    <!-- <arg name="batch_id" default="67a8d03b4f53fc9c6abb134d" /> -->
-    <!-- <arg name="batch_id" default="67acb07c4f53fc9c6af207cf" /> -->
-    <!-- <arg name="batch_id" default="67bfca684f53fc9c6ac0c1f1" /> -->
-    <!-- <arg name="batch_id" default="67c804004f53fc9c6abcd84f" /> -->
-    <!-- <arg name="batch_id" default="67c85d5e4f53fc9c6ad87f66" /> -->
-    <!-- <arg name="batch_id" default="67d111ec4f53fc9c6a7ef9d8" /> -->
-    <arg name="batch_id" default="67d4e8354f53fc9c6ae1aa2e" />
-    <!-- <arg name="batch_id" default="67c1d0c84f53fc9c6afdd7c6" /> -->
-
+    <arg name="batch_id" default="67d93a2fd8da7e14046d3736" />
 
     <!-- <arg name="map_name" default="alks_road_straight" /> -->
     <!-- <arg name="route_name" default="operation" /> -->

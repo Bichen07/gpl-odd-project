@@ -128,7 +128,7 @@ class SingleParameterizedScenarioSearch:
 
         response = requests.get(
             url=self.PAYLOAD_API
-            + "/scenarios/{}?depth=1".format(self.search_data["scenario"]["id"]),
+            + "/scenarios/{}?depth=2".format(self.search_data["scenario"]["id"]),
             headers=self.headers,
             verify=False,
         )
@@ -139,32 +139,28 @@ class SingleParameterizedScenarioSearch:
             value["id"]: value for value in self.scenario_data["parameters"]
         }
 
-        url = self.scenario_data["openScenarioField"]["openScenario"]["url"]
-        print(
-            "/".join(self.PAYLOAD_API.split("/")[:3])
-            + "/"
-            + "/".join(url.split("/")[3:])
-        )
+        payload_base_url = "/".join(self.PAYLOAD_API.split("/")[:3])
+        openscenario_id = self.scenario_data["openScenarioField"]["openScenario"]["id"]
+        openscenario_filename = self.scenario_data["openScenarioField"]["openScenario"]["filename"]
+        print(payload_base_url + "/xosc/" + openscenario_filename)
         response = requests.get(
-            "/".join(self.PAYLOAD_API.split("/")[:3])
-            + "/"
-            + "/".join(url.split("/")[3:]),
+            payload_base_url + "/xosc/" + openscenario_filename,
             verify=False,
         )
         response.raise_for_status()
-        self.openscenario_filepath = self.SHARE_FOLDER_PATH / url.split("/")[-1]
+        self.openscenario_filepath = self.SHARE_FOLDER_PATH / openscenario_filename
         self.openscenario_xml = response.content
 
-        url = self.scenario_data["openDrive"]["url"]
+        opendrive_id = self.scenario_data["openDrive"]["id"]
+        opendrive_filename = self.scenario_data["openDrive"]["filename"]
+        print(payload_base_url + "/xodr/" + opendrive_filename)
         response = requests.get(
-            "/".join(self.PAYLOAD_API.split("/")[:3])
-            + "/"
-            + "/".join(url.split("/")[3:]),
+            payload_base_url + "/xodr/" + opendrive_filename,
             verify=False,
         )
         response.raise_for_status()
         self.opendrive_xml = response.content
-        self.opendrive_filepath = self.SHARE_FOLDER_PATH / url.split("/")[-1]
+        self.opendrive_filepath = self.SHARE_FOLDER_PATH / opendrive_filename
         with open(str(self.opendrive_filepath), "wb") as f:
             f.write(self.opendrive_xml)
 
