@@ -1,0 +1,12 @@
+(cl:in-package openpilot_bridge-msg)
+(cl:export '(HEADER-VAL
+          HEADER
+          HALFCYCLESUBTRACTED-VAL
+          HALFCYCLESUBTRACTED
+          CARRIERPHASEVALID-VAL
+          CARRIERPHASEVALID
+          PSEUDORANGEVALID-VAL
+          PSEUDORANGEVALID
+          HALFCYCLEVALID-VAL
+          HALFCYCLEVALID
+))

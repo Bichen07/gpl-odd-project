@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot name="car">
+  <link name="base_link">
+    <visual name="base_visual">
+        <origin xyz="0.0 0.0 0.0" rpy="0 0 0" /> <!-- GBUS-->
+      <geometry>
+        <mesh filename="package://sdc/data/vehicle_model/GBUS/GBUS.dae"
+              scale="0.04 0.04 0.04"/> <!-- GBUS-->
+      </geometry>
+    </visual>
+  </link>
+</robot>

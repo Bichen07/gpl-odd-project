@@ -1,0 +1,23 @@
+Header header
+
+bool speed_control_enable
+bool CANLostFromECU
+bool CANLostFromEPS
+bool faultDBW
+bool readyAVCU
+bool CANLostFromiBooster
+bool CANLostFrom2024C
+bool CANLostFromAVCU
+uint8 velocityCmdState
+int8 speedCmdState
+float32 acceleration
+float32 forceComp
+float32 target_speed
+float32 current_speed
+float32 integral_term_action
+float32 p_term_action
+float32 feedforward_action
+float32 brake_pressure_f
+float32 brake_pressure_r
+float32 brake_pressure_f_tank
+float32 brake_pressure_r_tank

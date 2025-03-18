@@ -1,0 +1,10 @@
+uint32 search=1
+uint32 bitEdge=3
+uint32 track=5
+uint32 glo10msAt=9
+uint32 idle=0
+uint32 trackVerify=4
+uint32 searchVerify=2
+uint32 dpo=7
+uint32 restart=6
+uint32 glo10msBe=8

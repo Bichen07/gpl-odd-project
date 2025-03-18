@@ -1,0 +1,27 @@
+{
+    "Note": [
+        "There is an x-y offset between sumo map and mmsl HD Map (no orientation offset)",
+        "the file here list all the offset settings here.",
+        "There are 2 ways to describe offset of a map, 1) directly assign x-y value or 2) find same point on each map.",
+            "1) directly assign x-y value: see taichung_new for example",
+            "2) find same point on each map: see taichung_new_example for example.",
+        "In method 2, synchronization_adv calculates mmsl minus sumo and get the offset value."
+    ],
+    "III_itri": [595.39, 452.02],
+    "taichung_new":{
+        "sumo": [162.82, 211.67],
+        "mmsl": [-330.681, 23.318]
+    },
+    "taichung_new_": [494.566, 186.55],
+    "taichung_new_example": {
+        "sumo": [489.25, 193.36],
+        "mmsl": [-4.064, 6.83]
+    },
+    "itri_68_nanliao": {
+        "sumo": [12189.20, 342.03],
+        "mmsl": [47.419, -68.532],
+        "sumo_": [2454.13, 2011.17],
+        "mmsl_": [213.363, 1600.128]
+    }
+}
+

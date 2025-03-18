@@ -1,0 +1,6 @@
+Header header
+
+float32 actuatorEffectiveness
+float32 outerLoopGain
+float32 innerLoopGain
+float32 timeConstant

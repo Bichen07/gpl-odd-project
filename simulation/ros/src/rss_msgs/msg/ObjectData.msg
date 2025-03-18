@@ -1,0 +1,9 @@
+uint32 detected_object_id
+geometry_msgs/Pose pose
+geometry_msgs/Twist twist
+geometry_msgs/Accel accel
+geometry_msgs/Vector3 size
+float32 speed
+float32 yaw_rate
+float32 steering_angle
+string object_class_id

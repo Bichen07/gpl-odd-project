@@ -1,0 +1,2 @@
+CheckResultEgoVehicleState ego_vehicle_state
+CheckResultObjectState[] object_states

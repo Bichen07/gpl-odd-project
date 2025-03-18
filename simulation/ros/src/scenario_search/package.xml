@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>scenario_search</name>
+  <version>0.0.0</version>
+  <description>The scenario_search package</description>
+
+  <maintainer email="zackhsu@itri.org.tw">Hsiu-Wei Hsu</maintainer>
+  <license>ITRI</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>scenario</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>itri_msgs</build_depend>
+  <build_depend>visualization_msgs</build_depend>
+  <build_export_depend>geometry_msgs</build_export_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>rospy</build_export_depend>
+  <build_export_depend>scenario</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>itri_msgs</build_export_depend>
+  <build_export_depend>visualization_msgs</build_export_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>scenario</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>itri_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>utils</exec_depend>
+  <depend>simulation_msgs</depend>
+  <depend>simulation_srvs</depend>
+  <depend>simulation_utils</depend>
+  <exec_depend>data_utils</exec_depend>
+  <exec_depend>scenario_classification</exec_depend>
+  <exec_depend>simulation_monitor</exec_depend>
+
+  <export>
+  </export>
+
+</package>

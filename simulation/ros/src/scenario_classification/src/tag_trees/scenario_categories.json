@@ -1,0 +1,36 @@
+[
+    {
+        "name": "itri_05_unsignalized_turning_right_coming_vehicle",
+        "tag_trees":
+        {
+            "ego":
+            {
+                "lateral_activity": "turning:right"
+            },
+            "actor":
+            {
+                "initial_state_dynamics": "moving",
+                "initial_state_direction": "crossing",
+                "initial_state_lateral": "left_of_ego",
+                "initial_state_longitudinal": ["side_of_ego", "in_front_of_ego"],
+                "lateral_activity": "going_straight"
+            }
+        }
+    },
+    {
+        "name": "itri_03_vehicle_cutting_in_from_right",
+        "tag_trees":
+        {
+            "ego":
+            {
+                "lateral_activity": "going_straight"
+            },
+            "actor":
+            {
+                "initial_state_lateral": "right_of_ego",
+                "initial_state_direction": "same_as_ego",
+                "lead_vehicle": "appearing:cutting_in"
+            }
+        }
+    }
+]

@@ -1,0 +1,34 @@
+Header header
+
+bool decelForTurn
+float32 vTarget
+bool lateralValidDEPRECATED
+uint32 longitudinalPlanSource # enum const: LongitudinalPlanSource
+bool hasLead
+int64 radarStateMonoTime
+float32 jerkFactor
+float32 vCurvature
+float32 aTarget
+int64 mdMonoTime
+float32 aTargetMaxDEPRECATED
+float32 laneWidthDEPRECATED
+bool radarValid
+bool gpsPlannerActive
+bool fcw
+float32 processingDelay
+bool longitudinalValidDEPRECATED
+float32 aStart
+CarEvent[] eventsDEPRECATED
+bool hasRightLaneDEPRECATED
+float32 vStart
+float32 aCruise
+bool commIssue
+float32 vTargetFuture
+GpsTrajectory gpsTrajectory
+bool hasLeftLaneDEPRECATED
+float32 vCruise
+float32 aTargetMinDEPRECATED
+bool mapValid
+bool radarCanError
+float32 vMax
+float32[] dPolyDEPRECATED

@@ -1,0 +1,16 @@
+<package>
+  <name>kalman</name>
+  <version>0.0.0</version>
+  <description>
+      This package provides header only kalman filter library.
+  </description>
+
+  <maintainer email="mherb@no.address">Markus Herb</maintainer>
+
+  <license>MIT</license>
+
+  <author>Markus Herb</author>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+</package>

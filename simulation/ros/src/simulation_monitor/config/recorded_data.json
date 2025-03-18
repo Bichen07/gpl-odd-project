@@ -1,0 +1,57 @@
+{
+    "note": {
+        "Required Key": "topic_category",
+        "note1": "The program search key in this file that is listed in topic_category",
+        "note2": "Under each categories are topic name to record and the type."
+    },
+    "topic_catagory": ["simulation", "action"],
+    "simulation":{
+        "scenario_visualization": "visualization_msgs/MarkerArray",
+        "simulation/agent_data_array": "scenario_msgs/AgentDataArray"
+    },
+    "action":{
+        "behavior_state": "itri_msgs/BehaviorState",
+        "car_state": "itri_msgs/CarState",
+        "detected_objects": "itri_msgs/DetectedObjectArray",
+        "global_path": "itri_msgs/Path",
+        "imu/data": "sensor_msgs/Imu",
+        "ndt_pose": "geometry_msgs/PoseStamped",
+        "ndt_statw": "itri_msgs/NdtStatistics",
+        "waypoints": "itri_msgs/WaypointArray"
+    },
+    "action_2":{
+        "behavior": "itri_msgs/plan",
+        "behavior/Main": "std_msgs/String",
+        "behavior/ACC": "std_msgs/String",
+        "behavior/AEB": "std_msgs/String",
+        "behavior/Avoidance": "std_msgs/String",
+        "behavior/Cruise": "std_msgs/String",
+        "behavior/CutIn": "std_msgs/String",
+        "behavior/Destination": "std_msgs/String",
+        "behavior/Diagnosis": "std_msgs/String",
+        "behavior/intersection": "std_msgs/String",
+        "behavior/Parking": "std_msgs/String",
+        "behavior/TrafficJam": "std_msgs/String",
+        "behavior/TrafficLight": "std_msgs/String",
+        "behavior/StartEnd": "std_msgs/String",
+        "behavior/rviz_frenet": "visualization_msgs/MarkerArray",
+        "behavior/tree_html": "std_msgs/String",
+        "behavior/state_html": "std_msgs/String",
+        "detection/lidar_tracker/arrow_markers": "visualization_msgs/MarkerArray",
+        "filtered_cluster_hulls": "jsk_recognition_msgs/PolygonArray",
+        "intersection": "",
+        "lane_info": "",
+        "lane_waypoints_info": "",
+        "parking_spaces_position": "",
+        "parking_status": "",
+        "predict_pose_smoothed": "geometry_msgs/PoseStamped",
+        "route_info": "",
+        "tf": "tf2_msgs/TFMessage",
+        "tf_static": "tf2_msgs/TFMessage",
+        "speed_cmd": "itri_msgs/speed_cmd",
+        "steer_cmd": "itri_msgs/steer_cmd",
+        "traffic_light_status": "",
+        "traffic_light_status_fake": "",
+        "vehicle_state": "itri_msgs/VehicleState"
+    }
+}

@@ -1,0 +1,51 @@
+<launch>
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <arg name="headless" default="false"/>
+    <arg name="open_frenet" default="false"/>
+    <arg name="rviz_file" default="sdc.rviz" />
+    <arg name="suffix" default="_simulation" />
+    <arg name="pacifica" default="true" />
+    <arg name="gbus" default="false" />
+    <arg name="canter" default="false" />
+    <arg name="trailer" default="false" />
+
+
+    <param name="robot_description"
+       textfile="$(find sdc)/data/vehicle_model/pacifica.urdf" if="$(arg pacifica)"/>
+    <param name="robot_description"
+       textfile="$(find sdc)/data/vehicle_model/GBUS/GBUS.urdf" if="$(arg gbus)"/>
+    <param name="robot_description"
+       textfile="$(find sdc)/data/vehicle_model/canter/canter.urdf" if="$(arg canter)"/>
+    <param name="robot_description"
+       textfile="$(find sdc)/data/vehicle_model/trailer/trailer.urdf" if="$(arg trailer)"/>
+
+    <param name="use_gui" value="false"/>
+    <node name="joint_state_publisher"
+          pkg="joint_state_publisher"
+          type="joint_state_publisher"/>
+    <node name="robot_state_publisher"
+          pkg="robot_state_publisher"
+          type="robot_state_publisher"/>
+
+    <node
+        pkg="rviz"
+        type="rviz"
+        name="my_rviz$(arg suffix)"
+        output="screen"
+        args="-d $(find rviz_config)/data/$(arg rviz_file)"
+        unless="$(arg headless)"/>
+
+
+    <group if="$(arg open_frenet)">
+        <param name="robot_descriptionSD"
+               textfile="$(find sdc)/data/vehicle_model/pacificaSD.urdf"/>
+        <node
+            pkg="rviz"
+            type="rviz"
+            name="frenet_rviz$(arg suffix)"
+            output="screen"
+            args="-d $(find sdc)/data/frenet.rviz"
+            unless="$(arg headless)"/>
+    </group>
+
+</launch>

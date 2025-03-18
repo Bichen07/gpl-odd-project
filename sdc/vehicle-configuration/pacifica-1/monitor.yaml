@@ -1,0 +1,59 @@
+# use '.' instead of '/' for topic name since '/' in yaml has
+# different meaning to separate parameters
+
+monitor:
+    major_topics:
+        .behavior.speed_cmd:
+            type: FrequencyAnalyzer
+            freq_bound: [10.0, 25.0]
+
+        .car_state:
+            type: FrequencyAnalyzer
+            freq_bound: [95.0, 105.0]
+
+        .global_waypoints_display:
+            type: ExistanceAnalyzer
+
+        .imu.data:
+            type: FrequencyAnalyzer
+            freq_bound: [99.0, 101.0]
+
+        .laneinfo_fromfile:
+            type: ExistanceAnalyzer
+        .localizer_node.ndt_pose:
+            type: FrequencyAnalyzer
+            freq_bound: [2.0, 21.0]
+
+        .localizer_node.predict_pose:
+            type: FrequencyAnalyzer
+            freq_bound: [95.0, 105.0]
+
+        .remote_operator_connection_status:
+            type: FrequencyAnalyzer
+            freq_bound: [5.0, 15.0]
+
+        .road_markers_display:
+            type: ExistanceAnalyzer
+
+        .speed_cmd:
+            type: FrequencyAnalyzer
+            freq_bound: [29.0, 101.0]
+
+        .steer_cmd:
+            type: FrequencyAnalyzer
+            freq_bound: [19.0, 21.0]
+
+        .traffic_light_status:
+            type: FrequencyAnalyzer
+            freq_bound: [10.0, 40.0]
+
+        .vehicle_state:
+            type: FrequencyAnalyzer
+            freq_bound: [99.0, 101.0]
+
+    major_system: []
+
+    minor_system: [
+        'CpuMonitor',
+        'GpuMonitor'
+    ]

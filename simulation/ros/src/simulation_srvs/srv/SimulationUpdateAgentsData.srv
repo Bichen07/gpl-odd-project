@@ -1,0 +1,7 @@
+scenario_msgs/AgentData[] agents
+bool spawnIfNotExist
+bool onlyPose
+bool onlyPoint
+float32 dt
+---
+bool[] isSuccess

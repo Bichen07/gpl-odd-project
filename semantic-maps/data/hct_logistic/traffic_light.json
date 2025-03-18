@@ -1,0 +1,1649 @@
+{
+   "traffic_light" : [
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.5899999737739563,
+         "id" : 10,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 263.44999999999999,
+               "y" : 37.706000000000003,
+               "z" : 7.9530000000000003
+            },
+            {
+               "point_id" : 2,
+               "x" : 263.41899999999998,
+               "y" : 37.697000000000003,
+               "z" : 7.6130000000000004
+            },
+            {
+               "point_id" : 3,
+               "x" : 262.80099999999999,
+               "y" : 38.582999999999998,
+               "z" : 7.6360000000000001
+            },
+            {
+               "point_id" : 4,
+               "x" : 262.82400000000001,
+               "y" : 38.609000000000002,
+               "z" : 7.9889999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.55699998140335083,
+         "id" : 11,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 249.607,
+               "y" : 22.234000000000002,
+               "z" : 7.5890000000000004
+            },
+            {
+               "point_id" : 2,
+               "x" : 249.56200000000001,
+               "y" : 22.215,
+               "z" : 7.2409999999999997
+            },
+            {
+               "point_id" : 3,
+               "x" : 248.95500000000001,
+               "y" : 23.097000000000001,
+               "z" : 7.1829999999999998
+            },
+            {
+               "point_id" : 4,
+               "x" : 248.97399999999999,
+               "y" : 23.132000000000001,
+               "z" : 7.5659999999999998
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -2.5390000343322754,
+         "id" : 12,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 248.63300000000001,
+               "y" : 22.907,
+               "z" : 7.5540000000000003
+            },
+            {
+               "point_id" : 2,
+               "x" : 248.65199999999999,
+               "y" : 22.884,
+               "z" : 7.173
+            },
+            {
+               "point_id" : 3,
+               "x" : 249.25299999999999,
+               "y" : 21.981000000000002,
+               "z" : 7.2599999999999998
+            },
+            {
+               "point_id" : 4,
+               "x" : 249.26300000000001,
+               "y" : 22.018000000000001,
+               "z" : 7.5810000000000004
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 0,
+         "detect_at_night" : 1,
+         "heading" : 0.56699997186660767,
+         "id" : 13,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 146.15700000000001,
+               "y" : -42.734999999999999,
+               "z" : 7.0030000000000001
+            },
+            {
+               "point_id" : 2,
+               "x" : 146.25,
+               "y" : -42.636000000000003,
+               "z" : 6.673
+            },
+            {
+               "point_id" : 3,
+               "x" : 145.63999999999999,
+               "y" : -41.777999999999999,
+               "z" : 6.7050000000000001
+            },
+            {
+               "point_id" : 4,
+               "x" : 145.53800000000001,
+               "y" : -41.787999999999997,
+               "z" : 6.9980000000000002
+            }
+         ],
+         "rules" : [ "red", "yellow", "green", "flashyellow" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -2.5859999656677246,
+         "id" : 14,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 145.26900000000001,
+               "y" : -42.060000000000002,
+               "z" : 6.8739999999999997
+            },
+            {
+               "point_id" : 2,
+               "x" : 145.31700000000001,
+               "y" : -42.003999999999998,
+               "z" : 6.5309999999999997
+            },
+            {
+               "point_id" : 3,
+               "x" : 145.94399999999999,
+               "y" : -42.865000000000002,
+               "z" : 6.5289999999999999
+            },
+            {
+               "point_id" : 4,
+               "x" : 145.86500000000001,
+               "y" : -42.953000000000003,
+               "z" : 6.8339999999999996
+            }
+         ],
+         "rules" : [ "red", "yellow", "green", "flashyellow" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.56499999761581421,
+         "id" : 15,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 127.911,
+               "y" : -61.244,
+               "z" : 6.8630000000000004
+            },
+            {
+               "point_id" : 2,
+               "x" : 127.931,
+               "y" : -61.246000000000002,
+               "z" : 6.5110000000000001
+            },
+            {
+               "point_id" : 3,
+               "x" : 127.31699999999999,
+               "y" : -60.377000000000002,
+               "z" : 6.4710000000000001
+            },
+            {
+               "point_id" : 4,
+               "x" : 127.29000000000001,
+               "y" : -60.360999999999997,
+               "z" : 6.8120000000000003
+            }
+         ],
+         "rules" : [ "red", "yellow", "green", "flashyellow" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -2.5989999771118164,
+         "id" : 16,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 126.962,
+               "y" : -60.606999999999999,
+               "z" : 6.8079999999999998
+            },
+            {
+               "point_id" : 2,
+               "x" : 126.97499999999999,
+               "y" : -60.615000000000002,
+               "z" : 6.4619999999999997
+            },
+            {
+               "point_id" : 3,
+               "x" : 127.59699999999999,
+               "y" : -61.484000000000002,
+               "z" : 6.4729999999999999
+            },
+            {
+               "point_id" : 4,
+               "x" : 127.602,
+               "y" : -61.491,
+               "z" : 6.8700000000000001
+            }
+         ],
+         "rules" : [ "red", "yellow", "green", "flashyellow" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -0.94999998807907104,
+         "id" : 17,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 142.14400000000001,
+               "y" : -61.790999999999997,
+               "z" : 7.1139999999999999
+            },
+            {
+               "point_id" : 2,
+               "x" : 142.154,
+               "y" : -61.780999999999999,
+               "z" : 6.7839999999999998
+            },
+            {
+               "point_id" : 3,
+               "x" : 143.05199999999999,
+               "y" : -61.174999999999997,
+               "z" : 6.8499999999999996
+            },
+            {
+               "point_id" : 4,
+               "x" : 143.09,
+               "y" : -61.201999999999998,
+               "z" : 7.1619999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "green", "flashred" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 2.0980000495910645,
+         "id" : 18,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 142.85300000000001,
+               "y" : -60.850000000000001,
+               "z" : 7.1760000000000002
+            },
+            {
+               "point_id" : 2,
+               "x" : 142.86600000000001,
+               "y" : -60.854999999999997,
+               "z" : 6.8369999999999997
+            },
+            {
+               "point_id" : 3,
+               "x" : 141.929,
+               "y" : -61.402000000000001,
+               "z" : 6.8200000000000003
+            },
+            {
+               "point_id" : 4,
+               "x" : 141.91999999999999,
+               "y" : -61.433999999999997,
+               "z" : 7.1289999999999996
+            }
+         ],
+         "rules" : [ "red", "yellow", "green", "flashred" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -0.94300001859664917,
+         "id" : 19,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 130.251,
+               "y" : -46.948,
+               "z" : 7.0780000000000003
+            },
+            {
+               "point_id" : 2,
+               "x" : 130.21700000000001,
+               "y" : -46.927,
+               "z" : 6.7599999999999998
+            },
+            {
+               "point_id" : 3,
+               "x" : 131.08600000000001,
+               "y" : -46.271999999999998,
+               "z" : 6.75
+            },
+            {
+               "point_id" : 4,
+               "x" : 131.10499999999999,
+               "y" : -46.292000000000002,
+               "z" : 7.0659999999999998
+            }
+         ],
+         "rules" : [ "red", "yellow", "green", "flashred" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.62300002574920654,
+         "id" : 1,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 376.27999999999997,
+               "y" : -111.432,
+               "z" : 9.6709999999999994
+            },
+            {
+               "point_id" : 2,
+               "x" : 376.27199999999999,
+               "y" : -111.389,
+               "z" : 9.3089999999999993
+            },
+            {
+               "point_id" : 3,
+               "x" : 375.59899999999999,
+               "y" : -110.56100000000001,
+               "z" : 9.3420000000000005
+            },
+            {
+               "point_id" : 4,
+               "x" : 375.61599999999999,
+               "y" : -110.548,
+               "z" : 9.7210000000000001
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.62300002574920654,
+         "id" : 20,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : -1.893,
+               "y" : -144.88499999999999,
+               "z" : 6.9660000000000002
+            },
+            {
+               "point_id" : 2,
+               "x" : -1.802,
+               "y" : -144.80000000000001,
+               "z" : 6.7430000000000003
+            },
+            {
+               "point_id" : 3,
+               "x" : -2.4039999999999999,
+               "y" : -143.904,
+               "z" : 6.7569999999999997
+            },
+            {
+               "point_id" : 4,
+               "x" : -2.4620000000000002,
+               "y" : -143.92400000000001,
+               "z" : 7.101
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.62099999189376831,
+         "id" : 21,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : -21.957999999999998,
+               "y" : -159.53700000000001,
+               "z" : 8.5259999999999998
+            },
+            {
+               "point_id" : 2,
+               "x" : -21.951000000000001,
+               "y" : -159.56299999999999,
+               "z" : 8.2129999999999992
+            },
+            {
+               "point_id" : 3,
+               "x" : -22.614999999999998,
+               "y" : -158.69300000000001,
+               "z" : 8.1609999999999996
+            },
+            {
+               "point_id" : 4,
+               "x" : -22.619,
+               "y" : -158.68199999999999,
+               "z" : 8.5109999999999992
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 1.343999981880188,
+         "id" : 22,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : -29.117999999999999,
+               "y" : -157.79499999999999,
+               "z" : 8.5090000000000003
+            },
+            {
+               "point_id" : 2,
+               "x" : -29.120999999999999,
+               "y" : -157.84899999999999,
+               "z" : 8.1319999999999997
+            },
+            {
+               "point_id" : 3,
+               "x" : -30.198,
+               "y" : -157.66999999999999,
+               "z" : 8.1150000000000002
+            },
+            {
+               "point_id" : 4,
+               "x" : -30.192,
+               "y" : -157.65100000000001,
+               "z" : 8.4039999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 1.2250000238418579,
+         "id" : 23,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : -24.138999999999999,
+               "y" : -139.36000000000001,
+               "z" : 7.3419999999999996
+            },
+            {
+               "point_id" : 2,
+               "x" : -24.138999999999999,
+               "y" : -139.34299999999999,
+               "z" : 6.9960000000000004
+            },
+            {
+               "point_id" : 3,
+               "x" : -25.125,
+               "y" : -138.881,
+               "z" : 7.016
+            },
+            {
+               "point_id" : 4,
+               "x" : -25.117999999999999,
+               "y" : -138.87299999999999,
+               "z" : 7.3840000000000003
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 0,
+         "detect_at_night" : 0,
+         "heading" : -0.1289999932050705,
+         "id" : 24,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "left", "straight", "right" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : -46.801000000000002,
+               "y" : -151.62799999999999,
+               "z" : 7.1260000000000003
+            },
+            {
+               "point_id" : 2,
+               "x" : -46.820999999999998,
+               "y" : -151.613,
+               "z" : 6.8019999999999996
+            },
+            {
+               "point_id" : 3,
+               "x" : -46.807000000000002,
+               "y" : -149.881,
+               "z" : 6.8280000000000003
+            },
+            {
+               "point_id" : 4,
+               "x" : -46.787999999999997,
+               "y" : -149.88499999999999,
+               "z" : 7.202
+            }
+         ],
+         "rules" : [ "red", "yellow", "straight right", "red left" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 2.1449999809265137,
+         "id" : 25,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "left", "straight", "right" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 651.70100000000002,
+               "y" : 84.763999999999996,
+               "z" : 10.097
+            },
+            {
+               "point_id" : 2,
+               "x" : 651.68299999999999,
+               "y" : 84.709999999999994,
+               "z" : 9.8610000000000007
+            },
+            {
+               "point_id" : 3,
+               "x" : 650.05799999999999,
+               "y" : 83.921999999999997,
+               "z" : 9.8379999999999992
+            },
+            {
+               "point_id" : 4,
+               "x" : 650.07299999999998,
+               "y" : 83.936000000000007,
+               "z" : 10.209
+            }
+         ],
+         "rules" : [ "red", "yellow", "straight right", "left straight right" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 1,
+         "yOffset" : 0,
+         "yScale" : 1.5
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -0.96299999952316284,
+         "id" : 26,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 650.85799999999995,
+               "y" : 84.019999999999996,
+               "z" : 10.202999999999999
+            },
+            {
+               "point_id" : 2,
+               "x" : 650.86800000000005,
+               "y" : 83.881,
+               "z" : 9.8330000000000002
+            },
+            {
+               "point_id" : 3,
+               "x" : 651.84900000000005,
+               "y" : 84.334999999999994,
+               "z" : 9.7799999999999994
+            },
+            {
+               "point_id" : 4,
+               "x" : 651.87099999999998,
+               "y" : 84.367999999999995,
+               "z" : 10.127000000000001
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 2.2260000705718994,
+         "id" : 27,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "left", "straight", "right" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 674.36500000000001,
+               "y" : 65.980000000000004,
+               "z" : 10.366
+            },
+            {
+               "point_id" : 2,
+               "x" : 674.36300000000006,
+               "y" : 65.843999999999994,
+               "z" : 10.041
+            },
+            {
+               "point_id" : 3,
+               "x" : 672.952,
+               "y" : 64.810000000000002,
+               "z" : 10.085000000000001
+            },
+            {
+               "point_id" : 4,
+               "x" : 672.88400000000001,
+               "y" : 64.828999999999994,
+               "z" : 10.388999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "straight right", "left straight right" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 1,
+         "yOffset" : 0,
+         "yScale" : 1.5
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -1.5709999799728394,
+         "id" : 28,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 673.01099999999997,
+               "y" : 64.510999999999996,
+               "z" : 10.412000000000001
+            },
+            {
+               "point_id" : 2,
+               "x" : 673.04200000000003,
+               "y" : 64.507000000000005,
+               "z" : 10.109999999999999
+            },
+            {
+               "point_id" : 3,
+               "x" : 674.04600000000005,
+               "y" : 64.762,
+               "z" : 10.127000000000001
+            },
+            {
+               "point_id" : 4,
+               "x" : 674.02200000000005,
+               "y" : 64.722999999999999,
+               "z" : 10.398999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.041999999433755875,
+         "id" : 29,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "left", "straight", "right" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 672.755,
+               "y" : 86.936000000000007,
+               "z" : 9.9469999999999992
+            },
+            {
+               "point_id" : 2,
+               "x" : 672.69000000000005,
+               "y" : 86.983999999999995,
+               "z" : 9.7070000000000007
+            },
+            {
+               "point_id" : 3,
+               "x" : 672.74800000000005,
+               "y" : 88.781000000000006,
+               "z" : 9.7880000000000003
+            },
+            {
+               "point_id" : 4,
+               "x" : 672.72799999999995,
+               "y" : 88.769000000000005,
+               "z" : 10.170999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "straight right", "red left" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.52399998903274536,
+         "id" : 2,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 365.26900000000001,
+               "y" : -131.755,
+               "z" : 9.8640000000000008
+            },
+            {
+               "point_id" : 2,
+               "x" : 365.27800000000002,
+               "y" : -131.72800000000001,
+               "z" : 9.468
+            },
+            {
+               "point_id" : 3,
+               "x" : 364.495,
+               "y" : -131.02600000000001,
+               "z" : 9.4969999999999999
+            },
+            {
+               "point_id" : 4,
+               "x" : 364.47699999999998,
+               "y" : -131.006,
+               "z" : 9.8399999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -2.5450000762939453,
+         "id" : 30,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "left", "straight", "right" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 672.00800000000004,
+               "y" : 88.043000000000006,
+               "z" : 10.07
+            },
+            {
+               "point_id" : 2,
+               "x" : 672.06100000000004,
+               "y" : 88.078999999999994,
+               "z" : 9.7710000000000008
+            },
+            {
+               "point_id" : 3,
+               "x" : 672.58199999999999,
+               "y" : 86.257999999999996,
+               "z" : 9.6620000000000008
+            },
+            {
+               "point_id" : 4,
+               "x" : 672.54499999999996,
+               "y" : 86.277000000000001,
+               "z" : 9.9610000000000003
+            }
+         ],
+         "rules" : [ "red", "yellow", "straight right", "red left" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 0.58099997043609619,
+         "id" : 31,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "left", "straight", "right" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 650.40300000000002,
+               "y" : 64.768000000000001,
+               "z" : 10.427
+            },
+            {
+               "point_id" : 2,
+               "x" : 650.32399999999996,
+               "y" : 64.716999999999999,
+               "z" : 10.103999999999999
+            },
+            {
+               "point_id" : 3,
+               "x" : 649.29499999999996,
+               "y" : 66.152000000000001,
+               "z" : 10.058999999999999
+            },
+            {
+               "point_id" : 4,
+               "x" : 649.32299999999998,
+               "y" : 66.198999999999998,
+               "z" : 10.394
+            }
+         ],
+         "rules" : [ "red", "yellow", "straight right", "red left" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -2.5060000419616699,
+         "id" : 32,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "left", "straight", "right" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 649.01900000000001,
+               "y" : 65.969999999999999,
+               "z" : 10.442
+            },
+            {
+               "point_id" : 2,
+               "x" : 649.00099999999998,
+               "y" : 65.933999999999997,
+               "z" : 10.092000000000001
+            },
+            {
+               "point_id" : 3,
+               "x" : 650.029,
+               "y" : 64.513000000000005,
+               "z" : 10.143000000000001
+            },
+            {
+               "point_id" : 4,
+               "x" : 649.99599999999998,
+               "y" : 64.474000000000004,
+               "z" : 10.5
+            }
+         ],
+         "rules" : [ "red", "yellow", "straight right", "red left" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -1.9259999990463257,
+         "id" : 33,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 364.07900000000001,
+               "y" : -131.708,
+               "z" : 9.7899999999999991
+            },
+            {
+               "point_id" : 2,
+               "x" : 364.11799999999999,
+               "y" : -131.691,
+               "z" : 9.4320000000000004
+            },
+            {
+               "point_id" : 3,
+               "x" : 365.065,
+               "y" : -132.125,
+               "z" : 9.4610000000000003
+            },
+            {
+               "point_id" : 4,
+               "x" : 365.08100000000002,
+               "y" : -132.13200000000001,
+               "z" : 9.782
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -0.22200000286102295,
+         "id" : 34,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 393.14600000000002,
+               "y" : -126.72,
+               "z" : 10.009
+            },
+            {
+               "point_id" : 2,
+               "x" : 393.16699999999997,
+               "y" : -126.65300000000001,
+               "z" : 9.6600000000000001
+            },
+            {
+               "point_id" : 3,
+               "x" : 393.42700000000002,
+               "y" : -125.60599999999999,
+               "z" : 9.7070000000000007
+            },
+            {
+               "point_id" : 4,
+               "x" : 393.471,
+               "y" : -125.663,
+               "z" : 10.029999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -0.84799998998641968,
+         "id" : 35,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 355.00400000000002,
+               "y" : -116.75700000000001,
+               "z" : 9.5259999999999998
+            },
+            {
+               "point_id" : 2,
+               "x" : 355.02699999999999,
+               "y" : -116.749,
+               "z" : 9.2119999999999997
+            },
+            {
+               "point_id" : 3,
+               "x" : 355.55200000000002,
+               "y" : -115.812,
+               "z" : 9.2089999999999996
+            },
+            {
+               "point_id" : 4,
+               "x" : 355.613,
+               "y" : -115.797,
+               "z" : 9.5429999999999993
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 2.1770000457763672,
+         "id" : 3,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 355.22199999999998,
+               "y" : -115.462,
+               "z" : 9.5939999999999994
+            },
+            {
+               "point_id" : 2,
+               "x" : 355.25299999999999,
+               "y" : -115.477,
+               "z" : 9.2330000000000005
+            },
+            {
+               "point_id" : 3,
+               "x" : 354.36599999999999,
+               "y" : -116.099,
+               "z" : 9.2319999999999993
+            },
+            {
+               "point_id" : 4,
+               "x" : 354.40699999999998,
+               "y" : -116.137,
+               "z" : 9.5920000000000005
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 2.9230000972747803,
+         "id" : 4,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 392.96800000000002,
+               "y" : -125.482,
+               "z" : 9.9870000000000001
+            },
+            {
+               "point_id" : 2,
+               "x" : 392.995,
+               "y" : -125.495,
+               "z" : 9.6940000000000008
+            },
+            {
+               "point_id" : 3,
+               "x" : 392.69,
+               "y" : -126.51600000000001,
+               "z" : 9.6799999999999997
+            },
+            {
+               "point_id" : 4,
+               "x" : 392.67700000000002,
+               "y" : -126.539,
+               "z" : 10.023999999999999
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -0.87800002098083496,
+         "id" : 5,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 266.33699999999999,
+               "y" : 20.956,
+               "z" : 7.806
+            },
+            {
+               "point_id" : 2,
+               "x" : 266.35000000000002,
+               "y" : 20.994,
+               "z" : 7.4320000000000004
+            },
+            {
+               "point_id" : 3,
+               "x" : 267.21199999999999,
+               "y" : 21.655000000000001,
+               "z" : 7.4379999999999997
+            },
+            {
+               "point_id" : 4,
+               "x" : 267.23399999999998,
+               "y" : 21.594999999999999,
+               "z" : 7.806
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 2.2920000553131104,
+         "id" : 6,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 266.99700000000001,
+               "y" : 21.943999999999999,
+               "z" : 7.8230000000000004
+            },
+            {
+               "point_id" : 2,
+               "x" : 266.96499999999997,
+               "y" : 21.922999999999998,
+               "z" : 7.4660000000000002
+            },
+            {
+               "point_id" : 3,
+               "x" : 266.14999999999998,
+               "y" : 21.263999999999999,
+               "z" : 7.4370000000000003
+            },
+            {
+               "point_id" : 4,
+               "x" : 266.10399999999998,
+               "y" : 21.277000000000001,
+               "z" : 7.7859999999999996
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -0.86900001764297485,
+         "id" : 7,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 250.06,
+               "y" : 36.526000000000003,
+               "z" : 8.0169999999999995
+            },
+            {
+               "point_id" : 2,
+               "x" : 250.03999999999999,
+               "y" : 36.567,
+               "z" : 7.6310000000000002
+            },
+            {
+               "point_id" : 3,
+               "x" : 250.90100000000001,
+               "y" : 37.249000000000002,
+               "z" : 7.5990000000000002
+            },
+            {
+               "point_id" : 4,
+               "x" : 250.958,
+               "y" : 37.244999999999997,
+               "z" : 7.9429999999999996
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : 2.253000020980835,
+         "id" : 8,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 250.68299999999999,
+               "y" : 37.567,
+               "z" : 7.9269999999999996
+            },
+            {
+               "point_id" : 2,
+               "x" : 250.68199999999999,
+               "y" : 37.530000000000001,
+               "z" : 7.6189999999999998
+            },
+            {
+               "point_id" : 3,
+               "x" : 249.81899999999999,
+               "y" : 36.834000000000003,
+               "z" : 7.6630000000000003
+            },
+            {
+               "point_id" : 4,
+               "x" : 249.89599999999999,
+               "y" : 36.792999999999999,
+               "z" : 7.9390000000000001
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      },
+      {
+         "category" : 50,
+         "detect_at_day" : 1,
+         "detect_at_night" : 1,
+         "heading" : -2.505000114440918,
+         "id" : 9,
+         "intersection" : 0,
+         "lane_ids" : null,
+         "lat" : 0,
+         "lights" : [
+            [ "red", "yellow", "green" ]
+         ],
+         "lng" : 0,
+         "points" : [
+            {
+               "point_id" : 1,
+               "x" : 262.46100000000001,
+               "y" : 38.343000000000004,
+               "z" : 7.9299999999999997
+            },
+            {
+               "point_id" : 2,
+               "x" : 262.49799999999999,
+               "y" : 38.375,
+               "z" : 7.6020000000000003
+            },
+            {
+               "point_id" : 3,
+               "x" : 263.142,
+               "y" : 37.497999999999998,
+               "z" : 7.6139999999999999
+            },
+            {
+               "point_id" : 4,
+               "x" : 263.077,
+               "y" : 37.457000000000001,
+               "z" : 7.9560000000000004
+            }
+         ],
+         "rules" : [ "red", "yellow", "green" ],
+         "vpe" : "",
+         "vps" : "",
+         "xOffset" : 0,
+         "xScale" : 2,
+         "yOffset" : 0,
+         "yScale" : 2
+      }
+   ]
+}

@@ -1,0 +1,10 @@
+uint8 trackId
+uint8 status
+uint8 medRangeMode
+geometry_msgs/PoseStamped pose
+geometry_msgs/TwistStamped twist
+bool oncoming
+bool isBridge
+bool groupingChanged
+float32 width
+float32 rangeAccel

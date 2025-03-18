@@ -1,0 +1,18 @@
+#!/bin/bash
+
+shopt -s expand_aliases
+source ~/.bash_aliases
+
+psw
+rmp $1
+if [ "$2" == "--sdc" ]; then
+    roslaunch --wait sdc run.launch
+elif [ "$2" == "--simulation" ]; then
+    roslaunch simulation_adv run.launch
+elif [ "$2" == "--scenario_updater" ]; then
+    roslaunch --wait scenario scenario_updater.launch
+elif [ "$2" == "--scenario_search" ]; then
+    roslaunch scenario_search single_parameterized_scenario_search.launch
+elif [ "$2" == "--scenario_search_headless" ]; then
+    roslaunch scenario_search single_parameterized_scenario_search.launch headless:=true
+fi

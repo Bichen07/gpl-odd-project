@@ -1,0 +1,15 @@
+int32 lane_id
+int32 point_id
+int32 nroad_id
+float32 roadWidth
+float32 distToRightLine
+float32 distToLeftLine
+float32 right_road_bound
+float32 left_road_bound
+float32 curvature
+float32 heading
+geometry_msgs/Point point
+int32[] markerIds
+int32[] markerTypes
+int32 parkingLotId
+int32 parkingLotLaneId

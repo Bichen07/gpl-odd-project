@@ -1,0 +1,169 @@
+{
+    "action_01": "action_01_overtaking_before_stationary_vehicle_simulator",
+    "ego_vehicle":
+    {
+        "size":
+        {
+            "x": 5.172,
+            "y": 2.297,
+            "z": 1.777,
+            "x_": 9.4,
+            "y_": 3.3,
+            "z_": 3.7
+        },
+        "compensated_second_": 0.1,
+        "compensated_second": 0.0,
+        "static_longitudinal_compensated_distance_": 0.1,
+        "static_longitudinal_compensated_distance": -0.7
+    },
+    "action_01_overtaking_before_stationary_vehicle_simulator":
+    {
+        "map": "taichung_new",
+        "route": "zhongke_right_turn_dapeng_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 155,
+            "opposite": 169
+        },
+        "stationary_object_model":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "lane_id": 249,
+                    "point_id": 179,
+                    "longitudinal_offset": 0.0,
+                    "lateral_offset": 0.0,
+                    "orientation_offset": 0.0
+                }
+            ]
+        },
+        "adaptive_overtaking_model":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_waypoint_id":
+                    {
+                        "lane": 249,
+                        "point": 19
+                    },
+                    "begin_relative_longitudinal_movement":
+                    {
+                        "trigger_distance": 20.0,
+                        "speed_kph": 15.0
+                    },
+                    "begin_lateral_movement":
+                    {
+                        "distance": -2.5,
+                        "speed_kph": 2.5
+                    },
+                    "surpassing_relative_longitudinal_movement":
+                    {
+                        "trigger_distance": 10.0,
+                        "speed_kph": 15.0
+                    },
+                    "surpassing_lateral_movement":
+                    {
+                        "distance": 2.25,
+                        "speed_kph": 3.0
+                    },
+                    "returning_relative_longitudinal_movement":
+                    {
+                        "trigger_distance": 5.0,
+                        "speed_kph": 3.0
+                    },
+                    "returning_lateral_movement":
+                    {
+                        "distance": -2.25,
+                        "speed_kph": -7.0
+                    },
+                    "leading_speed_kph": 15.0,
+                    "moving_to_roadside_longitudinal_movement":
+                    {
+                        "trigger_distance": 12.0,
+                        "speed_kph": 10.0
+                    },
+                    "moving_to_roadside_lateral_movement":
+                    {
+                        "distance": -3.0,
+                        "speed_kph": -2.5
+                    },
+                    "end_waypoint_id":
+                    {
+                        "lane": 249,
+                        "point": 179
+                    }
+                }
+            ]
+        }
+    }
+}

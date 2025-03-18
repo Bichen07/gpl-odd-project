@@ -1,0 +1,11 @@
+string agentId
+string objectClassId
+string model
+string route
+string fileName
+int8 defaultPoseSequence
+float32 longitudinalNoiseScale
+std_msgs/ColorRGBA color
+bool simWithExternalVehicle
+---
+bool isSuccess

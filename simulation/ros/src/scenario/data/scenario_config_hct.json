@@ -1,0 +1,1496 @@
+{
+  "hct_01": "hct_01_unsignalized_t_junction_crossing_simulator",
+  "hct_02": "hct_02_unsignalized_straight_going_crossing_vehicle_simulator",
+  "hct_03": "hct_03_illegal_parking_simulator",
+  "hct_04": "hct_04_passing_vehicle_simulator",
+  "hct_05": "hct_05_unsignalized_turning_coming_vehicle_simulator",
+  "hct_06": "hct_06_mixed_traffic_flow_simulator",
+  "hct_07": "hct_07_signalized_straight_going_simulator",
+  "hct_08": "hct_08_signalized_right_turning_simulator",
+  "hct_09": "hct_09_signalized_left_turning_simulator",
+  "hct_10": "hct_10_merging_left_lane_simulator",
+  "hct_12": "hct_12_traffic_light_flashing_simulator",
+  "hct_13": "hct_13_approaching_ego_simulator",
+  "hct_14": "hct_14_cut_in_simulator",
+  "hct_15": "hct_15_route_moving_simulator",
+  "hct_16": "hct_16_opposite_turn_right_to_mall_parking_gateway_simulator",
+  "hct_02__": "hct_02_leaving_ramp_merging_simulator",
+  "hct_03__": "hct_03_vehicle_turning_left_at_exit_simulator",
+  "hct_04__": "hct_04_vehicle_turning_right_at_exit_simulator",
+  "hct_05__": "hct_05_crossing_at_t_junction_simulator",
+  "ego_vehicle": {
+    "size": {
+      "x": 5.172,
+      "y": 2.297,
+      "z": 1.777,
+      "x_": 9.4,
+      "y_": 3.3,
+      "z_": 3.7
+    },
+    "compensated_second_": 0.1,
+    "compensated_second": 0,
+    "static_longitudinal_compensated_distance": 0
+  },
+  "hct_16_opposite_turn_right_to_mall_parking_gateway_simulator": {
+    "map": "hct_logistic",
+    "route": "operation",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "openscenario_template": "/project/mmsl_simulation/src/scenario/openscenario/xosc/Hct_OppositeTurnRightToMallParking.xosc",
+    "preventable_condition": {
+      "response_time": 0.3,
+      "braking": 4,
+      "should_start_response_line": {
+        "start": [
+          455.93,
+          -62.14
+        ],
+        "end": [
+          474.12,
+          -49.88
+        ]
+      }
+    },
+    "safety_requirement": {
+      "collision": {
+        "threshold": 0.5,
+        "rule": "lessThan"
+      },
+      "ttc_min": {
+        "threshold": 1.5,
+        "rule": "greaterThan"
+      }
+    },
+    "coverage_requirement": {
+      "initial_sampling_count": 12,
+      "metrics": {
+        "r2": {
+          "min_improvement": 0.005,
+          "rule": "greaterThan",
+          "multioutput": false
+        },
+        "f1_score": {
+          "min_improvement": 0.005,
+          "rule": "greaterThan",
+          "multioutput": true
+        }
+      },
+      "global": {
+        "successive_improvement_chance": 5,
+        "metrics": [
+          "r2"
+        ]
+      },
+      "local": {
+        "successive_improvement_chance": 5,
+        "metrics": [
+          "f1_score"
+        ]
+      }
+    },
+    "route_moving_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "esmini_model": [
+        {
+          "object_class_id": "car",
+          "size_overwrite": {
+            "x": 5.04,
+            "y": 2.0,
+            "z": 1.7
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          }
+        }
+      ],
+      "motion_configs": [
+        {
+          "name": "agent",
+          "type": "intersectionTurn",
+          "parameters": {
+            "roadId0": 1,
+            "s0": 0,
+            "t0": 0,
+            "h0": 0,
+            "v0": 0,
+            "a0": 0,
+            "rho": 0,
+            "b": 0,
+            "roadIdf": 1,
+            "sf": 0,
+            "tf": 0,
+            "hf": 0
+          }
+        }
+      ]
+    }
+  },
+  "hct_15_route_moving_simulator": {
+    "map": "hct_logistic",
+    "route": "operation",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "openscenario_template": "/project/mmsl_simulation/src/scenario/openscenario/xosc/Hct_OppositeTurnRightToMallParking.xosc",
+    "preventable_condition": {
+      "response_time": 0.3,
+      "braking": 4,
+      "should_start_response_line": {
+        "start": [
+          455.93,
+          -62.14
+        ],
+        "end": [
+          474.12,
+          -49.88
+        ]
+      }
+    },
+    "safety_requirement": {
+      "collision": {
+        "threshold": 0.5,
+        "rule": "lessThan"
+      },
+      "ttc_min": {
+        "threshold": 1.5,
+        "rule": "greaterThan"
+      }
+    },
+    "coverage_requirement": {
+      "initial_sampling_count": 12,
+      "metrics": {
+        "r2": {
+          "min_improvement": 0.005,
+          "rule": "greaterThan",
+          "multioutput": false
+        },
+        "f1_score": {
+          "min_improvement": 0.005,
+          "rule": "greaterThan",
+          "multioutput": true
+        }
+      },
+      "global": {
+        "successive_improvement_chance": 5,
+        "metrics": [
+          "r2"
+        ]
+      },
+      "local": {
+        "successive_improvement_chance": 5,
+        "metrics": [
+          "f1_score"
+        ]
+      }
+    },
+    "route_moving_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "object_class_id": "car",
+          "size_overwrite": {
+            "x": 5.04,
+            "y": 2.0,
+            "z": 1.7
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          }
+        }
+      ],
+      "motion_configs": [
+        {
+          "vo0_kph": 25,
+          "dlon": 30,
+          "alpha": 1,
+          "beta": 3,
+          "rho": 1
+        }
+      ]
+    }
+  },
+  "hct_14_cut_in_simulator": {
+    "map": "hct_logistic",
+    "route": "operation",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "openscenario_template": "/project/mmsl_simulation/src/scenario/openscenario/xosc/CutIn_TEMPLATE.xosc",
+    "alks_cut_in_model": {
+      "openscenario_template": "/project/mmsl_simulation/src/scenario/openscenario/xosc/CutIn_TEMPLATE.xosc",
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "object_class_id": "motorbike",
+          "size_overwrite": {
+            "x": 2.5,
+            "y": 0.5,
+            "z": 1.7
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          }
+        }
+      ],
+      "motion_configs": [
+        {
+          "ve0_kph": 40,
+          "vo0_kph": 20,
+          "dx0_m": 5,
+          "dy0_m": 1.5,
+          "vy_mps": 3,
+          "begin_lane_id": 503,
+          "begin_point_id": 1,
+          "end_lane_id": 263,
+          "end_point_id": 5,
+          "delay_seconds": 4
+        }
+      ]
+    }
+  },
+  "hct_13_approaching_ego_simulator": {
+    "map": "hct_logistic",
+    "route": "operation",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "constant_velocity_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size_overwrite": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "longitudinal_offset_ratio": 1,
+          "lateral_offset_ratio": 1,
+          "longitudinal_offset": 5,
+          "lateral_offset": 5,
+          "agent_heading_degrees": 0,
+          "agent_speed_kph": 40,
+          "ego_speed_kph": 30,
+          "begin_lane_id": 6,
+          "begin_point_id": 10,
+          "end_lane_id": 88,
+          "end_point_id": 20
+        }
+      ]
+    }
+  },
+  "hct_01_unsignalized_t_junction_crossing_simulator": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 98,
+            "point": 13
+          },
+          "end_waypoint_id": {
+            "lane": 188,
+            "point": 2
+          },
+          "waypoint_lateral_offset": 0,
+          "init_move_speed_kph": 20.5,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": -7.995,
+                "y": -78.392,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 1
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    }
+  },
+  "hct_02_unsignalized_straight_going_crossing_vehicle_simulator": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "driving_into_lane_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "lane_ids": [
+            277,
+            164,
+            281
+          ],
+          "begin_point_id": 16,
+          "end_point_id": 13,
+          "begin_offset_s": -9,
+          "begin_offset_d": 9,
+          "init_moving_speed_kph": 20.5,
+          "move_trigger_distance": 53,
+          "begin_extended_distance": 43,
+          "begin_extended_radian": 0
+        }
+      ]
+    }
+  },
+  "hct_03_illegal_parking_simulator": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "stationary_object_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "lane_id": 195,
+          "point_id": 13,
+          "longitudinal_offset": -1.5,
+          "lateral_offset": -2.75,
+          "orientation_offset": 0
+        }
+      ]
+    }
+  },
+  "hct_04_passing_vehicle_simulator": {
+    "map": "hct_logistic",
+    "route": "A2-A1",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 96,
+            "point": 1
+          },
+          "end_waypoint_id": {
+            "lane": 98,
+            "point": 10
+          },
+          "waypoint_lateral_offset": 0.2,
+          "init_move_speed_kph": 20,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 37.63,
+                "y": -31.314,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 1
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    }
+  },
+  "hct_05_unsignalized_turning_coming_vehicle_simulator": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 173,
+            "point": 5
+          },
+          "end_waypoint_id": {
+            "lane": 263,
+            "point": 1
+          },
+          "waypoint_lateral_offset": 0,
+          "init_move_speed_kph": 19,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 579.805,
+                "y": 37.617,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 5
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    }
+  },
+  "hct_06_mixed_traffic_flow_simulator": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 1.5,
+            "y": 0.7,
+            "z": 1.6
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "motorbike"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 9,
+            "point": 5
+          },
+          "end_waypoint_id": {
+            "lane": 70,
+            "point": 10
+          },
+          "waypoint_lateral_offset": -1.8,
+          "init_move_speed_kph": 39,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 13.269,
+                "y": -134.357,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 1
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    }
+  },
+  "hct_07_signalized_straight_going_simulator": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 90,
+            "point": 1
+          },
+          "end_waypoint_id": {
+            "lane": 11,
+            "point": 2
+          },
+          "waypoint_lateral_offset": 0,
+          "init_move_speed_kph": 25,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 184.058,
+                "y": -17.127,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 1
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    },
+    "signalized_intersection_model": {
+      "motion_configs": [
+        {
+          "lateral_lane_traffic_light_ids": [
+            17,
+            18,
+            19,
+            5,
+            6,
+            7,
+            8
+          ]
+        }
+      ]
+    }
+  },
+  "hct_08_signalized_right_turning_simulator": {
+    "map": "hct_logistic",
+    "route": "A2-A1",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 415,
+            "point": 1
+          },
+          "via_lane_ids": [
+            173
+          ],
+          "end_waypoint_id": {
+            "lane": 280,
+            "point": 1
+          },
+          "waypoint_lateral_offset": 0,
+          "init_move_speed_kph": 41,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 630.592,
+                "y": 114.195,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 5
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    },
+    "lane_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "lane_ids": [
+            370,
+            382,
+            171,
+            507,
+            173,
+            284,
+            165,
+            505,
+            503,
+            280
+          ],
+          "begin_point_id": 1,
+          "end_point_id": 18,
+          "init_moving_speed_kph": 49,
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "move_trigger_distance": 30,
+          "lateral_move_trigger_distance": 0,
+          "begin_extended_distance": 45,
+          "begin_extended_radian": 0,
+          "end_extended_distance": 0,
+          "end_extended_radian": 0
+        }
+      ]
+    },
+    "signalized_intersection_model": {
+      "motion_configs": [
+        {
+          "lateral_lane_traffic_light_ids": [
+            29,
+            30,
+            31,
+            32
+          ]
+        }
+      ]
+    }
+  },
+  "hct_09_signalized_left_turning_simulator": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        },
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 445,
+            "point": 5
+          },
+          "end_waypoint_id": {
+            "lane": 82,
+            "point": 10
+          },
+          "waypoint_lateral_offset": 0,
+          "init_move_speed_kph": 30,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 286.178,
+                "y": -6.348,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 5
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        },
+        {
+          "begin_waypoint_id": {
+            "lane": 443,
+            "point": 20
+          },
+          "end_waypoint_id": {
+            "lane": 93,
+            "point": 1
+          },
+          "waypoint_lateral_offset": 0,
+          "init_move_speed_kph": 30,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 286.178,
+                "y": -6.348,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 5
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    },
+    "signalized_intersection_model": {
+      "motion_configs": [
+        {
+          "lateral_lane_traffic_light_ids": [
+            9,
+            10,
+            11,
+            12
+          ]
+        }
+      ]
+    }
+  },
+  "hct_10_merging_left_lane_simulator": {
+    "map": "hct_logistic",
+    "route": "A2-A1",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "lane_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "lane_ids": [
+            392,
+            394,
+            178
+          ],
+          "begin_point_id": 1,
+          "end_point_id": 48,
+          "init_moving_speed_kph": 25,
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "move_trigger_distance": 30,
+          "lateral_move_trigger_distance": 0,
+          "begin_extended_distance__": 38,
+          "begin_extended_distance": 45,
+          "begin_extended_radian": 0,
+          "end_extended_distance": 30,
+          "end_extended_radian": 0
+        }
+      ]
+    }
+  },
+  "hct_12_traffic_light_flashing_simulator": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 1,
+            "g": 0.5,
+            "b": 0,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 119,
+            "point": 90
+          },
+          "end_waypoint_id": {
+            "lane": 256,
+            "point": 20
+          },
+          "waypoint_lateral_offset": 0,
+          "init_move_speed_kph": 32,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 438.368,
+                "y": -68.329,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 5
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    },
+    "signalized_intersection_model": {}
+  },
+  "hct_02_leaving_ramp_merging_simulator__": {
+    "map": "hct_logistic",
+    "route": "A2-A1",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "lane_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 1,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "lane_ids": [
+            392,
+            394,
+            178
+          ],
+          "begin_point_id": 1,
+          "end_point_id": 48,
+          "init_moving_speed_kph": 20,
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "move_trigger_distance": 30,
+          "lateral_move_trigger_distance": 0,
+          "begin_extended_distance": 73,
+          "begin_extended_radian": 0,
+          "end_extended_distance": 30,
+          "end_extended_radian": 0
+        }
+      ]
+    }
+  },
+  "hct_03_vehicle_turning_left_at_exit_simulator__": {
+    "map": "hct_logistic",
+    "route": "A1-A2",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "driving_into_lane_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 1,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "lane_ids": [
+            277,
+            164,
+            281
+          ],
+          "begin_point_id": 16,
+          "end_point_id": 13,
+          "begin_offset_s": -9,
+          "begin_offset_d": 9,
+          "init_moving_speed_kph": 20,
+          "move_trigger_distance": 53,
+          "begin_extended_distance": 43,
+          "begin_extended_radian": 0
+        }
+      ]
+    }
+  },
+  "hct_04_vehicle_turning_right_at_exit_simulator__": {
+    "map": "hct_logistic",
+    "route": "A1-A2",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "driving_into_lane_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 1,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "lane_ids": [
+            280,
+            124,
+            263
+          ],
+          "begin_point_id": 25,
+          "end_point_id": 13,
+          "begin_offset_s": -9,
+          "begin_offset_d": -9,
+          "init_moving_speed_kph": 20,
+          "move_trigger_distance": 53,
+          "begin_extended_distance": 40,
+          "begin_extended_radian": 0
+        }
+      ]
+    }
+  },
+  "hct_05_crossing_at_t_junction_simulator__": {
+    "map": "hct_logistic",
+    "route": "Whole",
+    "time_step": 0.1,
+    "visualization_time_step": 0.01,
+    "dijkstra_waypoint_following_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 1,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        }
+      ],
+      "motion_configs": [
+        {
+          "begin_waypoint_id": {
+            "lane": 1,
+            "point": 17
+          },
+          "end_waypoint_id": {
+            "lane": 8,
+            "point": 9
+          },
+          "waypoint_lateral_offset": 0,
+          "init_move_speed_kph": 20,
+          "move_trigger_condition": {
+            "trigger_ref_position": {
+              "type_id": "position_based",
+              "ref_position": {
+                "x": 91.29,
+                "y": -73.446,
+                "z": 0
+              }
+            },
+            "spatial_relation_id": "ahead_of_ego_vehicle",
+            "distance": 5
+          },
+          "lateral_speed_kph": 0,
+          "lateral_move_distance": 0,
+          "lateral_move_trigger_distance": 0
+        }
+      ]
+    },
+    "stationary_object_model": {
+      "time_step": 0.1,
+      "visualization_time_step": 0.01,
+      "moving_agent_configs": [
+        {
+          "size": {
+            "x": 4.2,
+            "y": 1.8,
+            "z": 1.45
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 1,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "car"
+        },
+        {
+          "size": {
+            "x": 1.5,
+            "y": 0.7,
+            "z": 1.6
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 1,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "motorbike"
+        },
+        {
+          "size": {
+            "x": 1.5,
+            "y": 0.7,
+            "z": 1.6
+          },
+          "front_warning_region_size": {
+            "x": 0,
+            "y": 0
+          },
+          "color": {
+            "r": 0,
+            "g": 0,
+            "b": 1,
+            "a": 1
+          },
+          "safety_margin": {
+            "left": 0,
+            "right": 0,
+            "front": 0,
+            "rear": 0
+          },
+          "object_class_id": "motorbike"
+        }
+      ],
+      "motion_configs": [
+        {
+          "lane_id": 96,
+          "point_id": 6,
+          "longitudinal_offset": 0,
+          "lateral_offset": -1.5,
+          "orientation_offset": 0
+        },
+        {
+          "lane_id": 97,
+          "point_id": 42,
+          "longitudinal_offset": 1,
+          "lateral_offset": -2.5,
+          "orientation_offset": 1.5707
+        },
+        {
+          "lane_id": 97,
+          "point_id": 42,
+          "longitudinal_offset": -1,
+          "lateral_offset": -2.5,
+          "orientation_offset": 1.5707
+        }
+      ]
+    }
+  }
+}

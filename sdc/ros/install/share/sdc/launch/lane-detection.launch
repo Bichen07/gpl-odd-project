@@ -1,0 +1,15 @@
+<launch>
+
+    <arg name="remote" default="false"/>
+
+    <include file="$(env SDC_CONFIG_DIR)/machines/black-widow/machine.launch"
+        if="$(arg remote)">
+        <arg name="set_as_default" value="true"/>
+    </include>
+
+    <include file="$(find erfnet_tensorrt)/launch/highwaylanedetection.launch"/>
+
+    <include file="$(env SDC_CONFIG_DIR)/machines/machine-localhost-default.launch"
+        if="$(arg remote)"/>
+
+</launch>

@@ -1,0 +1,5 @@
+path_msgs/WaypointId begin_waypoint_id
+path_msgs/LanePair[] lane_pairs
+path_msgs/WaypointId end_waypoint_id
+---
+path_msgs/LanePairPlannedOutput[] planned_outputs

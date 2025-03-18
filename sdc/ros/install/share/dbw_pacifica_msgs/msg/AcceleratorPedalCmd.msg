@@ -1,0 +1,25 @@
+# Accelerator pedal (%)
+float32 pedal_cmd
+
+float32 torque_cmd # %-torque
+
+float32 speed_cmd # m/s
+
+# Enable
+bool enable
+
+# Ignore driver overrides
+bool ignore
+
+# Watchdog counter (optional)
+uint8 rolling_counter
+
+float32 road_slope # degrees - used with speed mode
+
+ActuatorControlMode control_type
+
+float32 accel_cmd_checksum
+
+float32 accel_limit
+
+float32 pos_jerk_limit

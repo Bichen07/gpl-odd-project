@@ -1,0 +1,12 @@
+int32 id
+string name
+bool croad1_positive
+bool croad2_positive
+int32 nav_croad_id
+int32 pointId1
+int32 nav_croad_id2
+int32 pointId2
+ParkingSpaceArray space_list
+LaneArray lot_lines
+ParkingLane[] lanes
+ParkingSpace[] spaces

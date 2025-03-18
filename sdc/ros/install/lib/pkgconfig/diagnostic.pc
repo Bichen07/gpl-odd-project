@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: diagnostic
+Description: Description of diagnostic
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib -ldiagnostic
+Requires: roscpp topic_tools

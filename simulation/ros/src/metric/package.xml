@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>metric</name>
+  <version>0.0.1</version>
+  <description>The metric package</description>
+  <maintainer email="chenhuihu@itri.org.tw">user</maintainer>
+  <license>ITRI</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>geometry_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>std_msgs</depend>
+  <depend>simulation_utils</depend>
+  <export>
+  </export>
+</package>

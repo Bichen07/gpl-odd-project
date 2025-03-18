@@ -1,0 +1,1551 @@
+{
+   "intersections" : [
+      {
+         "center_point" : {
+            "x" : 135.7152099609375,
+            "y" : -53.018630981445312,
+            "z" : 1.3512530326843262
+         },
+         "conns" : [
+            {
+               "laneId" : 1,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 34,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 38,
+               "pointId" : -1
+            }
+         ],
+         "id" : 1,
+         "lanes" : [ 217, 216, 218, 219, 221, 220 ],
+         "stoplines" : [ 1, 50, 7 ],
+         "trafficlights" : [ 13, 14, 15, 16, 17, 18, 19 ],
+         "zebracross" : [ 164, 165 ]
+      },
+      {
+         "center_point" : {
+            "x" : 96.6617431640625,
+            "y" : -79.160118103027344,
+            "z" : 1.2892636060714722
+         },
+         "conns" : [
+            {
+               "laneId" : 1,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 2,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 41,
+               "pointId" : -1
+            }
+         ],
+         "id" : 2,
+         "lanes" : [ 3, 4, 205, 206, 207, 204 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 48.141075134277344,
+            "y" : -112.84258270263672,
+            "z" : 1.3550423383712769
+         },
+         "conns" : [
+            {
+               "laneId" : 2,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 3,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 5,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 25,
+               "pointId" : -1
+            }
+         ],
+         "id" : 3,
+         "lanes" : [ 8, 7, 209, 197, 201, 198, 208, 202 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : -15.905317306518555,
+            "y" : -157.4381103515625,
+            "z" : 1.6292834281921387
+         },
+         "conns" : [
+            {
+               "laneId" : 3,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 4,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 68,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 69,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 117,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 118,
+               "pointId" : 1
+            }
+         ],
+         "id" : 4,
+         "lanes" : [ 195, 196, 350, 438, 436, 351 ,
+            527,
+            528,
+            535,
+            547,
+            548,
+            549,
+            524,
+            526,
+            534,
+            525,
+            546,                    
+            540,
+            543,
+            544,
+            529,
+            530,
+            531,
+            532,
+            533,                       
+            536,
+            537,
+            538,
+            539,
+            541,
+            542,
+            524,
+            526,
+            534,
+            525,
+            546,
+            540,
+            543,
+            544,
+            549
+],            
+         "stoplines" : [ 3, 4, 60 ],
+         "trafficlights" : [ 20, 21, 22, 23, 24 ],
+         "zebracross" : [ 157, 158, 159, 160, 161, 162 ]
+      },
+      {
+         "center_point" : {
+            "x" : -16.203069686889648,
+            "y" : -106.78376007080078,
+            "z" : 1.5897660255432129
+         },
+         "conns" : [
+            {
+               "laneId" : 4,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 24,
+               "pointId" : -1
+            }
+         ],
+         "id" : 5,
+         "lanes" : [ 13, 14 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 74.353713989257812,
+            "y" : -149.00630187988281,
+            "z" : 2.3163187503814697
+         },
+         "conns" : [
+            {
+               "laneId" : 5,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 6,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 7,
+               "pointId" : 1
+            }
+         ],
+         "id" : 6,
+         "lanes" : [ 210, 215, 213, 212, 211, 214 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 58.844593048095703,
+            "y" : -185.11549377441406,
+            "z" : 2.3317766189575195
+         },
+         "conns" : [
+            {
+               "laneId" : 6,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 67,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 69,
+               "pointId" : 1
+            }
+         ],
+         "id" : 7,
+         "lanes" : [ 348, 349, 344, 345 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 177.05549621582031,
+            "y" : -132.6802978515625,
+            "z" : 2.3900566101074219
+         },
+         "conns" : [
+            {
+               "laneId" : 7,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 18,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 8,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 9,
+               "pointId" : -1
+            }
+         ],
+         "id" : 8,
+         "lanes" : [ 314, 315, 318, 320, 319, 321, 317, 316, 313, 312 ],
+         "stoplines" : [ 34, 35, 36 ],
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 172.53999328613281,
+            "y" : -105.83603668212891,
+            "z" : 2.1682746410369873
+         },
+         "conns" : [
+            {
+               "laneId" : 8,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 19,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 38,
+               "pointId" : 1
+            }
+         ],
+         "id" : 9,
+         "lanes" : [ 298, 299, 301, 300 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 182.518310546875,
+            "y" : -165.02890014648438,
+            "z" : 2.8929510116577148
+         },
+         "conns" : [
+            {
+               "laneId" : 9,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 10,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 20,
+               "pointId" : 1
+            }
+         ],
+         "id" : 10,
+         "lanes" : [ 311, 306, 310, 308, 307, 309 ],
+         "stoplines" : [ 32, 33 ],
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 161.19879150390625,
+            "y" : -221.00578308105469,
+            "z" : 3.3535261154174805
+         },
+         "conns" : [
+            {
+               "laneId" : 10,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 67,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 43,
+               "pointId" : -1
+            }
+         ],
+         "id" : 11,
+         "lanes" : [ 341, 342, 337, 338 ],
+         "stoplines" : [ 39 ],
+         "trafficlights" : null,
+         "zebracross" : [ 186 ]
+      },
+      {
+         "center_point" : {
+            "x" : 329.880615234375,
+            "y" : -216.29505920410156,
+            "z" : 4.5405197143554688
+         },
+         "conns" : [
+            {
+               "laneId" : 11,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 21,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 12,
+               "pointId" : 1
+            }
+         ],
+         "id" : 12,
+         "lanes" : [ 58, 292, 293, 294, 295, 331 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 308.47421264648438,
+            "y" : -280.06121826171875,
+            "z" : 5.0302658081054688
+         },
+         "conns" : [
+            {
+               "laneId" : 11,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 43,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 48,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 46,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 47,
+               "pointId" : -1
+            }
+         ],
+         "id" : 13,
+         "lanes" : [ 354, 359, 360, 357, 358, 405, 406, 402, 404, 355, 356, 352, 353 ],
+         "stoplines" : [ 28, 54 ],
+         "trafficlights" : null,
+         "zebracross" : [ 176, 177, 178, 188 ]
+      },
+      {
+         "center_point" : {
+            "x" : 352.0413818359375,
+            "y" : -153.80824279785156,
+            "z" : 4.0975155830383301
+         },
+         "conns" : [
+            {
+               "laneId" : 12,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 13,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 14,
+               "pointId" : 1
+            }
+         ],
+         "id" : 14,
+         "lanes" : [ 288, 289, 290, 291, 297, 296 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 374.20654296875,
+            "y" : -119.9029541015625,
+            "z" : 3.8782434463500977
+         },
+         "conns" : [
+            {
+               "laneId" : 13,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 17,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 50,
+               "pointId" : 1
+            }
+         ],
+         "id" : 15,
+         "lanes" : [ 264, 266, 272, 265, 269, 437, 263, 270, 271 ],
+         "stoplines" : [ 11, 13, 14, 16 ],
+         "trafficlights" : [ 1, 2, 33, 34, 35, 3, 4 ],
+         "zebracross" : [ 167, 168, 169, 170 ]
+      },
+      {
+         "center_point" : {
+            "x" : 255.67793273925781,
+            "y" : -119.05584716796875,
+            "z" : 3.0478725433349609
+         },
+         "conns" : [
+            {
+               "laneId" : 14,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 18,
+               "pointId" : -1
+            }
+         ],
+         "id" : 16,
+         "lanes" : [ 324, 322, 327, 325 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 289.100341796875,
+            "y" : -95.325019836425781,
+            "z" : 3.22625732421875
+         },
+         "conns" : [
+            {
+               "laneId" : 15,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 16,
+               "pointId" : -1
+            }
+         ],
+         "id" : 18,
+         "lanes" : [ 328, 329 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 326.45751953125,
+            "y" : -69.154617309570312,
+            "z" : 3.1956424713134766
+         },
+         "conns" : [
+            {
+               "laneId" : 16,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 17,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 39,
+               "pointId" : -1
+            }
+         ],
+         "id" : 19,
+         "lanes" : [ 273, 275, 276, 274, 257, 258 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 229.0826416015625,
+            "y" : -66.930343627929688,
+            "z" : 2.3957390785217285
+         },
+         "conns" : [
+            {
+               "laneId" : 19,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 22,
+               "pointId" : -1
+            }
+         ],
+         "id" : 20,
+         "lanes" : [ 304, 305 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 295.0533447265625,
+            "y" : -204.65971374511719,
+            "z" : 4.3123798370361328
+         },
+         "conns" : [
+            {
+               "laneId" : 20,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 21,
+               "pointId" : 1
+            }
+         ],
+         "id" : 21,
+         "lanes" : [ 54, 53 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 258.510009765625,
+            "y" : -47.193794250488281,
+            "z" : 2.451650857925415
+         },
+         "conns" : [
+            {
+               "laneId" : 22,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 23,
+               "pointId" : 1
+            }
+         ],
+         "id" : 22,
+         "lanes" : [ 302, 303 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 294.23193359375,
+            "y" : -22.550374984741211,
+            "z" : 2.5790445804595947
+         },
+         "conns" : [
+            {
+               "laneId" : 23,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 40,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 29,
+               "pointId" : -1
+            }
+         ],
+         "id" : 23,
+         "lanes" : [ 251, 253, 254, 252, 250, 249 ],
+         "stoplines" : [ 10 ],
+         "trafficlights" : null,
+         "zebracross" : [ 166 ]
+      },
+      {
+         "center_point" : {
+            "x" : -11.0345458984375,
+            "y" : -84.245864868164062,
+            "z" : 1.5596885681152344
+         },
+         "conns" : [
+            {
+               "laneId" : 24,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 27,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 28,
+               "pointId" : -1
+            }
+         ],
+         "id" : 24,
+         "lanes" : [ 187, 189, 188, 203 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 23.649631500244141,
+            "y" : -91.217544555664062,
+            "z" : 1.3962485790252686
+         },
+         "conns" : [
+            {
+               "laneId" : 25,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 27,
+               "pointId" : -1
+            }
+         ],
+         "id" : 25,
+         "lanes" : [ 199, 67 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 1.86855149269104,
+            "y" : -23.381168365478516,
+            "z" : 1.4501804113388062
+         },
+         "conns" : [
+            {
+               "laneId" : 28,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 42,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 91,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 104,
+               "pointId" : 1
+            }
+         ],
+         "id" : 26,
+         "lanes" : [ 194, 190, 469, 500, 501, 463, 468, 502 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 257.9598388671875,
+            "y" : 30.402990341186523,
+            "z" : 1.9361526966094971
+         },
+         "conns" : [
+            {
+               "laneId" : 29,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 37,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 31,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 30,
+               "pointId" : -1
+            }
+         ],
+         "id" : 27,
+         "lanes" : [ 237, 227, 228, 232, 235, 234, 230, 231, 236, 226, 229, 233 ],
+         "stoplines" : [ 43, 45, 47, 49 ],
+         "trafficlights" : [ 10, 11, 12, 5, 6, 7, 8, 9 ],
+         "zebracross" : [ 146, 147, 148, 149 ]
+      },
+      {
+         "center_point" : {
+            "x" : 224.35881042480469,
+            "y" : 77.995086669921875,
+            "z" : 2.1369526386260986
+         },
+         "conns" : [
+            {
+               "laneId" : 30,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 103,
+               "pointId" : -1
+            }
+         ],
+         "id" : 28,
+         "lanes" : [ 448, 447 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 361.49697875976562,
+            "y" : 102.91799163818359,
+            "z" : 2.0228369235992432
+         },
+         "conns" : [
+            {
+               "laneId" : 31,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 32,
+               "pointId" : 1
+            }
+         ],
+         "id" : 29,
+         "lanes" : [ 77, 240 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 398.74627685546875,
+            "y" : 128.62348937988281,
+            "z" : 2.1234979629516602
+         },
+         "conns" : [
+            {
+               "laneId" : 32,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 33,
+               "pointId" : 1
+            }
+         ],
+         "id" : 30,
+         "lanes" : [ 243, 242 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 515.1214599609375,
+            "y" : 208.74960327148438,
+            "z" : 2.5378715991973877
+         },
+         "conns" : [
+            {
+               "laneId" : 33,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 59,
+               "pointId" : -1
+            }
+         ],
+         "id" : 31,
+         "lanes" : [ 245, 244 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 165.1082763671875,
+            "y" : -32.441802978515625,
+            "z" : 1.3755319118499756
+         },
+         "conns" : [
+            {
+               "laneId" : 34,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 35,
+               "pointId" : 1
+            }
+         ],
+         "id" : 32,
+         "lanes" : [ 222, 223 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 190.54733276367188,
+            "y" : -14.995199203491211,
+            "z" : 1.5619925260543823
+         },
+         "conns" : [
+            {
+               "laneId" : 35,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 36,
+               "pointId" : -1
+            }
+         ],
+         "id" : 33,
+         "lanes" : [ 225, 224 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 220.70335388183594,
+            "y" : 5.7213644981384277,
+            "z" : 1.7531849145889282
+         },
+         "conns" : [
+            {
+               "laneId" : 36,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 37,
+               "pointId" : -1
+            }
+         ],
+         "id" : 34,
+         "lanes" : [ 238, 239 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 313.61907958984375,
+            "y" : -50.520931243896484,
+            "z" : 2.9250679016113281
+         },
+         "conns" : [
+            {
+               "laneId" : 39,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 40,
+               "pointId" : -1
+            }
+         ],
+         "id" : 35,
+         "lanes" : [ 256, 255 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 60.444835662841797,
+            "y" : -35.541984558105469,
+            "z" : 1.401384711265564
+         },
+         "conns" : [
+            {
+               "laneId" : 41,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 42,
+               "pointId" : -1
+            }
+         ],
+         "id" : 36,
+         "lanes" : [ 192, 193 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 157.97569274902344,
+            "y" : -233.4532470703125,
+            "z" : 3.0845026969909668
+         },
+         "conns" : [
+            {
+               "laneId" : 47,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 68,
+               "pointId" : -1
+            }
+         ],
+         "id" : 40,
+         "lanes" : [ 339, 340 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 577.140869140625,
+            "y" : -193.40235900878906,
+            "z" : 7.0600390434265137
+         },
+         "conns" : [
+            {
+               "laneId" : 49,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 62,
+               "pointId" : -1
+            }
+         ],
+         "id" : 42,
+         "lanes" : [ 260, 259 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 463.51089477539062,
+            "y" : -57.182903289794922,
+            "z" : 4.1434502601623535
+         },
+         "conns" : [
+            {
+               "laneId" : 50,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 55,
+               "pointId" : 1
+            }
+         ],
+         "id" : 44,
+         "lanes" : [ 277, 278, 279, 280 ],
+         "stoplines" : [ 57, 58 ],
+         "trafficlights" : null,
+         "zebracross" : [ 171 ]
+      },
+      {
+         "center_point" : {
+            "x" : 544.2825927734375,
+            "y" : -363.9840087890625,
+            "z" : 8.351719856262207
+         },
+         "conns" : [
+            {
+               "laneId" : 51,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 81,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 51,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 54,
+               "pointId" : 1
+            }
+         ],
+         "id" : 45,
+         "lanes" : [ 129, 130, 131, 132, 135, 133, 136, 134, 138, 361, 362, 139, 140, 141 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 428.3712158203125,
+            "y" : -319.15762329101562,
+            "z" : 6.5992498397827148
+         },
+         "conns" : [
+            {
+               "laneId" : 52,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 52,
+               "pointId" : 1
+            }
+         ],
+         "id" : 46,
+         "lanes" : [ 152, 363, 149, 400, 401 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 549.2037353515625,
+            "y" : 1.788901686668396,
+            "z" : 4.3398289680480957
+         },
+         "conns" : [
+            {
+               "laneId" : 55,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 85,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 83,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 116,
+               "pointId" : 1
+            }
+         ],
+         "id" : 50,
+         "lanes" : [ 479, 481, 505, 509, 164, 165, 506, 472 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 628.21636962890625,
+            "y" : 57.304222106933594,
+            "z" : 4.4602861404418945
+         },
+         "conns" : [
+            {
+               "laneId" : 57,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 115,
+               "pointId" : 1
+            }
+         ],
+         "id" : 51,
+         "lanes" : [ 170, 167, 508, 507, 470 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 582.9693603515625,
+            "y" : 25.049840927124023,
+            "z" : 4.4182987213134766
+         },
+         "conns" : [
+            {
+               "laneId" : 57,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 116,
+               "pointId" : -1
+            }
+         ],
+         "id" : 52,
+         "lanes" : [ 283, 284, 281, 282 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 622.13775634765625,
+            "y" : 139.60954284667969,
+            "z" : 3.5409467220306396
+         },
+         "conns" : [
+            {
+               "laneId" : 58,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 72,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 71,
+               "pointId" : 1
+            }
+         ],
+         "id" : 53,
+         "lanes" : [ 386, 389, 387, 395, 394 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 662.419921875,
+            "y" : 76.111648559570312,
+            "z" : 4.4812345504760742
+         },
+         "conns" : [
+            {
+               "laneId" : 58,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 115,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 70,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 65,
+               "pointId" : -1
+            }
+         ],
+         "id" : 54,
+         "lanes" : [ 373, 365, 368, 376, 379, 381, 378, 380, 435, 382, 364, 372, 377 ],
+         "stoplines" : [ 22, 23, 25, 64 ],
+         "trafficlights" : [ 25, 26, 27, 28, 29, 30, 31, 32 ],
+         "zebracross" : [ 172, 173, 174, 175 ]
+      },
+      {
+         "center_point" : {
+            "x" : 543.04608154296875,
+            "y" : 228.44712829589844,
+            "z" : 2.910452127456665
+         },
+         "conns" : [
+            {
+               "laneId" : 59,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 60,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 61,
+               "pointId" : -1
+            }
+         ],
+         "id" : 55,
+         "lanes" : [ 246, 247, 248 ],
+         "stoplines" : [ 42 ],
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 524.828369140625,
+            "y" : 255.55491638183594,
+            "z" : 2.7106842994689941
+         },
+         "conns" : [
+            {
+               "laneId" : 61,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 75,
+               "pointId" : -1
+            }
+         ],
+         "id" : 57,
+         "lanes" : [ 398 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 628.0379638671875,
+            "y" : -212.23677062988281,
+            "z" : 7.7959833145141602
+         },
+         "conns" : [
+            {
+               "laneId" : 62,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 63,
+               "pointId" : -1
+            }
+         ],
+         "id" : 58,
+         "lanes" : [ 262, 261 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 692.6058349609375,
+            "y" : -235.77613830566406,
+            "z" : 9.03045654296875
+         },
+         "conns" : [
+            {
+               "laneId" : 63,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 78,
+               "pointId" : -1
+            }
+         ],
+         "id" : 59,
+         "lanes" : [ 434, 433 ],
+         "stoplines" : [ 68, 70 ],
+         "trafficlights" : null,
+         "zebracross" : [ 183, 184, 189 ]
+      },
+      {
+         "center_point" : {
+            "x" : 673.21929931640625,
+            "y" : 11.036899566650391,
+            "z" : 5.3563275337219238
+         },
+         "conns" : [
+            {
+               "laneId" : 65,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 76,
+               "pointId" : -1
+            }
+         ],
+         "id" : 60,
+         "lanes" : [ 407, 408, 409, 367 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 543.9425048828125,
+            "y" : 269.64181518554688,
+            "z" : 2.6362013816833496
+         },
+         "conns" : [
+            {
+               "laneId" : 73,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 75,
+               "pointId" : 1
+            }
+         ],
+         "id" : 66,
+         "lanes" : [ 399 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 676.79638671875,
+            "y" : -28.133831024169922,
+            "z" : 5.9516620635986328
+         },
+         "conns" : [
+            {
+               "laneId" : 76,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 77,
+               "pointId" : -1
+            }
+         ],
+         "id" : 68,
+         "lanes" : [ 421, 422, 414, 418 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 685.218994140625,
+            "y" : -130.26730346679688,
+            "z" : 7.1538734436035156
+         },
+         "conns" : [
+            {
+               "laneId" : 77,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 78,
+               "pointId" : 1
+            }
+         ],
+         "id" : 69,
+         "lanes" : [ 431, 432, 429, 430 ],
+         "stoplines" : [ 66, 73 ],
+         "trafficlights" : null,
+         "zebracross" : [ 185 ]
+      },
+      {
+         "center_point" : {
+            "x" : 534.897216796875,
+            "y" : 43.080226898193359,
+            "z" : 5.0269145965576172
+         },
+         "conns" : [
+            {
+               "laneId" : 84,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 85,
+               "pointId" : 1
+            }
+         ],
+         "id" : 76,
+         "lanes" : [ 485, 486 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 539.358154296875,
+            "y" : 67.454757690429688,
+            "z" : 4.7156982421875
+         },
+         "conns" : [
+            {
+               "laneId" : 84,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 86,
+               "pointId" : 1
+            }
+         ],
+         "id" : 77,
+         "lanes" : [ 484, 483 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : -34.245590209960938,
+            "y" : -12.31341552734375,
+            "z" : 1.4665780067443848
+         },
+         "conns" : [
+            {
+               "laneId" : 91,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 93,
+               "pointId" : -1
+            }
+         ],
+         "id" : 79,
+         "lanes" : [ 457, 458 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : -12.861606597900391,
+            "y" : 82.126144409179688,
+            "z" : 1.2151443958282471
+         },
+         "conns" : [
+            {
+               "laneId" : 93,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 95,
+               "pointId" : -1
+            }
+         ],
+         "id" : 80,
+         "lanes" : [ 449, 462 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 165.31173706054688,
+            "y" : 156.76190185546875,
+            "z" : 1.328596830368042
+         },
+         "conns" : [
+            {
+               "laneId" : 97,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 99,
+               "pointId" : 1
+            }
+         ],
+         "id" : 83,
+         "lanes" : [ 451, 453 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 176.97618103027344,
+            "y" : 144.27784729003906,
+            "z" : 1.6899483203887939
+         },
+         "conns" : [
+            {
+               "laneId" : 99,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 101,
+               "pointId" : 1
+            }
+         ],
+         "id" : 84,
+         "lanes" : [ 439, 440 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 193.02197265625,
+            "y" : 122.44106292724609,
+            "z" : 1.9255071878433228
+         },
+         "conns" : [
+            {
+               "laneId" : 101,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 101,
+               "pointId" : 1
+            },
+            {
+               "laneId" : 103,
+               "pointId" : 1
+            }
+         ],
+         "id" : 85,
+         "lanes" : [ 441, 442, 443, 444 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 2.9614007472991943,
+            "y" : 69.227630615234375,
+            "z" : 1.5922150611877441
+         },
+         "conns" : [
+            {
+               "laneId" : 104,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 108,
+               "pointId" : 1
+            }
+         ],
+         "id" : 86,
+         "lanes" : [ 495, 494 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      },
+      {
+         "center_point" : {
+            "x" : 43.694084167480469,
+            "y" : 64.58740234375,
+            "z" : 1.6977850198745728
+         },
+         "conns" : [
+            {
+               "laneId" : 108,
+               "pointId" : -1
+            },
+            {
+               "laneId" : 114,
+               "pointId" : -1
+            }
+         ],
+         "id" : 87,
+         "lanes" : [ 499, 498 ],
+         "stoplines" : null,
+         "trafficlights" : null,
+         "zebracross" : null
+      }
+   ]
+}

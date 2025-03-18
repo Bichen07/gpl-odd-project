@@ -1,0 +1,47 @@
+<launch>
+
+    <!-- Whether to run sdc/run.launch or not,
+    somehow it makes pub rate of /speed_cmd drop.
+    Not recommended to use this option. -->
+    <arg name="run" default="false"/>
+    <arg name="visualize" default="false" />
+    <arg name="run_mr_vil" default="false"/>
+
+    <!-- Position sequence defined in simulation_utils/data/vehicle_parameters.json -->
+    <arg name="seq" default="0"/>
+
+    <arg name="sim_with_external" default="true" />
+
+    <!-- If set to true, ego will stop after reaching destination globalpath. -->
+    <arg name="run_once" default="true"/>
+
+    <!-- This will load vehicle model name, route and fileName. -->
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+
+    <!-- If true, ego wrapper will shutdown after spawning the ego vehicle. -->
+    <arg name="disable_monitor" default="false" />
+
+    <node
+        pkg="simulation_adv"
+        type="ego_wrapper.py"
+        name="ego_wrapper"
+        output="screen"
+        respawn="false">
+        <param name="spawn_information/defaultPoseSequence" value="$(arg seq)" />
+        <param name="spawn_information/simWithExternalVehicle" value="$(arg sim_with_external)" />
+        <param name="run_once" value="$(arg run_once)" />
+        <param name="disable_monitor" value="$(arg disable_monitor)" />
+        <param name="run_mr_vil" value="$(arg run_mr_vil)"/>
+    </node>
+
+    <include file="$(find rviz_config)/launch/visualization.launch" if="$(arg visualize)">
+        <!-- <arg name="rviz_file" value="one_ego.rviz" />   -->
+    </include>
+
+    <include file="$(find sdc)/launch/run.launch" if="$(arg run)">
+        <arg name="simulation" value="true"/>
+    </include>
+
+    <!-- <include file="$(find scenario_visualization)/launch/scenario_visualization.launch"/> -->
+
+</launch>

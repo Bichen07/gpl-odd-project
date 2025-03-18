@@ -1,0 +1,85 @@
+<launch>
+
+    <rosparam command="load" file="$(find rss)/data/parameters.yaml"/>
+    <rosparam command="load" file="$(find scenario)/data/sil_testing_parameters.yaml"/>
+    <arg name="use_gdb" value="false"/>
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+
+    <arg name="real" default="false" />  <!-- Set to True if running on real car -->
+    <arg name="running_vil" default="false"/>  <!-- Set to True for either real car or run bag -->
+    <arg name="bring_up_simulation" default="false"/>  <!-- Set to True if running scenario simulation without vil -->
+    <arg name="use_simulation_adv" default="false"/>
+    
+    <param name="use_sim_time" value="false" if="$(arg real)"/>
+    <group unless="$(arg real)">
+        <group if="$(arg use_simulation_adv)">
+            <param name="use_sim_time" value="false"/>
+        </group>
+        <group unless="$(arg use_simulation_adv)">
+            <param name="use_sim_time" value="false" if="$(arg bring_up_simulation)"/>
+            <param name="use_sim_time" value="false" unless="$(arg bring_up_simulation)"/>
+        </group>
+        <rosparam param="/time_step">0.01</rosparam>
+    </group>
+
+    <rosparam param="open_gui">false</rosparam>
+    <rosparam param="sim_with_ego">true</rosparam>
+    <rosparam param="publishing_visualization_status">true</rosparam>
+    
+    <arg name="enable_rss_check" value="false"/>
+
+    <!-- Scenario Configuration -->
+    <arg name="scenario_id" default="hct_12"/>
+    <arg name="route_id" default="hct_logistic"/>
+    <arg name="config_file" default="scenario_config_hct.json"/> 
+    <arg name="agent_size" default="carla_agent_size.json"/>
+    <arg name="ego_init_pose_config_file" default="ego_init_pose_config_hct.json"/>
+
+    <arg name="scenario_configuration_directory" default="$(find scenario)/data/"/>
+    <arg name="can_show_ego_vehicle_speed" default="true"/>
+
+    <group ns="scenario">
+        <param name="id" value="$(arg scenario_id)"/>
+        <param name="route" value="$(arg route_id)"/>
+        <param name="config/file" value="$(arg config_file)"/>
+        <param name="config/agent/size" value="$(arg agent_size)"/>
+        <param name="config/dir" value="$(arg scenario_configuration_directory)"/>
+        <param name="can_show_ego_vehicle_speed" value="$(arg can_show_ego_vehicle_speed)"/>
+        <group ns="ego_vehicle_speed">
+            <param name="precision_digit" value="2"/>
+            <param name="text_longitudinal_offset" value="-4.5"/>
+            <param name="text_lateral_offset" value="0.0"/>
+            <param name="text_height_offset" value="1.0"/>
+            <param name="text_scale" value="2.5"/>
+        </group>
+    </group>
+
+
+    <!-- Simulation Configuration -->
+    <arg name="simulation_configuration_directory" default="/repository/ros/src/itri/simulation/data/"/>
+    <arg name="simulated_ego_config_file" default="ego.json"/>
+    <group ns="simulation">
+        <param name="config/dir" value="$(arg simulation_configuration_directory)"/>       
+        <param name="ego_vehicle/config/init_pose/file" value="$(arg ego_init_pose_config_file)"/>
+        <param name="ego_vehicle/config/file" value="$(arg simulated_ego_config_file)"/>
+    </group>
+
+    <include file="$(find path)/launch/planner.launch"/>
+    <include file="$(find path)/launch/ego_vehicle_global_path.launch"/>
+
+    <node
+        pkg="scenario"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="scenario_sil_testing_node"
+        name="scenario_sil_testing"
+        output="screen">
+    </node>
+
+     <group if="$(arg enable_rss_check)">
+         <include file="$(find rss)/launch/rss_verification.launch"/>
+     </group>
+     <include file="$(find scenario_visualization)/launch/scenario_visualization.launch"/>
+
+</launch>

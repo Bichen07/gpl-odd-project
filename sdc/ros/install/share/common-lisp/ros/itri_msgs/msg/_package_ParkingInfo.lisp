@@ -1,0 +1,6 @@
+(cl:in-package itri_msgs-msg)
+(cl:export '(TOTALPARKINGPATHCOUNT-VAL
+          TOTALPARKINGPATHCOUNT
+          CURRENTPATHNUMBER-VAL
+          CURRENTPATHNUMBER
+))

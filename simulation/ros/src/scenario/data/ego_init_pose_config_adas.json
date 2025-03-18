@@ -1,0 +1,158 @@
+{
+    "adas_acc_target_discrimination":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.167,
+                "y": 964.797
+            },
+            "orientation":-1.595
+        }
+    },
+    "adas_acc_curve_capability":
+    {
+        "s500m__":
+        {
+            "position":
+            {
+                "x": -665.948,
+                "y": 1003.411
+            },
+            "orientation":2.535
+        },
+        "s500m":
+        {
+            "position":
+            {
+                "x": -700.798,
+                "y": 1029.265
+            },
+            "orientation":2.452
+        }
+    },
+    "adas_fvcws_curved_road_lateral_discrimination":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": -700.798,
+                "y": 1029.265
+            },
+            "orientation":2.452
+        }
+    },
+    "adas_fvcws_straight_road_lateral_discrimination":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.167,
+                "y": 964.797
+            },
+            "orientation":-1.595
+        }
+    },
+    "adas_fvcws_longitudinal_discrimination":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.167,
+                "y": 964.797
+            },
+            "orientation":-1.595
+        }
+    },
+    "adas_lkas_straight_lane_keeping":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.167,
+                "y": 964.797
+            },
+            "orientation":-1.595
+        }
+    },
+    "adas_lcdas_overtaking_subject":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.328,
+                "y": 909.618
+            },
+            "orientation":-1.595
+        }
+    },
+    "adas_lcdas_overtaking_target":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.328,
+                "y": 909.618
+            },
+            "orientation":-1.595
+        }
+    },
+    "adas_lcdas_lateral_moving":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.087,
+                "y": 997.768
+            },
+            "orientation":-1.572
+        }
+    },
+    "adas_lsf_automatic_deceleration":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.328,
+                "y-": 909.618,
+                "y": 919.618
+            },
+            "orientation":-1.595
+        }
+    },
+    "adas_lsf_retargeting_capability":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 1.328,
+                "y-": 909.618,
+                "y": 919.618
+            },
+            "orientation":-1.595
+        }
+    },
+    "adas_lsf_retargeting_capability_2":
+    {
+        "s500m":
+        {
+            "position":
+            {
+                "x": 8.148,
+                "y": 878.562
+            },
+            "orientation":-1.573
+        }
+    }
+
+}

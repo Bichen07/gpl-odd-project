@@ -1,0 +1,37 @@
+<launch>
+    <!-- Run simulation_adv with 1 ego with no namespace assigned-->
+
+    <arg name="headless" default="false" />
+    <include file="$(find rviz_config)/launch/visualization.launch" unless="$(arg headless)"/>
+
+    <arg name="detect_range" default="250." />
+
+     <!-- SIMULATION RELATED START -->
+
+    <include file="$(find simulation_adv)/launch/simulation.launch">
+        <!-- Set to false if publishing by scenario_visualization package. -->
+        <arg name="publish_scenario_visualization" value="false" />
+        <arg name="ego_handler/detected_objects_100hz" value="true" />
+        <arg name="ego_handler/detected_objects_id_offset" value="5000" />
+        <arg name="ego_handler/detected_objects_topic" value="/detected_objects_virtual" />
+        <arg name="ego_handler/detect_range" value="$(arg detect_range)" />
+        <arg name="ego_handler/disable_noise" value="true" />
+        <arg name="disable_collision" value="false" />
+    </include>
+
+    <!-- SIMULATION RELATED END -->
+
+    <!-- EGO VEHICLE RELATED START -->
+
+    <include file="$(find simulation_adv)/launch/ego.launch">
+        <arg name="sim_with_external" value="true"/>
+        <arg name="seq"  value="0"/>
+        <arg name="run" value="false"/>
+        <arg name="visualize" value="false"/>
+        <arg name="run_once" value="true"/>
+        <arg name="run_mr_vil" value="true"/>
+    </include>
+
+    <!-- EGO VEHICLE RELATED END -->
+
+</launch>

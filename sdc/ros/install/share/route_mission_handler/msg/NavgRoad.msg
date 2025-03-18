@@ -1,0 +1,23 @@
+int32 ITRI_AREA=5
+int32 EXPRESS_WAY=8
+int32 EXIT_GATEWAY=20
+int32 ENTRY_GATEWAY=21
+
+int32 id
+int32 positiveLaneNum
+int32 negativeLaneNum
+bool twoWay
+int32[] positiveLaneIds
+int32[] negativeLaneIds
+int32 mode
+int32 r_class
+int32 routing
+float32 n_as
+float32 n_kph
+float32 p_as
+float32 p_kph
+float32 length
+ItriPoint[] points
+ConnectedNavgRoad[] heads
+ConnectedNavgRoad[] tails
+int32 type

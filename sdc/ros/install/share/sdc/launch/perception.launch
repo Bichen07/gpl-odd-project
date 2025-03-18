@@ -1,0 +1,33 @@
+<launch>
+    <arg name="remote" default="true"/>
+    <arg name="RadarFusion" default="true"/>
+
+    <include file="$(env SDC_CONFIG_DIR)/machines/black-widow/machine.launch">
+        <arg name="set_as_default" value="$(arg remote)"/>
+    </include>
+
+    <include file="$(find perception_manager)/launch/perception_manager.launch">
+        <arg name="scenario_setting_path" value="$(env SDC_CONFIG_DIR)"/>
+    </include>
+
+    <include file="$(find sdc)/launch/camera-object-detection.launch">
+        <arg name="remote" value="$(arg remote)"/>
+    </include>
+
+    <include file="$(find sdc)/launch/camera-radar-fusion.launch"
+        if="$(arg RadarFusion)">
+        <arg name="remote" value="$(arg remote)"/>
+    </include>
+
+    <include file="$(find sdc)/launch/traffic-light-detection.launch">
+        <arg name="remote" value="$(arg remote)"/>
+    </include>
+
+    <include file="$(find sdc)/launch/lane-detection.launch">
+        <arg name="remote" value="$(arg remote)"/>
+    </include>
+
+    <include file="$(env SDC_CONFIG_DIR)/machines/machine-localhost-default.launch"
+        if="$(arg remote)"/>
+
+</launch>

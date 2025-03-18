@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2020-2022, Bayerische Motoren Werke Aktiengesellschaft (BMW AG) -->
+<OpenSCENARIO>
+
+  <FileHeader revMajor="1" revMinor="1" date="2021-07-09T10:00:00" description="Two blocking cars"
+    author="chiu41">
+  </FileHeader>
+
+  <ParameterDeclarations>
+    <!-- <ParameterDeclaration name="Blocking1Width" unit="m" parameterType="double" value="2.2" /> -->
+    <!-- <ParameterDeclaration name="Blocking2Width" unit="m" parameterType="double" value="2.5" /> -->
+    <!-- <ParameterDeclaration name="Blocking1Length" unit="m" parameterType="double" value="5.04"
+    /> -->
+    <!-- <ParameterDeclaration name="Blocking2Length" unit="m" parameterType="double" value="6.04"
+    /> -->
+    <ParameterDeclaration name="Blocking1Width" unit="m" parameterType="double" value="2.2" />
+    <ParameterDeclaration name="Blocking2Width" unit="m" parameterType="double" value="2.2" />
+    <ParameterDeclaration name="Blocking1Length" unit="m" parameterType="double" value="5.04" />
+    <ParameterDeclaration name="Blocking2Length" unit="m" parameterType="double" value="5.04" />
+
+    <ParameterDeclaration name="initialS" unit="m" parameterType="double" value="50" />
+    <ParameterDeclaration name="parkingDelta" unit="m" parameterType="double" value="7" />
+
+    <ParameterDeclaration name="x1" unit="m" parameterType="double" value="0.0" />
+    <ParameterDeclaration name="x2" unit="m" parameterType="double" value="1.6" />
+    <ParameterDeclaration name="x3" unit="m" parameterType="double" value="3.0" />
+  </ParameterDeclarations>
+
+  <CatalogLocations>
+    <VehicleCatalog>
+      <Directory path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Vehicles" />
+    </VehicleCatalog>
+    <PedestrianCatalog>
+      <Directory
+        path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Pedestrians" />
+    </PedestrianCatalog>
+    <ControllerCatalog>
+      <Directory
+        path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Controllers" />
+    </ControllerCatalog>
+  </CatalogLocations>
+
+  <RoadNetwork>
+    <LogicFile
+      filepath="/project/mmsl_simulation/src/scenario/data/resources/xodr/hct_2.xodr" />
+  </RoadNetwork>
+
+  <Entities>
+
+    <ScenarioObject name="Ego">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_white"></CatalogReference>
+      <!-- <ObjectController> -->
+      <!--   <CatalogReference catalogName="ControllerCatalog"
+      entryName="ALKSController"></CatalogReference> -->
+      <!-- </ObjectController> -->
+
+      <ObjectController>
+        <CatalogReference catalogName="ControllerCatalog" entryName="externalController" />
+      </ObjectController>
+    </ScenarioObject>
+
+    <ScenarioObject name="Blocking1">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_red">
+        <ParameterAssignments>
+          <ParameterAssignment parameterRef="width" value="$Blocking1Width" />
+          <ParameterAssignment parameterRef="length" value="$Blocking1Length" />
+        </ParameterAssignments>
+      </CatalogReference>
+    </ScenarioObject>
+
+    <ScenarioObject name="Blocking2">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_red">
+        <ParameterAssignments>
+          <ParameterAssignment parameterRef="width" value="$Blocking2Width" />
+          <ParameterAssignment parameterRef="length" value="$Blocking2Length" />
+        </ParameterAssignments>
+      </CatalogReference>
+    </ScenarioObject>
+
+    <ScenarioObject name="BackgroundParking1">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_yellow"></CatalogReference>
+    </ScenarioObject>
+
+    <ScenarioObject name="BackgroundParking2">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_yellow"></CatalogReference>
+    </ScenarioObject>
+
+    <ScenarioObject name="BackgroundParking3">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_yellow"></CatalogReference>
+    </ScenarioObject>
+
+    <ScenarioObject name="BackgroundParking4">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_yellow"></CatalogReference>
+    </ScenarioObject>
+
+    <ScenarioObject name="BackgroundParking5">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_yellow"></CatalogReference>
+    </ScenarioObject>
+
+  </Entities>
+
+  <Storyboard>
+
+    <Init>
+      <Actions>
+
+        <Private entityRef="Ego">
+
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <!-- <LanePosition roadId="10" laneId="-1" offset="0.0" s="0.0"></LanePosition> -->
+                <WorldPosition x="0" y="0" z="0.0" />
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+
+          <!-- <PrivateAction> -->
+          <!--   <LongitudinalAction> -->
+          <!--     <SpeedAction> -->
+          <!--       <SpeedActionDynamics dynamicsShape="step" dynamicsDimension="time" value="0" /> -->
+          <!--       <SpeedActionTarget> -->
+          <!--         <AbsoluteTargetSpeed value="${$vo0 / 3.6}" /> -->
+          <!--       </SpeedActionTarget> -->
+          <!--     </SpeedAction> -->
+          <!--   </LongitudinalAction> -->
+          <!-- </PrivateAction> -->
+
+          <PrivateAction>
+            <ControllerAction>
+              <ActivateControllerAction lateral="true" longitudinal="true" />
+            </ControllerAction>
+          </PrivateAction>
+
+        </Private>
+
+        <Private entityRef="Blocking1">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <LanePosition roadId="10" laneId="-1" offset="$x2" s="$initialS"></LanePosition>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+        </Private>
+
+        <Private entityRef="Blocking2">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <LanePosition roadId="10" laneId="1" offset="$x3" s="${$initialS + $x1 + $Blocking1Length}"></LanePosition>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+          <!-- <PrivateAction> -->
+          <!--   <TeleportAction> -->
+          <!--     <Position> -->
+          <!--       <RelativeLanePosition entityRef="Blocking1" dLane="0" -->
+          <!--         ds="${$x1 + $Blocking2Length / 2  + $Blocking1Length / 2}" -->
+          <!--         offset="${$x2 + $x3 + $Blocking2Width / 2  + $Blocking1Width / 2}" /> -->
+          <!--     </Position> -->
+          <!--   </TeleportAction> -->
+          <!-- </PrivateAction> -->
+        </Private>
+
+        <Private entityRef="BackgroundParking1">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <LanePosition roadId="10" laneId="-2" offset="0" s="$initialS"></LanePosition>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+        </Private>
+
+        <Private entityRef="BackgroundParking2">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <LanePosition roadId="10" laneId="-2" offset="0" s="${$initialS + $parkingDelta}"></LanePosition>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+        </Private>
+
+        <Private entityRef="BackgroundParking3">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <LanePosition roadId="10" laneId="-2" offset="0" s="${$initialS - $parkingDelta}"></LanePosition>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+        </Private>
+
+        <Private entityRef="BackgroundParking4">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <LanePosition roadId="10" laneId="-2" offset="0"
+                  s="${$initialS + 2 * $parkingDelta}"></LanePosition>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+        </Private>
+
+        <Private entityRef="BackgroundParking5">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <LanePosition roadId="10" laneId="-2" offset="0"
+                  s="${$initialS - 2 * $parkingDelta}"></LanePosition>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+        </Private>
+
+      </Actions>
+    </Init>
+
+
+    <Story name="ReachPositionStory">
+
+      <Act name="StartValidAct" >
+        <StartTrigger>
+          <ConditionGroup>
+            <Condition name="StartValidCondition" delay="0" conditionEdge="none">
+              <ByEntityCondition>
+                <TriggeringEntities triggeringEntitiesRule="any">
+                  <EntityRef entityRef="Ego" />
+                </TriggeringEntities>
+                <EntityCondition>
+                  <ReachPositionCondition tolerance="3.0">
+                    <Position>
+                      <WorldPosition x="243.43" y="19.62" z="0.0" />
+                    </Position>
+                  </ReachPositionCondition>
+                </EntityCondition>
+              </ByEntityCondition>
+            </Condition>
+          </ConditionGroup>
+        </StartTrigger>
+      </Act>
+
+      <Act name="StartSamplingAct" >
+        <StartTrigger>
+          <ConditionGroup>
+            <Condition name="StartSamplingCondition" delay="0" conditionEdge="none">
+              <ByEntityCondition>
+                <TriggeringEntities triggeringEntitiesRule="any">
+                  <EntityRef entityRef="Ego" />
+                </TriggeringEntities>
+                <EntityCondition>
+                  <ReachPositionCondition tolerance="3.0">
+                    <Position>
+                      <WorldPosition x="243.43" y="19.62" z="0.0" />
+                    </Position>
+                  </ReachPositionCondition>
+                </EntityCondition>
+              </ByEntityCondition>
+            </Condition>
+          </ConditionGroup>
+        </StartTrigger>
+      </Act>
+
+      <Act name="ReachPositionAct">
+        <StartTrigger>
+          <ConditionGroup>
+            <Condition name="ReachPositionCondition" delay="0" conditionEdge="none">
+              <ByEntityCondition>
+                <TriggeringEntities triggeringEntitiesRule="any">
+                  <EntityRef entityRef="Ego" />
+                </TriggeringEntities>
+                <EntityCondition>
+                  <ReachPositionCondition tolerance="3.0">
+                    <Position>
+                      <!-- <WorldPosition x="522.9" y="-9.5" z="0.0" /> -->
+                      <WorldPosition x="0" y="0" z="-100.0" />
+                    </Position>
+                  </ReachPositionCondition>
+                </EntityCondition>
+              </ByEntityCondition>
+            </Condition>
+          </ConditionGroup>
+        </StartTrigger>
+      </Act>
+
+    </Story>
+
+    <StopTrigger>
+      <ConditionGroup>
+        <Condition name="EgoReachDestinationCondition" delay="0" conditionEdge="rising">
+          <ByEntityCondition>
+            <TriggeringEntities triggeringEntitiesRule="any">
+              <EntityRef entityRef="Ego" />
+            </TriggeringEntities>
+            <EntityCondition>
+              <ReachPositionCondition tolerance="3">
+                <Position>
+                  <WorldPosition x="501.73" y="198.42" z="0.0" />
+                </Position>
+              </ReachPositionCondition>
+            </EntityCondition>
+          </ByEntityCondition>
+        </Condition>
+      </ConditionGroup>
+      <ConditionGroup>
+        <Condition name="EgoStuckCondition" delay="0" conditionEdge="rising">
+          <ByEntityCondition>
+            <TriggeringEntities triggeringEntitiesRule="any">
+              <EntityRef entityRef="Ego" />
+            </TriggeringEntities>
+            <EntityCondition>
+              <StandStillCondition duration="7" />
+            </EntityCondition>
+          </ByEntityCondition>
+        </Condition>
+      </ConditionGroup>
+    </StopTrigger>
+
+  </Storyboard>
+
+</OpenSCENARIO>
+

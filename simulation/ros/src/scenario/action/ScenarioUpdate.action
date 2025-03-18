@@ -1,0 +1,15 @@
+string motion_config_file_path
+---
+int8 validation_result_config_not_recognized=-3
+int8 validation_result_config_not_valid=-2
+int8 validation_result_config_not_found=-1
+int8 validation_result_safe=0
+int8 validation_result_risky=1
+int8 validation_result_collided=2
+int8 validation_result
+---
+uint8 rss_state_red=0
+uint8 rss_state_yellow=1
+uint8 rss_state_green=2
+string[] agent_ids
+uint8[] rss_states

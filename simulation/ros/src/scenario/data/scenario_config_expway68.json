@@ -1,0 +1,141 @@
+{
+    "expway68_01": "expway68_01_vehicles_in_current_right_lanes_simulator",
+    "ego_vehicle":
+    {
+        "size":
+        {
+            "x": 5.172,
+            "y": 2.297,
+            "z": 1.777,
+            "x_": 9.4,
+            "y_": 3.3,
+            "z_": 3.7
+        },
+        "compensated_second_": 0.1,
+        "compensated_second": 0.0,
+        "static_longitudinal_compensated_distance": 0.0
+    },
+    "expway68_01_vehicles_in_current_right_lanes_simulator":
+    {
+        "map": "itri_68_nanliao",
+        "route": "whole",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 668,
+            "opposite": 8
+        },
+        "dijkstra_waypoint_following_model":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_waypoint_id":
+                    {
+                        "lane": 351,
+                        "point": 51
+                    },
+                    "end_waypoint_id":
+                    {
+                        "lane": 389,
+                        "point": 1544
+                    },
+                    "waypoint_lateral_offset": 0.0,
+                    "init_move_speed_kph": 72.0,
+                    "move_trigger_condition":
+                    {
+                        "spatial_relation_id": "ahead_of_ego_vehicle",
+                        "distance": 50.0
+                    },
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "lateral_move_trigger_distance": 0.0
+                },
+                {
+                    "begin_waypoint_id":
+                    {
+                        "lane": 669,
+                        "point": 150
+                    },
+                    "end_waypoint_id":
+                    {
+                        "lane": 390,
+                        "point": 1504
+                    },
+                    "waypoint_lateral_offset": 0.0,
+                    "init_move_speed_kph": 72.0,
+                    "move_trigger_condition":
+                    {
+                        "spatial_relation_id": "behind_ego_vehicle",
+                        "distance": 100.0
+                    },
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "lateral_move_trigger_distance": 0.0
+                }
+            ]
+        }
+    }
+}

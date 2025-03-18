@@ -1,0 +1,1029 @@
+{
+    "shuinan_01": "shuinan_01_straight_driving_simulator",
+    "shuinan_02": "shuinan_02_left_turn_driving_simulator",
+    "shuinan_03": "shuinan_03_right_turn_driving_simulator",
+    "shuinan_04": "shuinan_04_car_following_simulator",
+    "shuinan_05": "shuinan_05_passenger_carrying_simulator",
+    "shuinan_06": "shuinan_06_signalized_intersection_simulator",
+    "shuinan_07": "shuinan_07_illegal_parking_simulator",
+    "shuinan_08": "shuinan_08_eco_transportation_mixed_traffic_simulator",
+    "shuinan_09": "shuinan_09_overtaking_simulator",
+    "shuinan_10": "shuinan_10_pedestrian_crossing_simulator",
+    "shuinan_11": "shuinan_11_red_light_running_simulator",
+    "shuinan_12": "shuinan_12_pedestrian_crossing_overtaking_car_following_simulator",
+    "ego_vehicle":
+    {
+        "size":
+        {
+            "x_": 5.172,
+            "y_": 2.297,
+            "z_": 1.777,
+            "x": 9.4,
+            "y": 3.3,
+            "z": 3.7
+        },
+        "compensated_second_": 0.1,
+        "compensated_second": 0.0,
+        "static_longitudinal_compensated_distance_": 0.1,
+        "static_longitudinal_compensated_distance": -0.7
+    },
+    "shuinan_01_straight_driving_simulator":
+    {
+        "map": "taichung_new",
+        "route": "zhongke_north_to_south",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01
+    },
+    "shuinan_02_left_turn_driving_simulator":
+    {
+        "map": "taichung_new",
+        "route": "dapeng_left_turn_zhongke_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01
+    },
+    "shuinan_03_right_turn_driving_simulator":
+    {
+        "map": "taichung_new",
+        "route": "dapeng_right_turn_zhongke_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01
+    },
+    "shuinan_04_car_following_simulator":
+    {
+        "map": "taichung_new",
+        "route": "zhongke_right_turn_dapeng_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "min_relative_distance": 2.1,
+        "begin_lane_id":
+        {
+            "forward": 155,
+            "opposite": 169
+        },
+        "lane_roadside_moving_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 116,
+                    "begin_point_id": 165,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": -2.5,
+                    "begin_lateral_speed_kph": 2.5,
+                    "end_lane_id": 116,
+                    "end_point_id": 373,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -4.0,
+                    "end_lateral_speed_kph":-2.4,
+                    "move_to_roadside_trigger_lane_id": 116,
+                    "move_to_roadside_trigger_point_id": 335,
+                    "move_to_roadside_trigger_longitudinal_offset": 0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance_dynamic_control": 14.0,
+                    "move_trigger_distance_velocity_control": 10.0,
+                    "move_trigger_distance": 10.0, 
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 12.0
+                }
+            ]
+        }
+    },
+    "shuinan_05_passenger_carrying_simulator":
+    {
+        "map": "taichung_new",
+        "route": "dapeng_right_turn_zhongke_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01
+    },
+    "shuinan_06_signalized_intersection_simulator":
+    {
+        "map": "taichung_new",
+        "route": "zhongke_right_turn_dapeng_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 155,
+            "opposite": 169
+        },
+        "signalized_intersection_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01
+        }
+    },
+    "shuinan_07_illegal_parking_simulator":
+    {
+        "map": "taichung_new",
+        "route": "dapeng_right_turn_zhongke_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 195,
+            "opposite": 154
+        },
+        "lane_roadside_moving_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 136,
+                    "begin_point_id": 41,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": -1.5,
+                    "begin_lateral_speed_kph": 1.0,
+                    "end_lane_id": 152,
+                    "end_point_id": 5,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_lane_id": 148,
+                    "move_to_roadside_trigger_point_id": 29,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 6.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 0.36,
+                    "moving_speed_kph": 20.0
+                }
+            ]
+        }
+    },
+    "shuinan_08_eco_transportation_mixed_traffic_simulator":
+    {
+        "map": "taichung_new",
+        "route": "dapeng_right_turn_zhongke_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 195,
+            "opposite": 154
+        },
+        "lane_roadside_moving_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "bicycle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 113,
+                    "begin_point_id": 170,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": -1.0,
+                    "begin_lateral_speed_kph": 2.0,
+                    "end_lane_id": 251,
+                    "end_point_id": 84,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -2.5,
+                    "end_lateral_speed_kph":-1.0,
+                    "move_to_roadside_trigger_lane_id": 251,
+                    "move_to_roadside_trigger_point_id": 64,
+                    "move_to_roadside_trigger_longitudinal_offset": 0.0,
+                    "waypoint_lateral_offset": -1.0,
+                    "move_trigger_distance": 16.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 8.0
+                }
+            ]
+        },
+        "zigzag_moving_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "bicycle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 113,
+                    "begin_point_id": 165,
+                    "end_lane_id": 251,
+                    "end_point_id": 82,
+                    "lateral_offset": -2.5,
+                    "moving_speed_kph": 8.0,
+                    "move_trigger_distance": 15.0,
+                    "max_lateral_speed_kph": 1.5,
+                    "min_lateral_speed_kph": -1.5,
+                    "lateral_speed_frequency": 0.25,
+                    "lateral_speed_phase_radian": 0.0
+                }
+            ]
+        }
+    },
+    "shuinan_09_overtaking_simulator":
+    {
+        "map": "taichung_new",
+        "route": "dapeng_right_turn_zhongke_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 195,
+            "opposite": 154
+        },
+        "overtaking_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike",
+                    "carla": 
+                    {
+                        "model_type": "ninja"
+                    }
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 113,
+                    "begin_point_id": 75,
+                    "begin_point_id_": 250,
+                    "begin_lateral_offset": -2.5,
+                    "begin_lateral_speed_kph": 2.5,
+                    "end_lane_id": 251,
+                    "end_point_id": 25,
+                    "end_point_id_": 709,
+                    "end_lateral_offset": -3.0,
+                    "end_lateral_speed_kph": -2.5,
+                    "move_to_roadside_trigger_lane_id": 251,
+                    "move_to_roadside_trigger_point_id": 6,
+                    "moving_speed_kph": 25.0,
+                    "overtaking_trigger_distance": 10.0,
+                    "returning_trigger_distance": 3.0,
+                    "overtaking_lateral_distance": 2.25,
+                    "overtaking_speed_kph": 32.0,
+                    "overtaking_lateral_speed_kph": 3.0,
+                    "returning_speed_kph": 25.0,
+                    "returning_lateral_speed_kph": -7.0,
+                    "leading_speed_kph": 15.0,
+                    "move_trigger_distance": 15.0
+                }
+            ]
+        }
+    },
+    "shuinan_10_pedestrian_crossing_simulator":
+    {
+        "map": "taichung_new",
+        "route": "dapeng_right_turn_zhongke_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 195,
+            "opposite": 154
+        },
+        "pedestrian_crossing_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person",
+                    "carla":
+                    {
+                        "model_type": "001"
+                    }
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person",
+                    "carla":
+                    {
+                        "model_type": "002"
+                    }
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person",
+                    "carla":
+                    {
+                        "model_type": "003"
+                    }
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person",
+                    "carla":
+                    {
+                        "model_type": "004"
+                    }
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "crosswalk_id": 78,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.35,
+                    "longitudinal_extended_distance": 4.1,
+                    "speed_kph": 5.0,
+                    "pedestrian_move_trigger_distance": 20.0
+                },
+                {
+                    "crosswalk_id": 77,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.35,
+                    "longitudinal_extended_distance": 4.1,
+                    "speed_kph": 5.0,
+                    "pedestrian_move_trigger_distance": 15.0
+                },
+                {
+                    "crosswalk_id": 36,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.35,
+                    "longitudinal_extended_distance": 4.1,
+                    "speed_kph": 5.0,
+                    "pedestrian_move_trigger_distance": 15.0
+                },
+                {
+                    "crosswalk_id": 36,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.35,
+                    "longitudinal_extended_distance": 4.1,
+                    "speed_kph": 5.0,
+                    "pedestrian_move_trigger_distance": 15.0
+                }
+            ]
+        }
+    },
+    "shuinan_11_red_light_running_simulator":
+    {
+        "map": "taichung_new",
+        "route": "zhongke_north_to_south",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 155,
+            "opposite": 105
+        },
+        "red_light_running_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "min_relative_distance": 2.1,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 8.4,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 8.4,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 8.4,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "preceding_lane_ids":
+                    [386],
+                    "succeeding_lane_ids":
+                    [415],
+                    "begin_point_id": 60,
+                    "end_point_id": 30,
+                    "moving_speed_kph": 30.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 0.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0
+                },
+                {
+                    "preceding_lane_ids":
+                    [418],
+                    "succeeding_lane_ids":
+                    [377],
+                    "begin_point_id": 3,
+                    "end_point_id": 50,
+                    "moving_speed_kph": 35.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 22.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0
+                },
+                {
+                    "preceding_lane_ids__":
+                    [418, 276, 124, 287, 419],
+                    "preceding_lane_ids__":
+                    [378, 281, 123, 291, 425],
+                    "preceding_lane_ids":
+                    [418, 282, 129, 261, 415],
+                    "succeeding_lane_ids":
+                    [],
+                    "begin_point_id": 10,
+                    "end_point_id_": 20,
+                    "end_point_id": 30,
+                    "moving_speed_kph": 28.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 11.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0
+                }
+            ]
+        },
+        "signalized_intersection_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01
+        }
+    },
+    "shuinan_12_pedestrian_crossing_overtaking_car_following_simulator":
+    {
+        "map": "taichung_new",
+        "route": "dapeng_right_turn_zhongke_road",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 195,
+            "opposite": 154
+        },
+        "pedestrian_crossing_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "crosswalk_id": 78,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.35,
+                    "longitudinal_extended_distance": 4.1,
+                    "speed_kph": 5.0,
+                    "pedestrian_move_trigger_distance": 10.0
+                },
+                {
+                    "crosswalk_id": 77,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.35,
+                    "longitudinal_extended_distance": 4.1,
+                    "speed_kph": 5.0,
+                    "pedestrian_move_trigger_distance": 15.0
+                },
+                {
+                    "crosswalk_id": 36,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.35,
+                    "longitudinal_extended_distance": 4.1,
+                    "speed_kph": 3.0,
+                    "pedestrian_move_trigger_distance": 10.0
+                },
+                {
+                    "crosswalk_id": 36,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.35,
+                    "longitudinal_extended_distance": 4.1,
+                    "speed_kph": 5.0,
+                    "pedestrian_move_trigger_distance": 12.0
+                }
+            ]
+        },
+        "overtaking_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 113,
+                    "begin_point_id": 9,
+                    "begin_point_id_": 250,
+                    "begin_lateral_offset": -2.5,
+                    "begin_lateral_speed_kph": 2.5,
+                    "end_lane_id": 113,
+                    "end_point_id": 125,
+                    "end_point_id_": 709,
+                    "end_lateral_offset": -3.0,
+                    "end_lateral_speed_kph": -2.5,
+                    "move_to_roadside_trigger_lane_id": 113,
+                    "move_to_roadside_trigger_point_id": 106,
+                    "moving_speed_kph": 25.0,
+                    "overtaking_trigger_distance": 10.0,
+                    "returning_trigger_distance": 2.2,
+                    "overtaking_lateral_distance": 2.4,
+                    "overtaking_speed_kph": 30.0,
+                    "overtaking_lateral_speed_kph": 2.6,
+                    "returning_speed_kph": 25.0,
+                    "returning_lateral_speed_kph": -4.5,
+                    "leading_speed_kph": 15.0,
+                    "move_trigger_distance": 15.0
+                }
+            ]
+        },
+        "lane_roadside_moving_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 113,
+                    "begin_point_id": 132,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": -1.5,
+                    "begin_lateral_speed_kph": 2.2,
+                    "end_lane_id": 251,
+                    "end_point_id_": 407,
+                    "end_point_id": 100,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -3.5,
+                    "end_lateral_speed_kph": -2.0,
+                    "move_to_roadside_trigger_lane_id": 251,
+                    "move_to_roadside_trigger_point_id_": 313,
+                    "move_to_roadside_trigger_point_id": 70,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 7.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 16.0
+                }
+            ]
+        }
+    }
+}

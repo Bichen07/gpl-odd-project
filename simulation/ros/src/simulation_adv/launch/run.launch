@@ -1,0 +1,67 @@
+<launch>
+
+    <!-- For certain situation like rosbag replay, use_sim_time needs to be set to true,
+        otherwise, false.  -->
+    <arg name="use_sim_time" default="false" />
+    <arg name="by_tick" default="false"/>
+    <arg name="by_esmini" default="true"/>
+    <arg name="sim_with_external" default="false"/>
+
+    <!-- Run simulation_adv with 1 ego with no namespace assigned-->
+    <arg name="headless" default="false" />
+    <arg name="rviz_file" default="sdc.rviz" />
+    <arg name="gbus" default="false" />
+    <include file="$(find rviz_config)/launch/visualization.launch" unless="$(arg headless)">
+        <arg name="rviz_file" value="$(arg rviz_file)" />
+        <arg name="gbus" value="$(arg gbus)" />
+    </include>
+    <param name="/use_sim_time" value="$(arg use_sim_time)" />
+
+    <!-- SIMULATION RELATED START -->
+
+    <!-- This will publish visualization to
+        /simulation/scenario_visualization and
+        /detection/lidar_tracker/arrow_markers
+    -->
+    <arg name="publish_scenario_visualization" default="true"/>
+    <arg name="velocity_in_ego_coord" default="true" />
+    <arg name="detected_objects_topic" default="detected_objects" />
+    <arg name="filtered_cluster_hulls_topic" default="filtered_cluster_hulls" />
+    <arg name="disable_collision" default="true" />
+
+    <node pkg="fake_lane_detection" type="fake_lane_detection" name="fake_lane_detection"
+        if="$(arg velocity_in_ego_coord)" />
+
+    <include file="$(find simulation_adv)/launch/simulation.launch">
+        <arg name="filtered_cluster_hulls_topic" value="$(arg filtered_cluster_hulls_topic)" />
+        <arg name="by_tick" value="$(arg by_tick)"/>
+        <arg name="by_esmini" value="$(arg by_esmini)"/>
+        <arg name="headless" value="$(arg headless)"/>
+        <arg name="publish_scenario_visualization" value="$(arg publish_scenario_visualization)" />
+        <arg name="ego_handler/velocity_in_ego_coord" value="$(arg velocity_in_ego_coord)" />
+        <arg name="ego_handler/detected_objects_topic" value="$(arg detected_objects_topic)" />
+        <arg name="disable_collision" value="$(arg disable_collision)" />
+    </include>
+
+    <!-- SIMULATION RELATED END -->
+
+
+    <!-- EGO VEHICLE RELATED START -->
+
+    <!-- Position sequence defined in simulation_utils/data/vehicle_parameters.json -->
+    <arg name="ego_position_seq" default="3"/>
+    <arg name="run_once" default="true"/>
+    <arg name="disable_monitor" default="false" />
+
+    <include file="$(find simulation_adv)/launch/ego.launch">
+        <arg name="seq"  value="$(arg ego_position_seq)"/>
+        <arg name="run" value="false"/>
+        <arg name="visualize" value="false"/>
+        <arg name="sim_with_external" value="$(arg sim_with_external)"/>
+        <arg name="run_once" value="$(arg run_once)"/>
+        <arg name="disable_monitor" value="$(arg disable_monitor)"/>
+    </include>
+
+    <!-- EGO VEHICLE RELATED END -->
+
+</launch>

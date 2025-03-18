@@ -1,0 +1,1474 @@
+{
+    "itri_00": "itri_00_hybrid_scenario_simulator",
+    "itri_01": "itri_01_pedestrian_crossing_simulator",
+    "itri_02": "itri_02_adaptive_overtaking_simulator",
+    "itri_03": "itri_03_lane_roadside_moving_simulator",
+    "itri_04": "itri_04_canter_vil_simulator",
+    "itri_05": "itri_05_unsignalized_turning_coming_vehicle_simulator",
+    "ego_vehicle":
+    {
+        "size":
+        {
+            "x": 5.172,
+            "y": 2.297,
+            "z": 1.777
+        },
+        "compensated_second_": 0.1,
+        "compensated_second": 0.05,
+        "static_longitudinal_compensated_distance": 0.1
+    },
+    "itri_00_hybrid_scenario_simulator":
+    {
+        "map": "III_itri",
+        "route": "operation",
+        "time_step": 0.01,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 530,
+            "opposite": 101
+        },
+        "pedestrian_crossing_model":
+        {
+            "time_step": 0.01,
+            "visualization_time_step": 0.033,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "crosswalk_id": 27,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -7,
+                    "longitudinal_extended_distance": 2.1,
+                    "speed_kph": 10.0,
+                    "pedestrian_move_trigger_distance": 22.0
+                },
+                {
+                    "crosswalk_id": 27,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -5.5,
+                    "longitudinal_extended_distance": 4,
+                    "speed_kph": 6.0,
+                    "pedestrian_move_trigger_distance": 24.0
+                },
+                {
+                    "crosswalk_id": 27,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 6.2,
+                    "longitudinal_extended_distance": 3.1,
+                    "speed_kph": 16.0,
+                    "pedestrian_move_trigger_distance": 24.3
+                },
+                {
+                    "crosswalk_id": 27,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 5.75,
+                    "longitudinal_extended_distance": 2.3,
+                    "speed_kph": 4.0,
+                    "pedestrian_move_trigger_distance": 23.5
+                },
+                {
+                    "crosswalk_id": 27,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 3.1,
+                    "longitudinal_extended_distance": 2.4,
+                    "speed_kph": 9.0,
+                    "pedestrian_move_trigger_distance": 23.8
+                },
+                {
+                    "crosswalk_id": 27,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -6.5,
+                    "longitudinal_extended_distance": 1.8,
+                    "speed_kph": 14.0,
+                    "pedestrian_move_trigger_distance": 25.6
+                }
+            ],
+            "motion_configs_":
+            [
+                {
+                    "crosswalk_id": 23,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -62,
+                    "longitudinal_extended_distance": 2.1,
+                    "speed_kph": 10.0,
+                    "pedestrian_move_trigger_distance": 82.0
+                },
+                {
+                    "crosswalk_id": 23,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -60.5,
+                    "longitudinal_extended_distance": 4,
+                    "speed_kph": 6.0,
+                    "pedestrian_move_trigger_distance": 84.0
+                },
+                {
+                    "crosswalk_id": 23,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 61.2,
+                    "longitudinal_extended_distance": 3.1,
+                    "speed_kph": 16.0,
+                    "pedestrian_move_trigger_distance": 84.3
+                },
+                {
+                    "crosswalk_id": 23,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 60.75,
+                    "longitudinal_extended_distance": 2.3,
+                    "speed_kph": 4.0,
+                    "pedestrian_move_trigger_distance": 83.5
+                },
+                {
+                    "crosswalk_id": 23,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 58.1,
+                    "longitudinal_extended_distance": 2.4,
+                    "speed_kph": 9.0,
+                    "pedestrian_move_trigger_distance": 83.8
+                },
+                {
+                    "crosswalk_id": 23,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -61.5,
+                    "longitudinal_extended_distance": 1.8,
+                    "speed_kph": 14.0,
+                    "pedestrian_move_trigger_distance": 85.6
+                }
+            ]
+        },
+        "lane_roadside_moving_model":
+        {
+            "time_step": 0.01,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 158,
+                    "begin_point_id": 13,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": -1.6,
+                    "begin_lateral_speed_kph": 0.8,
+                    "end_lane_id": 329,
+                    "end_point_id": 43,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -1.4,
+                    "end_lateral_speed_kph": -1.4,
+                    "move_to_roadside_trigger_lane_id": 329,
+                    "move_to_roadside_trigger_point_id": 28 ,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 20.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 16
+                },
+                {
+                    "begin_lane_id": 327,
+                    "begin_point_id": 1,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": 0.1,
+                    "begin_lateral_speed_kph": -0.1,
+                    "end_lane_id": 156,
+                    "end_point_id": 29,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -3.0,
+                    "end_lateral_speed_kph": -4.0,
+                    "move_to_roadside_trigger_lane_id": 156,
+                    "move_to_roadside_trigger_point_id": 9,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 55.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 30
+                },
+                {
+                    "begin_lane_id": 211,
+                    "begin_point_id": 5,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": 0.1,
+                    "begin_lateral_speed_kph": -0.1,
+                    "end_lane_id": 156,
+                    "end_point_id": 65,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -3.0,
+                    "end_lateral_speed_kph": -4.0,
+                    "move_to_roadside_trigger_lane_id": 156,
+                    "move_to_roadside_trigger_point_id": 40,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 75.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 35
+                },
+                {
+                    "begin_lane_id": 329,
+                    "begin_point_id": 49,
+                    "end_lane_id": 329,
+                    "end_point_id": 88,
+                    "move_to_roadside_trigger_lane_id": 329,
+                    "move_to_roadside_trigger_point_id": 85,
+                    "_begin_lane_id": 357,
+                    "_begin_point_id": 30,
+                    "_end_lane_id": 357,
+                    "_end_point_id": 69,
+                    "_move_to_roadside_trigger_lane_id": 357,
+                    "_move_to_roadside_trigger_point_id": 63,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": -1.2,
+                    "begin_lateral_speed_kph": 1.2,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": -10.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 0
+                }
+            ]
+        },
+        "overtaking_model":
+        {
+            "time_step": 0.01,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 2,
+                    "begin_point_id": 5,
+                    "begin_lateral_offset": -2.5,
+                    "begin_lateral_speed_kph": 10.0,
+                    "end_lane_id": 33,
+                    "end_point_id": 21,
+                    "end_lateral_offset": -4.0,
+                    "end_lateral_speed_kph": -7.2,
+                    "move_to_roadside_trigger_lane_id": 33,
+                    "move_to_roadside_trigger_point_id": 1,
+                    "moving_speed_kph": 45.0,
+                    "overtaking_trigger_distance": 8,
+                    "returning_trigger_distance": 4.0,
+                    "overtaking_lateral_distance": 3.2,
+                    "overtaking_speed_kph": 48.0,
+                    "overtaking_lateral_speed_kph": 10.2,
+                    "returning_speed_kph": 48.0,
+                    "returning_lateral_speed_kph": -9.0,
+                    "leading_speed_kph": 24.0,
+                    "move_trigger_distance": 10.0
+                }
+            ]
+        }
+    },
+    "itri_01_pedestrian_crossing_simulator":
+    {
+        "map": "III_itri",
+        "route": "operation22",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 376,
+            "opposite_": 266,
+            "opposite": 101
+        },
+        "pedestrian_crossing_model":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "crosswalk_id": 24,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 15.35,
+                    "longitudinal_extended_distance": 2.1,
+                    "speed_kph": 14.0,
+                    "pedestrian_move_trigger_distance": 22.0
+                }
+            ]
+        }
+    },
+    "itri_02_adaptive_overtaking_simulator":
+    {
+        "map": "III_itri",
+        "route": "operation",
+        "time_step": 0.01,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 530,
+            "opposite": 101
+        },
+        "adaptive_overtaking_model":
+        {
+            "time_step": 0.01,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_waypoint_id":
+                    {
+                        "lane": 2,
+                        "point": 5
+                    },
+                    "begin_relative_longitudinal_movement":
+                    {
+                        "trigger_distance": 12.0,
+                        "speed_kph": 10.0
+                    },
+                    "begin_lateral_movement":
+                    {
+                        "distance": -2.5,
+                        "speed_kph": 7.5
+                    },
+                    "surpassing_relative_longitudinal_movement":
+                    {
+                        "trigger_distance": 10.0,
+                        "speed_kph": 20.0
+                    },
+                    "surpassing_lateral_movement":
+                    {
+                        "distance": 3.2,
+                        "speed_kph": 9.0
+                    },
+                    "returning_relative_longitudinal_movement":
+                    {
+                        "trigger_distance": 5.0,
+                        "speed_kph": 0.0
+                    },
+                    "returning_lateral_movement":
+                    {
+                        "distance": -2.25,
+                        "speed_kph": -7.0
+                    },
+                    "leading_speed_kph": 15.0,
+                    "moving_to_roadside_longitudinal_movement":
+                    {
+                        "trigger_distance": 12.0,
+                        "speed_kph": 10.0
+                    },
+                    "moving_to_roadside_lateral_movement":
+                    {
+                        "distance": -3.0,
+                        "speed_kph": -2.5
+                    },
+                    "end_waypoint_id":
+                    {
+                        "lane": 33,
+                        "point": 21
+                    }
+                }
+            ]
+        }
+    },
+    "itri_03_lane_roadside_moving_simulator":
+    {
+        "map": "III_itri",
+        "route": "operation",
+        "time_step": 0.01,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 530,
+            "opposite": 101
+        },
+        "lane_roadside_moving_model":
+        {
+            "time_step": 0.01,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 239,
+                    "begin_point_id": 12,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": -2.4,
+                    "begin_lateral_speed_kph": 4.8,
+                    "end_lane_id": 355,
+                    "end_point_id": 53,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -2.4,
+                    "end_lateral_speed_kph": -4.8,
+                    "move_to_roadside_trigger_lane_id": 355,
+                    "move_to_roadside_trigger_point_id": 33,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 20.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 16
+                }
+            ]
+        }
+    },
+    "itri_04_canter_vil_simulator":
+    {
+        "map": "III_itri",
+        "route": "operation",
+        "time_step": 0.01,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 530,
+            "opposite": 101
+        },
+        "pedestrian_crossing_model":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.033,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size":
+                    {
+                        "x": 0.335,
+                        "y": 0.558,
+                        "z": 1.74
+                    },
+                    "color":
+                    {
+                        "r": 1.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "crosswalk_id": 35,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -1,
+                    "longitudinal_extended_distance": 2.1,
+                    "speed_kph": 10.0,
+                    "pedestrian_move_trigger_distance": 7.0
+                },
+                {
+                    "crosswalk_id": 35,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.1,
+                    "longitudinal_extended_distance": 4,
+                    "speed_kph": 6.0,
+                    "pedestrian_move_trigger_distance": 6.0
+                },
+                {
+                    "crosswalk_id": 35,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 0.2,
+                    "longitudinal_extended_distance": 3.1,
+                    "speed_kph": 16.0,
+                    "pedestrian_move_trigger_distance": 7.3
+                },
+                {
+                    "crosswalk_id": 35,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 0.2,
+                    "longitudinal_extended_distance": 2.3,
+                    "speed_kph": 4.0,
+                    "pedestrian_move_trigger_distance": 6.5
+                },
+                {
+                    "crosswalk_id": 35,
+                    "crosswalk_edge_id": 2,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": 0.1,
+                    "longitudinal_extended_distance": 2.4,
+                    "speed_kph": 9.0,
+                    "pedestrian_move_trigger_distance": 7.8
+                },
+                {
+                    "crosswalk_id": 35,
+                    "crosswalk_edge_id": 3,
+                    "forward_direction": "Forward",
+                    "lateral_offset_to_edge": -0.5,
+                    "longitudinal_extended_distance": 1.8,
+                    "speed_kph": 14.0,
+                    "pedestrian_move_trigger_distance": 6.6
+                }
+            ]
+        },
+        "lane_roadside_moving_model":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                },
+                {
+                    "size_overwrite":
+                    {
+                        "x": 0.4,
+                        "y": 0.6,
+                        "z": 1.8
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                },
+                {
+                    "size_overwrite":
+                    {
+                        "x": 0.4,
+                        "y": 0.6,
+                        "z": 1.8
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "person"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 51,
+                    "begin_point_id": 1,
+                    "begin_longitudinal_offset": -10,
+                    "begin_lateral_offset": 0,
+                    "begin_lateral_speed_kph": 0,
+                    "end_lane_id": 51,
+                    "end_point_id": 16,
+                    "end_longitudinal_offset": 20,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_lane_id": 51,
+                    "move_to_roadside_trigger_point_id": 14,
+                    "move_to_roadside_trigger_longitudinal_offset": 0,
+                    "waypoint_lateral_offset": 0,
+                    "move_trigger_distance": 16,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "init_moving_speed_kph": 20.0
+                },
+                {
+                    "begin_lane_id": 331,
+                    "begin_point_id": 13,
+                    "begin_longitudinal_offset": 0,
+                    "begin_lateral_offset": 0,
+                    "begin_lateral_speed_kph": 0,
+                    "end_lane_id": 334,
+                    "end_point_id": 17,
+                    "end_longitudinal_offset": 0,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_lane_id": 334,
+                    "move_to_roadside_trigger_point_id": 14,
+                    "move_to_roadside_trigger_longitudinal_offset": 0,
+                    "waypoint_lateral_offset": 0,
+                    "move_trigger_distance": 70,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "init_moving_speed_kph": 25.0
+                },
+                {
+                    "begin_lane_id": 331,
+                    "begin_point_id": 3,
+                    "begin_longitudinal_offset": 0,
+                    "begin_lateral_offset": 0,
+                    "begin_lateral_speed_kph": 0,
+                    "end_lane_id": 334,
+                    "end_point_id": 12,
+                    "end_longitudinal_offset": 0,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_lane_id": 334,
+                    "move_to_roadside_trigger_point_id": 11,
+                    "move_to_roadside_trigger_longitudinal_offset": 0,
+                    "waypoint_lateral_offset": 0,
+                    "move_trigger_distance": 70,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "init_moving_speed_kph": 25.0
+                },
+                {
+                    "begin_lane_id": 332,
+                    "begin_point_id": 45,
+                    "begin_longitudinal_offset": 0,
+                    "begin_lateral_offset": 0,
+                    "begin_lateral_speed_kph": 0,
+                    "end_lane_id": 334,
+                    "end_point_id": 7,
+                    "end_longitudinal_offset": 0,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_lane_id": 334,
+                    "move_to_roadside_trigger_point_id": 8,
+                    "move_to_roadside_trigger_longitudinal_offset": 0,
+                    "waypoint_lateral_offset": 0,
+                    "move_trigger_distance": 118,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "init_moving_speed_kph": 16.0
+                },
+                {
+                    "begin_lane_id": 376,
+                    "begin_point_id": 137,
+                    "begin_longitudinal_offset": 0,
+                    "begin_lateral_offset": 0,
+                    "begin_lateral_speed_kph": 0,
+                    "end_lane_id": 329,
+                    "end_point_id": 31,
+                    "end_longitudinal_offset": 0,
+                    "end_lateral_offset": -4.0,
+                    "end_lateral_speed_kph": -2.5,
+                    "move_to_roadside_trigger_lane_id": 329,
+                    "move_to_roadside_trigger_point_id": 6,
+                    "move_to_roadside_trigger_longitudinal_offset": 0,
+                    "waypoint_lateral_offset": 0,
+                    "move_trigger_distance": 12,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "init_moving_speed_kph": 32.0
+                },
+                {
+                    "begin_lane_id": 324,
+                    "begin_point_id": 1,
+                    "begin_longitudinal_offset": 0,
+                    "begin_lateral_offset": -3.6,
+                    "begin_lateral_speed_kph": 0.5,
+                    "end_lane_id": 1,
+                    "end_point_id": 14,
+                    "end_longitudinal_offset": 0,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_lane_id": 1,
+                    "move_to_roadside_trigger_point_id": 13,
+                    "move_to_roadside_trigger_longitudinal_offset": 0,
+                    "waypoint_lateral_offset": -1.2,
+                    "move_trigger_distance": 72,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "init_moving_speed_kph": 3.5
+                },
+                {
+                    "begin_lane_id": 324,
+                    "begin_point_id": 2,
+                    "begin_longitudinal_offset": 0,
+                    "begin_lateral_offset": -3.2,
+                    "begin_lateral_speed_kph": 0.45,
+                    "end_lane_id": 1,
+                    "end_point_id": 14,
+                    "end_longitudinal_offset": 0,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_lane_id": 1,
+                    "move_to_roadside_trigger_point_id": 13,
+                    "move_to_roadside_trigger_longitudinal_offset": 0,
+                    "waypoint_lateral_offset": -1.6,
+                    "move_trigger_distance": 72,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "init_moving_speed_kph": 3.5
+                }
+            ]
+        },
+        "overtaking_model":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 94,
+                    "begin_point_id": 17,
+                    "begin_lateral_offset": -2.5,
+                    "begin_lateral_speed_kph": 10.0,
+                    "end_lane_id": 10,
+                    "end_point_id": 8,
+                    "end_lateral_offset": -1.5,
+                    "end_lateral_speed_kph": -2.0,
+                    "move_to_roadside_trigger_lane_id": 49,
+                    "move_to_roadside_trigger_point_id": 13,
+                    "moving_speed_kph": 45.0,
+                    "overtaking_trigger_distance": 8,
+                    "returning_trigger_distance": 4.0,
+                    "overtaking_lateral_distance": 3.2,
+                    "overtaking_speed_kph": 48.0,
+                    "overtaking_lateral_speed_kph": 10.2,
+                    "returning_speed_kph": 48.0,
+                    "returning_lateral_speed_kph": -9.0,
+                    "leading_speed_kph": 22.0,
+                    "move_trigger_distance": 10.0
+                }
+            ]
+        }
+    },
+    "itri_05_unsignalized_turning_coming_vehicle_simulator":
+    {
+        "map": "III_itri",
+        "route": "operation",
+        "time_step": 0.01,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 530,
+            "opposite": 101
+        },
+        "lane_roadside_moving_model":
+        {
+            "time_step": 0.01,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 315,
+                    "begin_point_id": 12,
+                    "begin_longitudinal_offset": 10.0,
+                    "begin_lateral_offset": 0.0,
+                    "begin_lateral_speed_kph": 0.0,
+                    "end_lane_id": 74,
+                    "end_point_id": 13,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": 0.0,
+                    "end_lateral_speed_kph": 0.0,
+                    "move_to_roadside_trigger_lane_id": 74,
+                    "move_to_roadside_trigger_point_id": 9,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "waypoint_lateral_offset": 0.5,
+                    "move_trigger_distance": 2.4,
+                    "moving_speed_kph": 40.0
+                }
+            ]
+        }
+    }
+}

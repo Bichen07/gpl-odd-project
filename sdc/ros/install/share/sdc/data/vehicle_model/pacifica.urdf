@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot name="car">
+  <link name="base_link">
+    <visual name="base_visual">
+        <origin xyz="-0.62 0  -1.85" rpy="0 0 1.57" /> <!-- CPEV-->
+      <geometry>
+        <mesh filename="package://sdc/data/vehicle_model/pacifica_lite_v1.dae"
+              scale="1.2 1.0 1.0"/> <!-- CPEV-->
+      </geometry>
+    </visual>
+  </link>
+</robot>

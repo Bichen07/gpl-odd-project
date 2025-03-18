@@ -1,0 +1,3 @@
+path_msgs/WaypointId waypoint_id
+---
+geometry_msgs/Point waypoint

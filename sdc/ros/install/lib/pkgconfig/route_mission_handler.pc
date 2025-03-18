@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: route_mission_handler
+Description: Description of route_mission_handler
+Version: 0.0.0
+Cflags: -I${prefix}/include -I/usr/include
+Libs: -L${prefix}/lib /usr/lib/x86_64-linux-gnu/libGeographic.so
+Requires: roscpp rospy std_msgs geometry_msgs visualization_msgs sensor_msgs itri_msgs dbw_pacifica_msgs tf message_runtime

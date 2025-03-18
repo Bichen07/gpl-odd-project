@@ -1,0 +1,16 @@
+geometry_msgs/Pose2D ego_pose
+---
+
+uint8 ROAD_TYPE_UNKNOWN = 0
+uint8 ROAD_TYPE_STRAIGHT = 1
+uint8 ROAD_TYPE_CURVE = 2
+uint8 ROAD_TYPE_INTERSECTION = 3
+uint8 road_type
+
+path_msgs/RouteWaypoint[] nearby_forward_route
+path_msgs/RouteWaypoint[] nearby_opposite_route
+itri_msgs/WaypointArray current_waypoints
+
+uint32 nearest_waypoint_idx_on_nearby_forward_route
+uint32 nearest_waypoint_idx_on_nearby_opposite_route
+uint32 nearest_waypoint_idx_on_current_waypoints

@@ -1,0 +1,9 @@
+<launch>
+
+    <include file="$(find sdc)/launch/boot.launch"/>
+    <include file="$(find sdc)/launch/perception.launch"/>
+    <include file="$(find imm_ukf_pda_track)/launch/imm_ukf_pda_track.launch"/>
+    <include file="$(find sdc)/launch/run.launch"/>
+    <node name="record_bag" pkg="sdc" type="record_bag"/>
+
+</launch>

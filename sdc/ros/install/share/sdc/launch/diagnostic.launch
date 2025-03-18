@@ -1,0 +1,15 @@
+<launch>
+
+    <node name="black_panther_iotop"
+          pkg="computer_monitor"
+          type="output_publisher_node.py">
+        <param name="command" value="sudo -n iotop -bkoP"/>
+        <param name="topic" value="/iotop"/>
+        <param name="use_hostname" value="true"/>
+    </node>
+
+    <node name="black_panther_io_monitor"
+          pkg="computer_monitor"
+          type="io"/>
+
+</launch>

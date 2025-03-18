@@ -1,0 +1,5 @@
+simulation_msgs/AgentPose2D[] agents
+bool spawnIfNotExist
+float32 dt
+---
+bool[] isSuccess

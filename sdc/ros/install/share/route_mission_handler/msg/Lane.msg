@@ -1,0 +1,20 @@
+int32 NORMAL=0
+int32 SPLIT_LEFT=1
+int32 SPLIT_RIGHT=2
+int32 MERGE_TO_RIGHT=3
+int32 MERGE_TO_LEFT=4
+int32 TOBE_MERGED=5
+int32 SPLIT_STRAIGHT=6
+
+int32 lane_id
+int32[] nroad_ids
+bool is_intersection
+bool is_positive
+Waypoint[] waypoints
+int32[] next_lanes
+int32[] left_lanes
+int32[] right_lanes
+int32 max_speed_limit
+uint32 order
+int32 roadType
+int32 type

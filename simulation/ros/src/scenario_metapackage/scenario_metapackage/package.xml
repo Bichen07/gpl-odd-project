@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>scenario_metapackage</name>
+  <version>0.0.0</version>
+  <description>
+      The scenario_metapackage package is used as a temporary metapackage of scenario package.
+      Finally, all sub-packages will be moved to scenario package.
+  </description>
+  <maintainer email="chenhuihu@itri.org.tw">Chen-Hui Hu</maintainer>
+  <license>ITRI</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>scenario_visualization</exec_depend>
+  <export>
+      <metapackage />
+  </export>
+</package>

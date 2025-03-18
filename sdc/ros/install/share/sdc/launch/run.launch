@@ -1,0 +1,19 @@
+<launch>
+    <arg name="simulation" default="true"/>
+
+    <group if="$(arg simulation)">
+        <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+        <node
+            pkg="ndt2veh"
+            type="ndt2veh_node"
+            name="ndt2veh">
+            <param name="simulation" value="$(arg simulation)"/>
+            <param name="ndt2veh_sub_car_pose_topic" value="/predict_pose"/>
+        </node>
+    </group>
+
+    <include file="$(find sdc)/launch/planning.launch">
+        <arg name="simulation" value="$(arg simulation)"/>
+    </include>
+
+</launch>

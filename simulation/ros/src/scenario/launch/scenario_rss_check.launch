@@ -1,0 +1,58 @@
+<launch>
+
+    <rosparam command="load" file="$(find rss)/data/parameters.yaml"/>
+    <arg name="use_gdb" value="false"/>
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+
+    <rosparam param="open_gui">false</rosparam>
+    <rosparam param="sim_with_ego">true</rosparam>
+    <rosparam param="publishing_visualization_status">true</rosparam>
+    <arg name="enable_rss_check" value="true"/>
+    
+    <!-- Scenario Configuration -->
+    
+    <arg name="scenario_id" default="shuinan_04"/>
+    <arg name="route_id" default="taichung_new"/>
+    <arg name="config_file" default="scenario_config_shuinan_ceci.json"/> 
+    <arg name="agent_size" default="carla_agent_size.json"/>
+    <arg name="ego_init_pose_config_file" default="ego_init_pose_config_shuinan.json"/>
+
+    <arg name="scenario_configuration_directory" default="$(find scenario)/data/"/>
+
+    <group ns="scenario">
+        <param name="id" value="$(arg scenario_id)"/>
+        <param name="route" value="$(arg route_id)"/>
+        <param name="config/file" value="$(arg config_file)"/>
+        <param name="config/agent/size" value="$(arg agent_size)"/>
+        <param name="config/dir" value="$(arg scenario_configuration_directory)"/>
+    </group>
+
+
+    <!-- Simulation Configuration -->
+
+    <arg name="simulation_configuration_directory" default="$(find simulation_adv)/data/"/>
+    
+    <arg name="simulated_ego_config_file" default="ego.json"/>
+
+    <group ns="simulation">
+        <param name="config/dir" value="$(arg simulation_configuration_directory)"/>       
+        <param name="ego_vehicle/config/init_pose/file" value="$(arg ego_init_pose_config_file)"/>
+        <param name="ego_vehicle/config/file" value="$(arg simulated_ego_config_file)"/>
+    </group>
+
+    <node
+        pkg="scenario"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="scenario_node"
+        name="scenario"
+        output="screen">
+    </node>
+
+     <group if="$(arg enable_rss_check)">
+         <include file="$(find rss)/launch/rss_verification.launch"/>
+     </group>
+     <include file="$(find scenario_visualization)/launch/scenario_visualization.launch"/>
+
+</launch>

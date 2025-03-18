@@ -1,0 +1,10 @@
+Header header
+
+float32 brakeDEPRECATED
+float32 gasDEPRECATED
+float32 steeringTorqueDEPRECATED
+CruiseControl cruiseControl
+Actuators actuators
+bool active
+HUDControl hudControl
+bool enabled

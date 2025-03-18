@@ -1,0 +1,4 @@
+bool track_moving
+bool track_movable_fast
+bool track_movable_slow
+int16 track_power

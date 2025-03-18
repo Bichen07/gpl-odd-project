@@ -1,0 +1,6 @@
+path_msgs/WaypointId begin_waypoint_id
+int32[] via_lane_ids
+path_msgs/WaypointId end_waypoint_id
+---
+int32[] planned_lane_ids
+geometry_msgs/Point[] planned_waypoints

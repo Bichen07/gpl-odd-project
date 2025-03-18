@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: fake_traffic_light
+Description: Description of fake_traffic_light
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: itri_msgs roscpp std_msgs

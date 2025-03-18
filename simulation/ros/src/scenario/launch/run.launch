@@ -1,0 +1,55 @@
+<launch>
+    <node
+        pkg="ndt2veh"
+        type="ndt2veh_node"
+        name="ndt2veh">
+        <param name="model_covariance1" value="0.01"/>
+        <param name="model_covariance2" value="0.01"/>
+        <param name="model_covariance3" value="0.01"/>
+        <param name="sensor_covariance1" value="0.05"/>
+        <param name="sensor_covariance2" value="0.05"/>
+        <param name="sensor_covariance3" value="0.05"/>
+        <param name="ndt2veh_sub_car_pose_topic" value="/predict_pose"/>
+    </node>
+
+    <arg name="waypt_resolution" value="0.1"/>
+
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <include file="$(find rrt_planning)/launch/rrt_star_visualizer.launch"/>
+
+    <node
+        pkg="behavior"
+        type="behavior_node"
+        name="behavior"
+        output="screen">
+        <param name="waypt_resolution" value="$(arg waypt_resolution)"/>
+        <param name="car_max_speed" value="30.0"/>
+        <param name="pid_p_gain" value="1.0"/>
+        <param name="pid_i_gain" value="0.01"/>
+        <param name="pid_d_gain" value="0.0"/>
+        <param name="parking_lane_id" value="92"/>
+        <param name="parking_lot_id" value="28"/>
+    </node>
+
+    <node
+        pkg="motion_planner"
+        type="motion_planner_node"
+        name="motion_planner">
+        <param name="waypt_resolution" value="$(arg waypt_resolution)"/>
+        <param name="roll_out_dist" value="50.0"/>
+    </node>
+
+    <node
+        pkg="waypoint_follower"
+        type="waypoint_follower_node"
+        name="waypoint_follower">
+        <param name="waypt_resolution" value="$(arg waypt_resolution)"/>
+        <param name="predict_ahead_time" value="1.4"/>
+    </node>
+
+    <node
+        pkg="behavior_gui"
+        type="behavior_gui"
+        name="itri_behavior_gui"/>
+
+</launch>

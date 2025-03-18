@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2020-2022, Bayerische Motoren Werke Aktiengesellschaft (BMW AG) -->
+<OpenSCENARIO>
+  <FileHeader revMajor="1" revMinor="0" date="2017-06-09T10:00:00" description="ALKS 4.4_1 CutIn"
+    author="SimS" />
+
+  <ParameterDeclarations>
+    <ParameterDeclaration name="ego_s" parameterType="double" value="30" />
+    <ParameterDeclaration name="ego_width" parameterType="double" value="2.2" />
+    <ParameterDeclaration name="ego_length" parameterType="double" value="5.17" />
+    <ParameterDeclaration name="agent_width" parameterType="double" value="2.2" />
+    <ParameterDeclaration name="agent_length" parameterType="double" value="5.04" />
+    <!-- <ParameterDeclaration name="agent_width" parameterType="double" value="0.5" /> -->
+    <!-- <ParameterDeclaration name="agent_length" parameterType="double" value="2.5" /> -->
+
+    <ParameterDeclaration name="carriagewayUser" parameterType="string" value="car_red" />
+    <ParameterDeclaration name="ve0" unit="kph" parameterType="double" value="50" />
+    <ParameterDeclaration name="vo0" unit="kph" parameterType="double" value="40" />
+    <ParameterDeclaration name="vy" unit="m/s" parameterType="double" value="1" />
+    <ParameterDeclaration name="dx0" unit="m" parameterType="double" value="15" />
+    <ParameterDeclaration name="dy0" unit="m" parameterType="double" value="1" />
+  </ParameterDeclarations>
+
+  <CatalogLocations>
+    <VehicleCatalog>
+      <Directory path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Vehicles" />
+    </VehicleCatalog>
+    <ControllerCatalog>
+      <Directory
+        path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Controllers" />
+    </ControllerCatalog>
+  </CatalogLocations>
+
+  <RoadNetwork>
+    <LogicFile
+      filepath="/project/mmsl_simulation/src/scenario/data/resources/xodr/alks_road_straight.xodr" />
+  </RoadNetwork>
+
+  <Entities>
+
+    <!-- <ScenarioObject name="Ego"> -->
+    <!--   <CatalogReference catalogName="VehicleCatalog" entryName="car_white" /> -->
+    <!--   <ObjectController> -->
+    <!--     <Controller name="ALKS_R157SM_Controller"> -->
+    <!--       <Properties> -->
+    <!--         <Property name="mode" value="override" /> -->
+    <!--         <Property name="model" value="Regulation" /> -->
+    <!--         <Property name="logLevel" value="2" /> -->
+    <!--         <Property name="cruise" value="false" /> -->
+    <!--         <Property name="cutInPerceptionDelayMode" value="Time" /> -->
+    <!--         <Property name="fullStop" value="true" /> -->
+    <!--         <Property name="lateralTrigDistance" value="0.5" /> -->
+    <!--         <Property name="aebTTC" value="1.2" /> -->
+    <!--       </Properties> -->
+    <!--     </Controller> -->
+    <!--   </ObjectController> -->
+    <!-- </ScenarioObject> -->
+
+    <ScenarioObject name="Ego">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_white" />
+      <ObjectController>
+        <CatalogReference catalogName="ControllerCatalog" entryName="externalController" />
+      </ObjectController>
+    </ScenarioObject>
+
+    <ScenarioObject name="CutInVehicle">
+      <CatalogReference catalogName="VehicleCatalog" entryName="$carriagewayUser" />
+    </ScenarioObject>
+
+  </Entities>
+
+  <Storyboard>
+
+    <Init>
+      <Actions>
+        <Private entityRef="Ego">
+
+          <PrivateAction>
+            <ControllerAction>
+              <ActivateControllerAction longitudinal="true" lateral="true" />
+            </ControllerAction>
+          </PrivateAction>
+
+          <!-- <PrivateAction> -->
+          <!--   <TeleportAction> -->
+          <!--     <Position> -->
+          <!--       <LanePosition roadId="0" laneId="-4" offset="0.0" s="$ego_s" /> -->
+          <!--     </Position> -->
+          <!--   </TeleportAction> -->
+          <!-- </PrivateAction> -->
+          <!---->
+          <!-- <PrivateAction> -->
+          <!--   <LongitudinalAction> -->
+          <!--     <SpeedAction> -->
+          <!--       <SpeedActionDynamics dynamicsShape="step" dynamicsDimension="time" value="0.0" /> -->
+          <!--       <SpeedActionTarget> -->
+          <!--         <AbsoluteTargetSpeed value="${$ve0 / 3.6}" /> -->
+          <!--       </SpeedActionTarget> -->
+          <!--     </SpeedAction> -->
+          <!--   </LongitudinalAction> -->
+          <!-- </PrivateAction> -->
+
+        </Private>
+
+        <Private entityRef="CutInVehicle">
+
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <WorldPosition x="100000" y="100000" z="100000" />
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+
+          <PrivateAction>
+            <LongitudinalAction>
+              <SpeedAction>
+                <SpeedActionDynamics dynamicsShape="step" dynamicsDimension="time" value="0.0" />
+                <SpeedActionTarget>
+                  <AbsoluteTargetSpeed value="${$vo0 / 3.6}" />
+                </SpeedActionTarget>
+              </SpeedAction>
+            </LongitudinalAction>
+          </PrivateAction>
+
+        </Private>
+
+      </Actions>
+    </Init>
+
+    <Story name="CutInStory">
+
+      <Act name="TeleportAgentAct">
+        <ManeuverGroup maximumExecutionCount="1" name="TeleportManeuverGroup">
+          <Actors selectTriggeringEntities="false">
+            <EntityRef entityRef="CutInVehicle" />
+          </Actors>
+          <Maneuver name="TeleportManeuver">
+            <Event name="TeleportEvent" priority="overwrite">
+              <Action name="TeleportAction">
+                <PrivateAction>
+                  <TeleportAction>
+                    <Position>
+                      <RelativeObjectPosition entityRef="Ego" dx="${10 * ($ve0 - $vo0) / 3.6 + $dx0}"
+                        dy="${$ego_width / 2 + $agent_width / 2 + $dy0}" />
+                    </Position>
+                  </TeleportAction>
+                </PrivateAction>
+              </Action>
+              <StartTrigger>
+                <ConditionGroup>
+                  <Condition name="TeleportStartCondition" delay="1" conditionEdge="none">
+                    <ByValueCondition>
+                      <SimulationTimeCondition value="0" rule="greaterThan" />
+                    </ByValueCondition>
+                  </Condition>
+                </ConditionGroup>
+              </StartTrigger>
+            </Event>
+          </Maneuver>
+        </ManeuverGroup>
+      </Act>
+
+      <Act name="CutInAct">
+        <ManeuverGroup maximumExecutionCount="1" name="CutInManeuverGroup">
+          <Actors selectTriggeringEntities="false">
+            <EntityRef entityRef="CutInVehicle" />
+          </Actors>
+          <Maneuver name="CutInManeuver">
+            <Event name="CutInEvent" priority="overwrite">
+              <Action name="CutInAction">
+                <PrivateAction>
+                  <LateralAction>
+                    <LaneChangeAction>
+                      <LaneChangeActionDynamics dynamicsShape="sinusoidal" value="$vy"
+                        dynamicsDimension="rate" />
+                      <LaneChangeTarget>
+                        <RelativeTargetLane entityRef="Ego" value="0" />
+                      </LaneChangeTarget>
+                    </LaneChangeAction>
+                  </LateralAction>
+                </PrivateAction>
+              </Action>
+              <StartTrigger>
+                <ConditionGroup>
+                  <Condition name="CutInStartCondition" delay="0" conditionEdge="rising">
+                    <ByEntityCondition>
+                      <TriggeringEntities triggeringEntitiesRule="any">
+                        <EntityRef entityRef="Ego" />
+                      </TriggeringEntities>
+                      <EntityCondition>
+                        <RelativeDistanceCondition entityRef="CutInVehicle"
+                          relativeDistanceType="longitudinal" value="$dx0" freespace="true"
+                          rule="lessThan" coordinateSystem="entity" />
+                      </EntityCondition>
+                    </ByEntityCondition>
+                  </Condition>
+                </ConditionGroup>
+              </StartTrigger>
+            </Event>
+          </Maneuver>
+        </ManeuverGroup>
+      </Act>
+
+    </Story>
+
+    <StopTrigger>
+      <ConditionGroup>
+        <Condition name="CutInCompletedCondition" delay="5.0" conditionEdge="none">
+          <ByValueCondition>
+            <StoryboardElementStateCondition storyboardElementType="action"
+              storyboardElementRef="CutInAction" state="completeState" />
+          </ByValueCondition>
+        </Condition>
+      </ConditionGroup>
+      <ConditionGroup>
+        <Condition name="EgoStuckCondition" delay="0" conditionEdge="rising">
+          <ByEntityCondition>
+            <TriggeringEntities triggeringEntitiesRule="any">
+              <EntityRef entityRef="Ego" />
+            </TriggeringEntities>
+            <EntityCondition>
+              <StandStillCondition duration="10" />
+            </EntityCondition>
+          </ByEntityCondition>
+        </Condition>
+      </ConditionGroup>
+    </StopTrigger>
+
+  </Storyboard>
+</OpenSCENARIO>

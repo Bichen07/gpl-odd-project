@@ -1,0 +1,7 @@
+sil_testing/node_frequency: 100.0
+sil_testing/detected_object_frequency: 10.0
+sil_testing/visualization_frequency: 100.0
+sil_testing/detected_object_pose_coord: local
+sil_testing/detected_object_velocity_coord: local
+sil_testing/detected_object_id_offset: 5000
+sil_testing/can_enable_path_republishing: false

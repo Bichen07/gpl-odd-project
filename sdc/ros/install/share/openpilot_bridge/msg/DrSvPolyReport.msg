@@ -1,0 +1,25 @@
+Header header
+
+float32[] xyzN
+bool hasSbasIono
+float32 positionUncertainty
+int64 svId
+float32 elevationUncertainty
+bool polyFromXtra
+float32[] other
+float32 ionoDot
+bool hasIono
+int32 frequencyIndex
+float32[] velocityCoeff
+float32 elevation
+float32 ionoDelay
+float32 sbasIonoDelay
+bool hasPosition
+bool hasElevation
+int64 iode
+float32 elevationDot
+float32 t0
+float32[] xyz0
+bool hasTropo
+float32 tropoDelay
+float32 sbasIonoDot

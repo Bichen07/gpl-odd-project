@@ -1,0 +1,24 @@
+(cl:in-package dbw_pacifica_msgs-msg)
+(cl:export '(HEADER-VAL
+          HEADER
+          FUEL_LEVEL-VAL
+          FUEL_LEVEL
+          DRIVE_BY_WIRE_ENABLED-VAL
+          DRIVE_BY_WIRE_ENABLED
+          VEHICLE_SPEED-VAL
+          VEHICLE_SPEED
+          SOFTWARE_BUILD_NUMBER-VAL
+          SOFTWARE_BUILD_NUMBER
+          GENERAL_ACTUATOR_FAULT-VAL
+          GENERAL_ACTUATOR_FAULT
+          BY_WIRE_READY-VAL
+          BY_WIRE_READY
+          GENERAL_DRIVER_ACTIVITY-VAL
+          GENERAL_DRIVER_ACTIVITY
+          COMMS_FAULT-VAL
+          COMMS_FAULT
+          AMBIENT_TEMP-VAL
+          AMBIENT_TEMP
+          VEHICLE_READY_TO_DRIVE-VAL
+          VEHICLE_READY_TO_DRIVE
+))

@@ -1,0 +1,6 @@
+string id
+int16 detected_object_id
+float32 distance
+geometry_msgs/Pose2D pose2d
+geometry_msgs/Vector3 dimensions
+geometry_msgs/Polygon polygon

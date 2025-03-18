@@ -1,0 +1,326 @@
+<?xml version="1.0"?>
+<OpenSCENARIO xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:noNamespaceSchemaLocation="OpenSccenario.xsd">
+    <FileHeader description="Lead vehicle drops a bike" author="Mandolin" revMajor="1" revMinor="0"
+        date="2021-06-17T14:48:00.821351" />
+
+    <ParameterDeclarations>
+        <ParameterDeclaration name="ve0" unit="kph" parameterType="double" value="50.0" />
+        <ParameterDeclaration name="dx0" unit="m" parameterType="double" value="15.0" />
+    </ParameterDeclarations>
+
+    <CatalogLocations>
+        <VehicleCatalog>
+            <Directory
+                path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Vehicles" />
+        </VehicleCatalog>
+        <PedestrianCatalog>
+            <Directory
+                path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Pedestrians" />
+        </PedestrianCatalog>
+        <MiscObjectCatalog>
+            <Directory
+                path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/MiscObjects" />
+        </MiscObjectCatalog>
+        <ControllerCatalog>
+            <Directory
+                path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Controllers" />
+        </ControllerCatalog>
+    </CatalogLocations>
+
+    <RoadNetwork>
+        <LogicFile
+            filepath="/project/mmsl_simulation/src/scenario/data/resources/xodr/alks_road_straight.xodr" />
+    </RoadNetwork>
+
+    <Entities>
+        <ScenarioObject name="Ego">
+            <CatalogReference catalogName="VehicleCatalog" entryName="car_white" />
+        </ScenarioObject>
+        <ScenarioObject name="Target">
+            <CatalogReference catalogName="VehicleCatalog" entryName="car_blue" />
+        </ScenarioObject>
+        <ScenarioObject name="bike">
+            <CatalogReference catalogName="VehicleCatalog" entryName="bicycle" />
+        </ScenarioObject>
+        <ScenarioObject name="Box">
+            <CatalogReference catalogName="MiscObjectCatalog" entryName="box" />
+        </ScenarioObject>
+    </Entities>
+
+    <Storyboard>
+
+        <Init>
+            <Actions>
+
+                <Private entityRef="Ego">
+                    <PrivateAction>
+                        <TeleportAction>
+                            <Position>
+                                <LanePosition roadId="0" laneId="-4" offset="0.0" s="5.0"></LanePosition>
+                            </Position>
+                        </TeleportAction>
+                    </PrivateAction>
+                    <PrivateAction>
+                        <LongitudinalAction>
+                            <SpeedAction>
+                                <SpeedActionDynamics dynamicsShape="step" value="1"
+                                    dynamicsDimension="time" />
+                                <SpeedActionTarget>
+                                    <AbsoluteTargetSpeed value="${$ve0 / 3.6}" />
+                                </SpeedActionTarget>
+                            </SpeedAction>
+                        </LongitudinalAction>
+                    </PrivateAction>
+                </Private>
+
+                <Private entityRef="Target">
+                    <PrivateAction>
+                        <TeleportAction>
+                            <Position>
+                                <WorldPosition x="10000" y="10000" z="10000" />
+                            </Position>
+                        </TeleportAction>
+                    </PrivateAction>
+                    <PrivateAction>
+                        <LongitudinalAction>
+                            <SpeedAction>
+                                <SpeedActionDynamics dynamicsShape="step" value="1"
+                                    dynamicsDimension="time" />
+                                <SpeedActionTarget>
+                                    <AbsoluteTargetSpeed value="${$ve0 / 3.6}" />
+                                </SpeedActionTarget>
+                            </SpeedAction>
+                        </LongitudinalAction>
+                    </PrivateAction>
+                </Private>
+
+                <Private entityRef="bike">
+                    <PrivateAction>
+                        <TeleportAction>
+                            <Position>
+                                <WorldPosition x="10000" y="10000" z="10000" />
+                            </Position>
+                        </TeleportAction>
+                    </PrivateAction>
+                </Private>
+
+                <Private entityRef="Box">
+                    <PrivateAction>
+                        <TeleportAction>
+                            <Position>
+                                <WorldPosition x="10000" y="10000" z="10000" />
+                            </Position>
+                        </TeleportAction>
+                    </PrivateAction>
+                </Private>
+
+            </Actions>
+        </Init>
+
+        <Story name="story_act_maneuvuergroup_drop maneuver">
+
+            <ParameterDeclarations />
+
+            <Act name="TeleportAgentAct">
+
+                <ManeuverGroup maximumExecutionCount="1" name="TeleportManeuverGroup">
+                    <Actors selectTriggeringEntities="false">
+                        <EntityRef entityRef="Target" />
+                    </Actors>
+                    <Maneuver name="TeleportManeuver">
+
+                        <Event name="TeleportEvent" priority="overwrite">
+                            <Action name="TeleportAction">
+                                <PrivateAction>
+                                    <TeleportAction>
+                                        <Position>
+                                            <RelativeLanePosition entityRef="Ego" dLane="0"
+                                                ds="$dx0" offset="0.0" />
+                                        </Position>
+                                    </TeleportAction>
+                                </PrivateAction>
+                            </Action>
+
+                            <StartTrigger>
+                                <ConditionGroup>
+                                    <Condition name="TeleportStartCondition" delay="1"
+                                        conditionEdge="none">
+                                        <ByValueCondition>
+                                            <SimulationTimeCondition value="0" rule="greaterThan" />
+                                        </ByValueCondition>
+                                    </Condition>
+                                </ConditionGroup>
+                            </StartTrigger>
+                        </Event>
+
+                    </Maneuver>
+                </ManeuverGroup>
+
+                <ManeuverGroup maximumExecutionCount="1" name="TeleportManeuverGroup3">
+                    <Actors selectTriggeringEntities="false">
+                        <EntityRef entityRef="Box" />
+                    </Actors>
+                    <Maneuver name="TeleportManeuver3">
+
+                        <Event name="TeleportEvent3" priority="overwrite">
+                            <Action name="TeleportAction3">
+                                <PrivateAction>
+                                    <TeleportAction>
+                                        <Position>
+                                            <RelativeLanePosition entityRef="Ego" dLane="1"
+                                                ds="${$dx0 + $ve0 / 3.6 * 10}" offset="0.0" />
+                                        </Position>
+                                    </TeleportAction>
+                                </PrivateAction>
+                            </Action>
+
+                            <StartTrigger>
+                                <ConditionGroup>
+                                    <Condition name="TeleportStartCondition3" delay="1"
+                                        conditionEdge="none">
+                                        <ByValueCondition>
+                                            <SimulationTimeCondition value="0" rule="greaterThan" />
+                                        </ByValueCondition>
+                                    </Condition>
+                                </ConditionGroup>
+                            </StartTrigger>
+                        </Event>
+
+                    </Maneuver>
+                </ManeuverGroup>
+
+                <ManeuverGroup maximumExecutionCount="1" name="TeleportManeuverGroup2">
+                    <Actors selectTriggeringEntities="false">
+                        <EntityRef entityRef="bike" />
+                    </Actors>
+                    <Maneuver name="TeleportManeuver2">
+
+                        <Event name="TeleportEvent2" priority="overwrite">
+                            <Action name="TeleportAction2">
+                                <PrivateAction>
+                                    <TeleportAction>
+                                        <Position>
+                                            <RelativeObjectPosition entityRef="Target" dy="-0.6"
+                                                dz="0.2">
+                                                <Orientation type="relative" h="1.57" />
+                                            </RelativeObjectPosition>
+                                        </Position>
+                                    </TeleportAction>
+                                </PrivateAction>
+                            </Action>
+
+                            <Action name="BikeLongAction">
+                                <PrivateAction>
+                                    <TeleportAction>
+                                        <Position>
+                                            <RelativeObjectPosition entityRef="Target" dy="-0.6"
+                                                dz="0.2">
+                                                <Orientation type="relative" h="1.57" />
+                                            </RelativeObjectPosition>
+                                        </Position>
+                                    </TeleportAction>
+                                </PrivateAction>
+                                <PrivateAction>
+                                    <LongitudinalAction>
+                                        <LongitudinalDistanceAction entityRef="Target"
+                                            freespace="false"
+                                            continuous="true" distance="1.2" />
+                                    </LongitudinalAction>
+                                </PrivateAction>
+                            </Action>
+
+                            <StartTrigger>
+                                <ConditionGroup>
+                                    <Condition name="TeleportStartCondition2" delay="1"
+                                        conditionEdge="none">
+                                        <ByValueCondition>
+                                            <SimulationTimeCondition value="0" rule="greaterThan" />
+                                        </ByValueCondition>
+                                    </Condition>
+                                </ConditionGroup>
+                            </StartTrigger>
+                        </Event>
+
+                    </Maneuver>
+                </ManeuverGroup>
+
+            </Act>
+
+            <Act name="act_maneuvuergroup_drop maneuver">
+                <ManeuverGroup name="maneuvuergroup_drop maneuver" maximumExecutionCount="1">
+                    <Actors selectTriggeringEntities="false">
+                        <EntityRef entityRef="bike" />
+                    </Actors>
+                    <Maneuver name="drop maneuver">
+                        <Event name="drop of bike" priority="overwrite" maximumExecutionCount="1">
+                            <Action name="drop action">
+                                <PrivateAction>
+                                    <TeleportAction>
+                                        <Position>
+                                            <RelativeObjectPosition entityRef="bike" dx="0" dy="0"
+                                                dz="-0.1">
+                                                <Orientation type="relative" r="1.57" />
+                                            </RelativeObjectPosition>
+                                        </Position>
+                                    </TeleportAction>
+                                </PrivateAction>
+                            </Action>
+                            <Action name="stop moving">
+                                <PrivateAction>
+                                    <LongitudinalAction>
+                                        <SpeedAction>
+                                            <SpeedActionDynamics dynamicsShape="step" value="0.0"
+                                                dynamicsDimension="time" />
+                                            <SpeedActionTarget>
+                                                <AbsoluteTargetSpeed value="0" />
+                                            </SpeedActionTarget>
+                                        </SpeedAction>
+                                    </LongitudinalAction>
+                                </PrivateAction>
+                            </Action>
+                            <StartTrigger>
+                                <ConditionGroup>
+                                    <Condition name="drop_trigger" delay="0" conditionEdge="none">
+                                        <ByValueCondition>
+                                            <SimulationTimeCondition value="10" rule="greaterThan" />
+                                        </ByValueCondition>
+                                    </Condition>
+                                </ConditionGroup>
+                            </StartTrigger>
+                        </Event>
+                    </Maneuver>
+                </ManeuverGroup>
+                <StartTrigger>
+                    <ConditionGroup>
+                        <Condition name="act_start" delay="0" conditionEdge="rising">
+                            <ByValueCondition>
+                                <SimulationTimeCondition value="0" rule="greaterThan" />
+                            </ByValueCondition>
+                        </Condition>
+                    </ConditionGroup>
+                </StartTrigger>
+                <StopTrigger />
+            </Act>
+
+        </Story>
+
+        <StopTrigger>
+            <ConditionGroup>
+                <Condition name="EgoStuckCondition" delay="0" conditionEdge="rising">
+                    <ByEntityCondition>
+                        <TriggeringEntities triggeringEntitiesRule="any">
+                            <EntityRef entityRef="Ego" />
+                        </TriggeringEntities>
+                        <EntityCondition>
+                            <StandStillCondition duration="7" />
+                        </EntityCondition>
+                    </ByEntityCondition>
+                </Condition>
+            </ConditionGroup>
+        </StopTrigger>
+
+    </Storyboard>
+
+</OpenSCENARIO>
+

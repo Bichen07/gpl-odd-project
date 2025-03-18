@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>openpilot_bridge</name>
+    <version>0.0.0</version>
+    <description>
+        This package receives openpolit message by zmq
+        and transforms the message to ros topic
+    </description>
+    <maintainer email="mxwu@itri.org.tw">MingXuanWu</maintainer>
+    <license>ITRI</license>
+    <buildtool_depend>catkin</buildtool_depend>
+    <depend>message_generation</depend>
+    <depend>message_runtime</depend>
+    <depend>std_msgs</depend>
+</package>

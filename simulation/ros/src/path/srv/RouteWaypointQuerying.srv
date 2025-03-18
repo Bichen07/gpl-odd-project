@@ -1,0 +1,3 @@
+path_msgs/WaypointId waypoint_id
+---
+path_msgs/RouteWaypoint route_waypoint

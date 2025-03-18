@@ -1,0 +1,61 @@
+<launch>
+
+    <arg name="output" default="screen"/>
+    <arg name="by_tick" default="false"/>
+    <arg name="by_esmini" default="true"/>
+    <arg name="headless" default="false"/>
+    <include file="$(env SDC_CONFIG_DIR)/static_tf.launch"/>
+
+    <!-- Set to false if publishing by scenario_visualization package. -->
+    <arg name="publish_scenario_visualization" default="false" />
+
+    <arg name="filtered_cluster_hulls_topic" default="filtered_cluster_hulls" />
+
+    <arg name="ego_handler/detect_range" default="120." />
+    <arg name="ego_handler/detected_objects_100hz" default="false" />
+    <arg name="ego_handler/detected_objects_id_offset" default="0" />
+    <arg name="ego_handler/detected_objects_topic" default="detected_objects" />
+    <arg name="ego_handler/velocity_in_ego_coord" default="true" />
+    <arg name="ego_handler/disable_noise" default="false" />
+
+    <arg name="disable_collision" default="true" />
+    <arg name="update_baselink_100hz" default="true"/>
+
+    <param name="/simulation/disable_collision" value="$(arg disable_collision)" />
+
+    <param name="/simulation/vehicle_configurations" value="$(find simulation_utils)/data/vehicle_parameters.json"/>
+
+    <rosparam param="simulation/using_carla">false</rosparam>
+
+    <node
+        pkg="simulation_adv"
+        type="simulation_adv_node"
+        name="simulation_adv"
+        output="$(arg output)"
+        unless="$(arg by_tick)">
+        <param name="by_esmini" value="$(arg by_esmini)"/>
+        <param name="headless" value="$(arg headless)"/>
+        <param name="publish_scenario_visualization" value="$(arg publish_scenario_visualization)"/>
+        <param name="filtered_cluster_hulls_topic" value="$(arg filtered_cluster_hulls_topic)" />
+        <param name="ego_handler/detect_range" value="$(arg ego_handler/detect_range)" />
+        <param name="ego_handler/detected_objects_100hz" value="$(arg ego_handler/detected_objects_100hz)" />
+        <param name="ego_handler/detected_objects_id_offset" value="$(arg ego_handler/detected_objects_id_offset)" />
+        <param name="ego_handler/detected_objects_topic" value="$(arg ego_handler/detected_objects_topic)" />
+        <param name="ego_handler/velocity_in_ego_coord" value="$(arg ego_handler/velocity_in_ego_coord)" />
+        <param name="ego_handler/disable_noise" value="$(arg ego_handler/disable_noise)" />
+    </node>
+    <node
+        pkg="simulation_adv"
+        type="simulation_adv_with_tick_node"
+        name="simulation_adv"
+        output="$(arg output)"
+        if="$(arg by_tick)">
+        <param name="publish_scenario_visualization" value="$(arg publish_scenario_visualization)"/>
+        <param name="ego_handler/detect_range" value="$(arg ego_handler/detect_range)" />
+        <param name="ego_handler/detected_objects_100hz" value="$(arg ego_handler/detected_objects_100hz)" />
+        <param name="ego_handler/detected_objects_id_offset" value="$(arg ego_handler/detected_objects_id_offset)" />
+        <param name="ego_handler/detected_objects_topic" value="$(arg ego_handler/detected_objects_topic)" />
+        <param name="ego_handler/velocity_in_ego_coord" value="$(arg ego_handler/velocity_in_ego_coord)" />
+    </node>
+
+</launch>

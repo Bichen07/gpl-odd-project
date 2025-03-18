@@ -1,0 +1,39 @@
+<launch>
+
+    <arg name="use_gdb" default="false" />
+    <arg name="simulation_output" default="log" />
+    <arg name="headless" default="false" />
+    <arg name="run" default="true" />
+    <arg name="disable_collision" default="true"/>
+    <arg name="sumo_port" default="9000"/>
+    <arg name="multisim" default="false" />
+
+    <rosparam command="load" file="$(find sumo_cosimulation)/config/parameters.yaml"/>
+    <rosparam command="load" file="$(find simulation_monitor)/config/simulation_monitor_setting.yaml"/>
+
+    <include file="$(find sdc)/launch/visualization.launch" unless="$(arg headless)" />
+
+    <include file="$(find simulation)/launch/simulation.launch">
+        <arg name="output" value="$(arg simulation_output)"/>
+        <arg name="publish_detected_objects" value="true"/>
+        <arg name="disable_collision" value="$(arg disable_collision)" />
+        <arg name="use_gdb" value="$(arg use_gdb)" />
+    </include>
+
+    <node pkg="itri_tasks" name="real_time_factor_publisher" type="real_time_factor_publish_tool.py" />
+    <node name="simulation_synchronization_node" pkg="sumo_cosimulation" type="simulation_synchronization.py" output="screen">
+        <param name="sumo_port" value="$(arg sumo_port)"/>
+    </node>
+    
+    <group unless="$(arg multisim)">
+        <node name="accident_recorder_node" pkg="simulation_monitor" type="accident_recorder.py" output="screen" />
+        <node name="ego_stuck_helper_node" pkg="simulation_monitor" type="ego_stuck_helper.py" output="screen" />
+        <node name="accident_identify_node" pkg="simulation_monitor" type="accident_identify_node.py" output="screen" />
+        <node name="navigation_path_runner_node" pkg="scenario" type="navigation_path_runner_node" output="log"/>
+    </group>
+
+    <include file="$(find sdc)/launch/run.launch" if="$(arg run)">
+        <arg name="simulation" value="true" />
+    </include>
+
+</launch>

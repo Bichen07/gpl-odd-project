@@ -1,0 +1,12 @@
+<launch>
+
+    <arg name="remote" default="false"/>
+
+    <rosparam file="$(env SDC_CONFIG_DIR)/perception/camera_object_detection/object.yaml"
+        param="objects" subst_value="True" />
+
+    <include file="$(env SDC_CONFIG_DIR)/perception/camera_object_detection/camera-object-detection.launch">
+        <arg name="remote" value="$(arg remote)"/>
+    </include>
+
+</launch>

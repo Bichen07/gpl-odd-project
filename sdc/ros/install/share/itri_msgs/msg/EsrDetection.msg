@@ -1,0 +1,13 @@
+Header header
+uint8 path_id_acc_stat
+uint8 path_id_acc
+uint8 path_id_cmbb_move
+uint8 path_id_cmbb_stat
+uint8 path_id_fcw_move
+uint8 path_id_fcw_stat
+uint8 water_spray_target_id
+float32 filtered_xohp_acc_cipv
+uint8 path_id_acc_2
+uint8 path_id_acc_3
+bool lr_only_grating_lobe_det
+bool truck_target_det

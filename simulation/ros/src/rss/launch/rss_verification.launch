@@ -1,0 +1,37 @@
+<launch>
+
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+
+    <!-- <arg name="rss_parameter_filename" value="unpreventable_parameters.yaml" /> -->
+    <!-- <rosparam command="load" file="$(find rss)/data/$(arg rss_parameter_filename)"/> -->
+
+    <arg name="use_gdb" value="false"/>
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+    <!-- <arg name="map_file_dir" default="$(find rss)/map_data"/> -->
+    <arg name="map_file_dir" default="/project/mmsl_simulation/src/scenario/data/resources/xodr"/>
+    <arg name="unsafe_logging_dir" default="$(find rss)/data"/>
+    <arg name="can_show_check_result" default="true"/>
+
+    <group ns="rss">
+        <param name="map_file_dir" value="$(arg map_file_dir)"/>
+        <param name="unsafe_logging_file" value="$(arg unsafe_logging_dir)/unsafe_log.txt"/>
+        <param name="can_show_check_result" value="$(arg can_show_check_result)"/>
+        <param name="longitudinal_distance_file" value="$(arg unsafe_logging_dir)/longitudinal_distance.txt"/>
+        <param name="lateral_distance_file" value="$(arg unsafe_logging_dir)/lateral_distance.txt"/>
+        <param name="long_safe_distance_file" value="$(arg unsafe_logging_dir)/long_safe_distance.txt"/>
+        <param name="relative_long_speed_file" value="$(arg unsafe_logging_dir)/relative_long_speed.txt"/>
+        <param name="relative_lat_speed_file" value="$(arg unsafe_logging_dir)/relative_lat_speed.txt"/>
+        <param name="safety_status_file" value="$(arg unsafe_logging_dir)/safety_status.txt"/>
+    </group>
+
+    <node
+        pkg="rss"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="rss_verification_node"
+        name="rss_verification"
+        output="screen">
+    </node>
+
+</launch>

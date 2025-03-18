@@ -1,0 +1,74 @@
+<launch>
+
+    <arg name="gps_reference" default="5"/>
+    <arg name="initial_using_gps" default="true"/>
+    <arg name="enable_imu_fusion" default="false"/>
+    <arg name="machine" default="default_localizer_machine"/>
+    <machine name="default_localizer_machine" address="localhost"/>
+
+    <node pkg="nmea2pose" type="nmea2pose" name="nmea2pose" output="screen">
+        <param name="gps_reference" value="$(arg gps_reference)"/>
+        <param name="use_GPHDT" value="true"/>
+        <param name="calibrate_x" value="0.00"/>
+        <param name="calibrate_y" value="0.00"/>
+        <param name="calibrate_z" value="0.00"/>
+    </node>
+
+    <node pkg="localizer"
+          type="localizer_node"
+          machine="$(arg machine)"
+          name="localizer_node">
+        <param name="use_gpu" value="true"/>
+        <param name="gpu_heap_size_mb" value="2000"/>
+        <param name="ndt_resolution" value="2.0"/>
+        <param name="ndt_max_iterations" value="200"/>
+        <param name="ndt_timeout" value="0.2"/>
+        <param name="estimation_lag_time" value="0.5"/>
+        <param name="reliable_window" value="10.0"/>
+        <remap from="gnss_pose" to="gnss_pose_unbiased"/>
+    </node>
+
+    <node pkg="voxel_grid_filter"
+          type="voxel_grid_filter_node"
+          machine="$(arg machine)"
+          name="localization_voxel_grid_filter_node">
+    </node>
+
+    <node name="map_loader"
+          pkg="pointmap_loader"
+          machine="$(arg machine)"
+          type="pointmap_loader">
+        <param name="initial_map_files" value="submap_0_0.pcd, submap_0_-1.pcd"/>
+        <param name="dynamic_loading" value="true"/>
+        <param name="initialize_with_gnss" value="true"/>
+        <param name="ndt_score_threshold" value="1.0"/>
+        <param name="search_radius" value="150"/>
+        <param name="rviz_downsample_size" value="100000"/>
+    </node>
+
+    <node
+        pkg="ndt2veh"
+        type="ndt2veh_node"
+        name="ndt2veh">
+        <param name="simulation" value="false"/>
+        <param name="ndt2veh_sub_car_pose_topic" value="/localizer_node/predict_pose"/>
+    </node>
+
+    <node pkg="local_pose_estimation"
+          type="local_pose_estimation_node"
+          machine="$(arg machine)"
+          name="local_pose_estimation">
+          <param name="pose_frame_id" value="/odom"/>
+          <param name="output_pose_name" value="/local_pose"/>
+    </node>
+
+    <node pkg="motion_compensation"
+          type="motion_compensation_node"
+          name="motion_compensation">
+    </node>
+
+    <node pkg="gps_bias_compensate"
+          type="gps_bias_compensate_node"
+          name="gps_bias_compensate">
+    </node>
+</launch>

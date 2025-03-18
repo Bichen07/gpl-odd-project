@@ -1,0 +1,8 @@
+<launch>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="ground_plane_frame_publisher"
+        args="0.0 0.0 -2.2 0.0 0.0 0.0 base_link ground_plane "/>
+
+    <node pkg="tf2_ros" type="static_transform_publisher" name="imu_frame_publisher"
+        args="-2.0 0.0 -1.0 0.0 0.0 0.0 base_link imu"/>
+</launch>

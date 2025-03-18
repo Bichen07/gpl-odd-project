@@ -1,0 +1,21 @@
+<launch>
+
+    <arg name="use_gdb" value="false"/>
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+
+    <group ns="/scenario">
+        <param name="visualization_frequency" value="100.0"/>
+    </group>
+
+    <node
+        pkg="scenario_visualization"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="scenario_visualization_node"
+        name="scenario_visualization"
+        respawn="true"
+        output="screen">
+    </node>
+
+</launch>

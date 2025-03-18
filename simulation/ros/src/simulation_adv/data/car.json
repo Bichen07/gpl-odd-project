@@ -1,0 +1,33 @@
+{
+   "command" : [
+      {
+         "loop_stamp" : 2,
+         "speed" : 5.0,
+         "steering" : 0
+      }
+   ],
+   "drag_coefficient" : 0.30000001192092896,
+   "existance" : {
+      "begin" : 1,
+      "end" : 2147483647
+   },
+   "front_axis" : 1.5,
+   "front_stiffness" : 30000,
+   "id" : "car",
+   "is_operable" : true,
+   "length" : 4,
+   "mass" : 1280,
+   "orientation" : -1.1449360847473145,
+   "position" : {
+      "x" : 29.799766540527344,
+      "y" : -7.6961526870727539
+   },
+   "rear_axis" : 1.1119999885559082,
+   "rear_stiffness" : 60000,
+   "speed" : 0,
+   "width" : 2,
+   "yaw_rate" : 0,
+   "zero_thrust" : false,
+   "is_operable":false,
+   "follow_waypoint":true
+}

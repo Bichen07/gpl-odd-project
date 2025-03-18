@@ -1,0 +1,136 @@
+rss:
+  in_simulation: true
+  verification_node/node_frequency: 10.0
+  forward_looking_distance: 30.0
+  can_show_verifier_warning_message: false
+  can_run_unsafe_logging: false
+  can_run_quantitative_analysis_logging: false
+  ego_vehicle_dynamics:
+    alphaLon:
+      accelMax: 2.0 #3.5
+      brakeMax: -8.2
+      brakeMin: -8.1
+      brakeMinCorrect: -8.0
+    alphaLat:
+      accelMax: 0.1
+      brakeMin: -3.0
+    lateralFluctuationMargin: 0.0 #0.0
+    responseTime: 0.05  #1.0
+    maxSpeedOnAcceleration: 100.0
+    unstructuredSettings:
+      pedestrianTurningRadius: 2.0 #1.0
+      driveAwayMaxAngle: 2.4
+      vehicleYawRateChange: 1.3 #0.3
+      vehicleMinRadius: 3.5
+      vehicleTrajectoryCalculationStep: 0.2
+      vehicleFrontIntermediateYawRateChangeRatioSteps: 4
+      vehicleBackIntermediateYawRateChangeRatioSteps: 0
+      vehicleBrakeIntermediateAccelerationSteps: 3 #0
+      vehicleContinueForwardIntermediateAccelerationSteps: 3 #0
+      vehicleContinueForwardIntermediateYawRateChangeRatioSteps: 0
+      pedestrianContinueForwardIntermediateHeadingChangeRatioSteps: 3 #0
+      pedestrianContinueForwardIntermediateAccelerationSteps: 3 #0
+      pedestrianBrakeIntermediateAccelerationSteps: 3 #0
+      pedestrianFrontIntermediateHeadingChangeRatioSteps: 4 #0
+      pedestrianBackIntermediateHeadingChangeRatioSteps: 0
+  other_vehicle_dynamics:
+    alphaLon:
+      accelMax: 2.0 #3.5
+      brakeMax: -8.2
+      brakeMin: -8.1
+      brakeMinCorrect: -8.0
+    alphaLat:
+      accelMax: 0.1
+      brakeMin: -3.0
+    lateralFluctuationMargin: 0.0 #0.0
+    responseTime: 0.5
+    maxSpeedOnAcceleration: 100.0
+    unstructuredSettings:
+      pedestrianTurningRadius: 2.0 #1.0
+      driveAwayMaxAngle: 2.4
+      vehicleYawRateChange: 1.3 #0.3
+      vehicleMinRadius: 3.5
+      vehicleTrajectoryCalculationStep: 0.2
+      vehicleFrontIntermediateYawRateChangeRatioSteps: 4 #0
+      vehicleBackIntermediateYawRateChangeRatioSteps: 0
+      vehicleBrakeIntermediateAccelerationSteps: 3 #0
+      vehicleContinueForwardIntermediateAccelerationSteps: 3 #0
+      vehicleContinueForwardIntermediateYawRateChangeRatioSteps: 0
+      pedestrianContinueForwardIntermediateHeadingChangeRatioSteps: 3 #0
+      pedestrianContinueForwardIntermediateAccelerationSteps: 3 #0
+      pedestrianBrakeIntermediateAccelerationSteps: 3 #0
+      pedestrianFrontIntermediateHeadingChangeRatioSteps: 4 #0
+      pedestrianBackIntermediateHeadingChangeRatioSteps: 4 #0
+  human_reference_vehicle_dynamics:
+    alphaLon:
+      accelMax: 3.5 #3.5
+      brakeMax: -8.0
+      brakeMin: -4.0
+      brakeMinCorrect: -3.0
+    alphaLat:
+      accelMax: 0.2
+      brakeMin: -0.8
+    lateralFluctuationMargin: 0.1 #0.0
+    responseTime: 1.0 #1.0
+    maxSpeedOnAcceleration: 100.0
+    unstructuredSettings:
+      pedestrianTurningRadius: 2.0 #1.0
+      driveAwayMaxAngle: 2.4
+      vehicleYawRateChange: 1.3 #0.3
+      vehicleMinRadius: 3.5
+      vehicleTrajectoryCalculationStep: 0.2
+      vehicleFrontIntermediateYawRateChangeRatioSteps: 4
+      vehicleBackIntermediateYawRateChangeRatioSteps: 0
+      vehicleBrakeIntermediateAccelerationSteps: 3 #0
+      vehicleContinueForwardIntermediateAccelerationSteps: 3 #0
+      vehicleContinueForwardIntermediateYawRateChangeRatioSteps: 0
+      pedestrianContinueForwardIntermediateHeadingChangeRatioSteps: 3 #0
+      pedestrianContinueForwardIntermediateAccelerationSteps: 3 #0
+      pedestrianBrakeIntermediateAccelerationSteps: 3 #0
+      pedestrianFrontIntermediateHeadingChangeRatioSteps: 4 #0
+      pedestrianBackIntermediateHeadingChangeRatioSteps: 0
+  pedestrian_dynamics:
+    alphaLon:
+      accelMax: 2.0
+      brakeMax: -2.0
+      brakeMin: -2.0
+      brakeMinCorrect: -2.0
+    alphaLat:
+      accelMax: 0.001
+      brakeMin: -0.001
+    lateralFluctuationMargin: 0.1
+    responseTime: 0.8
+    maxSpeedOnAcceleration: 10.0
+    unstructuredSettings:
+      pedestrianTurningRadius: 2.0
+      driveAwayMaxAngle: 2.4
+      vehicleYawRateChange: 1.3
+      vehicleMinRadius: 3.5
+      vehicleTrajectoryCalculationStep: 0.2
+      vehicleFrontIntermediateYawRateChangeRatioSteps: 4
+      vehicleBackIntermediateYawRateChangeRatioSteps: 0
+      vehicleBrakeIntermediateAccelerationSteps: 3
+      vehicleContinueForwardIntermediateAccelerationSteps: 3
+      vehicleContinueForwardIntermediateYawRateChangeRatioSteps: 0
+      pedestrianContinueForwardIntermediateHeadingChangeRatioSteps: 3
+      pedestrianContinueForwardIntermediateAccelerationSteps: 0
+      pedestrianBrakeIntermediateAccelerationSteps: 3
+      pedestrianFrontIntermediateHeadingChangeRatioSteps: 4
+      pedestrianBackIntermediateHeadingChangeRatioSteps: 0
+  visualization:
+    canShowDetectedObjectId: true
+    canShowEgoVehicleBrakeTrajectorySet: true
+    canShowEgoVehicleContinueForwardTrajectorySet: false
+    canShowObjectBrakeTrajectorySet: false
+    canShowObjectContinueForwardTrajectorySet: false
+    canShowSituationType: false
+    canShowLandmark: false
+  open_drive_map: {
+      taichung_new: "shuinan_ceci_3_thi_sidewalk.xodr",
+      III_itri: "III_itri_v6-0.xodr",
+      # hct_logistic: "hct_logistic.xdor",
+      # hct_logistic: "bdsc_export.xodr",
+      hct_logistic: "hct_6.xodr",
+      straight_500m: "straight_500m.xodr",
+      alks_road_straight: "alks_road_straight.xodr",
+    }

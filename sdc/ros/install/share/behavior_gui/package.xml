@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<package>
+  <name>behavior_gui</name>
+  <version>0.1.0</version>
+  <description>
+
+     behavior_gui
+
+  </description>
+  <maintainer email="jeromelin@itri.org.tw">jeromelin</maintainer>
+  <author>chantellin</author>
+  <license>BSD</license>
+  <!-- <url type="bugtracker">https://github.com/stonier/qt_ros/issues</url> -->
+  <!-- <url type="repository">https://github.com/stonier/qt_ros</url> -->
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>std_srvs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>rviz</build_depend>
+  <build_depend>roslib</build_depend>
+  <build_depend>message_runtime</build_depend>
+  <build_depend>interactive_markers</build_depend>
+  <build_depend>visualization_msgs</build_depend>
+  <build_depend>itri_msgs</build_depend>
+  <build_depend>behavior</build_depend>
+
+
+  <run_depend>roscpp</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>std_msgs</run_depend>
+  <run_depend>std_srvs</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>geometry_msgs</run_depend>
+  <run_depend>message_generation</run_depend>
+  <run_depend>rviz</run_depend>
+  <run_depend>roslib</run_depend>
+  <run_depend>message_runtime</run_depend>
+  <run_depend>interactive_markers</run_depend>
+  <run_depend>visualization_msgs</run_depend>
+  <run_depend>itri_msgs</run_depend>
+  <run_depend>behavior</run_depend>
+</package>

@@ -1,0 +1,19 @@
+
+simulation_control:
+    timing:
+        kill_contact_agent: 3.0
+        kill_nearest_agent: 10.0
+        kill_next_nearest: 2.0
+        restart_chosen_route_after: 10.0
+        force_reset: 40
+    setting:
+        route: 5
+
+accident_recorder:
+    enable:
+        info: true
+        image: true
+        bag: false
+    topics: /project/mmsl_simulation/src/simulation_monitor/config/recorded_data.json
+    save_path: /project/mmsl_simulation/src/simulation_monitor/data/saved/
+

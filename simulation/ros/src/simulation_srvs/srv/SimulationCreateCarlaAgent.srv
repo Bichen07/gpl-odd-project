@@ -1,0 +1,10 @@
+string role_name
+string filter_pattern
+string vehicle_type  # This will be used if filter_pattern is not assigned
+string sensor_config_file
+geometry_msgs/Pose pose
+std_msgs/ColorRGBA color
+bool enable_vehicle_control
+---
+# return -1 if fail spawning the agent
+int32 carla_id

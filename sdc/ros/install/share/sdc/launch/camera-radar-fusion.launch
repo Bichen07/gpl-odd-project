@@ -1,0 +1,17 @@
+<launch>
+
+    <arg name="remote" default="false"/>
+
+    <include file="$(env SDC_CONFIG_DIR)/machines/black-widow/machine.launch"
+        if="$(arg remote)">
+        <arg name="set_as_default" value="true"/>
+    </include>
+
+    <include file="$(find motion_segment)\launch\motion_segment.launch"/>
+
+    <include file="$(find camera_radar_fusion)/launch/camera_radar_fusion.launch"/>
+
+    <include file="$(env SDC_CONFIG_DIR)/machines/machine-localhost-default.launch"
+        if="$(arg remote)"/>
+
+</launch>

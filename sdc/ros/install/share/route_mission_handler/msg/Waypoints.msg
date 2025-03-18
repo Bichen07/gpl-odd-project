@@ -1,0 +1,13 @@
+int32 laneId
+int32 pointId
+float32 roadWidth
+float32 distToRightLine
+float32 distToLeftLine
+float32 right_road_bound
+float32 left_road_bound
+float32 curve
+float32 slope
+float32 bank_angle
+geometry_msgs/Pose pose
+int32[] markerIds
+int32[] markerTypes

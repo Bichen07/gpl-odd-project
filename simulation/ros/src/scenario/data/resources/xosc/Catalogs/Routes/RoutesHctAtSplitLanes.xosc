@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSCENARIO>
+   <FileHeader revMajor="1"
+      revMinor="0"
+      date="2024-01-01T20:28:00"
+      author="chiu41" />
+   <Catalog name="RoutesHctAtSplitLanes">
+      <Route name="TurnRight" closed="false">
+         <Waypoint routeStrategy="shortest">
+            <Position>
+               <LanePosition roadId="10" laneId="1" offset="0" s="8" />
+            </Position>
+         </Waypoint>
+         <Waypoint routeStrategy="shortest">
+            <Position>
+               <LanePosition roadId="3" laneId="2" offset="0" s="10" />
+            </Position>
+         </Waypoint>
+      </Route>
+   </Catalog>
+</OpenSCENARIO>

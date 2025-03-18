@@ -1,0 +1,1 @@
+scenario_search/QuinticWaypoint[] points

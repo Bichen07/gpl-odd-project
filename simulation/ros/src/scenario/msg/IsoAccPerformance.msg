@@ -1,0 +1,2 @@
+bool is_successful_time_gap
+float64 time_gap

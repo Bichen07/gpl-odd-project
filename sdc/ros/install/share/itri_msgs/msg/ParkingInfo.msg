@@ -1,0 +1,2 @@
+int32 totalParkingPathCount
+int32 currentPathNumber

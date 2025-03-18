@@ -1,0 +1,17 @@
+Header header
+
+uint8 RED = 1
+uint8 GREEN = 2
+uint8 YELLOW = 3
+uint8 STRAIGHT = 4
+uint8 RED_LEFT = 5
+uint8 RED_RIGHT = 6
+uint8 RED_LEFT_RIGHT = 7
+uint8 STRAIGHT_LEFT = 8
+uint8 STRAIGHT_RIGHT = 9
+uint8 STRAIGHT_LEFT_RIGHT = 10
+uint8 LEFT = 11
+uint8 RIGHT = 12
+uint8 LEFT_RIGHT = 13
+uint8 FLASH_RED = 14
+uint8 FLASH_YELLOW = 15

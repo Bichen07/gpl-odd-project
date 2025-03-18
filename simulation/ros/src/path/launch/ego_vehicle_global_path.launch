@@ -1,0 +1,14 @@
+<launch>
+    <arg name="use_gdb" value="false"/>
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+
+    <node
+        pkg="path"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="path_ego_vehicle_global_path_node"
+        name="path_ego_vehicle_global_path"
+        output="screen">
+    </node>
+</launch>

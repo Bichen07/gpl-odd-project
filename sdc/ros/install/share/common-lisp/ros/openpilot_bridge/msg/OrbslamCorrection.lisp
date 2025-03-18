@@ -1,0 +1,276 @@
+; Auto-generated. Do not edit!
+
+
+(cl:in-package openpilot_bridge-msg)
+
+
+;//! \htmlinclude OrbslamCorrection.msg.html
+
+(cl:defclass <OrbslamCorrection> (roslisp-msg-protocol:ros-message)
+  ((header
+    :reader header
+    :initarg :header
+    :type std_msgs-msg:Header
+    :initform (cl:make-instance 'std_msgs-msg:Header))
+   (correctionMonoTime
+    :reader correctionMonoTime
+    :initarg :correctionMonoTime
+    :type cl:integer
+    :initform 0)
+   (prePositionECEF
+    :reader prePositionECEF
+    :initarg :prePositionECEF
+    :type (cl:vector cl:float)
+   :initform (cl:make-array 0 :element-type 'cl:float :initial-element 0.0))
+   (postPositionECEF
+    :reader postPositionECEF
+    :initarg :postPositionECEF
+    :type (cl:vector cl:float)
+   :initform (cl:make-array 0 :element-type 'cl:float :initial-element 0.0))
+   (postPoseQuatECEF
+    :reader postPoseQuatECEF
+    :initarg :postPoseQuatECEF
+    :type (cl:vector cl:float)
+   :initform (cl:make-array 0 :element-type 'cl:float :initial-element 0.0))
+   (numInliers
+    :reader numInliers
+    :initarg :numInliers
+    :type cl:integer
+    :initform 0)
+   (prePoseQuatECEF
+    :reader prePoseQuatECEF
+    :initarg :prePoseQuatECEF
+    :type (cl:vector cl:float)
+   :initform (cl:make-array 0 :element-type 'cl:float :initial-element 0.0)))
+)
+
+(cl:defclass OrbslamCorrection (<OrbslamCorrection>)
+  ())
+
+(cl:defmethod cl:initialize-instance :after ((m <OrbslamCorrection>) cl:&rest args)
+  (cl:declare (cl:ignorable args))
+  (cl:unless (cl:typep m 'OrbslamCorrection)
+    (roslisp-msg-protocol:msg-deprecation-warning "using old message class name openpilot_bridge-msg:<OrbslamCorrection> is deprecated: use openpilot_bridge-msg:OrbslamCorrection instead.")))
+
+(cl:ensure-generic-function 'header-val :lambda-list '(m))
+(cl:defmethod header-val ((m <OrbslamCorrection>))
+  (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader openpilot_bridge-msg:header-val is deprecated.  Use openpilot_bridge-msg:header instead.")
+  (header m))
+
+(cl:ensure-generic-function 'correctionMonoTime-val :lambda-list '(m))
+(cl:defmethod correctionMonoTime-val ((m <OrbslamCorrection>))
+  (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader openpilot_bridge-msg:correctionMonoTime-val is deprecated.  Use openpilot_bridge-msg:correctionMonoTime instead.")
+  (correctionMonoTime m))
+
+(cl:ensure-generic-function 'prePositionECEF-val :lambda-list '(m))
+(cl:defmethod prePositionECEF-val ((m <OrbslamCorrection>))
+  (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader openpilot_bridge-msg:prePositionECEF-val is deprecated.  Use openpilot_bridge-msg:prePositionECEF instead.")
+  (prePositionECEF m))
+
+(cl:ensure-generic-function 'postPositionECEF-val :lambda-list '(m))
+(cl:defmethod postPositionECEF-val ((m <OrbslamCorrection>))
+  (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader openpilot_bridge-msg:postPositionECEF-val is deprecated.  Use openpilot_bridge-msg:postPositionECEF instead.")
+  (postPositionECEF m))
+
+(cl:ensure-generic-function 'postPoseQuatECEF-val :lambda-list '(m))
+(cl:defmethod postPoseQuatECEF-val ((m <OrbslamCorrection>))
+  (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader openpilot_bridge-msg:postPoseQuatECEF-val is deprecated.  Use openpilot_bridge-msg:postPoseQuatECEF instead.")
+  (postPoseQuatECEF m))
+
+(cl:ensure-generic-function 'numInliers-val :lambda-list '(m))
+(cl:defmethod numInliers-val ((m <OrbslamCorrection>))
+  (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader openpilot_bridge-msg:numInliers-val is deprecated.  Use openpilot_bridge-msg:numInliers instead.")
+  (numInliers m))
+
+(cl:ensure-generic-function 'prePoseQuatECEF-val :lambda-list '(m))
+(cl:defmethod prePoseQuatECEF-val ((m <OrbslamCorrection>))
+  (roslisp-msg-protocol:msg-deprecation-warning "Using old-style slot reader openpilot_bridge-msg:prePoseQuatECEF-val is deprecated.  Use openpilot_bridge-msg:prePoseQuatECEF instead.")
+  (prePoseQuatECEF m))
+(cl:defmethod roslisp-msg-protocol:serialize ((msg <OrbslamCorrection>) ostream)
+  "Serializes a message object of type '<OrbslamCorrection>"
+  (roslisp-msg-protocol:serialize (cl:slot-value msg 'header) ostream)
+  (cl:let* ((signed (cl:slot-value msg 'correctionMonoTime)) (unsigned (cl:if (cl:< signed 0) (cl:+ signed 18446744073709551616) signed)))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 32) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 40) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 48) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 56) unsigned) ostream)
+    )
+  (cl:let ((__ros_arr_len (cl:length (cl:slot-value msg 'prePositionECEF))))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) __ros_arr_len) ostream))
+  (cl:map cl:nil #'(cl:lambda (ele) (cl:let ((bits (roslisp-utils:encode-single-float-bits ele)))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) bits) ostream)))
+   (cl:slot-value msg 'prePositionECEF))
+  (cl:let ((__ros_arr_len (cl:length (cl:slot-value msg 'postPositionECEF))))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) __ros_arr_len) ostream))
+  (cl:map cl:nil #'(cl:lambda (ele) (cl:let ((bits (roslisp-utils:encode-single-float-bits ele)))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) bits) ostream)))
+   (cl:slot-value msg 'postPositionECEF))
+  (cl:let ((__ros_arr_len (cl:length (cl:slot-value msg 'postPoseQuatECEF))))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) __ros_arr_len) ostream))
+  (cl:map cl:nil #'(cl:lambda (ele) (cl:let ((bits (roslisp-utils:encode-single-float-bits ele)))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) bits) ostream)))
+   (cl:slot-value msg 'postPoseQuatECEF))
+  (cl:let* ((signed (cl:slot-value msg 'numInliers)) (unsigned (cl:if (cl:< signed 0) (cl:+ signed 18446744073709551616) signed)))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 32) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 40) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 48) unsigned) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 56) unsigned) ostream)
+    )
+  (cl:let ((__ros_arr_len (cl:length (cl:slot-value msg 'prePoseQuatECEF))))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) __ros_arr_len) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) __ros_arr_len) ostream))
+  (cl:map cl:nil #'(cl:lambda (ele) (cl:let ((bits (roslisp-utils:encode-single-float-bits ele)))
+    (cl:write-byte (cl:ldb (cl:byte 8 0) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 8) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 16) bits) ostream)
+    (cl:write-byte (cl:ldb (cl:byte 8 24) bits) ostream)))
+   (cl:slot-value msg 'prePoseQuatECEF))
+)
+(cl:defmethod roslisp-msg-protocol:deserialize ((msg <OrbslamCorrection>) istream)
+  "Deserializes a message object of type '<OrbslamCorrection>"
+  (roslisp-msg-protocol:deserialize (cl:slot-value msg 'header) istream)
+    (cl:let ((unsigned 0))
+      (cl:setf (cl:ldb (cl:byte 8 0) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 8) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 16) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 24) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 32) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 40) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 48) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 56) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:slot-value msg 'correctionMonoTime) (cl:if (cl:< unsigned 9223372036854775808) unsigned (cl:- unsigned 18446744073709551616))))
+  (cl:let ((__ros_arr_len 0))
+    (cl:setf (cl:ldb (cl:byte 8 0) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 8) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 16) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 24) __ros_arr_len) (cl:read-byte istream))
+  (cl:setf (cl:slot-value msg 'prePositionECEF) (cl:make-array __ros_arr_len))
+  (cl:let ((vals (cl:slot-value msg 'prePositionECEF)))
+    (cl:dotimes (i __ros_arr_len)
+    (cl:let ((bits 0))
+      (cl:setf (cl:ldb (cl:byte 8 0) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 8) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 16) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 24) bits) (cl:read-byte istream))
+    (cl:setf (cl:aref vals i) (roslisp-utils:decode-single-float-bits bits))))))
+  (cl:let ((__ros_arr_len 0))
+    (cl:setf (cl:ldb (cl:byte 8 0) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 8) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 16) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 24) __ros_arr_len) (cl:read-byte istream))
+  (cl:setf (cl:slot-value msg 'postPositionECEF) (cl:make-array __ros_arr_len))
+  (cl:let ((vals (cl:slot-value msg 'postPositionECEF)))
+    (cl:dotimes (i __ros_arr_len)
+    (cl:let ((bits 0))
+      (cl:setf (cl:ldb (cl:byte 8 0) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 8) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 16) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 24) bits) (cl:read-byte istream))
+    (cl:setf (cl:aref vals i) (roslisp-utils:decode-single-float-bits bits))))))
+  (cl:let ((__ros_arr_len 0))
+    (cl:setf (cl:ldb (cl:byte 8 0) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 8) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 16) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 24) __ros_arr_len) (cl:read-byte istream))
+  (cl:setf (cl:slot-value msg 'postPoseQuatECEF) (cl:make-array __ros_arr_len))
+  (cl:let ((vals (cl:slot-value msg 'postPoseQuatECEF)))
+    (cl:dotimes (i __ros_arr_len)
+    (cl:let ((bits 0))
+      (cl:setf (cl:ldb (cl:byte 8 0) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 8) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 16) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 24) bits) (cl:read-byte istream))
+    (cl:setf (cl:aref vals i) (roslisp-utils:decode-single-float-bits bits))))))
+    (cl:let ((unsigned 0))
+      (cl:setf (cl:ldb (cl:byte 8 0) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 8) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 16) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 24) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 32) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 40) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 48) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 56) unsigned) (cl:read-byte istream))
+      (cl:setf (cl:slot-value msg 'numInliers) (cl:if (cl:< unsigned 9223372036854775808) unsigned (cl:- unsigned 18446744073709551616))))
+  (cl:let ((__ros_arr_len 0))
+    (cl:setf (cl:ldb (cl:byte 8 0) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 8) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 16) __ros_arr_len) (cl:read-byte istream))
+    (cl:setf (cl:ldb (cl:byte 8 24) __ros_arr_len) (cl:read-byte istream))
+  (cl:setf (cl:slot-value msg 'prePoseQuatECEF) (cl:make-array __ros_arr_len))
+  (cl:let ((vals (cl:slot-value msg 'prePoseQuatECEF)))
+    (cl:dotimes (i __ros_arr_len)
+    (cl:let ((bits 0))
+      (cl:setf (cl:ldb (cl:byte 8 0) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 8) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 16) bits) (cl:read-byte istream))
+      (cl:setf (cl:ldb (cl:byte 8 24) bits) (cl:read-byte istream))
+    (cl:setf (cl:aref vals i) (roslisp-utils:decode-single-float-bits bits))))))
+  msg
+)
+(cl:defmethod roslisp-msg-protocol:ros-datatype ((msg (cl:eql '<OrbslamCorrection>)))
+  "Returns string type for a message object of type '<OrbslamCorrection>"
+  "openpilot_bridge/OrbslamCorrection")
+(cl:defmethod roslisp-msg-protocol:ros-datatype ((msg (cl:eql 'OrbslamCorrection)))
+  "Returns string type for a message object of type 'OrbslamCorrection"
+  "openpilot_bridge/OrbslamCorrection")
+(cl:defmethod roslisp-msg-protocol:md5sum ((type (cl:eql '<OrbslamCorrection>)))
+  "Returns md5sum for a message object of type '<OrbslamCorrection>"
+  "5782313d8262eba95695c847d7e1398d")
+(cl:defmethod roslisp-msg-protocol:md5sum ((type (cl:eql 'OrbslamCorrection)))
+  "Returns md5sum for a message object of type 'OrbslamCorrection"
+  "5782313d8262eba95695c847d7e1398d")
+(cl:defmethod roslisp-msg-protocol:message-definition ((type (cl:eql '<OrbslamCorrection>)))
+  "Returns full string definition for message of type '<OrbslamCorrection>"
+  (cl:format cl:nil "Header header~%~%int64 correctionMonoTime~%float32[] prePositionECEF~%float32[] postPositionECEF~%float32[] postPoseQuatECEF~%int64 numInliers~%float32[] prePoseQuatECEF~%~%================================================================================~%MSG: std_msgs/Header~%# Standard metadata for higher-level stamped data types.~%# This is generally used to communicate timestamped data ~%# in a particular coordinate frame.~%# ~%# sequence ID: consecutively increasing ID ~%uint32 seq~%#Two-integer timestamp that is expressed as:~%# * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')~%# * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')~%# time-handling sugar is provided by the client library~%time stamp~%#Frame this data is associated with~%string frame_id~%~%~%"))
+(cl:defmethod roslisp-msg-protocol:message-definition ((type (cl:eql 'OrbslamCorrection)))
+  "Returns full string definition for message of type 'OrbslamCorrection"
+  (cl:format cl:nil "Header header~%~%int64 correctionMonoTime~%float32[] prePositionECEF~%float32[] postPositionECEF~%float32[] postPoseQuatECEF~%int64 numInliers~%float32[] prePoseQuatECEF~%~%================================================================================~%MSG: std_msgs/Header~%# Standard metadata for higher-level stamped data types.~%# This is generally used to communicate timestamped data ~%# in a particular coordinate frame.~%# ~%# sequence ID: consecutively increasing ID ~%uint32 seq~%#Two-integer timestamp that is expressed as:~%# * stamp.sec: seconds (stamp_secs) since epoch (in Python the variable is called 'secs')~%# * stamp.nsec: nanoseconds since stamp_secs (in Python the variable is called 'nsecs')~%# time-handling sugar is provided by the client library~%time stamp~%#Frame this data is associated with~%string frame_id~%~%~%"))
+(cl:defmethod roslisp-msg-protocol:serialization-length ((msg <OrbslamCorrection>))
+  (cl:+ 0
+     (roslisp-msg-protocol:serialization-length (cl:slot-value msg 'header))
+     8
+     4 (cl:reduce #'cl:+ (cl:slot-value msg 'prePositionECEF) :key #'(cl:lambda (ele) (cl:declare (cl:ignorable ele)) (cl:+ 4)))
+     4 (cl:reduce #'cl:+ (cl:slot-value msg 'postPositionECEF) :key #'(cl:lambda (ele) (cl:declare (cl:ignorable ele)) (cl:+ 4)))
+     4 (cl:reduce #'cl:+ (cl:slot-value msg 'postPoseQuatECEF) :key #'(cl:lambda (ele) (cl:declare (cl:ignorable ele)) (cl:+ 4)))
+     8
+     4 (cl:reduce #'cl:+ (cl:slot-value msg 'prePoseQuatECEF) :key #'(cl:lambda (ele) (cl:declare (cl:ignorable ele)) (cl:+ 4)))
+))
+(cl:defmethod roslisp-msg-protocol:ros-message-to-list ((msg <OrbslamCorrection>))
+  "Converts a ROS message object to a list"
+  (cl:list 'OrbslamCorrection
+    (cl:cons ':header (header msg))
+    (cl:cons ':correctionMonoTime (correctionMonoTime msg))
+    (cl:cons ':prePositionECEF (prePositionECEF msg))
+    (cl:cons ':postPositionECEF (postPositionECEF msg))
+    (cl:cons ':postPoseQuatECEF (postPoseQuatECEF msg))
+    (cl:cons ':numInliers (numInliers msg))
+    (cl:cons ':prePoseQuatECEF (prePoseQuatECEF msg))
+))

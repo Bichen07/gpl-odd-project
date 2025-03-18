@@ -1,0 +1,6 @@
+data/*/*
+!data/tw_behavior/*
+!data/shuinan/*
+!data/indirect_left_turn_example/*
+!data/itri_68_nanliao/*
+!data/*

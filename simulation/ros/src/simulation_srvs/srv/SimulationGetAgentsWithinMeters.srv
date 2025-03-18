@@ -1,0 +1,5 @@
+std_msgs/Header header
+float32 distance
+geometry_msgs/Pose2D fromPosition
+---
+simulation_msgs/AgentPose2DArray agents

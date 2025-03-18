@@ -1,0 +1,37 @@
+<launch>
+
+    <arg name="bag" default="/repository/ros/vid1.bag" />
+    <arg name="use_only_detected_objects_for_rss_matching" default="true" />
+
+    <rosparam param="/use_sim_time">true</rosparam>
+
+    <include file="$(find rviz_config)/launch/visualization.launch">
+        <arg name="rviz_file" value="sdc.rviz"/>
+    </include>
+
+
+    <!-- Load Semantic Map -->
+    <rosparam param="/route_mission_handler/route">taichung_new</rosparam>
+    <rosparam param="/route_mission_handler/fileName">dapeng_left_turn_zhongke_road</rosparam>
+    <remap from="load_file_node/route" to="route_mission_handler/route"/>
+    <include file="$(find route_mission_handler)/launch/run.launch"/>
+
+    <!-- Run rss_verification and scenario_visualization -->
+    <include file="$(find scenario_visualization)/launch/scenario_visualization.launch">
+        <arg name="use_only_detected_objects_for_rss_matching" value="$(arg use_only_detected_objects_for_rss_matching)"/>
+    </include>
+    <include file="$(find rss)/launch/rss_verification.launch"/>
+
+    <!-- Run Bag -->
+    <node pkg="rosbag" type="play" name="rosbag_player"
+        args=" $(arg bag)
+            --quiet --pause -l --clock
+            /rss/check_result:=/rss/check_result/old
+            /scenario_visualization:=/scenario_visualization/old
+            ">
+    </node>
+    <!-- Move original result marker aside -->
+    <node pkg="scenario_tools" name="rss_check_result_remapper" type="rss_check_result_remapper.py"/>
+
+
+</launch>

@@ -1,0 +1,141 @@
+<launch>
+    <param name="/simulation/usage/parameterized_scenario_search" value="true" />
+    <rosparam command="load" file="$(find rss)/data/parameters.yaml" />
+
+    <arg name="enable_rss_check" default="false" />
+    <arg name="enable_reference_preventable_judgement" default="false" />
+    <arg name="sim_with_external" default="false" />
+
+    <arg name="sampling_suggestion_api" default="http://localhost:9009" />
+    <!-- <arg name="sampling_suggestion_api" default="http://192.168.0.177:9009" /> -->
+    <!-- <arg name="search_id" default="6622a8c63abf3eab7ce7b641" /> -->
+    <!-- <arg name="search_id" default="6628cd68e1363c6484fc7e56" /> -->
+    <!-- <arg name="search_id" default="662fceb105185defa9998a52" /> -->
+    <!-- <arg name="search_id" default="663ad93fbee9da7635cbaabe" /> -->
+    <!-- <arg name="search_id" default="6640d664eceffeb41b047bad" /> -->
+    <!-- <arg name="search_id" default="6641851175c12617a7898597" /> -->
+    <!-- <arg name="search_id" default="6641992b75c12617a78ae7d6" /> -->
+    <!-- <arg name="search_id" default="66425a05bcce06f8aff2ee32" /> -->
+    <!-- <arg name="search_id" default="664f1064a45c09cb1a3af48f" /> -->
+    <!-- <arg name="search_id" default="664f70c5c3f4a1bc6bd59d8b" /> -->
+    <!-- <arg name="search_id" default="665025b3b81c5c189a667bf8" /> -->
+    <!-- <arg name="search_id" default="665f3d85a34737577698df22" /> -->
+    <!-- <arg name="batch_id" default="6678be3b711f7470a0956690" /> -->
+    <!-- <arg name="batch_id" default="667ab8fe5ece766810677b06" /> -->
+    <!-- <arg name="batch_id" default="667ae2e57a7fda8cfab8c133" /> -->
+    <!-- <arg name="batch_id" default="6685ecfbc25c36e55b5570c9" /> -->
+    <!-- <arg name="batch_id" default="66948722ca90a30a352c3f10" /> -->
+
+    <!-- <arg name="batch_id" default="66b33556840605cf386ea226" /> -->
+    <!-- <arg name="batch_id" default="66dc58e3102508adc0bcb34d" /> -->
+
+    <!-- <arg name="batch_id" default="6781103f1a9ac48913a8ee80" /> -->
+    <!-- <arg name="batch_id" default="6782124f1a9ac48913a8f138" /> -->
+    <!-- 678d9b132ed96a72d5a7c672 -->
+    <!-- <arg name="batch_id" default="678b17976b4a83255ebd8755" /> -->
+    <!-- <arg name="batch_id" default="678d0c572ed96a72d57d43b9" /> -->
+    <!-- <arg name="batch_id" default="67a8d03b4f53fc9c6abb134d" /> -->
+    <!-- <arg name="batch_id" default="67acb07c4f53fc9c6af207cf" /> -->
+    <!-- <arg name="batch_id" default="67bfca684f53fc9c6ac0c1f1" /> -->
+    <!-- <arg name="batch_id" default="67c804004f53fc9c6abcd84f" /> -->
+    <!-- <arg name="batch_id" default="67c85d5e4f53fc9c6ad87f66" /> -->
+    <!-- <arg name="batch_id" default="67d111ec4f53fc9c6a7ef9d8" /> -->
+    <arg name="batch_id" default="67d4e8354f53fc9c6ae1aa2e" />
+    <!-- <arg name="batch_id" default="67c1d0c84f53fc9c6afdd7c6" /> -->
+
+
+    <!-- <arg name="map_name" default="alks_road_straight" /> -->
+    <!-- <arg name="route_name" default="operation" /> -->
+    <!-- <arg name="ego_position_seq" default="0" /> -->
+
+    <arg name="map_name" default="hct_logistic" />
+    <arg name="route_name" default="operation" />
+
+    <!-- drive out hct -->
+    <!-- <arg name="ego_position_seq" default="22" /> -->
+
+    <!-- opposite overtake -->
+    <arg name="ego_position_seq" default="4" />
+
+    <!-- Bicycle Cut-in with Oncoming Car from Back -->
+    <!-- <arg name="ego_position_seq" default="27" /> -->
+
+
+    <!-- <arg name="route_name" default="hsc-hsp-hsc-loop" /> -->
+    <!-- <arg name="route_name" default="loop1" /> -->
+    <!-- <arg name="ego_position_seq" default="1" /> -->
+    <!-- <arg name="ego_position_seq" default="3" /> -->
+
+    <!-- <arg name="ego_position_seq" default="4" /> -->
+    <!-- <arg name="ego_position_seq" default="5" /> -->
+    <!-- <arg name="ego_position_seq" default="10" /> -->
+    <!-- <arg name="ego_position_seq" default="12" /> -->
+    <!-- <arg name="ego_position_seq" default="13" /> -->
+
+    <!-- <arg name="ego_position_seq" default="14" /> -->
+    <!-- <arg name="ego_position_seq" default="15" /> -->
+    <!-- <arg name="ego_position_seq" default="17" /> -->
+
+    <!-- <arg name="ego_position_seq" default="18" /> -->
+    <!-- <arg name="ego_position_seq" default="20" /> -->
+
+    <!-- <arg name="ego_position_seq" default="26" /> -->
+    <!-- <arg name="ego_position_seq" default="25" /> -->
+    <!-- <arg name="ego_position_seq" default="24" /> -->
+    <!-- <arg name="ego_position_seq" default="23" /> -->
+    <!-- <arg name="ego_position_seq" default="22" /> -->
+    <!-- <arg name="ego_position_seq" default="21" /> -->
+    <!-- <arg name="ego_position_seq" default="5" /> -->
+    <!-- <arg name="ego_position_seq" default="6" /> -->
+    <!-- <arg name="ego_position_seq" default="7" /> -->
+    <!-- <arg name="ego_position_seq" default="8" /> -->
+    <!-- <arg name="ego_position_seq" default="9" /> -->
+    <!-- <arg name="ego_position_seq" default="4" /> -->
+
+    <include file="$(find simulation_adv)/launch/run.launch">
+        <arg name="sim_with_external" value="$(arg sim_with_external)" />
+        <arg name="use_sim_time" value="false" />
+        <arg name="by_tick" value="false" />
+        <arg name="gbus" value="false" />
+        <arg name="publish_scenario_visualization" value="false" />
+        <arg name="velocity_in_ego_coord" value="true" />
+        <arg name="detected_objects_topic" value="detected_objects" />
+        <arg name="ego_position_seq" value="$(arg ego_position_seq)" />
+        <arg name="run_once" value="true" />
+        <arg name="disable_monitor" value="false" />
+        <arg name="disable_collision" value="true" />
+        <arg name="headless" value="$(arg headless)" />
+    </include>
+
+    <include file="$(find scenario)/launch/scenario_updater.launch">
+        <arg name="enable_rss_check" value="$(arg enable_rss_check)" />
+        <arg name="scenario_id" value="esmini" />
+        <arg name="route_id" value="$(arg map_name)" />
+        <arg name="agent_size" value="carla_agent_size.json" />
+        <arg name="ego_init_pose_config_file" value="ego_init_pose_config_itri.json" />
+    </include>
+
+    <node
+        pkg="scenario_search"
+        type="single_parameterized_scenario_search.py"
+        name="single_parameterized_scenario_search"
+        output="screen"
+    >
+        <param name="sim_with_external" value="$(arg sim_with_external)" />
+        <param name="batch_id" value="$(arg batch_id)" />
+        <param name="route_name" value="$(arg route_name)" />
+        <param name="map_name" value="$(arg map_name)" />
+        <param name="sampling_suggestion_api" value="$(arg sampling_suggestion_api)" />
+        <param name="enable_reference_preventable_judgement"
+            value="$(arg enable_reference_preventable_judgement)" />
+    </node>
+
+    <node name="navigation_path_runner_node" pkg="scenario" type="navigation_path_runner_node"
+        output="screen" />
+    <!-- <rosparam command="load" file="$(find
+    simulation_monitor)/config/simulation_monitor_setting.yaml"/> -->
+    <!-- <node name="accident_recorder_node" pkg="simulation_monitor" type="accident_recorder.py"
+    output="screen"/> -->
+    <node name="tag_tree_identifier" pkg="scenario_classification" type="run_tree_of_tags.py"
+        output="screen" />
+</launch>

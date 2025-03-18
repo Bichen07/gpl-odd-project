@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>object_path_prediction</name>
+  <version>0.0.0</version>
+  <description>The object_path_prediction package</description>
+
+  <maintainer email="chingwen.chen@itri.org.tw">user</maintainer>
+
+  <license>ITRI</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>roscpp</depend>
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>pcl_ros</depend>
+  <depend>itri_msgs</depend>
+
+</package>

@@ -1,0 +1,34 @@
+<edgeRelations>
+
+   <interval id="h1" begin="0.0" end="3600.0">
+       <edgeRelation from="-11.0.00" to="14.0.00" count="2" type="carTypeDistribution"/>
+       <edgeRelation from="-11.0.00" to="14.0.00" count="5" type="motorcycleTypeDistribution"/>
+       <edgeRelation from="-11.0.00" to="-24.0.00" count="118" type="carTypeDistribution"/>
+       <edgeRelation from="-11.0.00" to="-24.0.00" count="235" type="motorcycleTypeDistribution"/>
+       <edgeRelation from="-11.0.00" to="-0.0.00" count="12" type="carTypeDistribution"/>
+       <edgeRelation from="-11.0.00" to="-0.0.00" count="24" type="motorcycleTypeDistribution"/>
+
+       <edgeRelation from="-14.0.00" to="-24.0.00" count="25" type="carTypeDistribution"/>
+       <edgeRelation from="-14.0.00" to="-24.0.00" count="51" type="motorcycleTypeDistribution"/>
+       <edgeRelation from="-14.0.00" to="-0.0.00" count="172" type="carTypeDistribution"/>
+       <edgeRelation from="-14.0.00" to="-0.0.00" count="348" type="motorcycleTypeDistribution"/>
+       <edgeRelation from="-14.0.00" to="11.0.00" count="1" type="carTypeDistribution"/>
+       <edgeRelation from="-14.0.00" to="11.0.00" count="3" type="motorcycleTypeDistribution"/>
+       
+       <edgeRelation from="24.0.00" to="-0.0.00" count="16" type="carTypeDistribution"/>
+       <edgeRelation from="24.0.00" to="-0.0.00" count="32" type="motorcycleTypeDistribution"/>
+       <edgeRelation from="24.0.00" to="11.0.00" count="60" type="carTypeDistribution"/>
+       <edgeRelation from="24.0.00" to="11.0.00" count="120" type="motorcycleTypeDistribution"/>
+       <edgeRelation from="24.0.00" to="14.0.00" count="8" type="carTypeDistribution"/>
+       <edgeRelation from="24.0.00" to="14.0.00" count="16" type="motorcycleTypeDistribution"/>
+       
+       <edgeRelation from="0.0.00" to="11.0.00" count="27" type="carTypeDistribution"/>
+       <edgeRelation from="0.0.00" to="11.0.00" count="53" type="motorcycleTypeDistribution"/>
+       <edgeRelation from="0.0.00" to="14.0.00" count="167" type="carTypeDistribution"/>
+       <edgeRelation from="0.0.00" to="14.0.00" count="339" type="motorcycleTypeDistribution"/>
+       <edgeRelation from="0.0.00" to="-24.0.00" count="61" type="carTypeDistribution"/>
+       <edgeRelation from="0.0.00" to="-24.0.00" count="125" type="motorcycleTypeDistribution"/>   
+       
+   </interval>
+   
+</edgeRelations>

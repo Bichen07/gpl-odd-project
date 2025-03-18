@@ -1,0 +1,77 @@
+{
+    "itri_00":
+    {
+        "III_itri":
+        {
+            "position":
+            {
+                "x_" : -222.9,
+                "y_" : 171.43776905215341,
+                "x" : -24.28,
+                "y" : -9.28
+            },
+            "orientation" : 2.424,
+            "orientation" : 2.48797
+        }
+    },
+    "itri_01":
+    {
+        "III_itri":
+        {
+            "position":
+            {
+                "x" : -272.343,
+                "y" : 113.626
+            },
+            "orientation" : 0.869
+        }
+    },
+     "itri_02":
+    {
+        "III_itri":
+        {
+            "position":
+            {
+                "x" : -318.744,
+                "y" : 239.021
+            },
+            "orientation" : -2.288
+        }
+    },
+     "itri_03":
+    {
+        "III_itri":
+        {
+            "position":
+            {
+                "x" : -318.744,
+                "y" : 239.021
+            },
+            "orientation" : -2.288
+        }
+    },
+     "itri_04":
+    {
+        "III_itri":
+        {
+            "position":
+            {
+                "x" : -30.770,
+                "y" : 1.823
+            },
+            "orientation" : 2.436
+        }
+    },
+     "itri_05":
+    {
+        "III_itri":
+        {
+            "position":
+            {
+                "x" : 56.150,
+                "y" : -182.809
+            },
+            "orientation" : 2.408
+        }
+    }
+}

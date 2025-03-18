@@ -1,0 +1,4 @@
+simulation_msgs/CollisionProfile collision_profile
+---
+string brief
+AccidentTypeMatchingResult[] results

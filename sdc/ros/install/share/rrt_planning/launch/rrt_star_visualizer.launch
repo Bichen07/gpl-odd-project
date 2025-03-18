@@ -1,0 +1,24 @@
+<launch>
+    <arg name="use_gdb" value="false"/>
+
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+
+    <arg name="map" default="$(find rrt_planning)/test/maps/ParkingSlot_Horizontal_Obstacle.yaml"/>
+    <arg name="freespace_occupied" default="false"/>
+
+    <!-- <node pkg="map_server" name="map_server" type="map_server" args="$(arg map)" /> -->
+    <node pkg="rrt_planning"
+          name="rrt_star_node"
+          launch-prefix="$(arg launch_prefix_gdb)"
+          type="rrt_star_node">
+          <rosparam param="input_topics" subst_value="True">
+              ["top_cloud_rrt", "front_cloud_rrt", "right_cloud_rrt", "left_cloud_rrt"]
+          </rosparam>
+          <param name="freespace_occupied" value="$(arg freespace_occupied)"/>
+          <remap from = "/move_base_simple/goal" to = "/move_base_simple/goal_" />
+    </node>
+    <!-- <node name="rviz" pkg="rviz" type="rviz" args="-d $(find rrt_planning)/test/maps/rrt_planning.rviz"/> -->
+
+</launch>

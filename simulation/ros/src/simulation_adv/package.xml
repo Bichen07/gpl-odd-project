@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>simulation_adv</name>
+  <version>0.0.0</version>
+  <description>The simulation_adv package</description>
+  <maintainer email="zackhsu@itri.org.tw">Hsiu-Wei Hsu</maintainer>
+  <license>ITRI</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>itri_msgs</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>simulation_msgs</build_depend>
+  <build_depend>simulation_utils</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>tf</build_depend>
+  <build_export_depend>itri_msgs</build_export_depend>
+  <build_export_depend>roscpp</build_export_depend>
+  <build_export_depend>simulation_msgs</build_export_depend>
+  <build_export_depend>simulation_utils</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>tf</build_export_depend>
+  <exec_depend>itri_msgs</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>simulation_msgs</exec_depend>
+  <exec_depend>simulation_utils</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <depend>scenario_msgs</depend>
+  <depend>simulation_srvs</depend>
+  <export>
+  </export>
+</package>

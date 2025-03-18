@@ -1,0 +1,21 @@
+<launch>
+
+    <arg name="night_mode" value= "false" />
+
+    <include file="$(env SDC_CONFIG_DIR)/detection.launch"/>
+
+    <!-- <node pkg="radar_objects_processor"
+        name="radar_objects_processor_1"
+        type="radar_objects_processor_node"
+        output="screen">
+        <param name="input_point_topic" value="/radar_objs" />
+        <param name="output_point_topic" value="/radar_detected_objects" />
+        <param name="output_frame" value="/base_link"/>
+        <param name="probability_threshold" value="100.0"/>
+        <param name="min_obj_height" value="-1.6" />
+        <param name="max_obj_height" value="-0.2" />
+    </node> -->
+
+    <include file="$(find dsrc_client)/launch/run.launch"/>
+
+</launch>

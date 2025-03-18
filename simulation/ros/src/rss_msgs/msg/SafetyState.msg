@@ -1,0 +1,3 @@
+bool is_lateral_left_safe
+bool is_lateral_right_safe
+bool is_longitudinal_safe

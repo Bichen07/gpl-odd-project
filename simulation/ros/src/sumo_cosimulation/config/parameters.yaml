@@ -1,0 +1,9 @@
+/use_sim_time: true
+/timeStep: 0.01
+sumo_cosimulation:
+    launch_sumo: false
+    launch_gui: false
+    sumocfg: /project/mmsl_simulation/src/sumo_cosimulation/data/III_itri_v6/final.sumocfg
+    # port: 9001
+    extra_cmd: []
+    use_pedestrian: false

@@ -1,0 +1,25 @@
+Header header
+
+string[] radioVersion
+string[] versionCodename
+string[] hardware
+string[] versionSecurityPatch
+string[] supportedAbis
+string[] id
+string[] board
+string[] type
+string[] product
+string[] tags
+string[] brand
+string[] host
+string[] user
+string[] fingerprint
+string[] device
+string[] bootloader
+string[] model
+string[] serial
+string[] manufacturer
+string[] versionRelease
+int32 time
+int32 versionSdk
+string[] display

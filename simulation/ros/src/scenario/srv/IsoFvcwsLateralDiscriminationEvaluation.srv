@@ -1,0 +1,4 @@
+scenario/IsoVehicleAttribute[] attributes
+scenario/IsoVehicleState[] states
+---
+scenario/IsoFvcwsLateralDiscriminationPerformance performance

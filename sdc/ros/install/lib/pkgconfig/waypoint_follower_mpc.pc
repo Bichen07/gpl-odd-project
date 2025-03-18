@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: waypoint_follower_mpc
+Description: Description of waypoint_follower_mpc
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: diagnostic roscpp itri_msgs kalman openpilot_bridge trace

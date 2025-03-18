@@ -1,0 +1,12 @@
+string id
+geometry_msgs/Pose pose
+geometry_msgs/Twist twist
+geometry_msgs/Accel accel
+geometry_msgs/Vector3 size
+geometry_msgs/Point target
+float32 speed
+float32 yaw_rate
+float32 steering_angle
+float32 speed_cmd_kph
+float32 steer_cmd_angle
+float32 acceleration_cmd

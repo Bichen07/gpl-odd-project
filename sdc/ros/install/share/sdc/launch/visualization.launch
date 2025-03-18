@@ -1,0 +1,37 @@
+<launch>
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <arg name="headless" default="false"/>
+    <arg name="open_frenet" default="false"/>
+
+    <param name="use_gui" value="false"/>
+    <node name="joint_state_publisher"
+          pkg="joint_state_publisher"
+          type="joint_state_publisher"/>
+    <node name="robot_state_publisher"
+          pkg="robot_state_publisher"
+          type="state_publisher"/>
+
+    <node
+        pkg="rviz"
+        type="rviz"
+        name="my_rviz"
+        output="screen"
+        args="-d /tmp/sdc.rviz"
+        unless="$(arg headless)"/>
+
+    <param name="robot_description"
+               textfile="$(find sdc)/data/vehicle_model/pacifica.urdf"/>
+
+    <group if="$(arg open_frenet)">
+        <param name="robot_descriptionSD"
+               textfile="$(find sdc)/data/vehicle_model/BUS-1.urdf"/>
+        <node
+            pkg="rviz"
+            type="rviz"
+            name="frenet_rviz"
+            output="screen"
+            args="-d $(find sdc)/data/frenet.rviz"
+            unless="$(arg headless)"/>
+    </group>
+
+</launch>

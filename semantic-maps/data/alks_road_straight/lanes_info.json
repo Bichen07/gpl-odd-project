@@ -1,0 +1,82 @@
+{
+  "lanes": [
+    {
+      "direction": 0,
+      "id": 0,
+      "laneno": 0,
+      "mode": 0,
+      "next_clane": null,
+      "roadlines": [],
+      "subtype": 1,
+      "_lane_index": 0,
+      "_lane_number": 5,
+      "_navgroad_id": 0,
+      "_ref_index": -1
+    },
+    {
+      "direction": 0,
+      "id": 1,
+      "laneno": 0,
+      "mode": 0,
+      "next_clane": null,
+      "roadlines": [],
+      "subtype": 1,
+      "_lane_index": 1,
+      "_lane_number": 4,
+      "_navgroad_id": 0,
+      "_ref_index": -1
+    },
+    {
+      "direction": 0,
+      "id": 2,
+      "laneno": 0,
+      "mode": 0,
+      "next_clane": null,
+      "roadlines": [],
+      "subtype": 1,
+      "_lane_index": 2,
+      "_lane_number": 3,
+      "_navgroad_id": 0,
+      "_ref_index": -1
+    },
+    {
+      "direction": 0,
+      "id": 3,
+      "laneno": 0,
+      "mode": 0,
+      "next_clane": null,
+      "roadlines": [],
+      "subtype": 1,
+      "_lane_index": 3,
+      "_lane_number": -3,
+      "_navgroad_id": 0,
+      "_ref_index": 0
+    },
+    {
+      "direction": 0,
+      "id": 4,
+      "laneno": 0,
+      "mode": 0,
+      "next_clane": null,
+      "roadlines": [],
+      "subtype": 1,
+      "_lane_index": 4,
+      "_lane_number": -4,
+      "_navgroad_id": 0,
+      "_ref_index": 0
+    },
+    {
+      "direction": 0,
+      "id": 5,
+      "laneno": 0,
+      "mode": 0,
+      "next_clane": null,
+      "roadlines": [],
+      "subtype": 1,
+      "_lane_index": 5,
+      "_lane_number": -5,
+      "_navgroad_id": 0,
+      "_ref_index": 0
+    }
+  ]
+}

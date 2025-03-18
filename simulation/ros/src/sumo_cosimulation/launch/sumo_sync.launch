@@ -1,0 +1,33 @@
+<launch>
+
+    <arg name="use_gdb_in_sumo" default="false" />
+    <arg name="sumo_gui" default="false" />
+    <arg name="sumo_with_debug_build" default="true" />
+    <arg name="run_without_namespace" default="false" />
+
+    <arg name="sync_by_tick" default="false" />
+    <arg name="use_sim_time" default="true" />
+
+    <param name="/sumo_cosim/sync_by_tick" value="$(arg sync_by_tick)" />
+    <param name="/use_sim_time" value="$(arg use_sim_time)" />
+    <param name="/time_step" value="0.05" />
+
+    <!-- Load route name. -->
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <!-- Load offset data -->
+    <param name="/sumo_cosim/offset_data_path" value="$(find sumo_cosimulation)/data/offsets.json" />
+    
+    <node 
+        name="sumo_cosim_adv_node" 
+        pkg="sumo_cosimulation" 
+        type="synchronization_adv.py"
+        output="screen">
+        <param name="cfg_file" value="$(find sumo_cosimulation)/data/III_itri_v6/final.sumocfg" />
+        <param name="use_gui" value="$(arg sumo_gui)" />
+        <param name="sumo_with_debug_build" value="$(arg sumo_with_debug_build)" />
+        <param name="synchronize_mode" value="ture" />
+        <param name="use_gdb_in_sumo" value="$(arg use_gdb_in_sumo)" />
+
+    </node>
+
+</launch>

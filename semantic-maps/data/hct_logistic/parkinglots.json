@@ -1,0 +1,74 @@
+{
+   "parking_lot" : [
+      {
+         "id" : 1,
+         "name" : "",
+         "nav_croad_id" : 106,
+         "nav_croad_id2" : 108,
+         "point_id" : 1,
+         "point_id2" : 10,
+         "positive" : 1,
+         "positive2" : 1
+      },
+      {
+         "id" : 2,
+         "name" : "",
+         "nav_croad_id" : 108,
+         "nav_croad_id2" : 114,
+         "point_id" : 40,
+         "point_id2" : 1,
+         "positive" : 1,
+         "positive2" : 0
+      },
+      {
+         "id" : 3,
+         "name" : "",
+         "nav_croad_id" : 108,
+         "nav_croad_id2" : 108,
+         "point_id" : 10,
+         "point_id2" : 40,
+         "positive" : 1,
+         "positive2" : 1
+      },
+      {
+         "id" : 4,
+         "name" : "",
+         "nav_croad_id" : 83,
+         "nav_croad_id2" : 83,
+         "point_id" : 9,
+         "point_id2" : 75,
+         "positive" : 1,
+         "positive2" : 1
+      },
+      {
+         "id" : 5,
+         "name" : "",
+         "nav_croad_id" : 84,
+         "nav_croad_id2" : 86,
+         "point_id" : 7,
+         "point_id2" : 58,
+         "positive" : 0,
+         "positive2" : 1
+      },
+      {
+         "id" : 6,
+         "name" : "",
+         "nav_croad_id" : 85,
+         "nav_croad_id2" : 85,
+         "point_id" : 2,
+         "point_id2" : 17,
+         "positive" : 1,
+         "positive2" : 1
+      },
+      {
+         "id" : 7,
+         "name" : "",
+         "nav_croad_id" : 86,
+         "nav_croad_id2" : 86,
+         "point_id" : 57,
+         "point_id2" : 1,
+         "positive" : 0,
+         "positive2" : 0
+      }
+   ]
+}

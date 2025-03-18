@@ -1,0 +1,41 @@
+<launch>
+
+    <arg name="use_gdb_in_sumo" default="false" />
+    <arg name="simulation_output" default="screen" />
+    <arg name="headless" default="false" />
+    <arg name="sumo_gui" default="false" />
+    <arg name="sumo_with_debug_build" default="false" />
+
+    <arg name="velocity_in_ego_coord" default="true" />
+    <arg name="ego_position_seq" default="1"/>
+    <arg name="publish_scenario_visualization" default="true" /> 
+    
+    <param name="/time_step" value="0.01" />
+
+    <!-- Load route name. -->
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <!-- Load offset data -->
+    <param name="/sumo_cosim/offset_data_path" value="$(find sumo_cosimulation)/data/offsets.json" />
+
+    <include file="$(find simulation_adv)/launch/run.launch">
+        <arg name="by_tick" value="true"/>
+        <arg name="use_sim_time" value="true"/>
+        <arg name="headless" value="$(arg headless) "/>
+        <arg name="ego_position_seq" value="$(arg ego_position_seq)" />
+        <arg name="velocity_in_ego_coord" value="$(arg velocity_in_ego_coord)" />
+        <arg name="publish_scenario_visualization" value="$(arg publish_scenario_visualization)" />
+    </include>
+    
+    <node 
+        name="sumo_cosim_adv_node" 
+        pkg="sumo_cosimulation" 
+        type="synchronization_adv.py"
+        output="screen">
+        <param name="cfg_file" value="$(find sumo_cosimulation)/data/III_itri_v6/final.sumocfg" />
+        <param name="use_gui" value="$(arg sumo_gui)" />
+        <param name="sumo_with_debug_build" value="$(arg sumo_with_debug_build)" />
+        <param name="synchronize_mode" value="true" />
+        <param name="use_gdb_in_sumo" value="$(arg use_gdb_in_sumo)" />
+    </node>
+    <node name="rtf_publisher" pkg="itri_tasks" type="real_time_factor_publish_tool.py" output="log" />
+</launch>

@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>exception_handler</name>
+  <version>0.0.0</version>
+  <description>Exception handler package</description>
+
+  <maintainer email="jeromelin@itri.org.tw">jeromelin</maintainer>
+  <license>ITRI</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>behaviortree_cpp_v3</depend>
+  <depend>diagnostic</depend>
+  <depend>itri_msgs</depend>
+  <depend>roscpp</depend>
+  <depend>tf</depend>
+</package>

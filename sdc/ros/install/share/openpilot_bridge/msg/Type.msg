@@ -1,0 +1,12 @@
+uint32 decelCruise=4
+uint32 accelCruise=3
+uint32 leftBlinker=1
+uint32 unknown=0
+uint32 setCruise=9
+uint32 gapAdjustCruise=11
+uint32 resumeCruise=10
+uint32 rightBlinker=2
+uint32 altButton1=6
+uint32 cancel=5
+uint32 altButton3=8
+uint32 altButton2=7

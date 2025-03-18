@@ -1,0 +1,107 @@
+<launch>
+
+    <arg name="simulation" default="false"/>
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+
+    <node name="black_panther_ps"
+        pkg="diagnostic"
+        type="program_output_logger">
+        <param name="command" value="ps -u user -o cpuid,pid,comm,pcpu"/>
+        <param name="poll_interval" value="2"/>
+    </node>
+
+    <node name="black_panther_top"
+        pkg="diagnostic"
+        type="program_output_logger">
+        <param name="command" value="top -n2 -b -d1 -i -S -c -w2048 | $(find diagnostic)/scripts/top_filter"/>
+        <param name="poll_interval" value="2"/>
+    </node>
+
+    <node name="black_panther_iotop"
+        pkg="diagnostic"
+        type="program_output_logger">
+        <param name="command" value="sudo iotop --only --processes --batch --iter 1"/>
+        <param name="poll_interval" value="1"/>
+    </node>
+
+    <node name="black_panther_iostat"
+        pkg="diagnostic"
+        type="program_output_logger">
+        <param name="command" value="iostat -mxy 1 1 | grep -v loop"/>
+        <param name="poll_interval" value="1.1"/>
+    </node>
+
+    <node name="black_panther_meminfo"
+        pkg="diagnostic"
+        type="program_output_logger">
+        <param name="command" value="cat /proc/meminfo"/>
+        <param name="poll_interval" value="1"/>
+    </node>
+
+    <node name="black_panther_nvidia_smi"
+        pkg="diagnostic"
+        type="program_output_logger">
+        <param name="command" value="nvidia-smi -q -d UTILIZATION"/>
+        <param name="poll_interval" value="1"/>
+    </node>
+
+    <node name="black_panther_cpu"
+        pkg="monitor"
+        type="cpu_usage"/>
+
+    <node name="rosapi" pkg="rosapi" type="rosapi_node">
+        <param name="topics_glob" value="[*]"/>
+        <param name="services_glob" value="[*]"/>
+        <param name="params_glob" value="[*]"/>
+    </node>
+
+    <node name="rosbridge_websocket"
+          pkg="rosbridge_server"
+          type="rosbridge_websocket">
+          <param name="authenticate" value="false" />
+          <param name="port" value="9090"/>
+          <param name="address" value="localhost"/>
+          <param name="retry_startup_delay" value="5"/>
+          <param name="fragment_timeout" value="600"/>
+          <param name="delay_between_messages" value="0.1"/>
+          <param name="max_message_size" value="None"/>
+          <param name="unregister_timeout" value="10"/>
+          <param name="use_compression" value="false"/>
+          <param name="topics_glob" value="[*]"/>
+          <param name="services_glob" value="[*]"/>
+          <param name="params_glob" value="[*]"/>
+          <param name="bson_only_mode" value="false"/>
+    </node>
+
+    <node
+        pkg="monitor"
+        type="create_server.sh"
+        name="web_monitor"/>
+
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/monitor.yaml"/>
+    <node name="monitor"
+        pkg="monitor"
+        type="monitor_node"/>
+
+    <group if="$(arg simulation)">
+        <node name="mqtt_bridge_monitor"
+              pkg="mqtt_bridge"
+              type="mqtt_bridge_node.py"
+              output="screen">
+            <rosparam command="load" file="$(env SDC_CONFIG_DIR)/mqtt-monitor.yaml"/>
+            <rosparam param="enable_namespace">true</rosparam>
+            <param name="namespace" value="$(env HOSTNAME)"/>
+            <param name="mqtt/client/client_id" value="monitor-$(env HOSTNAME)"/>
+        </node>
+    </group>
+    <group unless="$(arg simulation)">
+        <node name="mqtt_bridge_monitor"
+              pkg="mqtt_bridge"
+              type="mqtt_bridge_node.py"
+              output="screen">
+            <rosparam param="enable_namespace">true</rosparam>
+            <rosparam command="load" file="$(env SDC_CONFIG_DIR)/mqtt-monitor.yaml"/>
+        </node>
+    </group>
+
+</launch>

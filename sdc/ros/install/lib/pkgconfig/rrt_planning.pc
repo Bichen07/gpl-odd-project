@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: rrt_planning
+Description: Description of rrt_planning
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib -lrrt_planning
+Requires: steering_functions

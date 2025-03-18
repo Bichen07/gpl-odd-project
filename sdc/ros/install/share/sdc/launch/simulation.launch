@@ -1,0 +1,20 @@
+<launch>
+
+    <arg name="bag"/>
+    <arg name="vehicle_configuration"/>
+    <param name="/use_sim_time" value="true"/>
+    <node
+        pkg="rosbag"
+        type="play"
+        name="rosbag"
+        args="--clock $(arg bag)"
+        required="true"/>
+
+    <include file="$(find sdc)/launch/boot.launch">
+        <arg name="simulation" value="true"/>
+        <arg name="vehicle_configuration"
+             value="$(arg vehicle_configuration)"/>
+    </include>
+    <include file="$(find sdc)/launch/run.launch"/>
+
+</launch>

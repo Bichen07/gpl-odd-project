@@ -1,0 +1,253 @@
+{
+	"parking_lot": [{
+			"id": 1,
+			"name": "P1",
+			"nav_croad_id": 22,
+			"point_id": 5,
+			"nav_croad_id2": 21,
+			"point_id2": 21,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 2,
+			"name": "P2",
+			"nav_croad_id": 25,
+			"point_id": 42,
+			"nav_croad_id2": 21,
+			"point_id2": 12,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 3,
+			"name": "P3",
+			"nav_croad_id": 25,
+			"point_id": 8,
+			"nav_croad_id2": 25,
+			"point_id2": 40,
+			"positive": 1,
+			"positive2": 1
+		},
+		{
+			"id": 4,
+			"name": "P4",
+			"nav_croad_id": 99,
+			"point_id": 8,
+			"nav_croad_id2": 99,
+			"point_id2": 69,
+			"positive": 1,
+			"positive2": 1
+		},
+		{
+			"id": 5,
+			"name": "P5",
+			"nav_croad_id": 40,
+			"point_id": 122,
+			"nav_croad_id2": 40,
+			"point_id2": 14,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 6,
+			"name": "P6",
+			"nav_croad_id": 18,
+			"point_id": 10,
+			"nav_croad_id2": 30,
+			"point_id2": 40,
+			"positive": 1,
+			"positive2": 1
+		},
+		{
+			"id": 7,
+			"name": "P7",
+			"nav_croad_id": 103,
+			"point_id": 28,
+			"nav_croad_id2": 103,
+			"point_id2": 3,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 8,
+			"name": "P8",
+			"nav_croad_id": 105,
+			"point_id": 69,
+			"nav_croad_id2": 105,
+			"point_id2": 22,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 9,
+			"name": "P9",
+			"nav_croad_id": 119,
+			"point_id": 17,
+			"nav_croad_id2": 122,
+			"point_id2": 4,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 10,
+			"name": "P10",
+			"nav_croad_id": 117,
+			"point_id": 30,
+			"nav_croad_id2": 114,
+			"point_id2": 55,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 11,
+			"name": "P11",
+			"nav_croad_id": 2,
+			"point_id": 116,
+			"nav_croad_id2": 2,
+			"point_id2": 10,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 12,
+			"name": "P12",
+			"nav_croad_id": 71,
+			"point_id": 1,
+			"nav_croad_id2": 71,
+			"point_id2": 148,
+			"positive": 1,
+			"positive2": 1
+		},
+		{
+			"id": 13,
+			"name": "P13",
+			"nav_croad_id": 71,
+			"point_id": 31,
+			"nav_croad_id2": 74,
+			"point_id2": 10,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 14,
+			"name": "P14",
+			"nav_croad_id": 71,
+			"point_id": 107,
+			"nav_croad_id2": 71,
+			"point_id2": 42,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 15,
+			"name": "P15",
+			"nav_croad_id": 3,
+			"point_id": 107,
+			"nav_croad_id2": 3,
+			"point_id2": 12,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 16,
+			"name": "P16",
+			"nav_croad_id": 54,
+			"point_id": 8,
+			"nav_croad_id2": 56,
+			"point_id2": 6,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 17,
+			"name": "P17",
+			"nav_croad_id": 67,
+			"point_id": 14,
+			"nav_croad_id2": 52,
+			"point_id2": 5,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 18,
+			"name": "P18",
+			"nav_croad_id": 57,
+			"point_id": 1,
+			"nav_croad_id2": 56,
+			"point_id2": 25,
+			"positive": 1,
+			"positive2": 1
+		},
+		{
+			"id": 19,
+			"name": "P19",
+			"nav_croad_id": 58,
+			"point_id": 11,
+			"nav_croad_id2": 59,
+			"point_id2": 8,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 20,
+			"name": "P20",
+			"nav_croad_id": 57,
+			"point_id": 20,
+			"nav_croad_id2": 58,
+			"point_id2": 19,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 21,
+			"name": "P21",
+			"nav_croad_id": 60,
+			"point_id": 12,
+			"nav_croad_id2": 77,
+			"point_id2": 12,
+			"positive": 0,
+			"positive2": 0
+		},
+		{
+			"id": 22,
+			"name": "P22",
+			"nav_croad_id": 76,
+			"point_id": 2,
+			"nav_croad_id2": 76,
+			"point_id2": 16,
+			"positive": 1,
+			"positive2": 1
+		},
+		{
+			"id": 23,
+			"name": "P23",
+			"nav_croad_id": 63,
+			"point_id": 2,
+			"nav_croad_id2": 63,
+			"point_id2": 16,
+			"positive": 1,
+			"positive2": 1
+		},
+		{
+			"id": 24,
+			"name": "P24",
+			"nav_croad_id": 60,
+			"point_id": 5,
+			"nav_croad_id2": 59,
+			"point_id2": 38,
+			"positive": 1,
+			"positive2": 1
+		},
+		{
+			"id": 25,
+			"name": "P25",
+			"nav_croad_id": 45,
+			"point_id": 44,
+			"nav_croad_id2": 45,
+			"point_id2": 55,
+			"positive": 1,
+			"positive2": 1
+		}
+	]
+}

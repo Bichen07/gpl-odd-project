@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: sdc
+Description: Description of sdc
+Version: 1.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: 

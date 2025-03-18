@@ -1,0 +1,15 @@
+<launch>
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <arg name="use_gdb" value="false"/>
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+
+    <node
+        pkg="path"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="path_planner_node"
+        name="path_planner"
+        output="screen">
+    </node>
+</launch>

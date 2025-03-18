@@ -1,0 +1,32 @@
+#!/usr/bin/env python2
+
+import rospy
+from itri_msgs.msg import ProgramOutput
+import subprocess
+
+class Node:
+
+    def __init__(self):
+        rospy.init_node("program_output_logger")
+        self.command = rospy.get_param("~command")
+        self.publisher = rospy.Publisher(
+            "~output", ProgramOutput, queue_size=1)
+        poll_interval = rospy.get_param("~poll_interval")
+        if poll_interval is not None:
+            process = rospy.Timer(
+                rospy.Duration(poll_interval), self.output_callback)
+        else:
+            rospy.logerr('parameter poll_interval is missing')
+
+    def run(self):
+        rospy.spin();
+
+    def output_callback(self, data):
+        message = ProgramOutput()
+        message.header.stamp = rospy.Time.now()
+        message.output = subprocess.check_output(self.command, shell=True)
+        self.publisher.publish(message)
+
+if __name__ == "__main__":
+    node = Node()
+    node.run()

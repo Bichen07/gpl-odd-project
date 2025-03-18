@@ -1,0 +1,25 @@
+<launch>
+
+    <arg name="remote" default="false"/>
+    <arg name="use_nodelet" default="false"/>
+    <arg name="use_cuda_image" default="false"/>
+
+    <include file="$(env SDC_CONFIG_DIR)/machines/black-widow/machine.launch"
+        if="$(arg remote)">
+        <arg name="set_as_default" value="true"/>
+    </include>
+
+    <include file="$(find traffic_light_module)/launch/traffic_light_module_nodelet.launch"
+        if="$(arg use_nodelet)">
+        <arg name="use_cuda_image" default="$(arg use_cuda_image)"/>
+    </include>
+
+    <include file="$(find traffic_light_module)/launch/traffic_light_module.launch"
+        unless="$(arg use_nodelet)">
+        <arg name="use_cuda_image" default="$(arg use_cuda_image)"/>
+    </include>
+
+    <include file="$(env SDC_CONFIG_DIR)/machines/machine-localhost-default.launch"
+        if="$(arg remote)"/>
+
+</launch>

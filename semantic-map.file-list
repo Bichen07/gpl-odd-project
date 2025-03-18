@@ -1,0 +1,44 @@
+semantic-maps
+├── data/
+│   ├── III_itri/
+│   │   ├── curbs.json
+│   │   ├── intersection_rois.json
+│   │   ├── lanes_info.json
+│   │   ├── lanes_navgroads.json
+│   │   ├── navgroads.json
+│   │   ├── navgroads_point.json
+│   │   ├── non_accessible.json
+│   │   ├── no_temperate_parking_zone.json
+│   │   ├── parkinglots.json
+│   │   ├── parkinglots_lanes.json
+│   │   ├── parkingspaces.json
+│   │   ├── pedestrian_crossing.json
+│   │   ├── roadlines.json
+│   │   ├── roadmarkers.json
+│   │   ├── traffic_light.json
+│   │   ├── traffic_sign.json
+│   │   └── waypoints.json
+│   └── taichung_new/
+│       ├── bus_station.json
+│       ├── curbs.json
+│       ├── driving_area.json
+│       ├── intersection_rois.json
+│       ├── lanes_info.json
+│       ├── lanes_navgroads.json
+│       ├── navgroads.json
+│       ├── navgroads_point.json
+│       ├── non_accessible.json
+│       ├── pedestrian_crossing.json
+│       ├── roadlines.json
+│       ├── roadmarkers.json
+│       └── waypoints.json
+└── route/
+    ├── III_itri/
+    │   └── operation.json
+    └── taichung_new/
+        ├── dapeng_left_turn_zhongke_road.json
+        ├── dapeng_right_turn_zhongke_road.json
+        ├── zhongke_north_to_south.json
+        └── zhongke_right_turn_dapeng_road.json
+
+6 directories, 35 files

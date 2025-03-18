@@ -1,0 +1,67 @@
+<launch>
+    <rosparam command="load" file="$(find scenario)/data/sil_testing_parameters.yaml" />
+
+    <arg name="use_gdb" value="false" />
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)" />
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)" />
+
+    <include file="$(find path)/launch/planner.launch" />
+    <include file="$(find path)/launch/ego_vehicle_global_path.launch" />
+
+    <param name="use_sim_time" value="false" />
+
+    <!-- <rosparam param="sim_with_ego">true</rosparam> -->
+    <rosparam param="publishing_visualization_status">false</rosparam>
+    <arg name="enable_rss_check" default="true" />
+
+    <!-- Scenario Configuration -->
+
+    <arg name="scenario_id" default="itri_04" />
+    <arg name="route_id" default="III_itri" />
+    <arg name="agent_size" default="carla_agent_size.json" />
+    <arg name="ego_init_pose_config_file" default="ego_init_pose_config_itri.json" />
+
+    <param name="/route_mission_handler/route" value="$(arg route_id)" />
+    <param name="/route_mission_handler/fileName" value="operation" />
+
+    <arg name="scenario_configuration_directory" default="$(find scenario)/data/" />
+
+    <group ns="scenario">
+        <param name="id" value="$(arg scenario_id)" />
+        <param name="route" value="$(arg route_id)" />
+        <param name="config/agent/size" value="$(arg agent_size)" />
+        <param name="config/dir" value="$(arg scenario_configuration_directory)" />
+    </group>
+
+    <!-- Simulation Configuration -->
+
+    <arg name="simulation_configuration_directory" default="$(find simulation_adv)/data/" />
+    <arg name="simulated_ego_config_file" default="ego.json" />
+    <group ns="simulation">
+        <param name="config/dir" value="$(arg simulation_configuration_directory)" />
+        <param name="ego_vehicle/config/init_pose/file" value="$(arg ego_init_pose_config_file)" />
+        <param name="ego_vehicle/config/file" value="$(arg simulated_ego_config_file)" />
+    </group>
+
+    <node
+        pkg="scenario"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="scenario_updater_node"
+        name="scenario_updater"
+        output="screen">
+        <!-- These 2 topics actually don't publish anything, but they are still
+            listed when checking this node.  To clarify dataflow, these are remapped and
+            not used.  If there are msgs sending to these 2 topics, it will be
+            an unexpected situation. -->
+        <remap from="/detected_objects" to="/detected_objects/scenario" />
+        <remap from="/scenario_visualization" to="/scenario_visualization/scenario" />
+    </node>
+
+    <!-- <include file="$(find scenario_visualization)/launch/scenario_visualization.launch"/> -->
+
+    <group if="$(arg enable_rss_check)">
+        <include file="$(find rss)/launch/rss_verification.launch" />
+    </group>
+
+</launch>

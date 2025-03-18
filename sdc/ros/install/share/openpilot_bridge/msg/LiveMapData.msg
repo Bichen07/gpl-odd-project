@@ -1,0 +1,19 @@
+Header header
+
+float32[] roadCurvatureX
+int64 wayId
+bool speedLimitValid
+float32 distToTurn
+float32 curvature
+float32[] roadCurvature
+bool mapValid
+float32[] roadY
+float32[] roadX
+float32 speedLimitAheadDistance
+bool curvatureValid
+bool speedLimitAheadValid
+bool speedAdvisoryValid
+float32 speedLimit
+float32 speedAdvisory
+GpsLocationData lastGps
+float32 speedLimitAhead

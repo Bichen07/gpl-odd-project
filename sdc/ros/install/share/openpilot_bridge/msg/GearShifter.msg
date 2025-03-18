@@ -1,0 +1,10 @@
+uint32 reverse=4
+uint32 eco=8
+uint32 unknown=0
+uint32 park=1
+uint32 drive=2
+uint32 manumatic=9
+uint32 neutral=3
+uint32 brake=7
+uint32 low=6
+uint32 sport=5

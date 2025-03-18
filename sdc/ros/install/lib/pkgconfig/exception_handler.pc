@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: exception_handler
+Description: Description of exception_handler
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: behaviortree_cpp_v3 diagnostic itri_msgs roscpp tf

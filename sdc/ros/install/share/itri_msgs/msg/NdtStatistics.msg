@@ -1,0 +1,14 @@
+Header header
+
+float32 execution_time
+float32 fitness_score
+float32 fitness_score_valid
+uint32 invalid_points_number
+uint32 iteration
+float32 map_coverage
+float32 matching_score
+float32 matching_score_valid
+float32 regulate_matching_score
+uint32 scan_valid_ratio
+uint32 source_points_number
+uint32 valid_points_number

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot name="car">
+  <link name="base_link">
+    <visual name="base_visual">
+        <origin xyz="-1.5 0  -2.6" rpy="0 0 1.57" /> <!-- canter-->
+      <geometry>
+        <mesh filename="package://sdc/data/vehicle_model/canter/canter.dae"
+              scale="0.9 0.98 1.0"/> <!-- canter-->
+      </geometry>
+    </visual>
+  </link>
+</robot>

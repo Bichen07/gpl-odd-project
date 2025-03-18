@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: behavior
+Description: Description of behavior
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: behaviortree_cpp_v3 diagnostic trace roscpp itri_msgs route_mission_handler

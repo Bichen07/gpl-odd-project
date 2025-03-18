@@ -1,0 +1,19 @@
+Header header
+
+string[] exe
+string[] name
+string[] cmdline
+float32 cpuUser
+int32 numThreads
+int64 memRss
+int32 pid
+int64 memVms
+int32 priority
+float32 cpuSystem
+int64 state
+float32 startTime
+int32 nice
+float32 cpuChildrenUser
+int32 ppid
+int32 processor
+float32 cpuChildrenSystem

@@ -1,0 +1,85 @@
+{
+    "sgsi_debug_test": "sgsi_debug_test_simulator",
+    "ego_vehicle":
+    {
+        "size":
+        {
+            "x": 5.172,
+            "y": 2.297,
+            "z": 1.777
+        },
+        "compensated_second_": 0.1,
+        "compensated_second": 0.05,
+        "static_longitudinal_compensated_distance": 0.1
+    },
+    "sgsi_debug_test_simulator":
+    {
+        "map": "III_itri",
+        "route": "operation",
+        "time_step": 0.01,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 530,
+            "opposite": 101
+        },
+        "lane_roadside_moving_model":
+        {
+            "time_step": 0.01,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 0.0,
+                        "y": 0.0
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 239,
+                    "begin_point_id": 12,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": -2.4,
+                    "begin_lateral_speed_kph": 4.8,
+                    "end_lane_id": 355,
+                    "end_point_id": 53,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -2.4,
+                    "end_lateral_speed_kph": -4.8,
+                    "move_to_roadside_trigger_lane_id": 355,
+                    "move_to_roadside_trigger_point_id": 33,
+                    "move_to_roadside_trigger_longitudinal_offset":0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 20.0,
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0,
+                    "moving_speed_kph": 16
+                }
+            ]
+        }
+    }
+}

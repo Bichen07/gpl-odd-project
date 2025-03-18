@@ -1,0 +1,8 @@
+scenario_search/QuinticWaypointArray waypoints
+float32 time_horizon
+float32 delay_time
+float32 trigger_distance
+---
+duration duration
+float32 score
+string reason

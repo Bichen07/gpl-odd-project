@@ -1,0 +1,16 @@
+(cl:in-package openpilot_bridge-msg)
+(cl:export '(HEADER-VAL
+          HEADER
+          CORRECTIONMONOTIME-VAL
+          CORRECTIONMONOTIME
+          PREPOSITIONECEF-VAL
+          PREPOSITIONECEF
+          POSTPOSITIONECEF-VAL
+          POSTPOSITIONECEF
+          POSTPOSEQUATECEF-VAL
+          POSTPOSEQUATECEF
+          NUMINLIERS-VAL
+          NUMINLIERS
+          PREPOSEQUATECEF-VAL
+          PREPOSEQUATECEF
+))

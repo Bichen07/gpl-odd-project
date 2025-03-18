@@ -1,0 +1,16 @@
+std_msgs/Header header
+
+string real_time_factor
+uint32 n_rounds_completed
+
+string total_wall_time_duration
+string total_simulation_duration
+string overall_real_time_factor
+string current_round_simulation_duration
+string[] past_rounds_simulation_duration
+
+uint32 n_active_agents
+uint32 n_total_spawned_agents
+uint32 n_agents_force_removed
+
+sumo_cosimulation/AccidentOverview accident_overview

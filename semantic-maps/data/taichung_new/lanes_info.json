@@ -1,0 +1,4513 @@
+{
+   "lanes" : [
+      {
+         "direction" : 0,
+         "id" : 104,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 108, 238 ],
+         "roadlines" : [ 114, 653 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 105,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 109, 240 ],
+         "roadlines" : [ 614, 114 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 106,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 614, 130 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 107,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 130, 654 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 108,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 113 ],
+         "roadlines" : [ 778, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 109,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 114 ],
+         "roadlines" : [ 763, 778 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 110,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 106 ],
+         "roadlines" : [ 763, 779 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 111,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 107 ],
+         "roadlines" : [ 779, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 112,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 128 ],
+         "roadlines" : [ 785, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 113,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 247 ],
+         "roadlines" : [ 248, 682 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 114,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 246 ],
+         "roadlines" : [ 803, 248 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 115,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 252 ],
+         "roadlines" : [ 635, 320 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 116,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 253 ],
+         "roadlines" : [ 320, 706 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 117,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 115 ],
+         "roadlines" : [ 764, 781 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 118,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 116 ],
+         "roadlines" : [ 781, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 119,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 205, 289 ],
+         "roadlines" : [ 613, 402 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 120,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 119 ],
+         "roadlines" : [ 764, 780 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 121,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 122 ],
+         "roadlines" : [ 780, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 122,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 202, 285 ],
+         "roadlines" : [ 402, 708 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 123,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 208, 291 ],
+         "roadlines" : [ 634, 430 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 124,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 206, 287 ],
+         "roadlines" : [ 430, 714 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 125,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 123 ],
+         "roadlines" : [ 770, 784 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 126,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 124 ],
+         "roadlines" : [ 784, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 127,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 129 ],
+         "roadlines" : [ 770, 785 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 128,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 132, 254 ],
+         "roadlines" : [ 432, 717 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 129,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 133, 261 ],
+         "roadlines" : [ 612, 432 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 130,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 125, 280 ],
+         "roadlines" : [ 612, 442 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 131,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 126, 277 ],
+         "roadlines" : [ 442, 718 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 132,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 136 ],
+         "roadlines" : [ 786, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 133,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 137 ],
+         "roadlines" : [ 760, 786 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 134,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 130 ],
+         "roadlines" : [ 760, 787 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 135,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 131 ],
+         "roadlines" : [ 787, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 136,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 140 ],
+         "roadlines" : [ 452, 724 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 137,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 141, 273 ],
+         "roadlines" : [ 611, 452 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 138,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 134, 256 ],
+         "roadlines" : [ 611, 465 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 139,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 135, 260 ],
+         "roadlines" : [ 465, 723 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 140,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 144 ],
+         "roadlines" : [ 788, 725 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 141,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 145 ],
+         "roadlines" : [ 759, 788 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 142,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 138 ],
+         "roadlines" : [ 759, 789 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 143,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 139 ],
+         "roadlines" : [ 789, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 144,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 148, 263 ],
+         "roadlines" : [ 467, 727 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 145,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 149, 266 ],
+         "roadlines" : [ 610, 467 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 146,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 142 ],
+         "roadlines" : [ 610, 478 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 147,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 143, 271 ],
+         "roadlines" : [ 478, 728 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 148,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 152 ],
+         "roadlines" : [ 790, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 149,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 153 ],
+         "roadlines" : [ 758, 790 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 150,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 146 ],
+         "roadlines" : [ 758, 791 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 151,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 147 ],
+         "roadlines" : [ 791, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 152,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 481, 17 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 153,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 633, 481 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 154,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 150, 275 ],
+         "roadlines" : [ 633, 513 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 155,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 151, 265 ],
+         "roadlines" : [ 513, 732 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 165,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 765, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 167,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 169 ],
+         "roadlines" : [ 765, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 168,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 165, 342, 644 ],
+         "roadlines" : [ 630, 694 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 169,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 171, 333, 467 ],
+         "roadlines" : [ 630, 697 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 170,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 168 ],
+         "roadlines" : [ 754, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 171,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 173 ],
+         "roadlines" : [ 754, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 172,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 170, 336, 468, 676 ],
+         "roadlines" : [ 628, 691 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 173,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 175, 329 ],
+         "roadlines" : [ 628, 693 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 174,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 172 ],
+         "roadlines" : [ 801, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 175,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 177 ],
+         "roadlines" : [ 801, 687 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 176,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 174, 330 ],
+         "roadlines" : [ 626, 704 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 177,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 178 ],
+         "roadlines" : [ 626, 688 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 178,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 231 ],
+         "roadlines" : [ 741, 685 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 179,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 230 ],
+         "roadlines" : [ 202, 684 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 180,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 183 ],
+         "roadlines" : [ 755, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 181,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 179 ],
+         "roadlines" : [ 755, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 182,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 181, 239, 243 ],
+         "roadlines" : [ 201, 669 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 183,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 185 ],
+         "roadlines" : [ 201, 668 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 184,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 182 ],
+         "roadlines" : [ 744, 661 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 185,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 186 ],
+         "roadlines" : [ 744, 660 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 186,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 188, 303 ],
+         "roadlines" : [ 623, 670 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 187,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 184 ],
+         "roadlines" : [ 623, 662 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 188,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 191 ],
+         "roadlines" : [ 756, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 189,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 187 ],
+         "roadlines" : [ 756, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 190,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 189, 305 ],
+         "roadlines" : [ 621, 672 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 191,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 192, 315 ],
+         "roadlines" : [ 621, 26 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 192,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 194 ],
+         "roadlines" : [ 802, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 193,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 190 ],
+         "roadlines" : [ 802, 674 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 194,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 197, 319, 325 ],
+         "roadlines" : [ 620, 673 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 195,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 193, 317 ],
+         "roadlines" : [ 620, 679 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 196,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 195 ],
+         "roadlines" : [ 757, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 197,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 199 ],
+         "roadlines" : [ 757, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 199,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 502, 494, 493 ],
+         "roadlines" : [ 194, 675 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 201,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 196, 323, 326 ],
+         "roadlines" : [ 194, 678 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 202,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 203 ],
+         "roadlines" : [ 782, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 203,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 112, 278 ],
+         "roadlines" : [ 405, 713 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 204,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 127, 284 ],
+         "roadlines" : [ 634, 405 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 205,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 204 ],
+         "roadlines" : [ 771, 782 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 206,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 207 ],
+         "roadlines" : [ 783, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 207,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 118, 298 ],
+         "roadlines" : [ 403, 709 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 208,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 209 ],
+         "roadlines" : [ 771, 783 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 209,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 117 ],
+         "roadlines" : [ 613, 403 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 230,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 176 ],
+         "roadlines" : [ 741, 705 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 231,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 180, 237, 241, 544 ],
+         "roadlines" : [ 202, 689 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 236,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 179 ],
+         "roadlines" : [ 747, 683 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 237,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 107 ],
+         "roadlines" : [ 746, 657 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 238,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 183 ],
+         "roadlines" : [ 752, 655 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 239,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 113 ],
+         "roadlines" : [ 750, 667 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 240,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 179 ],
+         "roadlines" : [ 749, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 241,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 114 ],
+         "roadlines" : [ 748, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 242,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 183 ],
+         "roadlines" : [ 751, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 243,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 106 ],
+         "roadlines" : [ 753, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 246,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 250 ],
+         "roadlines" : [ 804, 810 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 247,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 251 ],
+         "roadlines" : [ 810, 811 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 248,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 110, 242 ],
+         "roadlines" : [ 803, 808 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 249,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 111, 236 ],
+         "roadlines" : [ 808, 809 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 250,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 120 ],
+         "roadlines" : [ 635, 805 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 251,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 121, 301 ],
+         "roadlines" : [ 805, 812 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 252,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 248 ],
+         "roadlines" : [ 804, 806 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 253,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 249 ],
+         "roadlines" : [ 806, 807 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 254,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 385 ],
+         "roadlines" : [ 813, 720 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 255,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 136 ],
+         "roadlines" : [ 814, 721 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 256,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 385 ],
+         "roadlines" : [ 815, 816 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 257,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 130 ],
+         "roadlines" : [ 817, 818 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 258,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 137 ],
+         "roadlines" : [ 819, 820 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 259,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 131 ],
+         "roadlines" : [ 821, 716 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 260,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 415 ],
+         "roadlines" : [ 822, 722 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 261,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 415 ],
+         "roadlines" : [ 823, 824 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 262,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 152 ],
+         "roadlines" : [ 825, 729 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 263,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 354 ],
+         "roadlines" : [ 826, 18 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 264,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 147 ],
+         "roadlines" : [ 827, 726 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 265,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 351 ],
+         "roadlines" : [ 828, 730 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 266,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 351 ],
+         "roadlines" : [ 829, 830 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 267,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 351 ],
+         "roadlines" : [ 831, 832 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 268,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 354 ],
+         "roadlines" : [ 831, 833 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 269,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 153 ],
+         "roadlines" : [ 834, 835 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 270,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 146 ],
+         "roadlines" : [ 836, 837 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 271,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 446 ],
+         "roadlines" : [ 838, 8 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 272,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 139 ],
+         "roadlines" : [ 839, 3 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 273,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 446 ],
+         "roadlines" : [ 840, 841 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 274,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 145 ],
+         "roadlines" : [ 842, 843 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 275,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 354 ],
+         "roadlines" : [ 844, 845 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 276,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 124 ],
+         "roadlines" : [ 846, 6 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 277,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 417 ],
+         "roadlines" : [ 847, 719 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 278,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 377 ],
+         "roadlines" : [ 848, 715 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 279,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 128 ],
+         "roadlines" : [ 849, 2 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 280,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 377 ],
+         "roadlines" : [ 850, 851 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 281,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 123 ],
+         "roadlines" : [ 852, 853 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 282,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 129 ],
+         "roadlines" : [ 854, 855 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 283,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 128 ],
+         "roadlines" : [ 0, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 284,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 417 ],
+         "roadlines" : [ 856, 857 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 285,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 425 ],
+         "roadlines" : [ 858, 710 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 286,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 203 ],
+         "roadlines" : [ 859, 1 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 287,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 419 ],
+         "roadlines" : [ 860, 712 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 288,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 207 ],
+         "roadlines" : [ 861, 711 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 289,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 419 ],
+         "roadlines" : [ 862, 863 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 290,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 204 ],
+         "roadlines" : [ 864, 865 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 291,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 425 ],
+         "roadlines" : [ 866, 867 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 292,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 209 ],
+         "roadlines" : [ 868, 869 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 293,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 421 ],
+         "roadlines" : [ 871, 872 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 294,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 422 ],
+         "roadlines" : [ 872, 873 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 295,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 122 ],
+         "roadlines" : [ 870, 5 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 296,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 119 ],
+         "roadlines" : [ 874, 876 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 297,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 115 ],
+         "roadlines" : [ 875, 877 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 298,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 422 ],
+         "roadlines" : [ 878, 7 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 299,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 423 ],
+         "roadlines" : [ 879, 880 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 300,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 424 ],
+         "roadlines" : [ 880, 881 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 301,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 424 ],
+         "roadlines" : [ 882, 707 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 302,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 116 ],
+         "roadlines" : [ 883, 12 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 303,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 473 ],
+         "roadlines" : [ 884, 663 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 304,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 187 ],
+         "roadlines" : [ 885, 886 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 305,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 471 ],
+         "roadlines" : [ 887, 665 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 306,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 469 ],
+         "roadlines" : [ 888, 889 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 307,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 470 ],
+         "roadlines" : [ 889, 890 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 308,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 471 ],
+         "roadlines" : [ 890, 891 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 309,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 191 ],
+         "roadlines" : [ 892, 893 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 310,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 472 ],
+         "roadlines" : [ 894, 895 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 311,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 473 ],
+         "roadlines" : [ 895, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 313,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 187 ],
+         "roadlines" : [ 896, 681 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 314,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 191 ],
+         "roadlines" : [ 897, 664 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 315,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 474 ],
+         "roadlines" : [ 898, 671 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 316,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 194 ],
+         "roadlines" : [ 899, 29 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 317,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 474 ],
+         "roadlines" : [ 899, 900 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 318,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 190 ],
+         "roadlines" : [ 898, 901 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 319,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 363 ],
+         "roadlines" : [ 902, 680 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 320,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 195 ],
+         "roadlines" : [ 903, 28 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 321,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 363 ],
+         "roadlines" : [ 904, 905 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 322,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 199 ],
+         "roadlines" : [ 906, 32 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 323,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 364 ],
+         "roadlines" : [ 907, 676 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 324,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 364 ],
+         "roadlines" : [ 904, 908 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 325,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 364 ],
+         "roadlines" : [ 903, 909 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 326,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 363 ],
+         "roadlines" : [ 906, 910 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 327,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 199 ],
+         "roadlines" : [ 907, 911 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 328,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 172 ],
+         "roadlines" : [ 912, 23 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 329,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 461 ],
+         "roadlines" : [ 912, 913 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 330,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 461 ],
+         "roadlines" : [ 914, 690 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 331,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 177 ],
+         "roadlines" : [ 914, 915 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 332,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 168 ],
+         "roadlines" : [ 917, 51 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 333,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 464 ],
+         "roadlines" : [ 916, 695 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 334,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 463 ],
+         "roadlines" : [ 918, 919 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 335,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 173 ],
+         "roadlines" : [ 920, 921 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 336,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 466 ],
+         "roadlines" : [ 922, 692 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 337,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 168 ],
+         "roadlines" : [ 923, 924 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 338,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 173 ],
+         "roadlines" : [ 925, 656 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 339,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 465 ],
+         "roadlines" : [ 926, 927 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 340,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 466 ],
+         "roadlines" : [ 927, 928 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 341,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 169 ],
+         "roadlines" : [ 929, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 342,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 650 ],
+         "roadlines" : [ 930, 696 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 343,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 650 ],
+         "roadlines" : [ 931, 932 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 345,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 300, 302 ],
+         "roadlines" : [ 936, 937 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 346,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 299 ],
+         "roadlines" : [ 935, 936 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 347,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 296 ],
+         "roadlines" : [ 934, 935 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 348,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 294, 295 ],
+         "roadlines" : [ 940, 941 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 349,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 293 ],
+         "roadlines" : [ 939, 940 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 350,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 297 ],
+         "roadlines" : [ 938, 939 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 351,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 943, 942 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 352,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 269, 268, 264 ],
+         "roadlines" : [ 943, 944 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 353,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 270, 267, 262 ],
+         "roadlines" : [ 945, 946 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 354,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 445, 450, 414 ],
+         "roadlines" : [ 945, 947 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 355,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 332, 677 ],
+         "roadlines" : [ 949, 948 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 356,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 334 ],
+         "roadlines" : [ 950, 949 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 357,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 335 ],
+         "roadlines" : [ 951, 950 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 358,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 666 ],
+         "roadlines" : [ 1427, 1428 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 359,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 667 ],
+         "roadlines" : [ 0, 1428 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 360,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 665 ],
+         "roadlines" : [ 954, 955 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 361,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 327, 321, 320 ],
+         "roadlines" : [ 956, 957 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 362,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 324, 322, 580 ],
+         "roadlines" : [ 959, 960 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 363,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 575, 579 ],
+         "roadlines" : [ 959, 961 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 364,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 538, 582 ],
+         "roadlines" : [ 956, 958 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 365,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 311, 313 ],
+         "roadlines" : [ 964, 965 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 366,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 310 ],
+         "roadlines" : [ 963, 964 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 367,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 309 ],
+         "roadlines" : [ 962, 963 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 368,
+         "laneno" : 3,
+         "mode" : 0,
+         "next_clane" : [ 308, 314 ],
+         "roadlines" : [ 969, 666 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 369,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 307 ],
+         "roadlines" : [ 968, 969 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 370,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 306 ],
+         "roadlines" : [ 967, 968 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 372,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 304 ],
+         "roadlines" : [ 966, 967 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 373,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 341 ],
+         "roadlines" : [ 970, 971 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 377,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 379, 403 ],
+         "roadlines" : [ 976, 977 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 378,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 279, 281 ],
+         "roadlines" : [ 976, 978 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 379,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 380 ],
+         "roadlines" : [ 979, 980 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 380,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 459, 434 ],
+         "roadlines" : [ 981, 982 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 381,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 516 ],
+         "roadlines" : [ 982, 984 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 382,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 460, 435 ],
+         "roadlines" : [ 985, 986 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 383,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 515 ],
+         "roadlines" : [ 986, 987 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 384,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 378 ],
+         "roadlines" : [ 989, 988 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 385,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 387, 390, 438 ],
+         "roadlines" : [ 990, 991 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 386,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 255, 257, 537 ],
+         "roadlines" : [ 990, 992 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 387,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 383 ],
+         "roadlines" : [ 994, 993 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 388,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 386 ],
+         "roadlines" : [ 996, 995 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 389,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 386 ],
+         "roadlines" : [ 997, 998 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 390,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 430 ],
+         "roadlines" : [ 999, 1000 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 391,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 430 ],
+         "roadlines" : [ 1003, 1004 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 392,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 382 ],
+         "roadlines" : [ 1002, 1001 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 393,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 383 ],
+         "roadlines" : [ 1001, 1005 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 394,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 431 ],
+         "roadlines" : [ 1004, 1006 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 395,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 401 ],
+         "roadlines" : [ 1007, 1008 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 396,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 402 ],
+         "roadlines" : [ 1008, 1009 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 397,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 511 ],
+         "roadlines" : [ 1010, 1011 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 398,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 381 ],
+         "roadlines" : [ 1013, 1012 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 399,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 380 ],
+         "roadlines" : [ 1014, 1015 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 400,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 381 ],
+         "roadlines" : [ 1015, 1016 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 401,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1058, 1059 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 402,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1059, 1060 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 403,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 402 ],
+         "roadlines" : [ 1061, 1057 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 404,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1051, 1052 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 405,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 437, 453 ],
+         "roadlines" : [ 1051, 1054 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 406,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1036, 1037 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 407,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 449, 451 ],
+         "roadlines" : [ 1036, 1039 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 408,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1044, 1045 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 409,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1045, 1046 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 411,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 442 ],
+         "roadlines" : [ 1047, 1048 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 412,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 413, 443 ],
+         "roadlines" : [ 1048, 1049 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 413,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 353 ],
+         "roadlines" : [ 1020, 1018 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 414,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 428 ],
+         "roadlines" : [ 1019, 1017 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 415,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1086, 1087 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 416,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 258, 259 ],
+         "roadlines" : [ 1083, 1084 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 417,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1077, 1078 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 418,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 276, 282, 283 ],
+         "roadlines" : [ 1080, 1081 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 419,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1074, 1075 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 420,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 288, 290 ],
+         "roadlines" : [ 1071, 1072 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 421,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1065, 1066 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 422,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1066, 1067 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 423,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1062, 1063 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 424,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1063, 1064 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 425,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1068, 1069 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 426,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 286, 292 ],
+         "roadlines" : [ 1068, 1070 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 427,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 533 ],
+         "roadlines" : [ 1021, 1029 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 428,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 534 ],
+         "roadlines" : [ 1029, 1033 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 429,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 519 ],
+         "roadlines" : [ 1149, 1150 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 430,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 535 ],
+         "roadlines" : [ 1022, 1031 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 431,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 536 ],
+         "roadlines" : [ 1031, 1034 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 433,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 522 ],
+         "roadlines" : [ 1152, 1153 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 434,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 523 ],
+         "roadlines" : [ 1192, 1193 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 435,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 526 ],
+         "roadlines" : [ 1195, 1196 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 437,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 386 ],
+         "roadlines" : [ 1129, 1131 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 438,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 404 ],
+         "roadlines" : [ 1129, 1130 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 439,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 408 ],
+         "roadlines" : [ 1023, 1027 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 440,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 409 ],
+         "roadlines" : [ 1027, 1028 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 442,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 427 ],
+         "roadlines" : [ 1024, 1025 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 443,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 428 ],
+         "roadlines" : [ 1025, 1026 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 444,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 353 ],
+         "roadlines" : [ 1132, 1133 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 445,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 408 ],
+         "roadlines" : [ 1134, 1135 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 446,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1090, 1091 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 447,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 272, 274 ],
+         "roadlines" : [ 1090, 1092 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 448,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 406 ],
+         "roadlines" : [ 1136, 1137 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 449,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 409 ],
+         "roadlines" : [ 1138, 1139 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 450,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 406 ],
+         "roadlines" : [ 1140, 1141 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 451,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 353 ],
+         "roadlines" : [ 1140, 1142 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 452,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 404 ],
+         "roadlines" : [ 1144, 1143 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 453,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 431 ],
+         "roadlines" : [ 1146, 1145 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 454,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 404 ],
+         "roadlines" : [ 1147, 1148 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 455,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 517 ],
+         "roadlines" : [ 1149, 1150 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 456,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 518 ],
+         "roadlines" : [ 1150, 1151 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 457,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 521 ],
+         "roadlines" : [ 1152, 1153 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 458,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 520 ],
+         "roadlines" : [ 1153, 1154 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 459,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 524 ],
+         "roadlines" : [ 1192, 1193 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 460,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 527 ],
+         "roadlines" : [ 1195, 1196 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 461,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1108, 1109 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 462,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 331, 328 ],
+         "roadlines" : [ 1108, 1110 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 463,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 634, 639 ],
+         "roadlines" : [ 1106, 1107 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 464,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 630, 635 ],
+         "roadlines" : [ 1107, 1105 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 465,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1102, 1103 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 466,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1103, 1104 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 467,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 465 ],
+         "roadlines" : [ 1155, 1156 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 468,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 463 ],
+         "roadlines" : [ 1157, 1158 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 469,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1093, 1094 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 470,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1094, 1159 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 471,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1159, 1095 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 472,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1096, 1097 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 473,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1097, 1098 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 474,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1099, 1100 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 475,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 316, 318 ],
+         "roadlines" : [ 1099, 1101 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 476,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 566, 571, 562 ],
+         "roadlines" : [ 1118, 1119 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 478,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 490, 581, 499 ],
+         "roadlines" : [ 1118, 1121 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 480,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 593, 596, 586 ],
+         "roadlines" : [ 1113, 1114 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 482,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 488, 501, 492 ],
+         "roadlines" : [ 1113, 1116 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 484,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1123, 1124 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 486,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 495, 500, 498 ],
+         "roadlines" : [ 1123, 1126 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 488,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 476 ],
+         "roadlines" : [ 1163, 1164 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 490,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 480 ],
+         "roadlines" : [ 1163, 1166 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 492,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 201 ],
+         "roadlines" : [ 1176, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 493,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 476 ],
+         "roadlines" : [ 1295, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 494,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 484 ],
+         "roadlines" : [ 1160, 1161 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 495,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 201 ],
+         "roadlines" : [ 1160, 1162 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 498,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 480 ],
+         "roadlines" : [ 1174, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 499,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 484 ],
+         "roadlines" : [ 1172, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 500,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 476 ],
+         "roadlines" : [ 1172, 1173 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 501,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 484 ],
+         "roadlines" : [ 1174, 1175 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 502,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 480 ],
+         "roadlines" : [ 1176, 1177 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 503,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 504 ],
+         "roadlines" : [ 1178, 1047 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 504,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 406 ],
+         "roadlines" : [ 1179, 1180 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 505,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 506 ],
+         "roadlines" : [ 1112, 970 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 506,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 649 ],
+         "roadlines" : [ 1111, 931 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 508,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 514 ],
+         "roadlines" : [ 1181, 1182 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 509,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 399 ],
+         "roadlines" : [ 1182, 1183 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 510,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 400, 513 ],
+         "roadlines" : [ 1183, 1184 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 511,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1186, 1187 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 512,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 398 ],
+         "roadlines" : [ 1186, 1188 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 513,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 511 ],
+         "roadlines" : [ 1189, 1185 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 514,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 378 ],
+         "roadlines" : [ 1190, 1191 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 515,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 528 ],
+         "roadlines" : [ 1196, 1197 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 516,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 525 ],
+         "roadlines" : [ 1193, 1194 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 517,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 439 ],
+         "roadlines" : [ 1032, 1199 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 518,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 440, 448 ],
+         "roadlines" : [ 1199, 1200 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 519,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 444 ],
+         "roadlines" : [ 1198, 1032 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 520,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 388, 393 ],
+         "roadlines" : [ 1201, 1202 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 521,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 392 ],
+         "roadlines" : [ 1030, 1201 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 522,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 454 ],
+         "roadlines" : [ 1203, 1030 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 523,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 389 ],
+         "roadlines" : [ 1204, 1042 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 524,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 391 ],
+         "roadlines" : [ 1042, 1205 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 525,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 394, 452 ],
+         "roadlines" : [ 1205, 1206 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 526,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 397 ],
+         "roadlines" : [ 1207, 1043 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 527,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 395 ],
+         "roadlines" : [ 1043, 1208 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 528,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 384, 396 ],
+         "roadlines" : [ 1208, 1209 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 529,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 433, 457 ],
+         "roadlines" : [ 1210, 1211 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 530,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 458 ],
+         "roadlines" : [ 1211, 1212 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 531,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 429, 455 ],
+         "roadlines" : [ 1213, 1214 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 532,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 456 ],
+         "roadlines" : [ 1214, 1215 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 533,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 529 ],
+         "roadlines" : [ 1216, 1217 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 534,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 530 ],
+         "roadlines" : [ 1217, 1218 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 535,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 531 ],
+         "roadlines" : [ 1219, 1220 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 536,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 532 ],
+         "roadlines" : [ 1220, 1221 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 537,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 131 ],
+         "roadlines" : [ 0, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 538,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 540 ],
+         "roadlines" : [ 1225, 1226 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 539,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 361 ],
+         "roadlines" : [ 1225, 1224 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 540,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1227, 1228 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 541,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 539, 584 ],
+         "roadlines" : [ 1227, 1229 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 542,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 591, 592, 598 ],
+         "roadlines" : [ 1232, 1233 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 543,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 585, 583 ],
+         "roadlines" : [ 1232, 1234 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 544,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 113 ],
+         "roadlines" : [ 0, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 545,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1239, 1240 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 546,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 587, 588, 599 ],
+         "roadlines" : [ 1239, 1241 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 547,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1242, 1243 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 549,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 589, 594, 590 ],
+         "roadlines" : [ 1242, 1245 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 552,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1258, 1259 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 553,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 564, 572, 563 ],
+         "roadlines" : [ 1258, 1260 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 554,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 573 ],
+         "roadlines" : [ 1253, 1255 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 555,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 578, 576 ],
+         "roadlines" : [ 1253, 1254 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 556,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 574, 577 ],
+         "roadlines" : [ 1248, 1250 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 557,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1248, 1249 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 558,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1261, 1262 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 560,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 568, 570, 565 ],
+         "roadlines" : [ 1261, 1263 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 562,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 555 ],
+         "roadlines" : [ 1271, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 563,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 478 ],
+         "roadlines" : [ 1283, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 564,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 558 ],
+         "roadlines" : [ 1273, 1274 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 565,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 552 ],
+         "roadlines" : [ 1273, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 566,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 558 ],
+         "roadlines" : [ 1276, 1277 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 568,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 478 ],
+         "roadlines" : [ 1276, 1279 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 570,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 555 ],
+         "roadlines" : [ 1281, 1282 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 571,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 552 ],
+         "roadlines" : [ 1283, 1284 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 572,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 555 ],
+         "roadlines" : [ 1285, 1286 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 573,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 552 ],
+         "roadlines" : [ 1285, 1287 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 574,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 362 ],
+         "roadlines" : [ 1288, 1289 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 575,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 557 ],
+         "roadlines" : [ 1288, 1247 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 576,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 557 ],
+         "roadlines" : [ 1290, 1291 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 577,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 554 ],
+         "roadlines" : [ 1290, 1251 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 578,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 362 ],
+         "roadlines" : [ 1292, 1252 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 579,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 554 ],
+         "roadlines" : [ 1292, 1293 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 580,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 195 ],
+         "roadlines" : [ 902, 1294 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 581,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 201 ],
+         "roadlines" : [ 1295, 1296 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 582,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 542 ],
+         "roadlines" : [ 1297, 1231 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 583,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 540 ],
+         "roadlines" : [ 1298, 1230 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 584,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 542 ],
+         "roadlines" : [ 1298, 1299 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 585,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 361 ],
+         "roadlines" : [ 1297, 1300 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 586,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 545 ],
+         "roadlines" : [ 1302, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 587,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 482 ],
+         "roadlines" : [ 1302, 1303 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 588,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 547 ],
+         "roadlines" : [ 1305, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 589,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 545 ],
+         "roadlines" : [ 1305, 1306 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 590,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 543 ],
+         "roadlines" : [ 1309, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 591,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 482 ],
+         "roadlines" : [ 1311, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 592,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 547 ],
+         "roadlines" : [ 1309, 1310 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 593,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 543 ],
+         "roadlines" : [ 1311, 1312 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 594,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 482 ],
+         "roadlines" : [ 1313, 1314 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 596,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 547 ],
+         "roadlines" : [ 1313, 1316 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 598,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 545 ],
+         "roadlines" : [ 1318, 1319 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 599,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 543 ],
+         "roadlines" : [ 1318, 1320 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 600,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 602, 647 ],
+         "roadlines" : [ 1112, 1268 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 601,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 603 ],
+         "roadlines" : [ 1268, 1269 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 602,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 606 ],
+         "roadlines" : [ 1322, 1323 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 603,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 607 ],
+         "roadlines" : [ 1323, 1325 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 604,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 505 ],
+         "roadlines" : [ 1322, 1326 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 605,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 373 ],
+         "roadlines" : [ 1326, 1327 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 606,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 613 ],
+         "roadlines" : [ 1328, 1329 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 607,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 614 ],
+         "roadlines" : [ 1329, 1330 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 608,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 604 ],
+         "roadlines" : [ 1328, 1332 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 610,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 605, 646 ],
+         "roadlines" : [ 1332, 1333 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 611,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 662 ],
+         "roadlines" : [ 1341, 1342 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 612,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 663 ],
+         "roadlines" : [ 1342, 1343 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 613,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 611 ],
+         "roadlines" : [ 1337, 1339 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 614,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 612 ],
+         "roadlines" : [ 1339, 1340 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 615,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 608 ],
+         "roadlines" : [ 1337, 1335 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 616,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 610 ],
+         "roadlines" : [ 1335, 1336 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 617,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 615 ],
+         "roadlines" : [ 1341, 1345 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 618,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 616 ],
+         "roadlines" : [ 1345, 1346 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 619,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 631, 641, 643 ],
+         "roadlines" : [ 1349, 1350 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 620,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 645, 648 ],
+         "roadlines" : [ 1349, 1351 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 621,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 358, 359 ],
+         "roadlines" : [ 952, 954 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 622,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 633, 640, 642 ],
+         "roadlines" : [ 1356, 1358 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 623,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1356, 1357 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 624,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 674 ],
+         "roadlines" : [ 0, 1434 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 625,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 669 ],
+         "roadlines" : [ 1361, 1362 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 626,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 627, 624 ],
+         "roadlines" : [ 1359, 1361 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 627,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 673 ],
+         "roadlines" : [ 1433, 0 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 628,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 636, 638 ],
+         "roadlines" : [ 1363, 1364 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 629,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 632, 637 ],
+         "roadlines" : [ 1364, 1365 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 630,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 620 ],
+         "roadlines" : [ 1382, 1352 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 631,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 625 ],
+         "roadlines" : [ 1383, 1353 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 632,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 623 ],
+         "roadlines" : [ 1384, 1355 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 633,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 360 ],
+         "roadlines" : [ 1385, 1354 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 634,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 626 ],
+         "roadlines" : [ 1386, 1387 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 635,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 625 ],
+         "roadlines" : [ 1387, 1388 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 636,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 621 ],
+         "roadlines" : [ 1389, 1390 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 637,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 360 ],
+         "roadlines" : [ 1390, 1391 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 638,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 620 ],
+         "roadlines" : [ 1392, 1393 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 639,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 623 ],
+         "roadlines" : [ 1394, 1395 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 640,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 626 ],
+         "roadlines" : [ 1396, 1397 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 641,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 621 ],
+         "roadlines" : [ 1398, 1399 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 642,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 620 ],
+         "roadlines" : [ 1400, 1401 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 643,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 623 ],
+         "roadlines" : [ 1400, 1402 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 644,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 600 ],
+         "roadlines" : [ 0, 1404 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 645,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 373 ],
+         "roadlines" : [ 1406, 1405 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 646,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 619 ],
+         "roadlines" : [ 1408, 1407 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 647,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 619 ],
+         "roadlines" : [ 1409, 1410 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 648,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 606 ],
+         "roadlines" : [ 1411, 1412 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 649,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1413, 1414 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 650,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1414, 1415 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 651,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 600 ],
+         "roadlines" : [ 1111, 1416 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 652,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 601 ],
+         "roadlines" : [ 1416, 1419 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 654,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 651 ],
+         "roadlines" : [ 1413, 1417 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 655,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 652 ],
+         "roadlines" : [ 1417, 1418 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 656,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1369, 1374 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 657,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1374, 1375 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 658,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1369, 1370 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 659,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 660 ],
+         "roadlines" : [ 1370, 1371 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 660,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 617 ],
+         "roadlines" : [ 1421, 1422 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 661,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 618 ],
+         "roadlines" : [ 1422, 1423 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 662,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 656 ],
+         "roadlines" : [ 1424, 1425 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 663,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 657 ],
+         "roadlines" : [ 1425, 1426 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 664,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 661 ],
+         "roadlines" : [ 1371, 1373 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 665,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 668 ],
+         "roadlines" : [ 1428, 1429 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 666,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 337 ],
+         "roadlines" : [ 1430, 953 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 667,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 339 ],
+         "roadlines" : [ 953, 1431 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 668,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 338, 340 ],
+         "roadlines" : [ 1431, 1432 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 669,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : [ 675 ],
+         "roadlines" : [ 1434, 1435 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 673,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1436, 1360 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 674,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1360, 1437 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 675,
+         "laneno" : 2,
+         "mode" : 0,
+         "next_clane" : null,
+         "roadlines" : [ 1437, 1438 ],
+         "subtype" : 0
+      },
+      {
+         "direction" : 0,
+         "id" : 676,
+         "laneno" : 1,
+         "mode" : 0,
+         "next_clane" : [ 464 ],
+         "roadlines" : [ 0, 0 ],
+         "subtype" : 1
+      },
+      {
+         "direction" : 0,
+         "id" : 677,
+         "laneno" : 0,
+         "mode" : 0,
+         "next_clane" : [ 464 ],
+         "roadlines" : [ 919, 0 ],
+         "subtype" : 1
+      }
+   ]
+}

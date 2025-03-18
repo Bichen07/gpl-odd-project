@@ -1,0 +1,74 @@
+{
+    "itri_03": "itri_03_lane_roadside_moving_simulator", 
+    "ego_vehicle": {
+        "size": {
+            "y": 2.297, 
+            "x": 5.172, 
+            "z": 1.777
+        }, 
+        "compensated_second": 0.05, 
+        "compensated_second_": 0.1, 
+        "static_longitudinal_compensated_distance": 0.1
+    }, 
+    "itri_03_lane_roadside_moving_simulator": {
+        "map": "III_itri", 
+        "route": "operation", 
+        "visualization_time_step": 0.01, 
+        "time_step": 0.01, 
+        "begin_lane_id": {
+            "forward": 530, 
+            "opposite": 101
+        }, 
+        "lane_roadside_moving_model": {
+            "moving_agent_configs": [
+                {
+                    "front_warning_region_size": {
+                        "y": 0.0, 
+                        "x": 0.0
+                    }, 
+                    "color": {
+                        "a": 1.0, 
+                        "r": 0.0, 
+                        "b": 1.0, 
+                        "g": 0.0
+                    }, 
+                    "safety_margin": {
+                        "front": 0.0, 
+                        "right": 0.0, 
+                        "rear": 0.0, 
+                        "left": 0.0
+                    }, 
+                    "size": {
+                        "y": 1.8, 
+                        "x": 4.2, 
+                        "z": 1.45
+                    }, 
+                    "object_class_id": "car"
+                }
+            ], 
+            "time_step": 0.01, 
+            "visualization_time_step": 0.01, 
+            "motion_configs": [
+                {
+                    "move_trigger_distance": 12.0, 
+                    "begin_longitudinal_offset": 0.0, 
+                    "begin_point_id": 12, 
+                    "end_lateral_offset": -2.4, 
+                    "end_lateral_speed_kph": -4.8, 
+                    "begin_lateral_speed_kph": 1.6, 
+                    "begin_lateral_offset": -3.2, 
+                    "move_to_roadside_trigger_longitudinal_offset": 0.0, 
+                    "end_point_id": 53, 
+                    "move_trigger_ego_vehicle_max_speed_kph": 60.0, 
+                    "waypoint_lateral_offset": 0.0, 
+                    "end_longitudinal_offset": 0.0, 
+                    "moving_speed_kph": 16, 
+                    "move_to_roadside_trigger_lane_id": 355, 
+                    "begin_lane_id": 239, 
+                    "move_to_roadside_trigger_point_id": 33, 
+                    "end_lane_id": 355
+                }
+            ]
+        }
+    }
+}

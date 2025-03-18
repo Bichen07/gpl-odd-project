@@ -1,0 +1,28 @@
+<launch>
+
+    <arg name="real" default="false" />  <!-- Set to true if running on real car, False if running on bag. -->
+    <arg name="scenario_id" default="itri_00"/>
+    <arg name="route_id" default="III_itri"/>
+    <arg name="config_file" default="scenario_config_itri.json"/>
+    <arg name="agent_size" default="carla_agent_size.json"/>
+    <arg name="ego_init_pose_config_file" default="ego_init_pose_config_itri.json"/>
+
+    <group unless="$(arg real)">  <!-- Run bag rather than real car. -->
+        <arg name="bag" default="/repository/ros/src/2020-08-31-17-44-34.bag" />
+        <node pkg="rosbag" type="play" name="rosbag_play" args="$(arg bag) --clock /detected_objects:=/detected_objects_real /detected_objects_viz:=/detected_objects_viz_real -s 10 --quiet --pause  -r 1" output="screen"/>
+        <include file="$(find sdc)/launch/visualization.launch"/>
+    </group>
+
+    <include file="$(find scenario)/launch/scenario_vil_testing.launch">
+        <arg name="real" value="$(arg real)" />
+        <arg name="running_vil" value="true" />
+        <arg name="bring_up_simulation" value="false" />
+        <arg name="scenario_id" value="itri_00"/>
+        <arg name="route_id" value="III_itri"/>
+        <arg name="config_file" value="scenario_config_itri.json"/>
+        <arg name="ego_init_pose_config_file" value="ego_init_pose_config_itri.json"/>
+    </include>
+
+    <node pkg="vil" type="detected_objects_integration_node.py" name="detected_objects_integration_node" output="screen"/>
+
+</launch>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+    <input>
+        <net-file value="shuinan_tl.net.xml"/>
+        <route-files value="shuinan_mod.rou.xml"/>
+        <!-- <additional-files value="traffic_light.add.xml"/> -->
+    </input>
+    <time>
+        <step-length value="0.05"/>
+    </time>
+    <processing>
+        <scale value="0.5"/>
+        <junction-taz value="true"/>
+        <lateral-resolution value="1.0"/>
+        <max-num-vehicles value="200"/>
+        <time-to-impatience value="10"/>
+        <default.speeddev value="1.0"/>
+        <!-- <threads value="16"/> -->
+        <!-- <collision.action value="teleport" /> -->
+        <!-- <collision.stoptime value="0.0" /> -->
+        <!-- <ignore-route-errors value="true" /> -->
+    </processing>
+</configuration>

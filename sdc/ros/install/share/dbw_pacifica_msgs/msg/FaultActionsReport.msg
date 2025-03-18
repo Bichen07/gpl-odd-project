@@ -1,0 +1,9 @@
+Header header
+
+bool auto_disable_no_brakes
+bool auto_disable_apply_brakes
+bool dbw_can_gateway_disable
+bool inverter_cnt_control_disable
+bool prevent_enter_auto_mode
+bool warn_driver_only
+bool chime_fcw_beeps

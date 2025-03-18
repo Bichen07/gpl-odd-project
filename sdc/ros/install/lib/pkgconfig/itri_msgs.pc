@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: itri_msgs
+Description: Description of itri_msgs
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: dbw_pacifica_msgs geometry_msgs message_runtime sensor_msgs std_msgs

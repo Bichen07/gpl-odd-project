@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<launch>
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <!-- 80: layer = 3, 100: layer = 4, max layer is 5 -->
+    <arg name="search_radius" default="50.0"/>
+    <arg name="distance_thresholds" default="5.0"/>
+    <arg name="action_event" default="action_event"/>
+    <arg name="path_lanes" default="path_lanes"/>
+    <arg name="vehicle_type" default="vehicle_type"/>
+    <arg name="car_state" default="/car_state"/>
+    <arg name="run_test" default="false" />
+
+    <group if="$(arg run_test)">
+        <param name="robot_description"
+            textfile="$(find sdc)/data/vehicle_model/pacifica.urdf"/>
+        <node
+            pkg="rviz"
+            type="rviz"
+            name="route_rviz"
+            output="screen"
+            args="-d $(find route_mission_handler)/data/check_bag_file.rviz"/>
+
+        <!-- simulate driving, publish car_state -->
+        <node pkg="route_mission_handler" type="test.py" name="simulate_driveing_node" output="screen" >
+            <param name="/action_event" value="$(arg action_event)" />
+            <param name="/car_state" value="$(arg car_state)" />
+            <param name="/path_lanes" value="$(arg path_lanes)" />
+        </node>
+    </group>
+
+    <arg name="map_data" default="$(env MAP_DATA_PATH)/"/>
+
+    <arg name="navgroad_display" default="/global_navgroads_display" />
+    <arg name="lanenavgroad_display" default="/global_lanenavgroads_display" />
+    <arg name="waypoints_display" default="/global_waypoints_display" />
+    <arg name="roadline_display" default="/road_lines_display" />
+    <arg name="roadmarker_display" default="/road_markers_display" />
+    <arg name="intersections_display" default="/intersections_display" />
+    <arg name="reference_latlng_path" default="$(find route_mission_handler)/data/route_reference_lat_lng.json"/>
+
+    <node pkg = "route_mission_handler" type = "route_mission_handler_node" name = "route_mission_handler" >
+        <param name="/map_data" value="$(arg map_data)"/>
+        <param name="/subscribe_topic_name" value="$(arg car_state)"/>
+        <param name="/search_radius" value="$(arg search_radius)"/>
+        <param name="/reference_latlng_path" value="$(arg reference_latlng_path)"/>
+    </node>
+
+    <node pkg="route_mission_handler" type="load_data.py" name="load_file_node"  >
+        <param name="/map_data" value="$(arg map_data)"/>
+
+        <param name="/navgroad_display" value="$(arg navgroad_display)" />
+        <param name="/lanenavgroad_display" value="$(arg lanenavgroad_display)" />
+        <param name="/waypoints_display" value="$(arg waypoints_display)" />
+        <param name="/roadline_display" value="$(arg roadline_display)" />
+        <param name="/roadmarker_display" value="$(arg roadmarker_display)" />
+        <param name="/intersections_display" value="$(arg intersections_display)" />
+
+    </node>
+
+</launch>

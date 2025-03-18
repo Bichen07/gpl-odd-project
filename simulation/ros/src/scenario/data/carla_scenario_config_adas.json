@@ -1,0 +1,1378 @@
+{
+    "adas_acc_target_discrimination": "adas_acc_target_discrimination_simulator",
+    "adas_acc_curve_capability": "adas_acc_curve_capability_simulator",
+    "adas_fvcws_curved_road_lateral_discrimination": "adas_fvcws_curved_road_lateral_discrimination_simulator",
+    "adas_fvcws_straight_road_lateral_discrimination": "adas_fvcws_straight_road_lateral_discrimination_simulator",
+    "adas_fvcws_longitudinal_discrimination": "adas_fvcws_longitudinal_discrimination_simulator",
+    "adas_lkas_straight_lane_keeping": "adas_lkas_straight_lane_keeping_simulator",
+    "adas_lcdas_overtaking_subject": "adas_lcdas_overtaking_subject_simulator",
+    "adas_lcdas_overtaking_target": "adas_lcdas_overtaking_target_simulator",
+    "adas_lcdas_lateral_moving": "adas_lcdas_lateral_moving_simulator",
+    "adas_lsf_automatic_deceleration": "adas_lsf_automatic_deceleration_simulator",
+    "adas_lsf_retargeting_capability": "adas_lsf_retargeting_simulator",
+    "adas_lsf_retargeting_capability_2": "adas_lsf_retargeting_simulator_2",
+    "ego_vehicle":
+    {
+        "size":
+        {
+            "x": 5.172,
+            "y": 2.297,
+            "z": 1.777,
+            "x_": 9.4,
+            "y_": 3.3,
+            "z_": 3.7
+        },
+        "compensated_second_": 0.1,
+        "compensated_second": 0.0,
+        "static_longitudinal_compensated_distance_": 0.1,
+        "static_longitudinal_compensated_distance": -0.7
+    },
+    "adas_acc_target_discrimination_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 7,
+            "opposite": 0
+        },
+        "begin_end_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "0, 0, 0"
+                    },
+ 
+                    "iso_agent_id": "acc_target_discrimination_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 7,
+                    "begin_point_id": 401,
+                    "end_lane_id": 7,
+                    "end_point_id": 2050,
+                    "waypoint_lateral_offset": 0.0,
+                    "init_moving_speed_kph": 86.4,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "speed_configs":
+                    [
+                        {
+                            "lane_id": 7,
+                            "point_id": 701,
+                            "speed_kph": 97.2
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 1101,
+                            "speed_kph": 77.2
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 901,
+                            "speed_kph": 67.2
+                        }
+                    ]
+                }
+            ]
+        },
+        "lane_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "acc_target_discrimination_forward_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "lane_ids":
+                    [8],
+                    "begin_point_id": 401,
+                    "end_point_id": 2050,
+                    "init_moving_speed_kph": 86.4,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0,
+                    "speed_configs__":
+                    [
+                        {
+                            "lane_id": 8,
+                            "point_id": 701,
+                            "speed_kph": 97.2
+                        },
+                        {
+                            "lane_id": 8,
+                            "point_id": 1101,
+                            "speed_kph": 77.2
+                        },
+                        {
+                            "lane_id": 8,
+                            "point_id": 901,
+                            "speed_kph": 67.2
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "adas_acc_curve_capability_simulator":
+    {
+        "map": "s500m",
+        "route": "test_curve_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 11,
+            "opposite": 0
+        },
+        "begin_end_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "acc_curve_capability_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 11,
+                    "begin_point_id": 201,
+                    "end_lane_id": 11,
+                    "end_point_id": 2455,
+                    "waypoint_lateral_offset": 0.0,
+                    "init_moving_speed_kph": 97.2,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0
+                }
+            ]
+        }
+    },
+    "adas_fvcws_curved_road_lateral_discrimination_simulator":
+    {
+        "map": "s500m",
+        "route": "test_curve_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 11,
+            "opposite": 0
+        },
+        "begin_end_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "fvcws_lateral_discrimination_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 11,
+                    "begin_point_id": 191,
+                    "end_lane_id": 11,
+                    "end_point_id": 2455,
+                    "waypoint_lateral_offset": 0.0,
+                    "init_moving_speed_kph": 71.5,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "speed_configs":
+                    [
+                        {
+                            "lane_id": 11,
+                            "point_id": 1001,
+                            "speed_kph": 54.0
+                        }
+                    ]
+                }
+            ]
+        },
+        "lane_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "fvcws_lateral_discrimination_forward_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "lane_ids":
+                    [10],
+                    "begin_point_id": 215,
+                    "end_point_id": 2455,
+                    "init_moving_speed_kph": 72.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0,
+                    "speed_configs":
+                    [
+                        {
+                            "lane_id": 10,
+                            "point_id": 801,
+                            "speed_kph": 54.0
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "adas_fvcws_straight_road_lateral_discrimination_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 7,
+            "opposite": 0
+        },
+        "begin_end_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "fvcws_lateral_discrimination_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 7,
+                    "begin_point_id": 401,
+                    "end_lane_id": 7,
+                    "end_point_id": 2050,
+                    "waypoint_lateral_offset": 0.0,
+                    "init_moving_speed_kph": 72.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "speed_configs":
+                    [
+                        {
+                            "lane_id": 7,
+                            "point_id": 1001,
+                            "speed_kph": 54.0
+                        }
+                    ]
+                }
+            ]
+        },
+        "lane_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "fvcws_lateral_discrimination_forward_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "lane_ids":
+                    [8],
+                    "begin_point_id": 401,
+                    "end_point_id": 2050,
+                    "init_moving_speed_kph": 72.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0,
+                    "speed_configs":
+                    [
+                        {
+                            "lane_id": 8,
+                            "point_id": 801,
+                            "speed_kph": 54.0
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "adas_fvcws_longitudinal_discrimination_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 7,
+            "opposite": 0
+        },
+        "begin_end_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_vehicle_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "fvcws_longitudinal_discrimination_far_target_vehicle"
+                },
+                {
+                    "size":
+                    {
+                        "x": 1.5,
+                        "y": 0.7,
+                        "z": 1.60
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 2.25,
+                        "y": 1.2
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "prius",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "fvcws_longitudinal_discrimination_near_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 7,
+                    "begin_point_id": 401,
+                    "end_lane_id": 7,
+                    "end_point_id": 2050,
+                    "waypoint_lateral_offset": 0.0,
+                    "init_moving_speed_kph": 72.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 43.0,
+                    "lateral_move_trigger_distance": 0.0
+                },
+                {
+                    "begin_lane_id": 7,
+                    "begin_point_id": 388,
+                    "end_lane_id": 7,
+                    "end_point_id": 2050,
+                    "waypoint_lateral_offset": 0.0,
+                    "init_moving_speed_kph": 72.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0
+                }
+            ]
+        }
+    },
+    "adas_lkas_straight_lane_keeping_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 7,
+            "opposite": 0
+        }
+    },
+    "adas_lcdas_overtaking_subject_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 7,
+            "opposite": 0
+        },
+        "lane_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike",
+                    "carla":{
+                        "model_type": "ninja",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "adas_lcdas_overtaking_subject_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "lane_ids":
+                    [8],
+                    "begin_point_id": 100,
+                    "end_point_id": 2053,
+                    "moving_speed_kph": 90.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": -40.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0,
+                    "init_moving_speed_kph": 90.0
+                }
+            ]
+        }
+    },
+    "adas_lcdas_overtaking_target_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 7,
+            "opposite": 0
+        },
+        "lane_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike",
+                    "carla":{
+                        "model_type": "ninja",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "adas_lcdas_overtaking_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "lane_ids":
+                    [8],
+                    "begin_point_id": 190,
+                    "end_point_id": 2000,
+                    "moving_speed_kph": 72.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 20.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0,
+                    "init_moving_speed_kph": 72.0
+                }
+            ]
+        }
+    },
+    "adas_lcdas_lateral_moving_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 5,
+            "opposite": 0
+        },
+        "zigzag_moving_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "motorbike",
+                    "carla":{
+                        "model_type": "low_rider",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "adas_lcdas_lateral_moving_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 5,
+                    "begin_point_id": 70,
+                    "end_lane_id": 5,
+                    "end_point_id": 1900,
+                    "lateral_offset": 3,
+                    "moving_speed_kph": 79.8,
+                    "move_trigger_distance": -3,
+                    "max_lateral_speed_kph": 7.2,
+                    "min_lateral_speed_kph": -7.2,
+                    "_lateral_speed_frequency": 0.01125,
+                    "lateral_speed_frequency": 0.03,
+                    "lateral_speed_phase_radian": 3.14
+                }
+            ]
+        }
+    },
+    "adas_lsf_automatic_deceleration_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 7,
+            "opposite": 0
+        },
+        "lane_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "c3",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "adas_lsf_automatic_deceleration_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "lane_ids":
+                    [7],
+                    "begin_point_id": 300,
+                    "end_point_id": 500,
+                    "init_moving_speed_kph": 45.0,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 30.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "begin_extended_distance": 0.0,
+                    "begin_extended_radian": 0.0,
+                    "end_extended_distance": 0.0,
+                    "end_extended_radian": 0.0,
+                    "speed_configs":
+                    [
+                        {
+                            "lane_id": 7,
+                            "point_id": 395,
+                            "speed_kph": 35.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 430,
+                            "speed_kph": 25.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 490,
+                            "speed_kph": 10.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 495,
+                            "speed_kph": 5.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 500,
+                            "speed_kph": 0.0
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "adas_lsf_retargeting_simulator":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 7,
+            "opposite": 0
+        },
+        "begin_end_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "255, 255, 255"
+                    },
+ 
+                    "iso_agent_id": "adas_lsf_first_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 7,
+                    "begin_point_id": 601,
+                    "end_lane_id": 7,
+                    "end_point_id": 2053,
+                    "waypoint_lateral_offset": 0.0,
+                    "moving_speed_kph": 10.08,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 170.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "init_moving_speed_kph": 10.08
+                }
+            ]
+        },
+        "lane_roadside_moving_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "prius",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "adas_lsf_second_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 7,
+                    "begin_point_id": 251,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": 0,
+                    "begin_lateral_speed_kph": 0,
+                    "end_lane_id": 7,
+                    "end_point_id": 2050,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -3.2,
+                    "end_lateral_speed_kph":-4.5,
+                    "move_to_roadside_trigger_lane_id": 7,
+                    "move_to_roadside_trigger_point_id": 645,
+                    "move_to_roadside_trigger_longitudinal_offset": 0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 150.0, 
+                    "move_trigger_ego_vehicle_max_speed_kph": 78.2,
+                    "init_moving_speed_kph": 40.0,
+                    "speed_configs":
+                    [
+                        {
+                            "lane_id": 7,
+                            "point_id": 331,
+                            "speed_kph": 40.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 520,
+                            "speed_kph": 35.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 530,
+                            "speed_kph": 32.5
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 540,
+                            "speed_kph": 30.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 550,
+                            "speed_kph": 27.5
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 560,
+                            "speed_kph": 25.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 570,
+                            "speed_kph": 22.5
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 580,
+                            "speed_kph": 20.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 590,
+                            "speed_kph": 17.5
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 600,
+                            "speed_kph": 15.0
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 642,
+                            "speed_kph": 27.5
+                        },
+                        {
+                            "lane_id": 7,
+                            "point_id": 645,
+                            "speed_kph": 30.0
+                        }
+                    ]
+                }
+            ]
+        }
+    },
+    "adas_lsf_retargeting_simulator_2":
+    {
+        "map": "s500m",
+        "route": "test_route",
+        "time_step": 0.1,
+        "visualization_time_step": 0.01,
+        "begin_lane_id":
+        {
+            "forward": 5,
+            "opposite": 0
+        },
+        "begin_end_waypoint_following_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "model3",
+                        "color": "255, 255, 255"
+                    },
+ 
+                    "iso_agent_id": "adas_lsf_first_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 5,
+                    "begin_point_id": 601,
+                    "end_lane_id": 5,
+                    "end_point_id": 2053,
+                    "waypoint_lateral_offset": 0.0,
+                    "moving_speed_kph": 10.08,
+                    "lateral_speed_kph": 0.0,
+                    "lateral_move_distance": 0.0,
+                    "move_trigger_distance": 170.0,
+                    "lateral_move_trigger_distance": 0.0,
+                    "init_moving_speed_kph": 10.08
+                }
+            ]
+        },
+        "lane_roadside_moving_simulator":
+        {
+            "time_step": 0.1,
+            "visualization_time_step": 0.01,
+            "moving_agent_configs":
+            [
+                {
+                    "size":
+                    {
+                        "x": 4.2,
+                        "y": 1.8,
+                        "z": 1.45
+                    },
+                    "front_warning_region_size":
+                    {
+                        "x": 6.3,
+                        "y": 2.7
+                    },
+                    "color":
+                    {
+                        "r": 0.0,
+                        "g": 0.0,
+                        "b": 1.0,
+                        "a": 1.0
+                    },
+                    "safety_margin":
+                    {
+                        "left": 0.0,
+                        "right": 0.0,
+                        "front": 0.0,
+                        "rear": 0.0
+                    },
+                    "object_class_id": "car",
+                    "carla":{
+                        "model_type": "prius",
+                        "color": "0, 0, 0"
+                    },
+                    "iso_agent_id": "adas_lsf_second_target_vehicle"
+                }
+            ],
+            "motion_configs":
+            [
+                {
+                    "begin_lane_id": 5,
+                    "begin_point_id": 251,
+                    "begin_longitudinal_offset": 0.0,
+                    "begin_lateral_offset": 0,
+                    "begin_lateral_speed_kph": 0,
+                    "end_lane_id": 5,
+                    "end_point_id": 2050,
+                    "end_longitudinal_offset": 0.0,
+                    "end_lateral_offset": -3.2,
+                    "end_lateral_speed_kph":-4.5,
+                    "move_to_roadside_trigger_lane_id": 5,
+                    "move_to_roadside_trigger_point_id": 645,
+                    "move_to_roadside_trigger_longitudinal_offset": 0.0,
+                    "waypoint_lateral_offset": 0.0,
+                    "move_trigger_distance": 150.0, 
+                    "move_trigger_ego_vehicle_max_speed_kph": 78.2,
+                    "init_moving_speed_kph": 40.0,
+                    "speed_configs":
+                    [
+                        {
+                            "lane_id": 5,
+                            "point_id": 331,
+                            "speed_kph": 40.0
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 520,
+                            "speed_kph": 35.0
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 530,
+                            "speed_kph": 32.5
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 540,
+                            "speed_kph": 30.0
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 550,
+                            "speed_kph": 27.5
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 560,
+                            "speed_kph": 25.0
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 570,
+                            "speed_kph": 22.5
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 580,
+                            "speed_kph": 20.0
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 590,
+                            "speed_kph": 17.5
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 600,
+                            "speed_kph": 15.0
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 642,
+                            "speed_kph": 27.5
+                        },
+                        {
+                            "lane_id": 5,
+                            "point_id": 645,
+                            "speed_kph": 30.0
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+}

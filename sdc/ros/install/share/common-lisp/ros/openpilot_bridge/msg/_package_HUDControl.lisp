@@ -1,0 +1,24 @@
+(cl:in-package openpilot_bridge-msg)
+(cl:export '(HEADER-VAL
+          HEADER
+          LEADVISIBLE-VAL
+          LEADVISIBLE
+          SETSPEED-VAL
+          SETSPEED
+          LEFTLANEDEPART-VAL
+          LEFTLANEDEPART
+          LANESVISIBLE-VAL
+          LANESVISIBLE
+          LEFTLANEVISIBLE-VAL
+          LEFTLANEVISIBLE
+          VISUALALERT-VAL
+          VISUALALERT
+          AUDIBLEALERT-VAL
+          AUDIBLEALERT
+          SPEEDVISIBLE-VAL
+          SPEEDVISIBLE
+          RIGHTLANEVISIBLE-VAL
+          RIGHTLANEVISIBLE
+          RIGHTLANEDEPART-VAL
+          RIGHTLANEDEPART
+))

@@ -1,0 +1,4030 @@
+{
+   "navgroads" : [
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 2,
+               "point_id" : 132
+            },
+            {
+               "id" : 90,
+               "point_id" : 22
+            },
+            {
+               "id" : 92,
+               "point_id" : 1
+            }
+         ],
+         "id" : 1,
+         "length" : 16.676368713378906,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 1,
+               "point_id" : 1
+            },
+            {
+               "id" : 90,
+               "point_id" : 22
+            },
+            {
+               "id" : 92,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 3,
+               "point_id" : 115
+            },
+            {
+               "id" : 4,
+               "point_id" : 1
+            },
+            {
+               "id" : 71,
+               "point_id" : 152
+            }
+         ],
+         "id" : 2,
+         "length" : 130.28233337402344,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 2,
+               "point_id" : 1
+            },
+            {
+               "id" : 4,
+               "point_id" : 1
+            },
+            {
+               "id" : 71,
+               "point_id" : 152
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 56,
+               "point_id" : 1
+            },
+            {
+               "id" : 57,
+               "point_id" : 24
+            }
+         ],
+         "id" : 3,
+         "length" : 113.98505401611328,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 2,
+               "point_id" : 1
+            },
+            {
+               "id" : 3,
+               "point_id" : 115
+            },
+            {
+               "id" : 71,
+               "point_id" : 152
+            }
+         ],
+         "id" : 4,
+         "length" : 18.993322372436523,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 11,
+               "point_id" : 1
+            },
+            {
+               "id" : 27,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 109,
+               "point_id" : 31
+            },
+            {
+               "id" : 12,
+               "point_id" : 1
+            }
+         ],
+         "id" : 5,
+         "length" : 40.283119201660156,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 9,
+               "point_id" : 42
+            },
+            {
+               "id" : 37,
+               "point_id" : 1
+            }
+         ],
+         "id" : 6,
+         "length" : 12.300579071044922,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 9,
+               "point_id" : 1
+            },
+            {
+               "id" : 10,
+               "point_id" : 22
+            }
+         ],
+         "id" : 7,
+         "length" : 7.1722288131713867,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 3
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 10,
+               "point_id" : 1
+            },
+            {
+               "id" : 28,
+               "point_id" : 68
+            }
+         ],
+         "id" : 8,
+         "length" : 13.789103507995605,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 6,
+               "point_id" : 1
+            },
+            {
+               "id" : 37,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 7,
+               "point_id" : 1
+            },
+            {
+               "id" : 10,
+               "point_id" : 22
+            }
+         ],
+         "id" : 9,
+         "length" : 40.154891967773438,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 7,
+               "point_id" : 1
+            },
+            {
+               "id" : 9,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 8,
+               "point_id" : 1
+            },
+            {
+               "id" : 28,
+               "point_id" : 68
+            }
+         ],
+         "id" : 10,
+         "length" : 20.377634048461914,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 5,
+               "point_id" : 42
+            },
+            {
+               "id" : 27,
+               "point_id" : 1
+            }
+         ],
+         "id" : 11,
+         "length" : 9.3593177795410156,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 12
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 5,
+               "point_id" : 1
+            },
+            {
+               "id" : 109,
+               "point_id" : 31
+            }
+         ],
+         "id" : 12,
+         "length" : 11.086281776428223,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 10
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 23,
+               "point_id" : 1
+            },
+            {
+               "id" : 15,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 14,
+               "point_id" : 14
+            },
+            {
+               "id" : 108,
+               "point_id" : 28
+            }
+         ],
+         "id" : 13,
+         "length" : 9.6503839492797852,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 9
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 13,
+               "point_id" : 1
+            },
+            {
+               "id" : 108,
+               "point_id" : 28
+            }
+         ],
+         "head_point" : null,
+         "id" : 14,
+         "length" : 12.098940849304199,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 0,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 13,
+               "point_id" : 11
+            },
+            {
+               "id" : 23,
+               "point_id" : 1
+            }
+         ],
+         "id" : 15,
+         "length" : 12.166600227355957,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 30,
+               "point_id" : 1
+            },
+            {
+               "id" : 31,
+               "point_id" : 13
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 17,
+               "point_id" : 6
+            },
+            {
+               "id" : 19,
+               "point_id" : 21
+            }
+         ],
+         "id" : 16,
+         "length" : 26.262151718139648,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 16,
+               "point_id" : 1
+            },
+            {
+               "id" : 19,
+               "point_id" : 21
+            }
+         ],
+         "head_point" : null,
+         "id" : 17,
+         "length" : 4.7563791275024414,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 19,
+               "point_id" : 1
+            },
+            {
+               "id" : 20,
+               "point_id" : 6
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 21,
+               "point_id" : 1
+            },
+            {
+               "id" : 22,
+               "point_id" : 33
+            }
+         ],
+         "id" : 18,
+         "length" : 34.562175750732422,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 16,
+               "point_id" : 1
+            },
+            {
+               "id" : 17,
+               "point_id" : 6
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 18,
+               "point_id" : 36
+            },
+            {
+               "id" : 20,
+               "point_id" : 6
+            }
+         ],
+         "id" : 19,
+         "length" : 19.299753189086914,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 18,
+               "point_id" : 36
+            },
+            {
+               "id" : 19,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 20,
+         "length" : 4.3265933990478516,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 25,
+               "point_id" : 1
+            },
+            {
+               "id" : 26,
+               "point_id" : 11
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 18,
+               "point_id" : 1
+            },
+            {
+               "id" : 22,
+               "point_id" : 33
+            }
+         ],
+         "id" : 21,
+         "length" : 29.433572769165039,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 18,
+               "point_id" : 1
+            },
+            {
+               "id" : 21,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 23,
+               "point_id" : 18
+            },
+            {
+               "id" : 24,
+               "point_id" : 13
+            }
+         ],
+         "id" : 22,
+         "length" : 31.379995346069336,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 22,
+               "point_id" : 1
+            },
+            {
+               "id" : 24,
+               "point_id" : 13
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 13,
+               "point_id" : 11
+            },
+            {
+               "id" : 15,
+               "point_id" : 1
+            }
+         ],
+         "id" : 23,
+         "length" : 16.537870407104492,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 9
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 22,
+               "point_id" : 1
+            },
+            {
+               "id" : 23,
+               "point_id" : 18
+            }
+         ],
+         "head_point" : null,
+         "id" : 24,
+         "length" : 11.838918685913086,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 10
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 40,
+               "point_id" : 1
+            },
+            {
+               "id" : 41,
+               "point_id" : 16
+            },
+            {
+               "id" : 99,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 21,
+               "point_id" : 31
+            },
+            {
+               "id" : 26,
+               "point_id" : 11
+            }
+         ],
+         "id" : 25,
+         "length" : 53.188831329345703,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 21,
+               "point_id" : 31
+            },
+            {
+               "id" : 25,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 26,
+         "length" : 9.8249406814575195,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 11
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 28,
+               "point_id" : 1
+            },
+            {
+               "id" : 29,
+               "point_id" : 14
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 5,
+               "point_id" : 42
+            },
+            {
+               "id" : 11,
+               "point_id" : 1
+            }
+         ],
+         "id" : 27,
+         "length" : 49.451671600341797,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 8,
+               "point_id" : 1
+            },
+            {
+               "id" : 10,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 27,
+               "point_id" : 51
+            },
+            {
+               "id" : 29,
+               "point_id" : 14
+            }
+         ],
+         "id" : 28,
+         "length" : 66.230224609375,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 16
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 27,
+               "point_id" : 51
+            },
+            {
+               "id" : 28,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 29,
+         "length" : 12.001960754394531,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 16
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 34,
+               "point_id" : 1
+            },
+            {
+               "id" : 36,
+               "point_id" : 1
+            },
+            {
+               "id" : 37,
+               "point_id" : 24
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 16,
+               "point_id" : 28
+            },
+            {
+               "id" : 31,
+               "point_id" : 13
+            }
+         ],
+         "id" : 30,
+         "length" : 50.113296508789062,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 16,
+               "point_id" : 28
+            },
+            {
+               "id" : 30,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 31,
+         "length" : 11.865318298339844,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 33,
+               "point_id" : 1
+            },
+            {
+               "id" : 40,
+               "point_id" : 132
+            },
+            {
+               "id" : 42,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 38,
+               "point_id" : 1
+            },
+            {
+               "id" : 39,
+               "point_id" : 27
+            }
+         ],
+         "id" : 32,
+         "length" : 31.987186431884766,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 32,
+               "point_id" : 33
+            },
+            {
+               "id" : 33,
+               "point_id" : 1
+            },
+            {
+               "id" : 42,
+               "point_id" : 1
+            }
+         ],
+         "id" : 33,
+         "length" : 8.9654922485351562,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 35,
+               "point_id" : 1
+            },
+            {
+               "id" : 39,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 30,
+               "point_id" : 52
+            },
+            {
+               "id" : 36,
+               "point_id" : 1
+            },
+            {
+               "id" : 37,
+               "point_id" : 24
+            }
+         ],
+         "id" : 34,
+         "length" : 25.843994140625,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 34,
+               "point_id" : 27
+            },
+            {
+               "id" : 39,
+               "point_id" : 1
+            }
+         ],
+         "id" : 35,
+         "length" : 6.2696232795715332,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 3
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 30,
+               "point_id" : 52
+            },
+            {
+               "id" : 34,
+               "point_id" : 1
+            },
+            {
+               "id" : 37,
+               "point_id" : 24
+            }
+         ],
+         "id" : 36,
+         "length" : 9.5124187469482422,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 30,
+               "point_id" : 52
+            },
+            {
+               "id" : 34,
+               "point_id" : 1
+            },
+            {
+               "id" : 36,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 6,
+               "point_id" : 1
+            },
+            {
+               "id" : 9,
+               "point_id" : 42
+            }
+         ],
+         "id" : 37,
+         "length" : 22.069286346435547,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 32,
+               "point_id" : 1
+            },
+            {
+               "id" : 39,
+               "point_id" : 27
+            }
+         ],
+         "id" : 38,
+         "length" : 6.0402998924255371,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 32,
+               "point_id" : 1
+            },
+            {
+               "id" : 38,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 34,
+               "point_id" : 27
+            },
+            {
+               "id" : 35,
+               "point_id" : 1
+            }
+         ],
+         "id" : 39,
+         "length" : 25.766738891601562,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 32,
+               "point_id" : 33
+            },
+            {
+               "id" : 33,
+               "point_id" : 1
+            },
+            {
+               "id" : 42,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 25,
+               "point_id" : 55
+            },
+            {
+               "id" : 41,
+               "point_id" : 16
+            },
+            {
+               "id" : 99,
+               "point_id" : 1
+            }
+         ],
+         "id" : 40,
+         "length" : 130.188232421875,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 25,
+               "point_id" : 55
+            },
+            {
+               "id" : 40,
+               "point_id" : 1
+            },
+            {
+               "id" : 99,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 41,
+         "length" : 14.372797966003418,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 32,
+               "point_id" : 33
+            },
+            {
+               "id" : 33,
+               "point_id" : 1
+            },
+            {
+               "id" : 40,
+               "point_id" : 132
+            }
+         ],
+         "id" : 42,
+         "length" : 11.695614814758301,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 44,
+               "point_id" : 1
+            },
+            {
+               "id" : 45,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 46,
+               "point_id" : 25
+            },
+            {
+               "id" : 68,
+               "point_id" : 132
+            }
+         ],
+         "id" : 43,
+         "length" : 158.08930969238281,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 0,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 43,
+               "point_id" : 160
+            },
+            {
+               "id" : 45,
+               "point_id" : 1
+            }
+         ],
+         "id" : 44,
+         "length" : 11.869155883789062,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 65,
+               "point_id" : 1
+            },
+            {
+               "id" : 66,
+               "point_id" : 1
+            },
+            {
+               "id" : 67,
+               "point_id" : 18
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 43,
+               "point_id" : 160
+            },
+            {
+               "id" : 44,
+               "point_id" : 1
+            }
+         ],
+         "id" : 45,
+         "length" : 72.526451110839844,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 43,
+               "point_id" : 1
+            },
+            {
+               "id" : 68,
+               "point_id" : 132
+            }
+         ],
+         "head_point" : null,
+         "id" : 46,
+         "length" : 23.96221923828125,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 15
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 62,
+               "point_id" : 8
+            },
+            {
+               "id" : 80,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 48,
+               "point_id" : 9
+            },
+            {
+               "id" : 70,
+               "point_id" : 18
+            }
+         ],
+         "id" : 47,
+         "length" : 31.235572814941406,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 47,
+               "point_id" : 1
+            },
+            {
+               "id" : 70,
+               "point_id" : 18
+            }
+         ],
+         "head_point" : null,
+         "id" : 48,
+         "length" : 7.0710592269897461,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 58,
+               "point_id" : 1
+            },
+            {
+               "id" : 59,
+               "point_id" : 41
+            }
+         ],
+         "head_point" : null,
+         "id" : 49,
+         "length" : 9.4968128204345703,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 10
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 57,
+               "point_id" : 1
+            },
+            {
+               "id" : 58,
+               "point_id" : 42
+            }
+         ],
+         "head_point" : null,
+         "id" : 50,
+         "length" : 9.070281982421875,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 10
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 52,
+               "point_id" : 18
+            },
+            {
+               "id" : 67,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 51,
+         "length" : 10.072866439819336,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 51,
+               "point_id" : 12
+            },
+            {
+               "id" : 67,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 53,
+               "point_id" : 12
+            },
+            {
+               "id" : 54,
+               "point_id" : 18
+            }
+         ],
+         "id" : 52,
+         "length" : 16.130111694335938,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 52,
+               "point_id" : 1
+            },
+            {
+               "id" : 54,
+               "point_id" : 18
+            }
+         ],
+         "head_point" : null,
+         "id" : 53,
+         "length" : 10.08973503112793,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 52,
+               "point_id" : 1
+            },
+            {
+               "id" : 53,
+               "point_id" : 12
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 55,
+               "point_id" : 12
+            },
+            {
+               "id" : 56,
+               "point_id" : 30
+            }
+         ],
+         "id" : 54,
+         "length" : 16.303791046142578,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 54,
+               "point_id" : 1
+            },
+            {
+               "id" : 56,
+               "point_id" : 30
+            }
+         ],
+         "head_point" : null,
+         "id" : 55,
+         "length" : 10.976179122924805,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 54,
+               "point_id" : 1
+            },
+            {
+               "id" : 55,
+               "point_id" : 12
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 3,
+               "point_id" : 1
+            },
+            {
+               "id" : 57,
+               "point_id" : 24
+            }
+         ],
+         "id" : 56,
+         "length" : 29.001171112060547,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 3,
+               "point_id" : 1
+            },
+            {
+               "id" : 56,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 50,
+               "point_id" : 11
+            },
+            {
+               "id" : 58,
+               "point_id" : 42
+            }
+         ],
+         "id" : 57,
+         "length" : 22.534500122070312,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 50,
+               "point_id" : 11
+            },
+            {
+               "id" : 57,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 49,
+               "point_id" : 11
+            },
+            {
+               "id" : 59,
+               "point_id" : 41
+            }
+         ],
+         "id" : 58,
+         "length" : 40.963096618652344,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 49,
+               "point_id" : 11
+            },
+            {
+               "id" : 58,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 60,
+               "point_id" : 17
+            },
+            {
+               "id" : 81,
+               "point_id" : 1
+            }
+         ],
+         "id" : 59,
+         "length" : 39.689109802246094,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 59,
+               "point_id" : 1
+            },
+            {
+               "id" : 81,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 61,
+               "point_id" : 14
+            },
+            {
+               "id" : 63,
+               "point_id" : 17
+            }
+         ],
+         "id" : 60,
+         "length" : 15.249099731445312,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 60,
+               "point_id" : 1
+            },
+            {
+               "id" : 63,
+               "point_id" : 17
+            }
+         ],
+         "head_point" : null,
+         "id" : 61,
+         "length" : 12.07048511505127,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 47,
+               "point_id" : 33
+            },
+            {
+               "id" : 80,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 62,
+         "length" : 6.4826521873474121,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 60,
+               "point_id" : 1
+            },
+            {
+               "id" : 61,
+               "point_id" : 14
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 64,
+               "point_id" : 13
+            },
+            {
+               "id" : 76,
+               "point_id" : 17
+            }
+         ],
+         "id" : 63,
+         "length" : 15.465334892272949,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 63,
+               "point_id" : 1
+            },
+            {
+               "id" : 76,
+               "point_id" : 17
+            }
+         ],
+         "head_point" : null,
+         "id" : 64,
+         "length" : 11.701638221740723,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 45,
+               "point_id" : 74
+            },
+            {
+               "id" : 66,
+               "point_id" : 1
+            },
+            {
+               "id" : 67,
+               "point_id" : 18
+            }
+         ],
+         "id" : 65,
+         "length" : 16.751052856445312,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 14
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 45,
+               "point_id" : 74
+            },
+            {
+               "id" : 65,
+               "point_id" : 1
+            },
+            {
+               "id" : 67,
+               "point_id" : 18
+            }
+         ],
+         "id" : 66,
+         "length" : 15.612691879272461,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 45,
+               "point_id" : 74
+            },
+            {
+               "id" : 65,
+               "point_id" : 1
+            },
+            {
+               "id" : 66,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 51,
+               "point_id" : 12
+            },
+            {
+               "id" : 52,
+               "point_id" : 18
+            }
+         ],
+         "id" : 67,
+         "length" : 16.597501754760742,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 11
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 43,
+               "point_id" : 1
+            },
+            {
+               "id" : 46,
+               "point_id" : 25
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 69,
+               "point_id" : 7
+            },
+            {
+               "id" : 70,
+               "point_id" : 1
+            }
+         ],
+         "id" : 68,
+         "length" : 130.99801635742188,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 68,
+               "point_id" : 1
+            },
+            {
+               "id" : 70,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 69,
+         "length" : 5.7980766296386719,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 47,
+               "point_id" : 1
+            },
+            {
+               "id" : 48,
+               "point_id" : 9
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 68,
+               "point_id" : 1
+            },
+            {
+               "id" : 69,
+               "point_id" : 7
+            }
+         ],
+         "id" : 70,
+         "length" : 16.390155792236328,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 2,
+               "point_id" : 1
+            },
+            {
+               "id" : 3,
+               "point_id" : 115
+            },
+            {
+               "id" : 4,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 72,
+               "point_id" : 16
+            },
+            {
+               "id" : 74,
+               "point_id" : 17
+            }
+         ],
+         "id" : 71,
+         "length" : 150.35166931152344,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 71,
+               "point_id" : 1
+            },
+            {
+               "id" : 74,
+               "point_id" : 17
+            }
+         ],
+         "head_point" : null,
+         "id" : 72,
+         "length" : 14.357925415039062,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 74,
+               "point_id" : 1
+            },
+            {
+               "id" : 75,
+               "point_id" : 12
+            },
+            {
+               "id" : 88,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 77,
+               "point_id" : 1
+            },
+            {
+               "id" : 78,
+               "point_id" : 15
+            },
+            {
+               "id" : 80,
+               "point_id" : 54
+            }
+         ],
+         "id" : 73,
+         "length" : 114.51190185546875,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 71,
+               "point_id" : 1
+            },
+            {
+               "id" : 72,
+               "point_id" : 16
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 73,
+               "point_id" : 116
+            },
+            {
+               "id" : 75,
+               "point_id" : 12
+            },
+            {
+               "id" : 88,
+               "point_id" : 1
+            }
+         ],
+         "id" : 74,
+         "length" : 15.91289234161377,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 73,
+               "point_id" : 116
+            },
+            {
+               "id" : 74,
+               "point_id" : 1
+            },
+            {
+               "id" : 88,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 75,
+         "length" : 10.524293899536133,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 63,
+               "point_id" : 1
+            },
+            {
+               "id" : 64,
+               "point_id" : 13
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 77,
+               "point_id" : 18
+            },
+            {
+               "id" : 79,
+               "point_id" : 13
+            }
+         ],
+         "id" : 76,
+         "length" : 15.099588394165039,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 76,
+               "point_id" : 1
+            },
+            {
+               "id" : 79,
+               "point_id" : 13
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 73,
+               "point_id" : 1
+            },
+            {
+               "id" : 78,
+               "point_id" : 15
+            },
+            {
+               "id" : 80,
+               "point_id" : 54
+            }
+         ],
+         "id" : 77,
+         "length" : 16.394012451171875,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 11
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 73,
+               "point_id" : 1
+            },
+            {
+               "id" : 77,
+               "point_id" : 1
+            },
+            {
+               "id" : 80,
+               "point_id" : 54
+            }
+         ],
+         "head_point" : null,
+         "id" : 78,
+         "length" : 13.109734535217285,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 18
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 76,
+               "point_id" : 1
+            },
+            {
+               "id" : 77,
+               "point_id" : 18
+            }
+         ],
+         "head_point" : null,
+         "id" : 79,
+         "length" : 11.950217247009277,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 73,
+               "point_id" : 1
+            },
+            {
+               "id" : 77,
+               "point_id" : 1
+            },
+            {
+               "id" : 78,
+               "point_id" : 15
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 47,
+               "point_id" : 33
+            },
+            {
+               "id" : 62,
+               "point_id" : 8
+            }
+         ],
+         "id" : 80,
+         "length" : 52.851955413818359,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 59,
+               "point_id" : 1
+            },
+            {
+               "id" : 60,
+               "point_id" : 17
+            }
+         ],
+         "id" : 81,
+         "length" : 12.356390953063965,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 89,
+               "point_id" : 9
+            },
+            {
+               "id" : 110,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 83,
+               "point_id" : 31
+            },
+            {
+               "id" : 91,
+               "point_id" : 17
+            }
+         ],
+         "id" : 82,
+         "length" : 28.962287902832031,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 82,
+               "point_id" : 1
+            },
+            {
+               "id" : 91,
+               "point_id" : 17
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 84,
+               "point_id" : 36
+            },
+            {
+               "id" : 95,
+               "point_id" : 17
+            }
+         ],
+         "id" : 83,
+         "length" : 29.625766754150391,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 83,
+               "point_id" : 1
+            },
+            {
+               "id" : 95,
+               "point_id" : 17
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 85,
+               "point_id" : 70
+            },
+            {
+               "id" : 112,
+               "point_id" : 9
+            }
+         ],
+         "id" : 84,
+         "length" : 34.066795349121094,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 84,
+               "point_id" : 1
+            },
+            {
+               "id" : 112,
+               "point_id" : 9
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 86,
+               "point_id" : 52
+            },
+            {
+               "id" : 113,
+               "point_id" : 10
+            }
+         ],
+         "id" : 85,
+         "length" : 68.406494140625,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 85,
+               "point_id" : 1
+            },
+            {
+               "id" : 113,
+               "point_id" : 10
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 87,
+               "point_id" : 32
+            },
+            {
+               "id" : 96,
+               "point_id" : 1
+            },
+            {
+               "id" : 97,
+               "point_id" : 11
+            }
+         ],
+         "id" : 86,
+         "length" : 50.719512939453125,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 86,
+               "point_id" : 1
+            },
+            {
+               "id" : 96,
+               "point_id" : 1
+            },
+            {
+               "id" : 97,
+               "point_id" : 11
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 88,
+               "point_id" : 96
+            },
+            {
+               "id" : 93,
+               "point_id" : 9
+            }
+         ],
+         "id" : 87,
+         "length" : 30.858932495117188,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 87,
+               "point_id" : 1
+            },
+            {
+               "id" : 93,
+               "point_id" : 9
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 74,
+               "point_id" : 1
+            },
+            {
+               "id" : 73,
+               "point_id" : 116
+            },
+            {
+               "id" : 75,
+               "point_id" : 12
+            }
+         ],
+         "id" : 88,
+         "length" : 94.891792297363281,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 82,
+               "point_id" : 30
+            },
+            {
+               "id" : 110,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 89,
+         "length" : 7.6951713562011719,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 10
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 1,
+               "point_id" : 1
+            },
+            {
+               "id" : 2,
+               "point_id" : 132
+            },
+            {
+               "id" : 92,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 90,
+         "length" : 20.084177017211914,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 9
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 82,
+               "point_id" : 1
+            },
+            {
+               "id" : 83,
+               "point_id" : 31
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 124,
+               "point_id" : 1
+            }
+         ],
+         "id" : 91,
+         "length" : 15.132183074951172,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 94,
+               "point_id" : 16
+            },
+            {
+               "id" : 114,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 1,
+               "point_id" : 1
+            },
+            {
+               "id" : 2,
+               "point_id" : 132
+            },
+            {
+               "id" : 90,
+               "point_id" : 22
+            }
+         ],
+         "id" : 92,
+         "length" : 33.555187225341797,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 9
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 88,
+               "point_id" : 96
+            },
+            {
+               "id" : 87,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 93,
+         "length" : 7.0175457000732422,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 9
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 92,
+               "point_id" : 35
+            },
+            {
+               "id" : 114,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 94,
+         "length" : 14.113864898681641,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 83,
+               "point_id" : 1
+            },
+            {
+               "id" : 84,
+               "point_id" : 36
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 124,
+               "point_id" : 31
+            }
+         ],
+         "id" : 95,
+         "length" : 15.382272720336914,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 86,
+               "point_id" : 1
+            },
+            {
+               "id" : 87,
+               "point_id" : 32
+            },
+            {
+               "id" : 97,
+               "point_id" : 11
+            }
+         ],
+         "id" : 96,
+         "length" : 13.652517318725586,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 9
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 86,
+               "point_id" : 1
+            },
+            {
+               "id" : 87,
+               "point_id" : 32
+            },
+            {
+               "id" : 96,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 97,
+         "length" : 9.2814111709594727,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 99,
+               "point_id" : 76
+            },
+            {
+               "id" : 100,
+               "point_id" : 1
+            },
+            {
+               "id" : 101,
+               "point_id" : 16
+            }
+         ],
+         "id" : 98,
+         "length" : 23.160806655883789,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 98,
+               "point_id" : 1
+            },
+            {
+               "id" : 100,
+               "point_id" : 1
+            },
+            {
+               "id" : 101,
+               "point_id" : 16
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 25,
+               "point_id" : 55
+            },
+            {
+               "id" : 40,
+               "point_id" : 1
+            },
+            {
+               "id" : 41,
+               "point_id" : 16
+            }
+         ],
+         "id" : 99,
+         "length" : 74.745285034179688,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 98,
+               "point_id" : 1
+            },
+            {
+               "id" : 101,
+               "point_id" : 16
+            },
+            {
+               "id" : 99,
+               "point_id" : 76
+            }
+         ],
+         "id" : 100,
+         "length" : 3.3389890193939209,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 10
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 98,
+               "point_id" : 1
+            },
+            {
+               "id" : 99,
+               "point_id" : 76
+            },
+            {
+               "id" : 100,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 102,
+               "point_id" : 1
+            },
+            {
+               "id" : 103,
+               "point_id" : 34
+            }
+         ],
+         "id" : 101,
+         "length" : 14.316028594970703,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 101,
+               "point_id" : 1
+            },
+            {
+               "id" : 103,
+               "point_id" : 34
+            }
+         ],
+         "id" : 102,
+         "length" : 6.3778462409973145,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 4
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 101,
+               "point_id" : 1
+            },
+            {
+               "id" : 102,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 104,
+               "point_id" : 1
+            },
+            {
+               "id" : 105,
+               "point_id" : 70
+            }
+         ],
+         "id" : 103,
+         "length" : 32.600860595703125,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 103,
+               "point_id" : 1
+            },
+            {
+               "id" : 105,
+               "point_id" : 70
+            }
+         ],
+         "id" : 104,
+         "length" : 8.7368135452270508,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 103,
+               "point_id" : 1
+            },
+            {
+               "id" : 104,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 121,
+               "point_id" : 9
+            },
+            {
+               "id" : 123,
+               "point_id" : 27
+            }
+         ],
+         "id" : 105,
+         "length" : 68.813636779785156,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 0,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 107,
+               "point_id" : 19
+            },
+            {
+               "id" : 109,
+               "point_id" : 1
+            }
+         ],
+         "id" : 106,
+         "length" : 9.4738540649414062,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 106,
+               "point_id" : 1
+            },
+            {
+               "id" : 109,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 108,
+               "point_id" : 1
+            },
+            {
+               "id" : 110,
+               "point_id" : 35
+            },
+            {
+               "id" : 111,
+               "point_id" : 14
+            }
+         ],
+         "id" : 107,
+         "length" : 17.112024307250977,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 13,
+               "point_id" : 1
+            },
+            {
+               "id" : 14,
+               "point_id" : 14
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 107,
+               "point_id" : 1
+            },
+            {
+               "id" : 110,
+               "point_id" : 35
+            },
+            {
+               "id" : 111,
+               "point_id" : 14
+            }
+         ],
+         "id" : 108,
+         "length" : 26.792669296264648,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 9
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 5,
+               "point_id" : 1
+            },
+            {
+               "id" : 12,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 106,
+               "point_id" : 1
+            },
+            {
+               "id" : 107,
+               "point_id" : 19
+            }
+         ],
+         "id" : 109,
+         "length" : 29.078634262084961,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 8
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 107,
+               "point_id" : 1
+            },
+            {
+               "id" : 108,
+               "point_id" : 1
+            },
+            {
+               "id" : 111,
+               "point_id" : 14
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 82,
+               "point_id" : 30
+            },
+            {
+               "id" : 89,
+               "point_id" : 9
+            }
+         ],
+         "id" : 110,
+         "length" : 33.051082611083984,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 107,
+               "point_id" : 1
+            },
+            {
+               "id" : 108,
+               "point_id" : 1
+            },
+            {
+               "id" : 110,
+               "point_id" : 35
+            }
+         ],
+         "head_point" : null,
+         "id" : 111,
+         "length" : 12.766322135925293,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 13
+      },
+      {
+         "direction" : 0,
+         "end_point" : [
+            {
+               "id" : 84,
+               "point_id" : 1
+            },
+            {
+               "id" : 85,
+               "point_id" : 70
+            }
+         ],
+         "head_point" : null,
+         "id" : 112,
+         "length" : 7.8018755912780762,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 5
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 85,
+               "point_id" : 1
+            },
+            {
+               "id" : 86,
+               "point_id" : 52
+            }
+         ],
+         "head_point" : null,
+         "id" : 113,
+         "length" : 8.0524063110351562,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 115,
+               "point_id" : 1
+            },
+            {
+               "id" : 117,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 92,
+               "point_id" : 35
+            },
+            {
+               "id" : 94,
+               "point_id" : 16
+            }
+         ],
+         "id" : 114,
+         "length" : 76.458152770996094,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 114,
+               "point_id" : 78
+            },
+            {
+               "id" : 117,
+               "point_id" : 1
+            }
+         ],
+         "id" : 115,
+         "length" : 8.1725568771362305,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 3
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 117,
+               "point_id" : 31
+            },
+            {
+               "id" : 122,
+               "point_id" : 1
+            }
+         ],
+         "id" : 116,
+         "length" : 6.3814253807067871,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 116,
+               "point_id" : 1
+            },
+            {
+               "id" : 122,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 114,
+               "point_id" : 78
+            },
+            {
+               "id" : 115,
+               "point_id" : 1
+            }
+         ],
+         "id" : 117,
+         "length" : 29.649431228637695,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 119,
+               "point_id" : 17
+            },
+            {
+               "id" : 123,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : null,
+         "id" : 118,
+         "length" : 6.5816364288330078,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 118,
+               "point_id" : 8
+            },
+            {
+               "id" : 123,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 120,
+               "point_id" : 1
+            },
+            {
+               "id" : 122,
+               "point_id" : 13
+            }
+         ],
+         "id" : 119,
+         "length" : 15.86945915222168,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 119,
+               "point_id" : 1
+            },
+            {
+               "id" : 122,
+               "point_id" : 13
+            }
+         ],
+         "id" : 120,
+         "length" : 7.7619242668151855,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 6
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 105,
+               "point_id" : 1
+            },
+            {
+               "id" : 123,
+               "point_id" : 27
+            }
+         ],
+         "head_point" : null,
+         "id" : 121,
+         "length" : 7.4426336288452148,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 119,
+               "point_id" : 1
+            },
+            {
+               "id" : 120,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 116,
+               "point_id" : 1
+            },
+            {
+               "id" : 117,
+               "point_id" : 31
+            }
+         ],
+         "id" : 122,
+         "length" : 11.37701416015625,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 105,
+               "point_id" : 1
+            },
+            {
+               "id" : 121,
+               "point_id" : 9
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 118,
+               "point_id" : 8
+            },
+            {
+               "id" : 119,
+               "point_id" : 17
+            }
+         ],
+         "id" : 123,
+         "length" : 25.409151077270508,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : null,
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 95,
+               "point_id" : 1
+            },
+            {
+               "id" : 125,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 91,
+               "point_id" : 1
+            }
+         ],
+         "id" : 124,
+         "length" : 29.609891891479492,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : [ 466 ],
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : [
+            {
+               "id" : 126,
+               "point_id" : 1
+            }
+         ],
+         "head_point" : [
+            {
+               "id" : 124,
+               "point_id" : 31
+            },
+            {
+               "id" : 95,
+               "point_id" : 1
+            }
+         ],
+         "id" : 125,
+         "length" : 15.036172866821289,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : [ 466, 467 ],
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      },
+      {
+         "direction" : 1,
+         "end_point" : null,
+         "head_point" : [
+            {
+               "id" : 125,
+               "point_id" : 15
+            }
+         ],
+         "id" : 126,
+         "length" : 11.904534339904785,
+         "mode" : 512,
+         "n_as" : 30,
+         "n_kph" : 30,
+         "neg_lanes" : null,
+         "p_as" : 30,
+         "p_kph" : 30,
+         "pos_lanes" : [ 467 ],
+         "r_class" : 0,
+         "routing" : 1,
+         "width" : 7
+      }
+   ]
+}

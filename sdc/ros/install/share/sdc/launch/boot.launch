@@ -1,0 +1,34 @@
+<launch>
+
+    <arg name="simulation" default="false"/>
+    <arg name="headless" default="false"/>
+    <arg name="open_frenet" default="false"/>
+    <arg name="server_ip" default="sdc.csie.io:13100" />
+
+    <include file="$(env SDC_CONFIG_DIR)/machines.launch"/>
+
+    <include file="$(env SDC_CONFIG_DIR)/boot.launch">
+        <arg name="simulation" value="$(arg simulation)"/>
+    </include>
+
+    <include file="$(find sdc)/launch/diagnostics.launch">
+        <arg name="simulation" value="$(arg simulation)"/>
+    </include>
+
+    <group unless="$(arg simulation)">
+        <!-- <include file="$(find data_communication)/launch/run.launch"/> -->
+        <!-- <include file="$(find v2x)/launch/run.launch"/> -->
+        <include file="$(find dsrc_client)/launch/run.launch"/>
+        <include file="$(env SDC_CONFIG_DIR)/actuation.launch"/>
+    </group>
+
+    <include file="$(find sdc)/launch/localization.launch">
+        <arg name="initial_using_gps" value="true"/>
+    </include>
+
+    <include file="$(find sdc)/launch/visualization.launch">
+        <arg name="headless" value="$(arg headless)"/>
+        <arg name="open_frenet" value="$(arg open_frenet)"/>
+    </include>
+
+</launch>

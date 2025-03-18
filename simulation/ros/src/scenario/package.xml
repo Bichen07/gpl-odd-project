@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>scenario</name>
+  <version>0.9.0</version>
+  <description>The scenario package</description>
+  <maintainer email="chenhuihu@itri.org.tw">Chen-Hui Hu</maintainer>
+  <maintainer email="zackhsu@itri.org.tw">Hsiu-Wei Hsu</maintainer>
+  <license>ITRI</license>
+  <build_depend>roslib</build_depend>
+  <build_export_depend>roslib</build_export_depend>
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>message_generation</build_depend>
+  <build_export_depend>message_generation</build_export_depend>
+  <depend>simulation_adv</depend>
+  <depend>roscpp</depend>
+  <depend>itri_msgs</depend>
+  <depend>scenario_msgs</depend>
+  <depend>tf</depend>
+  <depend>trace</depend>
+  <depend>route_mission_handler</depend>
+  <depend>common_utils_lib</depend>
+  <depend>carla_msgs</depend>
+  <depend>carla_ackermann_control</depend>
+  <depend>geometry_msgs</depend>
+  <depend>simulation_utils</depend>
+  <depend>path</depend>
+  <depend>path_msgs</depend>
+  <exec_depend>message_runtime</exec_depend>
+  <depend>simulation_srvs</depend>
+  <depend>actionlib</depend>
+  <depend>actionlib_msgs</depend>
+</package>

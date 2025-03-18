@@ -1,0 +1,5 @@
+uint8 state
+uint8 BEFORE_INITIAL_CONDITION = 0
+uint8 DURING_TEST = 1
+uint8 PASS_TEST = 2
+uint8 FAIL_TEST = 3

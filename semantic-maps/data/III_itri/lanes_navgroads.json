@@ -1,0 +1,3308 @@
+{
+   "lanes_navgroads" : [
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 1,
+         "navgroad1" : 60,
+         "navgroad2" : 59
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 2,
+         "navgroad1" : 77,
+         "navgroad2" : 77
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 3,
+         "navgroad1" : 57,
+         "navgroad2" : 56
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 4,
+         "navgroad1" : 60,
+         "navgroad2" : 63
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 5,
+         "navgroad1" : 79,
+         "navgroad2" : 76
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 6,
+         "navgroad1" : 64,
+         "navgroad2" : 63
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 7,
+         "navgroad1" : 73,
+         "navgroad2" : 88
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 8,
+         "navgroad1" : 88,
+         "navgroad2" : 87
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 9,
+         "navgroad1" : 86,
+         "navgroad2" : 85
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 10,
+         "navgroad1" : 86,
+         "navgroad2" : 86
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 11,
+         "navgroad1" : 87,
+         "navgroad2" : 96
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 12,
+         "navgroad1" : 110,
+         "navgroad2" : 82
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 13,
+         "navgroad1" : 109,
+         "navgroad2" : 109
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 14,
+         "navgroad1" : 27,
+         "navgroad2" : 27
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 15,
+         "navgroad1" : 30,
+         "navgroad2" : 36
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 16,
+         "navgroad1" : 32,
+         "navgroad2" : 42
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 17,
+         "navgroad1" : 99,
+         "navgroad2" : 25
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 18,
+         "navgroad1" : 103,
+         "navgroad2" : 103
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 19,
+         "navgroad1" : 2,
+         "navgroad2" : 3
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 20,
+         "navgroad1" : 1,
+         "navgroad2" : 2
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 21,
+         "navgroad1" : 105,
+         "navgroad2" : 104
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 22,
+         "navgroad1" : 6,
+         "navgroad2" : 37
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 23,
+         "navgroad1" : 10,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 24,
+         "navgroad1" : 27,
+         "navgroad2" : 29
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 25,
+         "navgroad1" : 110,
+         "navgroad2" : 107
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 26,
+         "navgroad1" : 108,
+         "navgroad2" : 108
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 27,
+         "navgroad1" : 25,
+         "navgroad2" : 25
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 28,
+         "navgroad1" : 18,
+         "navgroad2" : 18
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 29,
+         "navgroad1" : 16,
+         "navgroad2" : 16
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 30,
+         "navgroad1" : 30,
+         "navgroad2" : 30
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 31,
+         "navgroad1" : 73,
+         "navgroad2" : 78
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 32,
+         "navgroad1" : 77,
+         "navgroad2" : 80
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 33,
+         "navgroad1" : 58,
+         "navgroad2" : 58
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 34,
+         "navgroad1" : 71,
+         "navgroad2" : 74
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 35,
+         "navgroad1" : 114,
+         "navgroad2" : 117
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 36,
+         "navgroad1" : 119,
+         "navgroad2" : 122
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 37,
+         "navgroad1" : 123,
+         "navgroad2" : 119
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 38,
+         "navgroad1" : 123,
+         "navgroad2" : 105
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 39,
+         "navgroad1" : 101,
+         "navgroad2" : 101
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 40,
+         "navgroad1" : 82,
+         "navgroad2" : 83
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 41,
+         "navgroad1" : 39,
+         "navgroad2" : 34
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 42,
+         "navgroad1" : 5,
+         "navgroad2" : 27
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 43,
+         "navgroad1" : 59,
+         "navgroad2" : 58
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 44,
+         "navgroad1" : 60,
+         "navgroad2" : 60
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 45,
+         "navgroad1" : 76,
+         "navgroad2" : 63
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 46,
+         "navgroad1" : 59,
+         "navgroad2" : 81
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 47,
+         "navgroad1" : 61,
+         "navgroad2" : 63
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 48,
+         "navgroad1" : 93,
+         "navgroad2" : 88
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 49,
+         "navgroad1" : 85,
+         "navgroad2" : 86
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 50,
+         "navgroad1" : 96,
+         "navgroad2" : 97
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 51,
+         "navgroad1" : 97,
+         "navgroad2" : 96
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 52,
+         "navgroad1" : 73,
+         "navgroad2" : 75
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 53,
+         "navgroad1" : 108,
+         "navgroad2" : 110
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 54,
+         "navgroad1" : 28,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 55,
+         "navgroad1" : 39,
+         "navgroad2" : 39
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 56,
+         "navgroad1" : 36,
+         "navgroad2" : 30
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 57,
+         "navgroad1" : 42,
+         "navgroad2" : 32
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 58,
+         "navgroad1" : 41,
+         "navgroad2" : 40
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 59,
+         "navgroad1" : 99,
+         "navgroad2" : 98
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 60,
+         "navgroad1" : 114,
+         "navgroad2" : 114
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 61,
+         "navgroad1" : 119,
+         "navgroad2" : 119
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 62,
+         "navgroad1" : 105,
+         "navgroad2" : 105
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 63,
+         "navgroad1" : 2,
+         "navgroad2" : 1
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 64,
+         "navgroad1" : 10,
+         "navgroad2" : 7
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 65,
+         "navgroad1" : 8,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 66,
+         "navgroad1" : 27,
+         "navgroad2" : 29
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 67,
+         "navgroad1" : 4,
+         "navgroad2" : 71
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 68,
+         "navgroad1" : 71,
+         "navgroad2" : 4
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 69,
+         "navgroad1" : 56,
+         "navgroad2" : 57
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 70,
+         "navgroad1" : 74,
+         "navgroad2" : 74
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 71,
+         "navgroad1" : 23,
+         "navgroad2" : 23
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 72,
+         "navgroad1" : 78,
+         "navgroad2" : 77
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 73,
+         "navgroad1" : 18,
+         "navgroad2" : 21
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 74,
+         "navgroad1" : 22,
+         "navgroad2" : 24
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 75,
+         "navgroad1" : 101,
+         "navgroad2" : 103
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 76,
+         "navgroad1" : 21,
+         "navgroad2" : 25
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 77,
+         "navgroad1" : 13,
+         "navgroad2" : 108
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 78,
+         "navgroad1" : 85,
+         "navgroad2" : 84
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 79,
+         "navgroad1" : 32,
+         "navgroad2" : 39
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 80,
+         "navgroad1" : 16,
+         "navgroad2" : 19
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 81,
+         "navgroad1" : 19,
+         "navgroad2" : 18
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 82,
+         "navgroad1" : 27,
+         "navgroad2" : 5
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 83,
+         "navgroad1" : 5,
+         "navgroad2" : 109
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 84,
+         "navgroad1" : 109,
+         "navgroad2" : 107
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 85,
+         "navgroad1" : 63,
+         "navgroad2" : 63
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 86,
+         "navgroad1" : 77,
+         "navgroad2" : 76
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 87,
+         "navgroad1" : 77,
+         "navgroad2" : 73
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 88,
+         "navgroad1" : 81,
+         "navgroad2" : 60
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 89,
+         "navgroad1" : 76,
+         "navgroad2" : 64
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 90,
+         "navgroad1" : 61,
+         "navgroad2" : 60
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 91,
+         "navgroad1" : 50,
+         "navgroad2" : 57
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 92,
+         "navgroad1" : 87,
+         "navgroad2" : 88
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 93,
+         "navgroad1" : 86,
+         "navgroad2" : 86
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 94,
+         "navgroad1" : 84,
+         "navgroad2" : 84
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 95,
+         "navgroad1" : 86,
+         "navgroad2" : 96
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 96,
+         "navgroad1" : 87,
+         "navgroad2" : 97
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 97,
+         "navgroad1" : 85,
+         "navgroad2" : 113
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 98,
+         "navgroad1" : 73,
+         "navgroad2" : 74
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 99,
+         "navgroad1" : 75,
+         "navgroad2" : 88
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 100,
+         "navgroad1" : 88,
+         "navgroad2" : 75
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 101,
+         "navgroad1" : 82,
+         "navgroad2" : 82
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 102,
+         "navgroad1" : 107,
+         "navgroad2" : 107
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 103,
+         "navgroad1" : 95,
+         "navgroad2" : 83
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 104,
+         "navgroad1" : 107,
+         "navgroad2" : 110
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 105,
+         "navgroad1" : 5,
+         "navgroad2" : 5
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 106,
+         "navgroad1" : 28,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 107,
+         "navgroad1" : 32,
+         "navgroad2" : 32
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 108,
+         "navgroad1" : 9,
+         "navgroad2" : 10
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 109,
+         "navgroad1" : 37,
+         "navgroad2" : 9
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 110,
+         "navgroad1" : 40,
+         "navgroad2" : 33
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 111,
+         "navgroad1" : 33,
+         "navgroad2" : 40
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 112,
+         "navgroad1" : 98,
+         "navgroad2" : 99
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 113,
+         "navgroad1" : 123,
+         "navgroad2" : 123
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 114,
+         "navgroad1" : 103,
+         "navgroad2" : 103
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 115,
+         "navgroad1" : 92,
+         "navgroad2" : 92
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 116,
+         "navgroad1" : 3,
+         "navgroad2" : 3
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 117,
+         "navgroad1" : 2,
+         "navgroad2" : 2
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 118,
+         "navgroad1" : 117,
+         "navgroad2" : 115
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 119,
+         "navgroad1" : 117,
+         "navgroad2" : 116
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 120,
+         "navgroad1" : 120,
+         "navgroad2" : 122
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 121,
+         "navgroad1" : 104,
+         "navgroad2" : 105
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 122,
+         "navgroad1" : 101,
+         "navgroad2" : 98
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 123,
+         "navgroad1" : 99,
+         "navgroad2" : 40
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 124,
+         "navgroad1" : 25,
+         "navgroad2" : 41
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 125,
+         "navgroad1" : 35,
+         "navgroad2" : 34
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 126,
+         "navgroad1" : 34,
+         "navgroad2" : 36
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 127,
+         "navgroad1" : 37,
+         "navgroad2" : 30
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 128,
+         "navgroad1" : 30,
+         "navgroad2" : 34
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 129,
+         "navgroad1" : 36,
+         "navgroad2" : 37
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 130,
+         "navgroad1" : 10,
+         "navgroad2" : 8
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 131,
+         "navgroad1" : 28,
+         "navgroad2" : 27
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 132,
+         "navgroad1" : 27,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 133,
+         "navgroad1" : 74,
+         "navgroad2" : 71
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 134,
+         "navgroad1" : 25,
+         "navgroad2" : 25
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 135,
+         "navgroad1" : 22,
+         "navgroad2" : 21
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 136,
+         "navgroad1" : 16,
+         "navgroad2" : 30
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 137,
+         "navgroad1" : 18,
+         "navgroad2" : 18
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 138,
+         "navgroad1" : 30,
+         "navgroad2" : 31
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 139,
+         "navgroad1" : 31,
+         "navgroad2" : 16
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 140,
+         "navgroad1" : 19,
+         "navgroad2" : 17
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 141,
+         "navgroad1" : 90,
+         "navgroad2" : 1
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 142,
+         "navgroad1" : 92,
+         "navgroad2" : 2
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 143,
+         "navgroad1" : 2,
+         "navgroad2" : 4
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 144,
+         "navgroad1" : 3,
+         "navgroad2" : 71
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 145,
+         "navgroad1" : 57,
+         "navgroad2" : 3
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 146,
+         "navgroad1" : 74,
+         "navgroad2" : 73
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 147,
+         "navgroad1" : 78,
+         "navgroad2" : 80
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 148,
+         "navgroad1" : 73,
+         "navgroad2" : 77
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 149,
+         "navgroad1" : 99,
+         "navgroad2" : 99
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 150,
+         "navgroad1" : 58,
+         "navgroad2" : 59
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 151,
+         "navgroad1" : 22,
+         "navgroad2" : 23
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 152,
+         "navgroad1" : 23,
+         "navgroad2" : 13
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 153,
+         "navgroad1" : 63,
+         "navgroad2" : 60
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 154,
+         "navgroad1" : 59,
+         "navgroad2" : 60
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 155,
+         "navgroad1" : 77,
+         "navgroad2" : 77
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 156,
+         "navgroad1" : 73,
+         "navgroad2" : 73
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 157,
+         "navgroad1" : 75,
+         "navgroad2" : 74
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 158,
+         "navgroad1" : 87,
+         "navgroad2" : 87
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 159,
+         "navgroad1" : 88,
+         "navgroad2" : 93
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 160,
+         "navgroad1" : 86,
+         "navgroad2" : 97
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 161,
+         "navgroad1" : 87,
+         "navgroad2" : 96
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 162,
+         "navgroad1" : 113,
+         "navgroad2" : 85
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 163,
+         "navgroad1" : 84,
+         "navgroad2" : 112
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 164,
+         "navgroad1" : 110,
+         "navgroad2" : 110
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 165,
+         "navgroad1" : 83,
+         "navgroad2" : 83
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 166,
+         "navgroad1" : 89,
+         "navgroad2" : 82
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 167,
+         "navgroad1" : 28,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 168,
+         "navgroad1" : 37,
+         "navgroad2" : 34
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 169,
+         "navgroad1" : 10,
+         "navgroad2" : 10
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 170,
+         "navgroad1" : 9,
+         "navgroad2" : 9
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 171,
+         "navgroad1" : 34,
+         "navgroad2" : 37
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 172,
+         "navgroad1" : 39,
+         "navgroad2" : 39
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 173,
+         "navgroad1" : 40,
+         "navgroad2" : 40
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 174,
+         "navgroad1" : 25,
+         "navgroad2" : 99
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 175,
+         "navgroad1" : 105,
+         "navgroad2" : 103
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 176,
+         "navgroad1" : 119,
+         "navgroad2" : 123
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 177,
+         "navgroad1" : 117,
+         "navgroad2" : 122
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 178,
+         "navgroad1" : 3,
+         "navgroad2" : 3
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 179,
+         "navgroad1" : 90,
+         "navgroad2" : 92
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 180,
+         "navgroad1" : 114,
+         "navgroad2" : 115
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 181,
+         "navgroad1" : 123,
+         "navgroad2" : 121
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 182,
+         "navgroad1" : 102,
+         "navgroad2" : 101
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 183,
+         "navgroad1" : 33,
+         "navgroad2" : 42
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 184,
+         "navgroad1" : 40,
+         "navgroad2" : 32
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 185,
+         "navgroad1" : 9,
+         "navgroad2" : 6
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 186,
+         "navgroad1" : 7,
+         "navgroad2" : 9
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 187,
+         "navgroad1" : 8,
+         "navgroad2" : 10
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 188,
+         "navgroad1" : 28,
+         "navgroad2" : 27
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 189,
+         "navgroad1" : 27,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 190,
+         "navgroad1" : 11,
+         "navgroad2" : 5
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 191,
+         "navgroad1" : 107,
+         "navgroad2" : 108
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 192,
+         "navgroad1" : 74,
+         "navgroad2" : 75
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 193,
+         "navgroad1" : 23,
+         "navgroad2" : 23
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 194,
+         "navgroad1" : 21,
+         "navgroad2" : 22
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 195,
+         "navgroad1" : 21,
+         "navgroad2" : 21
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 196,
+         "navgroad1" : 19,
+         "navgroad2" : 19
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 197,
+         "navgroad1" : 30,
+         "navgroad2" : 16
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 198,
+         "navgroad1" : 108,
+         "navgroad2" : 14
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 199,
+         "navgroad1" : 92,
+         "navgroad2" : 1
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 200,
+         "navgroad1" : 4,
+         "navgroad2" : 3
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 201,
+         "navgroad1" : 71,
+         "navgroad2" : 2
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 202,
+         "navgroad1" : 3,
+         "navgroad2" : 57
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 203,
+         "navgroad1" : 72,
+         "navgroad2" : 71
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 204,
+         "navgroad1" : 73,
+         "navgroad2" : 80
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 205,
+         "navgroad1" : 58,
+         "navgroad2" : 57
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 206,
+         "navgroad1" : 114,
+         "navgroad2" : 92
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 207,
+         "navgroad1" : 109,
+         "navgroad2" : 5
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 208,
+         "navgroad1" : 57,
+         "navgroad2" : 57
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 209,
+         "navgroad1" : 58,
+         "navgroad2" : 58
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 210,
+         "navgroad1" : 81,
+         "navgroad2" : 59
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 211,
+         "navgroad1" : 76,
+         "navgroad2" : 76
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 212,
+         "navgroad1" : 60,
+         "navgroad2" : 60
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 213,
+         "navgroad1" : 63,
+         "navgroad2" : 61
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 214,
+         "navgroad1" : 59,
+         "navgroad2" : 49
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 215,
+         "navgroad1" : 63,
+         "navgroad2" : 64
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 216,
+         "navgroad1" : 88,
+         "navgroad2" : 88
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 217,
+         "navgroad1" : 93,
+         "navgroad2" : 87
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 218,
+         "navgroad1" : 87,
+         "navgroad2" : 86
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 219,
+         "navgroad1" : 86,
+         "navgroad2" : 87
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 220,
+         "navgroad1" : 85,
+         "navgroad2" : 85
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 221,
+         "navgroad1" : 86,
+         "navgroad2" : 113
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 222,
+         "navgroad1" : 124,
+         "navgroad2" : 95
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 223,
+         "navgroad1" : 75,
+         "navgroad2" : 73
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 224,
+         "navgroad1" : 83,
+         "navgroad2" : 83
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 225,
+         "navgroad1" : 110,
+         "navgroad2" : 108
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 226,
+         "navgroad1" : 110,
+         "navgroad2" : 110
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 227,
+         "navgroad1" : 82,
+         "navgroad2" : 91
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 228,
+         "navgroad1" : 107,
+         "navgroad2" : 111
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 229,
+         "navgroad1" : 27,
+         "navgroad2" : 27
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 230,
+         "navgroad1" : 5,
+         "navgroad2" : 5
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 231,
+         "navgroad1" : 28,
+         "navgroad2" : 29
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 232,
+         "navgroad1" : 34,
+         "navgroad2" : 34
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 233,
+         "navgroad1" : 9,
+         "navgroad2" : 37
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 234,
+         "navgroad1" : 10,
+         "navgroad2" : 9
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 235,
+         "navgroad1" : 28,
+         "navgroad2" : 10
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 236,
+         "navgroad1" : 37,
+         "navgroad2" : 37
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 237,
+         "navgroad1" : 92,
+         "navgroad2" : 92
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 238,
+         "navgroad1" : 103,
+         "navgroad2" : 105
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 239,
+         "navgroad1" : 123,
+         "navgroad2" : 123
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 240,
+         "navgroad1" : 117,
+         "navgroad2" : 117
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 241,
+         "navgroad1" : 116,
+         "navgroad2" : 122
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 242,
+         "navgroad1" : 120,
+         "navgroad2" : 119
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 243,
+         "navgroad1" : 118,
+         "navgroad2" : 119
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 244,
+         "navgroad1" : 105,
+         "navgroad2" : 121
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 245,
+         "navgroad1" : 104,
+         "navgroad2" : 103
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 246,
+         "navgroad1" : 103,
+         "navgroad2" : 102
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 247,
+         "navgroad1" : 101,
+         "navgroad2" : 99
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 248,
+         "navgroad1" : 99,
+         "navgroad2" : 101
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 249,
+         "navgroad1" : 99,
+         "navgroad2" : 41
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 250,
+         "navgroad1" : 25,
+         "navgroad2" : 40
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 251,
+         "navgroad1" : 40,
+         "navgroad2" : 25
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 252,
+         "navgroad1" : 41,
+         "navgroad2" : 99
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 253,
+         "navgroad1" : 40,
+         "navgroad2" : 42
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 254,
+         "navgroad1" : 33,
+         "navgroad2" : 32
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 255,
+         "navgroad1" : 42,
+         "navgroad2" : 40
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 256,
+         "navgroad1" : 32,
+         "navgroad2" : 33
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 257,
+         "navgroad1" : 32,
+         "navgroad2" : 38
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 258,
+         "navgroad1" : 34,
+         "navgroad2" : 30
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 259,
+         "navgroad1" : 37,
+         "navgroad2" : 36
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 260,
+         "navgroad1" : 6,
+         "navgroad2" : 9
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 261,
+         "navgroad1" : 7,
+         "navgroad2" : 10
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 262,
+         "navgroad1" : 8,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 263,
+         "navgroad1" : 29,
+         "navgroad2" : 27
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 264,
+         "navgroad1" : 109,
+         "navgroad2" : 12
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 265,
+         "navgroad1" : 107,
+         "navgroad2" : 106
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 266,
+         "navgroad1" : 71,
+         "navgroad2" : 71
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 267,
+         "navgroad1" : 22,
+         "navgroad2" : 22
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 268,
+         "navgroad1" : 108,
+         "navgroad2" : 13
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 269,
+         "navgroad1" : 30,
+         "navgroad2" : 30
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 270,
+         "navgroad1" : 19,
+         "navgroad2" : 19
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 271,
+         "navgroad1" : 77,
+         "navgroad2" : 78
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 272,
+         "navgroad1" : 16,
+         "navgroad2" : 31
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 273,
+         "navgroad1" : 16,
+         "navgroad2" : 17
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 274,
+         "navgroad1" : 20,
+         "navgroad2" : 18
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 275,
+         "navgroad1" : 26,
+         "navgroad2" : 21
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 276,
+         "navgroad1" : 21,
+         "navgroad2" : 18
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 277,
+         "navgroad1" : 18,
+         "navgroad2" : 22
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 278,
+         "navgroad1" : 15,
+         "navgroad2" : 13
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 279,
+         "navgroad1" : 94,
+         "navgroad2" : 114
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 280,
+         "navgroad1" : 2,
+         "navgroad2" : 92
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 281,
+         "navgroad1" : 90,
+         "navgroad2" : 2
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 282,
+         "navgroad1" : 1,
+         "navgroad2" : 90
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 283,
+         "navgroad1" : 3,
+         "navgroad2" : 4
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 284,
+         "navgroad1" : 2,
+         "navgroad2" : 71
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 285,
+         "navgroad1" : 3,
+         "navgroad2" : 56
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 286,
+         "navgroad1" : 74,
+         "navgroad2" : 72
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 287,
+         "navgroad1" : 74,
+         "navgroad2" : 88
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 288,
+         "navgroad1" : 78,
+         "navgroad2" : 80
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 289,
+         "navgroad1" : 28,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 290,
+         "navgroad1" : 59,
+         "navgroad2" : 59
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 291,
+         "navgroad1" : 73,
+         "navgroad2" : 80
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 292,
+         "navgroad1" : 76,
+         "navgroad2" : 77
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 293,
+         "navgroad1" : 63,
+         "navgroad2" : 76
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 294,
+         "navgroad1" : 88,
+         "navgroad2" : 73
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 295,
+         "navgroad1" : 97,
+         "navgroad2" : 86
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 296,
+         "navgroad1" : 82,
+         "navgroad2" : 110
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 297,
+         "navgroad1" : 83,
+         "navgroad2" : 82
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 298,
+         "navgroad1" : 108,
+         "navgroad2" : 111
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 299,
+         "navgroad1" : 29,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 300,
+         "navgroad1" : 29,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 301,
+         "navgroad1" : 29,
+         "navgroad2" : 29
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 302,
+         "navgroad1" : 29,
+         "navgroad2" : 29
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 303,
+         "navgroad1" : 40,
+         "navgroad2" : 41
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 304,
+         "navgroad1" : 101,
+         "navgroad2" : 101
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 305,
+         "navgroad1" : 3,
+         "navgroad2" : 2
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 306,
+         "navgroad1" : 92,
+         "navgroad2" : 90
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 307,
+         "navgroad1" : 10,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 308,
+         "navgroad1" : 57,
+         "navgroad2" : 58
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 309,
+         "navgroad1" : 74,
+         "navgroad2" : 74
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 310,
+         "navgroad1" : 92,
+         "navgroad2" : 114
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 311,
+         "navgroad1" : 117,
+         "navgroad2" : 114
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 312,
+         "navgroad1" : 122,
+         "navgroad2" : 117
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 313,
+         "navgroad1" : 119,
+         "navgroad2" : 119
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 314,
+         "navgroad1" : 105,
+         "navgroad2" : 123
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 315,
+         "navgroad1" : 25,
+         "navgroad2" : 21
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 316,
+         "navgroad1" : 23,
+         "navgroad2" : 22
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 317,
+         "navgroad1" : 13,
+         "navgroad2" : 23
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 318,
+         "navgroad1" : 84,
+         "navgroad2" : 85
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 319,
+         "navgroad1" : 39,
+         "navgroad2" : 32
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 320,
+         "navgroad1" : 34,
+         "navgroad2" : 39
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 321,
+         "navgroad1" : 19,
+         "navgroad2" : 16
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 322,
+         "navgroad1" : 18,
+         "navgroad2" : 19
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 323,
+         "navgroad1" : 107,
+         "navgroad2" : 109
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 324,
+         "navgroad1" : 76,
+         "navgroad2" : 76
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 325,
+         "navgroad1" : 59,
+         "navgroad2" : 59
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 326,
+         "navgroad1" : 60,
+         "navgroad2" : 81
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 327,
+         "navgroad1" : 63,
+         "navgroad2" : 63
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 328,
+         "navgroad1" : 77,
+         "navgroad2" : 79
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 329,
+         "navgroad1" : 73,
+         "navgroad2" : 73
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 330,
+         "navgroad1" : 60,
+         "navgroad2" : 61
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 331,
+         "navgroad1" : 87,
+         "navgroad2" : 87
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 332,
+         "navgroad1" : 88,
+         "navgroad2" : 88
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 333,
+         "navgroad1" : 87,
+         "navgroad2" : 93
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 334,
+         "navgroad1" : 84,
+         "navgroad2" : 84
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 335,
+         "navgroad1" : 85,
+         "navgroad2" : 85
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 336,
+         "navgroad1" : 97,
+         "navgroad2" : 87
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 337,
+         "navgroad1" : 96,
+         "navgroad2" : 86
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 338,
+         "navgroad1" : 113,
+         "navgroad2" : 86
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 339,
+         "navgroad1" : 88,
+         "navgroad2" : 74
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 340,
+         "navgroad1" : 108,
+         "navgroad2" : 107
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 341,
+         "navgroad1" : 82,
+         "navgroad2" : 82
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 342,
+         "navgroad1" : 89,
+         "navgroad2" : 110
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 343,
+         "navgroad1" : 83,
+         "navgroad2" : 91
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 344,
+         "navgroad1" : 109,
+         "navgroad2" : 109
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 345,
+         "navgroad1" : 28,
+         "navgroad2" : 29
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 346,
+         "navgroad1" : 37,
+         "navgroad2" : 37
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 347,
+         "navgroad1" : 9,
+         "navgroad2" : 9
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 348,
+         "navgroad1" : 10,
+         "navgroad2" : 10
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 349,
+         "navgroad1" : 34,
+         "navgroad2" : 34
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 350,
+         "navgroad1" : 32,
+         "navgroad2" : 32
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 351,
+         "navgroad1" : 40,
+         "navgroad2" : 40
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 352,
+         "navgroad1" : 99,
+         "navgroad2" : 99
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 353,
+         "navgroad1" : 117,
+         "navgroad2" : 117
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 354,
+         "navgroad1" : 103,
+         "navgroad2" : 101
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 355,
+         "navgroad1" : 105,
+         "navgroad2" : 105
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 356,
+         "navgroad1" : 122,
+         "navgroad2" : 119
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 357,
+         "navgroad1" : 114,
+         "navgroad2" : 114
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 358,
+         "navgroad1" : 2,
+         "navgroad2" : 2
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 359,
+         "navgroad1" : 118,
+         "navgroad2" : 123
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 360,
+         "navgroad1" : 103,
+         "navgroad2" : 104
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 361,
+         "navgroad1" : 98,
+         "navgroad2" : 101
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 362,
+         "navgroad1" : 40,
+         "navgroad2" : 99
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 363,
+         "navgroad1" : 41,
+         "navgroad2" : 25
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 364,
+         "navgroad1" : 42,
+         "navgroad2" : 33
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 365,
+         "navgroad1" : 32,
+         "navgroad2" : 40
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 366,
+         "navgroad1" : 39,
+         "navgroad2" : 38
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 367,
+         "navgroad1" : 30,
+         "navgroad2" : 37
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 368,
+         "navgroad1" : 36,
+         "navgroad2" : 34
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 369,
+         "navgroad1" : 37,
+         "navgroad2" : 6
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 370,
+         "navgroad1" : 9,
+         "navgroad2" : 7
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 371,
+         "navgroad1" : 28,
+         "navgroad2" : 8
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 372,
+         "navgroad1" : 29,
+         "navgroad2" : 27
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 373,
+         "navgroad1" : 11,
+         "navgroad2" : 27
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 374,
+         "navgroad1" : 5,
+         "navgroad2" : 12
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 375,
+         "navgroad1" : 110,
+         "navgroad2" : 111
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 376,
+         "navgroad1" : 71,
+         "navgroad2" : 71
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 377,
+         "navgroad1" : 22,
+         "navgroad2" : 22
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 378,
+         "navgroad1" : 21,
+         "navgroad2" : 21
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 379,
+         "navgroad1" : 108,
+         "navgroad2" : 108
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 380,
+         "navgroad1" : 16,
+         "navgroad2" : 16
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 381,
+         "navgroad1" : 31,
+         "navgroad2" : 30
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 382,
+         "navgroad1" : 20,
+         "navgroad2" : 19
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 383,
+         "navgroad1" : 22,
+         "navgroad2" : 18
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 384,
+         "navgroad1" : 23,
+         "navgroad2" : 24
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 385,
+         "navgroad1" : 14,
+         "navgroad2" : 13
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 386,
+         "navgroad1" : 94,
+         "navgroad2" : 92
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 387,
+         "navgroad1" : 2,
+         "navgroad2" : 90
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 388,
+         "navgroad1" : 1,
+         "navgroad2" : 92
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 389,
+         "navgroad1" : 4,
+         "navgroad2" : 2
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 390,
+         "navgroad1" : 71,
+         "navgroad2" : 3
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 391,
+         "navgroad1" : 56,
+         "navgroad2" : 3
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 392,
+         "navgroad1" : 78,
+         "navgroad2" : 73
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 393,
+         "navgroad1" : 77,
+         "navgroad2" : 80
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 394,
+         "navgroad1" : 28,
+         "navgroad2" : 28
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 395,
+         "navgroad1" : 57,
+         "navgroad2" : 57
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 396,
+         "navgroad1" : 35,
+         "navgroad2" : 39
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 397,
+         "navgroad1" : 26,
+         "navgroad2" : 25
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 398,
+         "navgroad1" : 68,
+         "navgroad2" : 46
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 399,
+         "navgroad1" : 47,
+         "navgroad2" : 70
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 400,
+         "navgroad1" : 47,
+         "navgroad2" : 47
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 401,
+         "navgroad1" : 80,
+         "navgroad2" : 47
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 402,
+         "navgroad1" : 80,
+         "navgroad2" : 80
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 403,
+         "navgroad1" : 68,
+         "navgroad2" : 46
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 404,
+         "navgroad1" : 80,
+         "navgroad2" : 80
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 405,
+         "navgroad1" : 46,
+         "navgroad2" : 43
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 406,
+         "navgroad1" : 43,
+         "navgroad2" : 43
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 407,
+         "navgroad1" : 43,
+         "navgroad2" : 43
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 408,
+         "navgroad1" : 67,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 409,
+         "navgroad1" : 68,
+         "navgroad2" : 43
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 410,
+         "navgroad1" : 67,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 411,
+         "navgroad1" : 52,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 412,
+         "navgroad1" : 54,
+         "navgroad2" : 52
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 413,
+         "navgroad1" : 56,
+         "navgroad2" : 54
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 414,
+         "navgroad1" : 67,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 415,
+         "navgroad1" : 52,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 416,
+         "navgroad1" : 52,
+         "navgroad2" : 52
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 417,
+         "navgroad1" : 54,
+         "navgroad2" : 52
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 418,
+         "navgroad1" : 54,
+         "navgroad2" : 54
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 419,
+         "navgroad1" : 70,
+         "navgroad2" : 70
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 420,
+         "navgroad1" : 70,
+         "navgroad2" : 68
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 421,
+         "navgroad1" : 80,
+         "navgroad2" : 62
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 422,
+         "navgroad1" : 62,
+         "navgroad2" : 47
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 423,
+         "navgroad1" : 47,
+         "navgroad2" : 48
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 424,
+         "navgroad1" : 56,
+         "navgroad2" : 56
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 425,
+         "navgroad1" : 55,
+         "navgroad2" : 54
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 426,
+         "navgroad1" : 55,
+         "navgroad2" : 54
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 427,
+         "navgroad1" : 54,
+         "navgroad2" : 53
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 428,
+         "navgroad1" : 53,
+         "navgroad2" : 52
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 429,
+         "navgroad1" : 53,
+         "navgroad2" : 52
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 430,
+         "navgroad1" : 52,
+         "navgroad2" : 51
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 431,
+         "navgroad1" : 51,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 432,
+         "navgroad1" : 51,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 433,
+         "navgroad1" : 69,
+         "navgroad2" : 68
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 434,
+         "navgroad1" : 45,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 435,
+         "navgroad1" : 45,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 436,
+         "navgroad1" : 67,
+         "navgroad2" : 65
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 437,
+         "navgroad1" : 67,
+         "navgroad2" : 65
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 438,
+         "navgroad1" : 45,
+         "navgroad2" : 66
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 439,
+         "navgroad1" : 45,
+         "navgroad2" : 66
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 440,
+         "navgroad1" : 65,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 441,
+         "navgroad1" : 45,
+         "navgroad2" : 65
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 442,
+         "navgroad1" : 65,
+         "navgroad2" : 66
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 443,
+         "navgroad1" : 56,
+         "navgroad2" : 55
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 444,
+         "navgroad1" : 56,
+         "navgroad2" : 54
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 445,
+         "navgroad1" : 54,
+         "navgroad2" : 54
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 446,
+         "navgroad1" : 52,
+         "navgroad2" : 52
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 447,
+         "navgroad1" : 56,
+         "navgroad2" : 56
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 448,
+         "navgroad1" : 54,
+         "navgroad2" : 56
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 449,
+         "navgroad1" : 54,
+         "navgroad2" : 54
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 450,
+         "navgroad1" : 52,
+         "navgroad2" : 54
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 451,
+         "navgroad1" : 52,
+         "navgroad2" : 52
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 452,
+         "navgroad1" : 67,
+         "navgroad2" : 52
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 453,
+         "navgroad1" : 80,
+         "navgroad2" : 47
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 454,
+         "navgroad1" : 47,
+         "navgroad2" : 47
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 455,
+         "navgroad1" : 47,
+         "navgroad2" : 70
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 456,
+         "navgroad1" : 70,
+         "navgroad2" : 70
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 457,
+         "navgroad1" : 70,
+         "navgroad2" : 68
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 458,
+         "navgroad1" : 68,
+         "navgroad2" : 68
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 459,
+         "navgroad1" : 83,
+         "navgroad2" : 84
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 460,
+         "navgroad1" : 84,
+         "navgroad2" : 83
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 461,
+         "navgroad1" : 67,
+         "navgroad2" : 67
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 466,
+         "navgroad1" : 124,
+         "navgroad2" : 125
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 467,
+         "navgroad1" : 125,
+         "navgroad2" : 126
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 0,
+         "lane_id" : 527,
+         "navgroad1" : 91,
+         "navgroad2" : 91
+      },
+      {
+         "isPositive1" : 0,
+         "isPositive2" : 1,
+         "lane_id" : 528,
+         "navgroad1" : 91,
+         "navgroad2" : 124
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 0,
+         "lane_id" : 529,
+         "navgroad1" : 95,
+         "navgroad2" : 84
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 530,
+         "navgroad1" : 95,
+         "navgroad2" : 95
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 531,
+         "navgroad1" : 43,
+         "navgroad2" : 45
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 532,
+         "navgroad1" : 45,
+         "navgroad2" : 45
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 533,
+         "navgroad1" : 43,
+         "navgroad2" : 45
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 534,
+         "navgroad1" : 45,
+         "navgroad2" : 45
+      },
+      {
+         "isPositive1" : 1,
+         "isPositive2" : 1,
+         "lane_id" : 535,
+         "navgroad1" : 124,
+         "navgroad2" : 124
+      }
+   ]
+}

@@ -1,0 +1,77 @@
+<launch>
+    <arg name="waypt_resolution" value="0.1"/>
+    <arg name="simulation" default="true"/>
+
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/acc_config.yaml"/>
+    <remap from="/load_file_node/route" to="/route_mission_handler/route"/>
+    <include file="$(find route_mission_handler)/launch/run.launch"/>
+    <include file="$(find rrt_planning)/launch/rrt_star_visualizer.launch">
+        <arg name="freespace_occupied" value="true"/>
+    </include>
+
+    <!-- <group if="$(arg simulation)">
+        <node name="mqtt_bridge_route_plan"
+              pkg="mqtt_bridge"
+              type="mqtt_bridge_node.py"
+              output="screen">
+            <rosparam command="load" file="$(env SDC_CONFIG_DIR)/mqtt-route-planner.yaml"/>
+            <rosparam param="enable_namespace">true</rosparam>
+            <param name="namespace" value="$(env HOSTNAME)"/>
+            <param name="mqtt/client/client_id" value="route-planner-$(env HOSTNAME)"/>
+        </node>
+    </group>
+    <group unless="$(arg simulation)">
+        <node name="mqtt_bridge_route_plan"
+              pkg="mqtt_bridge"
+              type="mqtt_bridge_node.py"
+              output="screen">
+            <rosparam param="enable_namespace">true</rosparam>
+            <rosparam command="load" file="$(env SDC_CONFIG_DIR)/mqtt-route-planner.yaml"/>
+        </node>
+    </group> -->
+
+    <node name="web_route_plan"
+          pkg="route_mission_handler"
+          type="web_interface.py">
+        <param name="simulation" value="$(arg simulation)"/>
+    </node>
+
+    <node
+        pkg="behavior"
+        type="behavior_node"
+        name="behavior"
+        output="screen">
+        <param name="waypt_resolution" value="$(arg waypt_resolution)"/>
+        <rosparam param="parking_lot_space" subst_value="True">
+            [[1, 3], [5, 124]]
+        </rosparam>
+        <remap from="/speed_cmd" to="/behavior/speed_cmd"/>
+    </node>
+
+    <node
+        pkg="exception_handler"
+        type="exception_handler_node"
+        name="exception_handler">
+    </node>
+
+    <node
+        pkg="motion_planner"
+        type="motion_planner_node"
+        name="motion_planner">
+        <param name="waypt_resolution" value="$(arg waypt_resolution)"/>
+        <param name="roll_out_dist" value="90.0"/>
+    </node>
+
+    <node
+        pkg="waypoint_follower_mpc"
+        type="waypoint_follower_mpc_node"
+        name="waypoint_follower">
+    </node>
+
+<!--     <node
+        pkg="behavior_gui"
+        type="behavior_gui"
+        name="itri_behavior_gui"/> -->
+
+</launch>

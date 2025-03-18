@@ -1,0 +1,11 @@
+string agentId
+string objectClassId
+geometry_msgs/Pose pose
+geometry_msgs/Vector3 size
+std_msgs/ColorRGBA color
+float32 longitudinalOffset
+float32 longitudinalNoiseScale
+bool simWithExternalVehicle
+itri_msgs/turn_signal_cmd turnSignalCmd
+---
+bool isSuccess

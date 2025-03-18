@@ -1,0 +1,17 @@
+geometry_msgs/PoseStamped pose
+geometry_msgs/TwistStamped twist
+int32 laneId
+int32 pointId
+geometry_msgs/Point point
+float32 heading
+float32 curvature
+float32 speed_limit
+int32 point_id
+int32 lane_id
+int32 nroad_id
+float32 s
+float32 d
+float32 left_space
+float32 right_space
+float32 width
+int32 road_type

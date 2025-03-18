@@ -1,0 +1,5 @@
+litestar[standard]==2.8.2
+ax-platform==0.3.7
+hdbscan==0.8.33
+umap-learn==0.5.6
+

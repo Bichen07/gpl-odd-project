@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<package format="2">
+    <name>diagnostic</name>
+    <version>0.0.0</version>
+    <description>check if sdc ready to drive</description>
+    <maintainer email="mxwu@itri.org.tw">MingXuan Wu</maintainer>
+    <license>ITRI</license>
+    <buildtool_depend>catkin</buildtool_depend>
+    <depend>roscpp</depend>
+    <depend>topic_tools</depend>
+</package>

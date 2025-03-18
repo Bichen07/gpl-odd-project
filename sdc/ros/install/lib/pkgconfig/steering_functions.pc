@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: steering_functions
+Description: Description of steering_functions
+Version: 1.0.0
+Cflags: -I${prefix}/include -I/opt/eigen/3.3.7/include/eigen3
+Libs: -L${prefix}/lib -lsteering_functions
+Requires: 

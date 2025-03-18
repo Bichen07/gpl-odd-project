@@ -1,0 +1,35 @@
+{
+  "navgroads": [
+    {
+      "direction": 1,
+      "end_point": [
+        {
+          "id": 0,
+          "point_id": 10000
+        }
+      ],
+      "head_point": [
+        {
+          "id": 0,
+          "point_id": 0
+        }
+      ],
+      "id": 0,
+      "length": 9999.999999,
+      "mode": 0,
+      "n_as": 30,
+      "n_kph": 30,
+      "neg_lanes": [3, 4, 5],
+      "p_as": 30,
+      "p_kph": 30,
+      "pos_lanes": [2, 1, 0],
+      "r_class": 0,
+      "routing": 0,
+      "type": 0,
+      "width": 0,
+      "_ref_index": 0,
+      "_neg_lanes_sorting_indices": [2, 3, 4],
+      "_pos_lanes_sorting_indices": [4, 3, 2]
+    }
+  ]
+}

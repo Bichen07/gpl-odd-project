@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: ndt2veh
+Description: Description of ndt2veh
+Version: 0.0.0
+Cflags: 
+Libs: -L${prefix}/lib 
+Requires: geometry_msgs itri_msgs kalman roscpp sensor_msgs tf2_ros

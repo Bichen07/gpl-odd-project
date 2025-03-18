@@ -1,0 +1,42 @@
+#!/bin/bash
+
+# nycu-odd-project
+
+dotenv="$(dirname $0)/.env"
+if [ -f $dotenv ]
+then
+    export $(cat $dotenv | xargs)
+fi
+
+export PROJECT_DIR=${HOME}/source_code/nycu-odd-project-release
+
+VERSION_DETAILS_PATH="${PROJECT_DIR}/version_details.md"
+SDC_VERSION=$(grep -Po "\* sdc built from commit # \K[0-9a-z]*" $VERSION_DETAILS_PATH)
+
+export SDC_CONFIG_DIR="${PROJECT_DIR}/sdc/vehicle-configuration/pacifica-1"
+
+export SDC_DOCKER_USER_VOLUMES=" \
+    	${SDC_CONFIG_DIR}:${SDC_CONFIG_DIR}:rw \
+    	${PROJECT_DIR}/sdc:/repository:rw \
+    	${PROJECT_DIR}/semantic-maps:/data/semantic-maps:rw \
+    	${PROJECT_DIR}/simulation/ros:/project/mmsl_simulation:rw \
+    	${PROJECT_DIR}/deploy/home:/home/user:rw \
+    	${PROJECT_DIR}/deploy/container_aliases:/home/user/.bash_aliases:rw \
+    	${PROJECT_DIR}/deploy/parallel/container_script:/home/user/.bash_script:rw"
+
+export SDC_DOCKER_USER_OPTIONS=" \
+    	--env MAP_DATA_PATH=/data/semantic-maps \
+    	--env SDC_CONFIG_DIR=$SDC_CONFIG_DIR \
+    	--env SIMULATION_PATH=/project/mmsl_simulation \
+    	--env PAYLOAD_API=$PAYLOAD_API\
+    	--env USER_API_KEY=$USER_API_KEY\
+    	--env SDC_VERSION=$SDC_VERSION"
+
+export SDC_DOCKER_CONTAINER_WORKING_DIRECTORY="/project/mmsl_simulation"
+
+# Add this line to SDC_DOCKER_USER_OPTIONS if you want to enable accellerated graphics with integrated intel GPU inside container
+# --device /dev/dri/card0
+
+# Uncomment this line if there's no Nvidia GPU on host machine.
+# export SDC_DOCKER_NVIDIA_SUPPORT_ENABLED=false
+export SDC_DOCKER_AUDIO_ENABLED=false

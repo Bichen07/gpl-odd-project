@@ -1,0 +1,239 @@
+#!/usr/bin/python3.8
+
+"""terminator-split
+
+Wrapper script for splitting Terminator terminal emulator
+https://github.com/AlekseyChudov/terminator-split
+"""
+
+import argparse
+import logging
+import os
+import resource
+import tempfile
+import socket
+
+import configobj
+
+os.environ['CONTAINER_NAME'] = "sdc-bionic"
+os.environ['SCRIPT_DIR'] = "/home/user/.bash_script"
+
+class TerminatorSplit(object):
+
+    def __init__(self):
+        self.commands_settings = {
+            'config': os.path.expanduser('~/.config/terminator/config'),
+            'command': [],
+            # A list of cmd options that will be used
+            'options': ['--scenario_search_headless', '--sdc'],
+            'total_host': "",
+            'terminator': '/usr/bin/terminator'
+        }
+        self._parse_args()
+        self._logging()
+        self._child = 0
+        self._layout = None
+        self._config = self._write_config()
+        self._launch_terminator()
+
+    def _parse_args(self):
+        usage = """
+        terminator-split [-h] [-d]
+                        [-e COMMAND] [-g CONFIG] [-t TERMINATOR]
+                        [TERMINATOR_OPTIONS]
+                        hostname [hostname ...]
+
+        terminator-split [-h] [-d]
+                        [-g CONFIG] [-t TERMINATOR] [-s SHELL]
+                        [TERMINATOR_OPTIONS]
+                        number
+        """
+        parser = argparse.ArgumentParser(usage=usage)
+        parser.add_argument('-d', '--debug', action='store_const', dest='level',
+                            const='DEBUG', default='INFO', help='show debug messages at execution time')
+        parser.add_argument('-e', '--command')
+        parser.add_argument('-g', '--config', help='Use this terminator config file')
+        parser.add_argument('-s', '--shell', default='bash', help='Specify the shell to be loaded')
+        parser.add_argument('-t', '--terminator')
+        parser.add_argument('-v', '--rviz', action='store_true', help='If not set, headless mode will be applied, no RVIZ will be shown.')
+        parser.add_argument('hostname', nargs='+')
+
+        args = parser.parse_args()
+        if args.rviz:
+            self.commands_settings['options'] = ['--scenario_search', '--sdc']
+
+        namespace = argparse.Namespace(**self.commands_settings)
+        self._args, self._unknown_args = parser.parse_known_args(namespace=namespace)
+
+
+        self._set_commands(self._args)
+
+
+    def _set_commands(self, args):
+        if len(args.hostname) == 1 and args.hostname[0].isdigit():
+            args.total_host = int(args.hostname[0])
+            args.command = [[0 for col in range(len(args.options))]
+                            for row in range(int(args.hostname[0]))]
+
+            port_offset = self._find_next_n_port(args.total_host)
+            assert port_offset != 0, "No available port."
+            print("Using port from {} to {}".format(port_offset, port_offset+args.total_host-1))
+
+            for i in range(int(args.hostname[0])):
+                for j in range(len(args.options)):
+                    port_number = port_offset + i
+                    script_command = f"{os.getenv('SCRIPT_DIR')} {i + port_offset - 11311} {args.options[j]}"
+                    docker_command = f"docker exec -it $CONTAINER_NAME /bin/bash -c \"{script_command}\""
+                    sleep_seconds = 2 + i * 2
+                    args.command[i][j] = \
+                        f"echo 'Using Port \033[1;33m{port_number}\033[0m.'; "\
+                        f"echo 'Will be started after {sleep_seconds} seconds.'; "\
+                        f"sleep {sleep_seconds}s; "\
+                        f"{docker_command}; "\
+                        f"echo '\n\033[1;32mUse the following command if you wish to rerun in this terminal:'"\
+                        f"'\n\033[1;37m \n{docker_command}\n\n\033[0m';"\
+                        f"{args.shell};"
+            args.hostname = range(int(args.hostname[0])*len(args.options))
+
+    def _is_debug(self):
+        return self._args.level == 'DEBUG'
+
+    def _logging(self):
+        logging.basicConfig(format='%(message)s', level=self._args.level)
+        logging.debug('args:{}'.format(self._args))
+        logging.debug('unknown_args:{}'.format(self._unknown_args))
+
+    def _write_config(self):
+        config = configobj.ConfigObj(self._args.config)
+        self._update_layout(config)
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            config.filename = tmp.name
+            config.write()
+        logging.debug("config:{}:'{}'".format(config.filename, config))
+        return config.filename
+
+    def _update_layout(self, config):
+        parent = self._next_child()
+        self._layout = {parent: {'parent': '', 'type': 'Window'}}
+        self._split_layout(parent, self._args.hostname)
+        config['layouts']['default'] = self._layout
+
+    def _next_child(self):
+        child = 'child{}'.format(self._child)
+        self._child += 1
+        return child
+
+    def _find_next_n_port(self, n: int, from_port:int=11311, to_port:int=65535) -> int:
+        start_port = from_port
+        while True:
+            if start_port > to_port: return 0
+            while self._is_port_in_use(start_port):
+                start_port += 1
+                if start_port > to_port: return 0
+            for check_port in range(start_port, start_port+n):
+                if self._is_port_in_use(check_port):
+                    start_port = check_port + 1
+                    if start_port > to_port: return 0
+                    break
+            else:
+                return start_port
+
+
+    def _is_port_in_use(self, port: int) -> bool:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('localhost', port)) == 0
+
+    @staticmethod
+    def _split_index(iterable):
+        return (len(iterable) + 1) // 2
+
+    def _split_layout(self, parent, hosts):
+        if len(hosts) == 1:
+            self._add_terminals(parent, hosts)
+            return
+
+        new_parent = self._split_horizontal(parent)
+        split_index = self._split_index(hosts)
+
+        if len(hosts) == 2:
+            self._add_terminals(new_parent, hosts)
+
+        elif len(hosts) == 3:
+            left_parent = self._split_vertical(new_parent)
+            self._add_terminals(left_parent, hosts[:split_index])
+            self._add_terminals(new_parent, hosts[split_index:])
+
+        elif len(hosts) == 4:
+            left_parent = self._split_vertical(new_parent)
+            right_parent = self._split_vertical(new_parent)
+            self._add_terminals(left_parent, hosts[:split_index])
+            self._add_terminals(right_parent, hosts[split_index:])
+        else:
+            self._split_layout(new_parent, hosts[:split_index])
+            self._split_layout(new_parent, hosts[split_index:])
+
+    def _add_terminals(self, parent, hosts):
+        for host in hosts:
+            self._layout[self._next_child()] = {
+                # 'labels': host,
+                'command': self._args.command[host % self._args.total_host][int(host/self._args.total_host)].format(host),
+                'parent': parent,
+                'type': 'Terminal',
+
+            }
+
+    def _split_horizontal(self, parent):
+        child = self._next_child()
+        self._layout[child] = {
+            'parent': parent,
+            'type': 'HPaned'
+        }
+        return child
+
+    def _split_vertical(self, parent):
+        child = self._next_child()
+        self._layout[child] = {
+            'parent': parent,
+            'type': 'VPaned'
+        }
+        return child
+
+    def _launch_terminator(self):
+        self._demonize()
+        os.execl(self._args.terminator, self._args.terminator,
+                 '-g', self._config, '-u', *self._unknown_args)
+
+    def _demonize(self, chdir='/', max_fd=1024, umask=0):
+        """
+        http://code.activestate.com/recipes/278731-creating-a-daemon-the-python-way/
+        """
+        if os.fork():
+            os._exit(0)
+
+        os.setsid()
+        os.chdir(chdir)
+        os.umask(umask)
+
+        if os.fork():
+            os._exit(0)
+
+        start_fd = 0
+        stop_fd = max(max_fd, resource.getrlimit(resource.RLIMIT_NOFILE)[1])
+
+        if self._is_debug():
+            start_fd = 4
+
+        for fd in range(start_fd, stop_fd):
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+        if not self._is_debug():
+            os.open(os.devnull, os.O_RDWR)
+            os.dup2(0, 1)
+            os.dup2(0, 2)
+
+
+if __name__ == '__main__':
+    TerminatorSplit()

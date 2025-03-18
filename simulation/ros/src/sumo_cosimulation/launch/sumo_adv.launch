@@ -1,0 +1,57 @@
+<launch>
+
+    <arg name="use_gdb" default="false" />
+    <arg name="use_gdb_in_sumo" default="false" />
+    <arg name="simulation_output" default="screen" />
+    <arg name="headless" default="false" />
+    <arg name="run" default="true" />
+    <arg name="disable_collision" default="true" />
+    <arg name="sumo_gui" default="false" />
+    <arg name="sumo_with_debug_build" default="true" />
+    <arg name="run_without_namespace" default="false" />
+
+    <arg name="sync_by_tick" default="true" />
+    <arg name="use_sim_time" default="true" />
+
+    <param name="/sumo_cosim/sync_by_tick" value="$(arg sync_by_tick)" />
+    <param name="/use_sim_time" value="$(arg use_sim_time)" />
+    <param name="/time_step" value="0.01" />
+
+    <!-- Load route name. -->
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <!-- Load offset data -->
+    <param name="/sumo_cosim/offset_data_path" value="$(find sumo_cosimulation)/data/offsets.json" />
+
+    <group unless="$(arg headless)">
+        <include file="$(find sdc)/launch/visualization.launch" ns="ego1" unless="$(arg run_without_namespace)">
+            <!-- <arg name="rviz_file" value="multiego.rviz"/> -->
+        </include>
+        <include file="$(find sdc)/launch/visualization.launch" if="$(arg run_without_namespace)">
+            <!-- <arg name="rviz_file" value="sdc.rviz"/> -->
+        </include>
+    </group>
+    
+    <include file="$(find simulation_adv)/launch/simulation.launch" unless="$(arg sync_by_tick)">
+        <arg name="output" value="$(arg simulation_output)"/>
+        <arg name="disable_collision" value="$(arg disable_collision)" />
+        <arg name="use_gdb" value="$(arg use_gdb)" />
+    </include>
+    <include file="$(find simulation_adv)/launch/run_by_tick.launch" if="$(arg sync_by_tick)">
+        <arg name="output" value="$(arg simulation_output)"/>
+        <arg name="disable_collision" value="$(arg disable_collision)" />
+        <arg name="use_gdb" value="$(arg use_gdb)" />
+    </include>
+    <node 
+        name="sumo_cosim_adv_node" 
+        pkg="sumo_cosimulation" 
+        type="synchronization_adv.py"
+        output="screen">
+        <param name="cfg_file" value="$(find sumo_cosimulation)/data/III_itri_v6/final.sumocfg" />
+        <param name="use_gui" value="$(arg sumo_gui)" />
+        <param name="sumo_with_debug_build" value="$(arg sumo_with_debug_build)" />
+        <param name="synchronize_mode" value="ture" />
+        <param name="use_gdb_in_sumo" value="$(arg use_gdb_in_sumo)" />
+
+    </node>
+
+</launch>

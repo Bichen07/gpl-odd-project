@@ -1,0 +1,923 @@
+{
+  "pacifica": {
+    "drag_coefficient": 0.3,
+    "front_axis": 1.36,
+    "front_stiffness": 386541.0,
+    "rear_axis": 1.73,
+    "rear_stiffness": 480105.0,
+    "mass": 2585,
+    "length": 5.17,
+    "width": 2.2,
+    "longitudinal_offset": -0.62,
+    "eps_model": [[64.0], [1.0, 16, 64.0]],
+    "default_pose": {
+      "taichung_new": {
+        "origin": [
+          {
+            "x": 26.186,
+            "y": -1.238,
+            "orientation": 2.117
+          }
+        ],
+        "zhongke_north_to_south": [
+          {
+            "alias": "shuinan_11",
+            "x": 111.078,
+            "y": 1341.855,
+            "orientation": -1.522
+          },
+          {
+            "alias": "shuinan_11",
+            "x": 111.078,
+            "y": 1321.855,
+            "orientation": -1.522
+          },
+          {
+            "x": 110.43,
+            "y": 450.19,
+            "orientation": -1.9950807
+          },
+          {
+            "x": 113.223,
+            "y": 1302.233,
+            "orientation": -1.506
+          }
+        ],
+        "zhongke_south_to_north": [
+          {
+            "alias": "at_zhongke_dapeng_intersection",
+            "x": -4.315,
+            "y": -33.015,
+            "orientation": 1.448
+          },
+          {
+            "alias": "before_props",
+            "x": 140.466,
+            "y": 983.724,
+            "orientation": 1.628
+          },
+          {
+            "alias": "thi_u-turn_scenario",
+            "x": 12.091,
+            "y": 81.256,
+            "orientation": 1.435
+          },
+          {
+            "alias": "thi_overtaking_scenarios",
+            "x": 162.223,
+            "y": 583.381,
+            "orientation": 1.667
+          },
+          {
+            "alias": "thi_intersection_scenarios",
+            "x": 159.427,
+            "y": 633.605,
+            "orientation": 1.614
+          },
+          {
+            "alias": "thi_red-light-running_scenarios",
+            "x": 151.822,
+            "y": 776.891,
+            "orientation": 1.608
+          }
+        ],
+        "zhongke_right_turn_dapeng_road": [
+          {
+            "alias": "shuinan_04",
+            "x": 150.342,
+            "y": 616.082,
+            "orientation": -1.511
+          },
+          {
+            "alias": "shuinan_04",
+            "x": 6.388,
+            "y": 120.562,
+            "orientation": -1.712
+          }
+        ],
+        "tie_agent": [
+          {
+            "alias": "road_side",
+            "x": 25.8,
+            "y": 271.18,
+            "orientation": 3.1415927
+          },
+          {
+            "alias": "red_light_running",
+            "x": 24.0,
+            "y": 24.98,
+            "orientation": 3.1415927
+          },
+          {
+            "alias": "agent_route",
+            "x": 72.925,
+            "y": 358.006,
+            "orientation": -2.04
+          }
+        ],
+        "dapeng_left_turn_zhongke_road": [
+          {
+            "x": -37.847,
+            "y": 22.38,
+            "orientation": 0.02
+          },
+          {
+            "x": -322.193,
+            "y": 23.173,
+            "orientation": 0.015
+          },
+          {
+            "x": -213.31,
+            "y": 22.787,
+            "orientation": -0.005
+          },
+          {
+            "x": -109.734,
+            "y": 22.364,
+            "orientation": 0.024
+          },
+          {
+            "alias": "tw01",
+            "x": 125.315,
+            "y": 1212.185,
+            "orientation": 1.614
+          },
+          {
+            "alias": "tw04",
+            "x": -432.992,
+            "y": 23.482,
+            "orientation": 0.006
+          }
+        ],
+        "dapeng_right_turn_zhongke_road": [
+          {
+            "x": 612.102,
+            "y": 23.862,
+            "orientation": -3.092
+          },
+          {
+            "x": 387.004,
+            "y": 24.601,
+            "orientation": -3.092
+          },
+          {
+            "x": 194.943,
+            "y": 24.775,
+            "orientation": -3.116
+          },
+          {
+            "alias": "tw02",
+            "x": 66.261,
+            "y": 324.302,
+            "orientation": 1.194
+          },
+          {
+            "alias": "tw03",
+            "x": 144.462,
+            "y": 916.419,
+            "orientation": 1.658
+          },
+          {
+            "alias": "rss_demo",
+            "x": 10.088,
+            "y": 67.945,
+            "orientation": 1.411
+          }
+        ]
+      },
+      "III_itri": {
+        "origin": [
+          {
+            "x": 0.0,
+            "y": 0.0,
+            "orientation": 0.0
+          }
+        ],
+        "operation": [
+          {
+            "x": -109.923,
+            "y": 69.962,
+            "orientation": 2.45
+          },
+          {
+            "alias": "driveway",
+            "x": 5.355,
+            "y": -9.424,
+            "orientation": 2.405
+          },
+          {
+            "alias": "itri_00",
+            "x": -29.211,
+            "y": 0.699,
+            "orientation": 2.495
+          },
+          {
+            "alias": "itri_02",
+            "x": -318.744,
+            "y": 239.021,
+            "orientation": -2.288
+          },
+          {
+            "alias": "itri_03",
+            "x": -271.096,
+            "y": -113.878,
+            "orientation": -0.675
+          },
+          {
+            "alias": "itri_05",
+            "x": 56.15,
+            "y": -182.809,
+            "orientation": 2.408
+          },
+          {
+            "x": -197.32,
+            "y": -176.251,
+            "orientation": -0.704
+          },
+          {
+            "x": 54.545,
+            "y": -181.439,
+            "orientation": 2.546
+          },
+          {
+            "x": -237.836,
+            "y": 184.526,
+            "orientation": 2.427
+          },
+          {
+            "x": 30.604,
+            "y": -103.918,
+            "orientation": 0.935
+          },
+          {
+            "x": -176.181,
+            "y": 129.195,
+            "orientation": 2.446
+          },
+          {
+            "x": -380.265,
+            "y": 84.516,
+            "orientation": -0.743
+          },
+          {
+            "x": -110.35,
+            "y": 71.78,
+            "orientation": 2.446
+          }
+        ]
+      },
+      "itri_68_nanliao": {
+        "origin": [
+          {
+            "x": 0.0,
+            "y": 0.0,
+            "orientation": 0.0
+          }
+        ],
+        "whole": [
+          {
+            "alias": "driveway",
+            "x": 5.355,
+            "y": -9.424,
+            "orientation": 2.405
+          },
+          {
+            "alias": "off_ramp",
+            "x": -2203.906,
+            "y": 2778.819,
+            "orientation": -0.599
+          },
+          {
+            "alias": "off_ramp2",
+            "x": -936.548,
+            "y": 2155.9,
+            "orientation": -0.486
+          },
+          {
+            "alias": "on_ramp",
+            "x": 1072.976,
+            "y": 223.856,
+            "orientation": 1.115
+          }
+        ]
+      },
+      "hct_logistic": {
+        "operation": [
+          {
+            "alias": "hct_14",
+            "x": 539.31,
+            "y": 1.78,
+            "orientation": -2.532
+          },
+          {
+            "alias": "two_blocking_cars",
+            "x": 105.6,
+            "y": -76.3,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "ped_crossing",
+            "x": 280.25,
+            "y": 44.36,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "turn_right",
+            "x": 508.8,
+            "y": -19.8,
+            "orientation": -2.532
+          },
+          {
+            "alias": "opposite_overtake_or_cutin",
+            "index": 4,
+            "x": 191.48,
+            "y": -16.62,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "leaving_a_bay",
+            "index": 5,
+            "x": 632.42,
+            "y": 64.86,
+            "orientation": -2.532
+          },
+          {
+            "alias": "mall_gateway_interaction",
+            "x": 598,
+            "y": 51,
+            "orientation": -2.532
+          },
+          {
+            "alias": "ego_change_lane",
+            "x": 635.1,
+            "y": 66.3,
+            "orientation": -2.532
+          },
+          {
+            "alias": "cut_in",
+            "x": 641.77,
+            "y": 97.64,
+            "orientation": -0.962
+          },
+          {
+            "alias": "parking_start",
+            "index": 9,
+            "x": 565,
+            "y": 85,
+            "orientation": -2.532
+          },
+          {
+            "alias": "ppt1",
+            "x": 191.48,
+            "y": -16.62,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "ppt5",
+            "x": -16.3,
+            "y": -95.2,
+            "orientation": -1.918
+          },
+          {
+            "alias": "ppt8",
+            "x": -15.9,
+            "y": -17.5,
+            "orientation": -0.69
+          },
+          {
+            "alias": "5-way-turn-right",
+            "index": 13,
+            "x": 87.55,
+            "y": -83.85,
+            "orientation": -2.532
+          },
+          {
+            "alias": "pri15",
+            "x": 6.08,
+            "y": -144.53,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "braking_cutin_cutin",
+            "index": 15,
+            "x": 551.41,
+            "y": 216.92,
+            "orientation": -0.962
+          },
+          {
+            "alias": "overtake_overtake",
+            "index": 16,
+            "x": 606.77,
+            "y": 147.64,
+            "orientation": -0.962
+          },
+          {
+            "alias": "merge_bridge_exit",
+            "index": 17,
+            "x": 326.8,
+            "y": 76.6,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "overtake_oncoming",
+            "index": 18,
+            "x": 526.4,
+            "y": 214.3,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "overtake_oncoming",
+            "index": 19,
+            "x": 592,
+            "y": 164,
+            "orientation": -0.962
+          },
+          {
+            "alias": "overtake_oncoming",
+            "index": 20,
+            "x": 623.1,
+            "y": 125,
+            "orientation": -0.962
+          },
+          {
+            "alias": "5-way-turn-right-drive-into-hct",
+            "index": 21,
+            "x": 237,
+            "y": 19,
+            "orientation": -2.532
+          },
+          {
+            "alias": "5-way-turn-left-drive-out-hct",
+            "index": 22,
+            "x": -9,
+            "y": 50,
+            "orientation": -1.91
+          },
+          {
+            "alias": "intersection",
+            "index": 23,
+            "x": 448.6,
+            "y": -60.8,
+            "orientation": -2.532
+          },
+          {
+            "alias": "unsignalized_intersection_near_5way",
+            "index": 24,
+            "x": -11.5,
+            "y": -79,
+            "orientation": -1.91
+          },
+          {
+            "alias": "drive-in-hct-exit-near-5way",
+            "index": 25,
+            "x": -19.2,
+            "y": -128.2,
+            "orientation": 1.23
+          },
+          {
+            "alias": "turn_right_at_bridge",
+            "index": 26,
+            "x": 338.0,
+            "y": 84.5,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "Bicycle Cut-in with Oncoming Car from Back",
+            "index": 27,
+            "x": 314.3,
+            "y": -56.4,
+            "orientation": 5.318
+          },
+          {
+            "alias": "ppt8",
+            "x": -15.0,
+            "y": -0.9,
+            "orientation": -1.57,
+            "orientation": -3.48,
+            "x": 314.3,
+            "y": -56.4,
+            "orientation": 5.318,
+            "x": 202.75,
+            "y": -87.87,
+            "orientation": 0.608
+          },
+          {
+            "alias": "ppt8",
+            "x": -10.2,
+            "y": -18.0,
+            "orientation": -0.34
+          },
+          {
+            "alias": "ppt1_backup",
+            "x": -18.12,
+            "y": -146.6,
+            "orientation": -0.174
+          },
+          {
+            "alias": "hct_14",
+            "x": 535.5,
+            "y": -1.57,
+            "orientation": -2.532
+          },
+          {
+            "alias": "hct_14",
+            "x": 563.3,
+            "y": 26.0,
+            "orientation": -2.532
+          },
+          {
+            "alias": "hct_13",
+            "x": 3.67,
+            "y": -145.827,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "hct_03",
+            "x": 487.504,
+            "y": -34.37,
+            "orientation": -2.532
+          }
+        ],
+        "Whole": [
+          {
+            "alias": "hct_05",
+            "x": 611.174,
+            "y": 59.046,
+            "orientation": -2.593
+          },
+          {
+            "alias": "hct_06",
+            "x": 36.259,
+            "y": -118.347,
+            "orientation": -2.531
+          }
+        ]
+      },
+      "straight_500m": {
+        "operation": [
+          {
+            "alias": "straight_500m_0",
+            "x": 10,
+            "y": -1.75,
+            "orientation": 0
+          }
+        ]
+      },
+      "alks_road_straight": {
+        "operation": [
+          {
+            "alias": "alks_road_straight_0",
+            "x": 10,
+            "y": -8,
+            "orientation": 0
+          }
+        ]
+      },
+      "shalun": {
+        "DRTS_route1": [
+          {
+            "alias": "drts_01",
+            "x": 32.475,
+            "y": -43.739,
+            "orientation": 2.005
+          },
+          {
+            "alias": "drts_01_scenario_2",
+            "x": -0.863,
+            "y": 30.432,
+            "orientation": 1.996
+          },
+          {
+            "alias": "drts_01_scenario_3",
+            "x": 6.309,
+            "y": 48.154,
+            "orientation": -1.09
+          },
+          {
+            "alias": "drts_01_scenario_5",
+            "x": 17.162,
+            "y": -82.085,
+            "orientation": 1.983
+          },
+          {
+            "alias": "drts_01_scenario_6",
+            "x": 10.177,
+            "y": -66.244,
+            "orientation": 2.018
+          }
+        ]
+      }
+    }
+  },
+  "dijiya": {
+    "drag_coefficient": 0.36,
+    "front_axis": 1.15,
+    "front_stiffness": 40000,
+    "rear_axis": 1.92,
+    "rear_stiffness": 40000,
+    "mass": 1820,
+    "length": 7.005,
+    "width": 2.02,
+    "longitudinal_offset": -2.2,
+    "default_pose": {
+      "shalun": {
+        "origin": [
+          {
+            "x": 32.475,
+            "y": -43.739,
+            "orientation": 2.005
+          }
+        ],
+        "DRTS_route1": [
+          {
+            "alias": "drts_01",
+            "x": 32.475,
+            "y": -43.739,
+            "orientation": 2.005
+          },
+          {
+            "alias": "drts_01_scenario_2",
+            "x": -0.863,
+            "y": 30.432,
+            "orientation": 1.996
+          },
+          {
+            "alias": "drts_01_scenario_3",
+            "x": 6.309,
+            "y": 48.154,
+            "orientation": -1.09
+          },
+          {
+            "alias": "drts_01_scenario_5",
+            "x": 17.162,
+            "y": -82.085,
+            "orientation": 1.983
+          },
+          {
+            "alias": "drts_01_scenario_6",
+            "x": 10.177,
+            "y": -66.244,
+            "orientation": 2.018
+          }
+        ],
+        "DRTS_route2": [
+          {
+            "alias": "drts_02",
+            "x": 30.252,
+            "y": -44.373,
+            "orientation": 2.005
+          },
+          {
+            "alias": "drts_02_scenario_2",
+            "x": 16.359,
+            "y": 26.671,
+            "orientation": -1.145
+          }
+        ]
+      }
+    }
+  },
+  "canter1": {
+    "drag_coefficient": 0.36,
+    "front_axis": 0.964,
+    "front_stiffness": 40000,
+    "rear_axis": 1.2,
+    "rear_stiffness": 40000,
+    "mass": 1820,
+    "length": 5.15,
+    "width": 1.9,
+    "longitudinal_offset": -1.375,
+    "default_pose": {
+      "III_itri": {
+        "origin": [
+          {
+            "x": 0.0,
+            "y": 0.0,
+            "orientation": 0.0
+          }
+        ],
+        "operation": [
+          {
+            "x": -109.923,
+            "y": 69.962,
+            "orientation": 2.45
+          },
+          {
+            "alias": "driveway",
+            "x": 5.355,
+            "y": -9.424,
+            "orientation": 2.405
+          },
+          {
+            "alias": "itri_00",
+            "x": -29.211,
+            "y": 0.699,
+            "orientation": 2.495
+          },
+          {
+            "alias": "itri_02",
+            "x": -318.744,
+            "y": 239.021,
+            "orientation": -2.288
+          },
+          {
+            "alias": "itri_03",
+            "x": -271.096,
+            "y": -113.878,
+            "orientation": -0.675
+          },
+          {
+            "x": -197.32,
+            "y": -176.251,
+            "orientation": -0.704
+          },
+          {
+            "x": 54.545,
+            "y": -181.439,
+            "orientation": 2.546
+          },
+          {
+            "x": -237.836,
+            "y": 184.526,
+            "orientation": 2.427
+          },
+          {
+            "x": 30.604,
+            "y": -103.918,
+            "orientation": 0.935
+          },
+          {
+            "x": -176.181,
+            "y": 129.195,
+            "orientation": 2.446
+          },
+          {
+            "x": -380.265,
+            "y": 84.516,
+            "orientation": -0.743
+          },
+          {
+            "x": -110.35,
+            "y": 71.78,
+            "orientation": 2.446
+          }
+        ]
+      }
+    }
+  },
+  "gbus": {
+    "drag_coefficient": 0.36,
+    "front_axis": 1.5,
+    "front_stiffness": 40000,
+    "rear_axis": 1.5,
+    "rear_stiffness": 40000,
+    "mass": 1820,
+    "length": 9.0,
+    "width": 3.0,
+    "longitudinal_offset": 2.0,
+    "default_pose": {
+      "taichung_new": {
+        "origin": [
+          {
+            "x": 26.186,
+            "y": -1.238,
+            "orientation": 2.117
+          }
+        ],
+        "zhongke_north_to_south": [
+          {
+            "alias": "shuinan_11",
+            "x": 111.078,
+            "y": 1341.855,
+            "orientation": -1.522
+          },
+          {
+            "alias": "shuinan_11",
+            "x": 111.078,
+            "y": 1321.855,
+            "orientation": -1.522
+          },
+          {
+            "x": 110.43,
+            "y": 450.19,
+            "orientation": -1.9950807
+          },
+          {
+            "x": 113.223,
+            "y": 1302.233,
+            "orientation": -1.506
+          }
+        ],
+        "zhongke_south_to_north": [
+          {
+            "alias": "at_zhongke_dapeng_intersection",
+            "x": -4.315,
+            "y": -33.015,
+            "orientation": 1.448
+          },
+          {
+            "alias": "before_props",
+            "x": 140.466,
+            "y": 983.724,
+            "orientation": 1.628
+          },
+          {
+            "alias": "thi_u-turn_scenario",
+            "x": 12.091,
+            "y": 81.256,
+            "orientation": 1.435
+          },
+          {
+            "alias": "thi_overtaking_scenarios",
+            "x": 162.223,
+            "y": 583.381,
+            "orientation": 1.625
+          },
+          {
+            "alias": "thi_intersection_scenarios",
+            "x": 159.427,
+            "y": 633.605,
+            "orientation": 1.614
+          },
+          {
+            "alias": "thi_red-light-running_scenarios",
+            "x": 151.822,
+            "y": 776.891,
+            "orientation": 1.608
+          },
+          {
+            "alias": "thi_ped-on-road",
+            "x": 45.03,
+            "y": 261.978,
+            "orientation": 1.274
+          },
+          {
+            "alias": "thi_props",
+            "x": 149.556,
+            "y": 819.778,
+            "orientation": 1.625
+          }
+        ],
+        "tie_agent": [
+          {
+            "alias": "road_side",
+            "x": 25.8,
+            "y": 271.18,
+            "orientation": 3.1415927
+          },
+          {
+            "alias": "red_light_running",
+            "x": 24.0,
+            "y": 24.98,
+            "orientation": 3.1415927
+          },
+          {
+            "alias": "agent_route",
+            "x": 72.925,
+            "y": 358.006,
+            "orientation": -2.04
+          }
+        ],
+        "dapeng_left_turn_zhongke_road": [
+          {
+            "x": -37.847,
+            "y": 22.38,
+            "orientation": 0.02
+          },
+          {
+            "x": -322.193,
+            "y": 23.173,
+            "orientation": 0.015
+          },
+          {
+            "x": -213.31,
+            "y": 22.787,
+            "orientation": -0.005
+          },
+          {
+            "x": -109.734,
+            "y": 22.364,
+            "orientation": 0.024
+          }
+        ],
+        "dapeng_right_turn_zhongke_road": [
+          {
+            "x": 612.102,
+            "y": 23.862,
+            "orientation": -3.092
+          },
+          {
+            "x": 387.004,
+            "y": 24.601,
+            "orientation": -3.092
+          },
+          {
+            "x": 194.943,
+            "y": 24.775,
+            "orientation": -3.116
+          }
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,85 @@
+##
+# ----------------- BEGIN LICENSE BLOCK ---------------------------------
+#
+# Copyright (C) 2018-2020 Intel Corporation
+#
+# SPDX-License-Identifier: LGPL-2.1-only
+#
+# ----------------- END LICENSE BLOCK -----------------------------------
+##
+##
+# Generated file
+#
+# Generator Version : 11.0.0-1997
+##
+
+cmake_minimum_required(VERSION 3.5)
+project(ad_rss VERSION 4.4.0)
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+set(CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 14)
+
+option(BUILD_SHARED_LIBS "Build shared libraries instead of static ones" ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+set(INCLUDE_DIRS)
+set(LIBRARIES)
+
+include(ad_rss)
+
+if ((NOT ad_rss_SOURCES) OR (NOT ad_rss_INCLUDE_DIRS))
+  message(FATAL_ERROR "${PROJECT_NAME}: Variable ad_rss_SOURCES or ad_rss_INCLUDE_DIRS pointing to the generator managed library not set!")
+endif()
+
+find_package(Boost REQUIRED)
+list(APPEND INCLUDE_DIRS ${Boost_INCLUDE_DIRS})
+list(APPEND LIBRARIES ${Boost_LIBRARIES})
+
+add_library(${PROJECT_NAME}
+  ${ad_rss_SOURCES}
+  src/ad/rss/situation/LateralRelativePosition.cpp
+  src/ad/rss/situation/LongitudinalRelativePosition.cpp
+  src/ad/rss/situation/SituationType.cpp
+  src/ad/rss/state/LateralResponse.cpp
+  src/ad/rss/state/LongitudinalResponse.cpp
+  src/ad/rss/state/RssStateEvaluator.cpp
+  src/ad/rss/state/UnstructuredSceneResponse.cpp
+  src/ad/rss/world/LaneDrivingDirection.cpp
+  src/ad/rss/world/LaneSegmentType.cpp
+  src/ad/rss/world/ObjectType.cpp
+)
+
+if (DEFINED ad_rss_TARGET_COMPILE_DEFINITIONS)
+string(APPEND TARGET_COMPILE_DEFINITIONS ${ad_rss_TARGET_COMPILE_DEFINITIONS})
+endif()
+
+target_compile_definitions(${PROJECT_NAME} PUBLIC ${TARGET_COMPILE_DEFINITIONS})
+target_compile_options(${PROJECT_NAME} PRIVATE ${TARGET_COMPILE_OPTIONS})
+set_property(TARGET ${PROJECT_NAME} APPEND_STRING PROPERTY LINK_FLAGS ${TARGET_LINK_FLAGS})
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+  ${ad_rss_TARGET_INCLUDE_DIRECTORIES}
+  "$<BUILD_INTERFACE:${ad_rss_INCLUDE_DIRS}>"
+  ${INCLUDE_DIRS}
+)
+
+target_link_libraries(${PROJECT_NAME} PUBLIC
+  ad_physics
+  spdlog::spdlog
+  ${ad_rss_TARGET_LINK_LIBRARIES}
+  PRIVATE
+  ${LIBRARIES}
+)
+
+#####################################################################
+# Tools
+#####################################################################
+if (ad_rss_TOOLS_DIR)
+  add_subdirectory(${ad_rss_TOOLS_DIR} ad_rss_tools)
+endif()
+

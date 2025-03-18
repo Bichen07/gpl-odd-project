@@ -1,0 +1,2 @@
+RouteWaypoints[] forward_route_waypoints_array
+RouteWaypoints[] opposite_route_waypoints_array

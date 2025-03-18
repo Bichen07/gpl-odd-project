@@ -1,0 +1,18 @@
+Header header
+
+bool hasDriftUncertaintyNanosPerSecond
+int32 timeNanos
+float32 driftUncertaintyNanosPerSecond
+bool hasBiasNanos
+float32 timeUncertaintyNanos
+int32 fullBiasNanos
+bool hasLeapSecond
+int32 leapSecond
+bool hasTimeUncertaintyNanos
+int32 hardwareClockDiscontinuityCount
+float32 driftNanosPerSecond
+float32 biasNanos
+bool hasDriftNanosPerSecond
+bool hasFullBiasNanos
+float32 biasUncertaintyNanos
+bool hasBiasUncertaintyNanos

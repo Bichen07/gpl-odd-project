@@ -1,0 +1,8 @@
+string[] agentIds
+itri_msgs/CarState[] agentStates
+itri_msgs/turn_signal_cmd[] turnSignalCmds
+bool onlyPose
+bool onlyPoint
+float32 dt
+---
+bool[] isSuccess

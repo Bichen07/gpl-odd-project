@@ -1,0 +1,26 @@
+{
+    "drts_01":
+    {
+        "DRTS_route1":
+        {
+            "position":
+            {
+                "x": 32.475,
+                "y": -43.739
+            },
+            "orientation": 2.005,
+        }
+    },
+    "drts_02":
+    {
+        "DRTS_route2":
+        {
+            "position":
+            {
+                "x":30.252,
+                "y":-44.373
+            },
+            "orientation": 2.005,
+        }
+    }
+}

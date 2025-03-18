@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>rss</name>
+  <version>0.9.0</version>
+  <description>The rss package</description>
+  <maintainer email="chenhuihu@itri.org.tw">Chen-Hui Hu</maintainer>
+  <license>ITRI</license>
+  <build_depend>roslib</build_depend>
+  <build_export_depend>roslib</build_export_depend>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>ad_rss_lib_ros</depend>
+  <depend>roscpp</depend>
+  <depend>itri_msgs</depend>
+  <depend>rss_msgs</depend>
+  <depend>scenario_msgs</depend>
+  <depend>tf</depend>
+  <depend>geometry_msgs</depend>
+  <depend>scenario</depend>
+  <depend>simulation_utils</depend>
+</package>

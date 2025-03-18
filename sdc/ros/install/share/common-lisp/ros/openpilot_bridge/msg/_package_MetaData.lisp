@@ -1,0 +1,14 @@
+(cl:in-package openpilot_bridge-msg)
+(cl:export '(HEADER-VAL
+          HEADER
+          GASDISENGAGEPROB-VAL
+          GASDISENGAGEPROB
+          BRAKEDISENGAGEPROB-VAL
+          BRAKEDISENGAGEPROB
+          STEEROVERRIDEPROB-VAL
+          STEEROVERRIDEPROB
+          ENGAGEDPROB-VAL
+          ENGAGEDPROB
+          DESIREPREDICTION-VAL
+          DESIREPREDICTION
+))

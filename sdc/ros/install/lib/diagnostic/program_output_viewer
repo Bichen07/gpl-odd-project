@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+
+"""
+Script for pretty-printing itri_msgs/ProgramOutput messages generated
+by program_output_logger node.
+"""
+
+from argparse import ArgumentParser
+import rospy
+from itri_msgs.msg import ProgramOutput
+
+def main():
+    parser = ArgumentParser()
+    parser.add_argument("topic")
+    args = parser.parse_args()
+
+    rospy.init_node("program_output_viewer", anonymous=True)
+    subscriber = rospy.Subscriber(
+        args.topic, ProgramOutput, callback)
+    rospy.spin()
+
+def callback(message):
+    print("Header:\n\n{0}\n\nOutput:\n\n{1}\n" \
+        .format(message.header, message.output))
+
+if __name__ == "__main__":
+    main()

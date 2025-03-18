@@ -1,0 +1,116 @@
+<launch>
+
+    <arg name="bag" default="/repository/ros/src/2022-07-06-12-38-32_8.bag" />
+    <arg name="bag_starts_from_begin_sec" default="5.0" />
+    <arg name="pre_run_secs" default="120.0" />
+    <arg name="headless" default="false" />
+    <arg name="gbus" default="false" />
+    <arg name="max_sensor_range" default="120" />
+    <!-- <arg name="run" default="true" /> -->
+    <arg name="record_traj" default="false" />
+
+    <!-- If this set to true, it is recommended to lower the play rate < 1.0  -->
+    <arg name="transform_predicted_poses" default="true" />
+    <arg name="play_rate" default="0.4" />
+
+    <!-- Set to true if sdc branch is on release/highway -->
+    <arg name="velocity_in_ego_coord" default="true" />
+
+    <rosparam param="simulation/config/dir" subst_value="true">
+        $(find simulation)/data/
+    </rosparam>
+    <rosparam param="open_gui">false</rosparam>
+    <rosparam param="sim_with_ego">true</rosparam>
+    <rosparam param="/time_step">0.01</rosparam>
+    <rosparam param="/use_sim_time">true</rosparam>
+    <rosparam param="/simulation/update_baselink_100hz">true</rosparam>
+    <param name="/scenario_tools_dir" value="$(find scenario_tools)" />
+
+    <!-- sdc/run.launch has to be launched manually to avoid route_mission_handler loads too early -->
+    <!-- <include file="$(find sdc)/launch/run.launch" if="$(arg run)">
+        <arg name="simulation" value="true" />
+    </include> -->
+
+    <node pkg="scenario_tools" type="detected_objects_marker.py" name="agent_marker" output="screen"/>
+    <node pkg="rosbag" type="play" name="rosbag_player"
+        args=" $(arg bag)
+            --rate $(arg play_rate)
+            --clock --pause --quiet
+            --start $(arg bag_starts_from_begin_sec)
+            --topic
+                /scenario_visualization
+                /detected_objects
+                /detected_objects_prediction
+                /tf
+                /tf_static
+                /points_map_downsampler
+                /no_ground
+                /global_path
+                /traffic_light_status
+                /traffic_light_status_fake
+                /speed_cmd
+                /vehicle_state
+                " >
+        <remap from="/speed_cmd" to="/speed_cmd_old" />
+        <remap from="/vehicle_state" to="/vehicle_state_old" />
+        <remap from="/clock" to="/clock_old" />
+        <remap from="/detected_objects" to="/detected_objects_old" />
+        <remap from="/detected_objects_prediction" to="/detected_objects_prediction_old" />
+        <remap from="/tf" to="/tf_old" />
+        <remap from="/tf_static" to="/tf_static_old" />
+    </node>
+
+    <!-- If offset_x_local was set properly, both egos from bag and from simulation should be
+        completely overlapped at the beginning of the replayed scenario. -->
+    <arg name="offset_x_local" value="1.0" />
+
+    <node pkg="scenario_tools" type="detected_objects_transformer.py" name="detected_objects_transformer" output="screen">
+        <param name="replay_rate" value="$(arg play_rate)" />
+        <param name="transform_linear_velocity" value="$(arg velocity_in_ego_coord)" />
+        <param name="max_sensor_range" value="$(arg max_sensor_range)" />
+        <param name="transform_predicted_poses" value="$(arg transform_predicted_poses)" />
+    </node>
+    <node pkg="scenario_tools" type="rosbag_replay_tool.py" name="rosbag_replay_tool" output="screen">
+        <param name="offset_x_local" value="$(arg offset_x_local)" />
+        <param name="replayed_bag" value="$(arg bag)"/>
+        <param name="replay_rate" value="$(arg play_rate)" />
+        <param name="offset_time_secs" value="$(arg bag_starts_from_begin_sec)" />
+        <param name="pre_run_secs" value="$(arg pre_run_secs)" />
+    </node>
+
+    <include file="$(find simulation_adv)/launch/run.launch">
+        <arg name="filtered_cluster_hulls_topic" value="filtered_cluster_hulls_sim" />
+        <arg name="velocity_in_ego_coord" value="$(arg velocity_in_ego_coord)" />
+        <arg name="detected_objects_topic" value="detected_objects_sim" />
+        <arg name="ego_position_seq" value="-1" />
+        <arg name="headless" value="$(arg headless)" />
+        <arg name="rviz_file" value="replay.rviz" />
+        <arg name="gbus" value="$(arg gbus)" />
+        <arg name="disable_monitor" value="true" />
+        <arg name="use_sim_time" value="true" />
+    </include>
+
+    <node pkg="imm_ukf_pda_track" type="visualize_detected_objects" name="viz_detected_objects_noode" />
+
+    <node pkg="tf" type="tf_remap" name="tf_remapper">
+        <rosparam param="mappings">
+            [
+                {old: base_link, new: origin/base_link},
+                {old: /base_link, new: /origin/base_link},
+                {old: base_link_with_imu, new: origin/base_link_with_imu},
+                {old: /base_link_with_imu, new: /origin/base_link_with_imu},
+                {old: base_linkSD, new: origin/base_linkSD},
+                {old: /base_linkSD, new: /origin/base_linkSD},
+                {old: base_link_ground, new: origin/base_link_ground},
+                {old: /base_link_ground, new: /origin/base_link_ground}
+            ]
+        </rosparam>
+    </node>
+
+    <node pkg="scenario_tools" type="tf_static_remapper.py" name="tf_static_remapper" output="screen"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="velodyn_link_publisher"
+        args="0 0 0 0 0 0 1 origin/base_link velodyne"/>
+
+    <node pkg="scenario_tools" type="record_traj.py" name="traj_record" output="screen" if="$(arg record_traj)"/>
+
+</launch>

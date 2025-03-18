@@ -1,0 +1,28 @@
+<launch>
+    <arg name="use_gdb" value="false"/>
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+
+    <arg name="min_bounding_envelope_file_name"
+        default="$(find metric)/data/recorded-traj-2021-07-19-10-36-32.json"/>
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+
+    <group ns="metric">
+        <param name="min_bounding_envelope_file_name"
+            value="$(arg min_bounding_envelope_file_name)"/>
+    </group>
+
+    <include file="$(find rviz_config)/launch/visualization.launch"/>
+    <include file="$(find scenario_visualization)/launch/scenario_visualization.launch"/>
+    <remap from="/load_file_node/route" to="/route_mission_handler/route"/>
+    <include file="$(find route_mission_handler)/launch/run.launch"/>
+    <node
+        pkg="metric"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="metric_min_bounding_envelope_node"
+        name="min_bounding_envelope"
+        output="screen">
+    </node>
+
+</launch>

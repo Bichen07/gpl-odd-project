@@ -1,0 +1,75 @@
+<launch>
+    
+    <arg name="real" default="false" />  <!-- Set to True if running on real car -->
+    <arg name="running_vil" default="false"/>  <!-- Set to True for either real car or run bag -->
+    <arg name="bring_up_simulation" default="true"/>  <!-- Set to True if running scenario simulation without vil -->
+
+    
+    <param name="/use_sim_time" value="false" if="$(arg real)"/>
+    <group unless="$(arg real)">
+        <param name="/use_sim_time" value="false" if="$(arg bring_up_simulation)"/>
+        <param name="/use_sim_time" value="true" unless="$(arg bring_up_simulation)"/>
+        <rosparam param="/time_step">0.01</rosparam>
+    </group>
+
+    <arg name="use_gdb" value="false"/>
+    <arg name="launch_prefix_gdb" value="" unless="$(arg use_gdb)"/>
+    <arg name="launch_prefix_gdb"
+        value="xterm -fa 'monospace' -e gdb --args" if="$(arg use_gdb)"/>
+
+    <rosparam param="open_gui">false</rosparam>
+    <rosparam param="sim_with_ego">true</rosparam>
+    <rosparam param="publishing_visualization_status">true</rosparam>
+
+    <!-- Scenario Configuration -->
+
+    <arg name="scenario_id" default="itri_00"/>
+    <arg name="route_id" default="III_itri"/>
+    <arg name="config_file" default="scenario_config_itri.json"/>
+    <arg name="agent_size" default="carla_agent_size.json"/>
+    <arg name="ego_init_pose_config_file" default="ego_init_pose_config_itri.json"/>
+
+    <arg name="scenario_configuration_directory" default="$(find scenario)/data/"/>
+
+    <group ns="scenario">
+        <param name="id" value="$(arg scenario_id)"/>
+        <param name="route" value="$(arg route_id)"/>
+        <param name="config/file" value="$(arg config_file)"/>
+        <param name="config/agent/size" value="$(arg agent_size)"/>
+        <param name="config/dir" value="$(arg scenario_configuration_directory)"/>
+    </group>
+
+    <!-- Simulation Configuration -->
+
+    <arg name="simulation_configuration_directory" default="$(find simulation_adv)/data/"/>
+    <arg name="simulated_ego_config_file" default="ego.json"/>
+
+    <group ns="simulation">
+        <param name="running_vil" value="$(arg running_vil)"/>
+
+        <param name="config/dir" value="$(arg simulation_configuration_directory)"/>
+        <param name="ego_vehicle/config/init_pose/file" value="$(arg ego_init_pose_config_file)"/>
+        <param name="ego_vehicle/config/file" value="$(arg simulated_ego_config_file)"/>
+    </group>
+
+    <group if="$(arg bring_up_simulation)">
+        <arg name="update_baselink_100hz" default="true"/>
+        <param name="simulation/update_baselink_100hz" value="$(arg update_baselink_100hz)"/>
+        <include file="$(find simulation)/launch/simulation.launch"/>
+    </group>
+
+    <node
+        pkg="scenario"
+        launch-prefix="$(arg launch_prefix_gdb)"
+        type="scenario_mr_vil_testing_node"
+        name="scenario_mr_vil_testing"
+        output="screen"
+        respawn="true">
+    </node>
+
+    <remap from="/detected_objects_vil" to="detected_objects" if="$(arg bring_up_simulation)" />
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <remap from="load_file_node/route" to="route_mission_handler/route"/>
+    <include file="$(find route_mission_handler)/launch/run.launch">
+    </include>
+</launch>

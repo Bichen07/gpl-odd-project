@@ -1,0 +1,15 @@
+uint32 bdsD2BitSync=9
+uint32 towDecoded=4
+uint32 galE1bcCodeLock=11
+uint32 sbasSync=14
+uint32 symbolSync=6
+uint32 unknown=0
+uint32 bdsD2SubframeSync=10
+uint32 codeLock=1
+uint32 subframeSync=3
+uint32 galE1bPageSync=13
+uint32 bitSync=2
+uint32 galE1c2ndCodeLock=12
+uint32 gloStringSync=7
+uint32 gloTodDecoded=8
+uint32 msecAmbiguous=5

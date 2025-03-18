@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>scenario_tools</name>
+  <version>0.0.0</version>
+  <description>
+    The scenario_tools package aims to develop tools for creating scenarios.
+    For example, run simulated ego vehicle with recorded rosbag for reproduce on-road experiences or fetch single agent from recorded rosbag to create a new agent.
+  </description>
+
+  <!-- One maintainer tag required, multiple allowed, one person per tag -->
+  <!-- Example:  -->
+  <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
+  <maintainer email="zackhsu@itri.org.tw">Hsiu Wei Hsu</maintainer>
+  <license>ITRI</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>simulation_adv</depend>
+</package>

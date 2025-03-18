@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- generated on 2022-05-26 11:56:28.213925 by generate_by_turn_count.py v1_13_0+0014-475466eb0160
+  options: -n ./shuinan_tl_indirect_left_turn.net.xml -t shuinan.turns.xml -v ../vehicles.add.xml -o tw.rou.xml -f tw.flow.xml -b 0 -e 3600 -m pacifica
+-->
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+
+
+    <!-- Vehicle Definitions Head. -->
+    <vTypeDistribution id="itri_model">
+        <vType id="pacifica"                          length="5.94" width="2.22" height="1.79" vClass="evehicle"  guiShape="evehicle"    latAlignment="arbitrary" probability="0.05"/>
+        <vType id="gbus"                              length="9.00" width="3.00" height="4.00" vClass="truck"     guiShape="truck"       latAlignment="arbitrary" probability="0.05"/>
+    </vTypeDistribution>
+    <vTypeDistribution id="carTypeDistribution">
+        <vType id="vehicle.carlamotors.carlacola"     length="5.20" width="2.62" height="2.48" vClass="truck"     guiShape="truck"       latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.dodge_charger.police"      length="5.01" width="2.05" height="1.58" vClass="authority" guiShape="police"      latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.audi.a2"                   length="3.71" width="1.79" height="1.53" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.audi.tt"                   length="4.14" width="2.00" height="1.38" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.jeep.wrangler_rubicon"     length="3.87" width="1.90" height="1.88" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.chevrolet.impala"          length="5.36" width="2.05" height="1.41" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.mini.cooperst"             length="3.80" width="1.97" height="1.48" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.mercedes-benz.coupe"       length="5.04" width="2.16" height="1.64" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.bmw.grandtourer"           length="4.63" width="2.25" height="1.68" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.citroen.c3"                length="3.98" width="1.86" height="1.63" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.volkswagen.t2"             length="4.47" width="1.81" height="2.05" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.seat.leon"                 length="4.20" width="1.82" height="1.47" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.nissan.patrol"             length="4.51" width="1.92" height="1.89" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.bmw.isetta"                length="2.20" width="1.49" height="1.35" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.nissan.micra"              length="3.67" width="1.86" height="1.52" vClass="passenger" guiShape="passenger"   latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.lincoln.mkz2017"           length="4.90" width="2.06" height="1.47" vClass="evehicle"  guiShape="evehicle"    latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.toyota.prius"              length="4.53" width="2.00" height="1.54" vClass="evehicle"  guiShape="evehicle"    latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.audi.etron"                length="4.89" width="2.00" height="1.65" vClass="evehicle"  guiShape="evehicle"    latAlignment="arbitrary" probability="0.05"/>
+        <vType id="vehicle.tesla.model3"              length="4.80" width="2.17" height="1.52" vClass="evehicle"  guiShape="evehicle"    latAlignment="arbitrary" probability="0.05"/> 
+        <vType id="vehicle.chrysler.pacifica"         length="5.94" width="2.22" height="1.79" vClass="evehicle"  guiShape="evehicle"    latAlignment="arbitrary" probability="0.05"/>
+    </vTypeDistribution>
+    <vTypeDistribution id="motorcycleTypeDistribution">
+        <vType id="vehicle.harley-davidson.low_rider" length="2.35" width="0.77" height="2.06" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.4" probability="0.04"/>
+        <vType id="vehicle.kawasaki.ninja"            length="2.04" width="0.80" height="1.77" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.4" probability="0.04"/>
+        <vType id="vehicle.yamaha.yzf"                length="2.19" width="0.77" height="2.03" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.4" probability="0.04"/>
+        <vType id="vehicle.yamaha.fz"                 length="1.96" width="0.77" height="1.47" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.4" probability="0.04"/>
+        <vType id="vehicle.ducati.1199"               length="2.08" width="0.81" height="1.51" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.4" probability="0.04"/>
+        <vType id="vehicle.yamaha.cygnusx3"           length="1.90" width="0.69" height="1.72" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.2" probability="0.2"/>
+        <vType id="vehicle.yamaha.cuxi"               length="1.71" width="0.66" height="1.78" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.2" probability="0.2"/>
+        <vType id="vehicle.gogoro.gen2"               length="1.88" width="0.67" height="1.69" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.2" probability="0.2"/>
+        <vType id="vehicle.sym.duke"                  length="1.81" width="0.68" height="1.71" vClass="motorcycle" guiShape="motorcycle" latAlignment="compact" minGapLat="0.2" probability="0.2"/>
+    </vTypeDistribution>
+    <vTypeDistribution id="bicycleTypeDistribution">
+        <vType id="vehicle.bh.crossbike"              length="1.51" width="0.87" height="1.53" vClass="bicycle"    guiShape="bicycle"    latAlignment="compact" minGapLat="0.15" probability="0.2"/>
+        <vType id="vehicle.gazelle.omafiets"          length="1.84" width="0.47" height="1.59" vClass="bicycle"    guiShape="bicycle"    latAlignment="compact" minGapLat="0.15" probability="0.3"/>
+        <vType id="vehicle.diamondback.century"       length="1.66" width="0.42" height="1.45" vClass="bicycle"    guiShape="bicycle"    latAlignment="compact" minGapLat="0.15" probability="0.5"/>
+    </vTypeDistribution>
+    <!-- Vehicle Definitions End. -->
+
+    <flow id="0" from="-23.0.00" to="12.0.00" via="-11.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="51" type="pacifica"/>
+    <flow id="1" from="-10.0.00" to="1.0.00" via="-14.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="9" type="carTypeDistribution"/>
+    <flow id="2" from="-1.0.00" to="-29.0.00" via="24.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="8" type="motorcycleTypeDistribution"/>
+    <flow id="3" from="-23.0.00" to="25.0.00" via="-11.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="1" type="motorcycleTypeDistribution"/>
+    <flow id="4" from="0.0.00" to="25.0.00" via="14.0.00" begin="0.0" end="3600.0" vehsPerHour="29" type="carTypeDistribution"/>
+    <flow id="5" from="-1.0.00" to="-0.0.00" via="24.0.00" begin="0.0" end="3600.0" vehsPerHour="2" type="carTypeDistribution"/>
+    <flow id="6" from="-23.0.00" to="1.0.00" via="-11.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="53" type="carTypeDistribution"/>
+    <flow id="7" from="0.0.00" to="10.0.00" via="14.0.00" begin="0.0" end="3600.0" vehsPerHour="76" type="carTypeDistribution"/>
+    <flow id="8" from="-23.0.00" to="-0.0.00" via="-11.0.00" begin="0.0" end="3600.0" vehsPerHour="11" type="motorcycleTypeDistribution"/>
+    <flow id="9" from="-12.0.00" to="-0.0.00" via="24.0.00" begin="0.0" end="3600.0" vehsPerHour="12" type="motorcycleTypeDistribution"/>
+    <flow id="10" from="-16.0.00" to="1.0.00" via="-14.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="6" type="carTypeDistribution"/>
+    <flow id="11" from="0.0.00" to="16.0.00" via="14.0.00" begin="0.0" end="3600.0" vehsPerHour="21" type="motorcycleTypeDistribution"/>
+    <flow id="12" from="0.0.00" to="-18.0.00" via="-24.0.00" begin="0.0" end="3600.0" vehsPerHour="13" type="carTypeDistribution"/>
+    <flow id="13" from="-23.0.00" to="-0.0.00" via="-11.0.00" begin="0.0" end="3600.0" vehsPerHour="5" type="carTypeDistribution"/>
+    <flow id="14" from="-23.0.00" to="10.0.00" via="-11.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="1" type="carTypeDistribution"/>
+    <flow id="15" from="18.0.00" to="23.0.00" via="24.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="57" type="motorcycleTypeDistribution"/>
+    <flow id="16" from="-10.0.00" to="23.0.00" via="-14.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="1" type="motorcycleTypeDistribution"/>
+    <flow id="17" from="-16.0.00" to="-0.0.00" via="-14.0.00" begin="0.0" end="3600.0" vehsPerHour="132" type="motorcycleTypeDistribution"/>
+    <flow id="18" from="-1.0.00" to="10.0.00" via="24.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="3" type="carTypeDistribution"/>
+    <flow id="19" from="0.0.00" to="12.0.00" via="-24.0.00" begin="0.0" end="3600.0" vehsPerHour="54" type="motorcycleTypeDistribution"/>
+    <flow id="20" from="-16.0.00" to="-0.0.00" via="-14.0.00" begin="0.0" end="3600.0" vehsPerHour="124" type="motorcycleTypeDistribution"/>
+    <flow id="21" from="-23.0.00" to="1.0.00" via="-11.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="57" type="carTypeDistribution"/>
+    <flow id="22" from="-23.0.00" to="-0.0.00" via="-11.0.00" begin="0.0" end="3600.0" vehsPerHour="3" type="motorcycleTypeDistribution"/>
+    <flow id="23" from="-1.0.00" to="10.0.00" via="24.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="4" type="carTypeDistribution"/>
+    <flow id="24" from="0.0.00" to="16.0.00" via="14.0.00" begin="0.0" end="3600.0" vehsPerHour="153" type="motorcycleTypeDistribution"/>
+    <flow id="25" from="-1.0.00" to="23.0.00" via="24.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="30" type="carTypeDistribution"/>
+    <flow id="26" from="-1.0.00" to="-0.0.00" via="24.0.00" begin="0.0" end="3600.0" vehsPerHour="12" type="motorcycleTypeDistribution"/>
+    <flow id="27" from="-10.0.00" to="-0.0.00" via="-14.0.00" begin="0.0" end="3600.0" vehsPerHour="92" type="motorcycleTypeDistribution"/>
+    <flow id="28" from="0.0.00" to="16.0.00" via="14.0.00" begin="0.0" end="3600.0" vehsPerHour="165" type="motorcycleTypeDistribution"/>
+    <flow id="29" from="-16.0.00" to="12.0.00" via="-14.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="22" type="motorcycleTypeDistribution"/>
+    <flow id="30" from="-10.0.00" to="1.0.00" via="-14.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="26" type="motorcycleTypeDistribution"/>
+    <flow id="31" from="0.0.00" to="23.0.00" via="11.0.00" begin="0.0" end="3600.0" vehsPerHour="11" type="carTypeDistribution"/>
+    <flow id="32" from="-10.0.00" to="-0.0.00" via="-14.0.00" begin="0.0" end="3600.0" vehsPerHour="16" type="carTypeDistribution"/>
+    <flow id="33" from="-10.0.00" to="1.0.00" via="-14.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="10" type="carTypeDistribution"/>
+    <flow id="34" from="-1.0.00" to="23.0.00" via="24.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="18" type="motorcycleTypeDistribution"/>
+    <flow id="35" from="0.0.00" to="12.0.00" via="-24.0.00" begin="0.0" end="3600.0" vehsPerHour="25" type="carTypeDistribution"/>
+    <flow id="36" from="-2.0.00" to="-0.0.00" via="24.0.00" begin="0.0" end="3600.0" vehsPerHour="8" type="motorcycleTypeDistribution"/>
+    <flow id="37" from="-1.0.00" to="23.0.00" via="24.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="45" type="motorcycleTypeDistribution"/>
+    <flow id="38" from="0.0.00" to="10.0.00" via="14.0.00" begin="0.0" end="3600.0" vehsPerHour="62" type="carTypeDistribution"/>
+    <flow id="39" from="-10.0.00" to="-0.0.00" via="-14.0.00" begin="0.0" end="3600.0" vehsPerHour="75" type="carTypeDistribution"/>
+    <flow id="40" from="0.0.00" to="23.0.00" via="11.0.00" begin="0.0" end="3600.0" vehsPerHour="9" type="motorcycleTypeDistribution"/>
+    <flow id="41" from="-23.0.00" to="10.0.00" via="-11.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="2" type="motorcycleTypeDistribution"/>
+    <flow id="42" from="-23.0.00" to="1.0.00" via="-11.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="92" type="motorcycleTypeDistribution"/>
+    <flow id="43" from="-16.0.00" to="-0.0.00" via="-14.0.00" begin="0.0" end="3600.0" vehsPerHour="81" type="carTypeDistribution"/>
+    <flow id="44" from="0.0.00" to="1.0.00" via="-24.0.00" begin="0.0" end="3600.0" vehsPerHour="60" type="motorcycleTypeDistribution"/>
+    <flow id="45" from="-23.0.00" to="28.0.00" via="-11.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="1" type="carTypeDistribution"/>
+    <flow id="46" from="-23.0.00" to="-18.0.00" via="-11.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="92" type="motorcycleTypeDistribution"/>
+    <flow id="47" from="-12.0.00" to="28.0.00" via="24.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="1" type="carTypeDistribution"/>
+    <flow id="48" from="0.0.00" to="1.0.00" via="-24.0.00" begin="0.0" end="3600.0" vehsPerHour="23" type="carTypeDistribution"/>
+    <flow id="49" from="18.0.00" to="23.0.00" via="24.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="26" type="carTypeDistribution"/>
+    <flow id="50" from="-23.0.00" to="-18.0.00" via="-11.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="8" type="carTypeDistribution"/>
+    <flow id="51" from="0.0.00" to="23.0.00" via="11.0.00" begin="0.0" end="3600.0" vehsPerHour="12" type="carTypeDistribution"/>
+    <flow id="52" from="-2.0.00" to="23.0.00" via="24.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="4" type="carTypeDistribution"/>
+    <flow id="53" from="-16.0.00" to="23.0.00" via="-14.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="1" type="carTypeDistribution"/>
+    <flow id="54" from="-23.0.00" to="-0.0.00" via="-11.0.00" begin="0.0" end="3600.0" vehsPerHour="7" type="carTypeDistribution"/>
+    <flow id="55" from="-1.0.00" to="-0.0.00" via="24.0.00" begin="0.0" end="3600.0" vehsPerHour="7" type="carTypeDistribution"/>
+    <flow id="56" from="0.0.00" to="23.0.00" via="11.0.00" begin="0.0" end="3600.0" vehsPerHour="22" type="motorcycleTypeDistribution"/>
+    <flow id="57" from="0.0.00" to="23.0.00" via="11.0.00" begin="0.0" end="3600.0" vehsPerHour="22" type="motorcycleTypeDistribution"/>
+    <flow id="58" from="-23.0.00" to="5.0.00" via="-11.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="2" type="motorcycleTypeDistribution"/>
+    <flow id="59" from="0.0.00" to="-18.0.00" via="-24.0.00" begin="0.0" end="3600.0" vehsPerHour="11" type="motorcycleTypeDistribution"/>
+    <flow id="60" from="-23.0.00" to="-0.0.00" via="-11.0.00" begin="0.0" end="3600.0" vehsPerHour="10" type="motorcycleTypeDistribution"/>
+    <flow id="61" from="-5.0.00" to="23.0.00" via="-14.0.00 11.0.00" begin="0.0" end="3600.0" vehsPerHour="2" type="motorcycleTypeDistribution"/>
+    <flow id="62" from="18.0.00" to="-0.0.00" via="24.0.00" begin="0.0" end="3600.0" vehsPerHour="7" type="carTypeDistribution"/>
+    <flow id="63" from="-16.0.00" to="1.0.00" via="-14.0.00 -24.0.00" begin="0.0" end="3600.0" vehsPerHour="3" type="motorcycleTypeDistribution"/>
+    <flow id="64" from="18.0.00" to="10.0.00" via="24.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="7" type="motorcycleTypeDistribution"/>
+    <flow id="65" from="0.0.00" to="23.0.00" via="11.0.00" begin="0.0" end="3600.0" vehsPerHour="4" type="carTypeDistribution"/>
+    <flow id="66" from="-2.0.00" to="10.0.00" via="24.0.00 14.0.00" begin="0.0" end="3600.0" vehsPerHour="1" type="motorcycleTypeDistribution"/>
+
+</routes>

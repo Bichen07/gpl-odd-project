@@ -1,0 +1,17 @@
+<launch>
+    <param name="/use_sim_time" value="true"/>
+    <rosparam command="load" file="$(env SDC_CONFIG_DIR)/parameters.yaml"/>
+    <include file="$(find rviz_config)/launch/visualization.launch"/>
+    <include file="$(find sdc)/launch/run.launch">
+        <arg name="simulation" value="false"/>
+    </include>
+
+    <arg name="bag" default=""/>
+    <arg name="play_rate" default="1.0" />
+    <node pkg="rosbag" type="play" name="rosbag_player"
+        args=" $(arg bag)
+            --rate $(arg play_rate)
+            --clock"/>
+    
+
+</launch>

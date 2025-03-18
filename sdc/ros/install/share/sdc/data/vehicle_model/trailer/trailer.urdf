@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<robot name="trailer">
+  <link name="trailer">
+    <visual name="base_visual">
+        <origin xyz="-5.6 0 2.65 " rpy="0 0 3.14159" />
+      <geometry>
+        <mesh filename="package://sdc/data/vehicle_model/trailer/trailer.dae"
+              scale="1.0 1.0 1.0"/>
+      </geometry>
+    </visual>
+  </link>
+</robot>

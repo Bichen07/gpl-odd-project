@@ -1,0 +1,30 @@
+Header header
+
+float32 gpsToGlonassTimeBiasMilliseconds
+int64 gpsMilliseconds
+int64 seqMax
+int64 gpsClockTimeUncertaintyMs
+int64 glonassClockSource
+float32 glonassTimeBias
+int64 gpsClockSource
+float32 clockFrequencyBias
+uint32 source # enum const: MeasurementSource
+int64 rfLoss
+int64 fCount
+int64 gpsTimeBiasMs
+float32 clockFrequencyUncertainty
+int64 systemRtcTime
+int64 seqNum
+int64 frequencySource
+int64 glonassDay
+int64 reason
+int64 glonassMilliseconds
+int64 clockResets
+SV[] sv
+int64 gpsLeapSeconds
+float32 glonassClockTimeUncertainty
+int64 gpsWeek
+bool systemRtcValid
+float32 gpsToGlonassTimeBiasMillisecondsUncertainty
+int64 glonassYear
+int64 gpsLeapSecondsUncertainty

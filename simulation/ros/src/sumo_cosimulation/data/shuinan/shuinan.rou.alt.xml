@@ -1,0 +1,720 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2021-06-19 23:57:43 by Eclipse SUMO duarouter Version v1_9_2+0595-7a16b263b4
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/duarouterConfiguration.xsd">
+
+    <input>
+        <net-file value="shuinan.net.xml"/>
+        <route-files value="shuinan.flow.xml"/>
+    </input>
+
+    <output>
+        <output-file value="shuinan.rou.xml"/>
+        <alternatives-output value="shuinan.rou.alt.xml"/>
+    </output>
+
+</configuration>
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="pacifica" length="5.94" probability="0.05" vClass="evehicle" guiShape="evehicle" width="2.22" height="1.79" latAlignment="arbitrary"/>
+    <vehicle id="0.0" type="pacifica" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="128.63" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 14.0.00 4.0.00 7.0.00 28.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.gogoro.gen2" length="1.88" probability="0.20" vClass="motorcycle" guiShape="motorcycle" width="0.67" height="1.69" latAlignment="compact" minGapLat="0.20"/>
+    <vehicle id="1.0" type="vehicle.gogoro.gen2" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="117.05" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.tesla.model3" length="4.80" probability="0.05" vClass="evehicle" guiShape="evehicle" width="2.17" height="1.52" latAlignment="arbitrary"/>
+    <vehicle id="10.0" type="vehicle.tesla.model3" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="118.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.sym.duke" length="1.81" probability="0.20" vClass="motorcycle" guiShape="motorcycle" width="0.68" height="1.71" latAlignment="compact" minGapLat="0.20"/>
+    <vehicle id="11.0" type="vehicle.sym.duke" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="132.27" probability="1.00000000" edges="-28.0.00 -7.0.00 -4.0.00 -14.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.audi.etron" length="4.89" probability="0.05" vClass="evehicle" guiShape="evehicle" width="2.00" height="1.65" latAlignment="arbitrary"/>
+    <vehicle id="12.0" type="vehicle.audi.etron" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="32.46" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.yamaha.cygnusx3" length="1.90" probability="0.20" vClass="motorcycle" guiShape="motorcycle" width="0.69" height="1.72" latAlignment="compact" minGapLat="0.20"/>
+    <vehicle id="13.0" type="vehicle.yamaha.cygnusx3" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="32.46" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.volkswagen.t2" length="4.47" probability="0.05" vClass="passenger" guiShape="passenger" width="1.81" height="2.05" latAlignment="arbitrary"/>
+    <vehicle id="14.0" type="vehicle.volkswagen.t2" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="15.0" type="vehicle.yamaha.cygnusx3" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.lincoln.mkz2017" length="4.90" probability="0.05" vClass="evehicle" guiShape="evehicle" width="2.06" height="1.47" latAlignment="arbitrary"/>
+    <vehicle id="18.0" type="vehicle.lincoln.mkz2017" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="70.39" probability="1.00000000" edges="0.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.yamaha.fz" length="1.96" probability="0.04" vClass="motorcycle" guiShape="motorcycle" width="0.77" height="1.47" latAlignment="compact" minGapLat="0.40"/>
+    <vehicle id="19.0" type="vehicle.yamaha.fz" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="70.39" probability="1.00000000" edges="0.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.chrysler.pacifica" length="5.94" probability="0.05" vClass="evehicle" guiShape="evehicle" width="2.22" height="1.79" latAlignment="arbitrary"/>
+    <vehicle id="2.0" type="vehicle.chrysler.pacifica" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.carlamotors.carlacola" length="5.20" probability="0.05" vClass="truck" guiShape="truck" width="2.62" height="2.48" latAlignment="arbitrary"/>
+    <vehicle id="20.0" type="vehicle.carlamotors.carlacola" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.0" type="vehicle.gogoro.gen2" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.mini.cooperst" length="3.80" probability="0.05" vClass="passenger" guiShape="passenger" width="1.97" height="1.48" latAlignment="arbitrary"/>
+    <vehicle id="22.0" type="vehicle.mini.cooperst" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.0" type="vehicle.yamaha.fz" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.0" type="vehicle.yamaha.fz" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.bmw.grandtourer" length="4.63" probability="0.05" vClass="passenger" guiShape="passenger" width="2.25" height="1.68" latAlignment="arbitrary"/>
+    <vehicle id="4.0" type="vehicle.bmw.grandtourer" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="72.22" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="5.0" type="vehicle.sym.duke" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="72.22" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.chevrolet.impala" length="5.36" probability="0.05" vClass="passenger" guiShape="passenger" width="2.05" height="1.41" latAlignment="arbitrary"/>
+    <vehicle id="6.0" type="vehicle.chevrolet.impala" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="112.39" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="7.0" type="vehicle.yamaha.cygnusx3" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="82.89" probability="1.00000000" edges="-25.0.00 -7.0.00 -4.0.00 -14.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.audi.tt" length="4.14" probability="0.05" vClass="passenger" guiShape="passenger" width="2.00" height="1.38" latAlignment="arbitrary"/>
+    <vehicle id="8.0" type="vehicle.audi.tt" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.yamaha.cuxi" length="1.71" probability="0.20" vClass="motorcycle" guiShape="motorcycle" width="0.66" height="1.78" latAlignment="compact" minGapLat="0.20"/>
+    <vehicle id="9.0" type="vehicle.yamaha.cuxi" depart="0.00">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.bmw.isetta" length="2.20" probability="0.05" vClass="passenger" guiShape="passenger" width="1.49" height="1.35" latAlignment="arbitrary"/>
+    <vehicle id="8.1" type="vehicle.bmw.isetta" depart="13.85">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.ducati.1199" length="2.08" probability="0.04" vClass="motorcycle" guiShape="motorcycle" width="0.81" height="1.51" latAlignment="compact" minGapLat="0.40"/>
+    <vehicle id="9.1" type="vehicle.ducati.1199" depart="13.85">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.1" type="vehicle.mini.cooperst" depart="14.23">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.1" type="vehicle.yamaha.cygnusx3" depart="14.23">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="22.1" type="vehicle.bmw.grandtourer" depart="19.35">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.yamaha.yzf" length="2.19" probability="0.04" vClass="motorcycle" guiShape="motorcycle" width="0.77" height="2.03" latAlignment="compact" minGapLat="0.40"/>
+    <vehicle id="23.1" type="vehicle.yamaha.yzf" depart="19.35">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.1" type="vehicle.audi.tt" depart="20.22">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.1" type="vehicle.yamaha.cygnusx3" depart="20.22">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.seat.leon" length="4.20" probability="0.05" vClass="passenger" guiShape="passenger" width="1.82" height="1.47" latAlignment="arbitrary"/>
+    <vehicle id="8.2" type="vehicle.seat.leon" depart="27.69">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.2" type="vehicle.yamaha.cygnusx3" depart="27.69">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.dodge_charger.police" length="5.01" probability="0.05" vClass="authority" guiShape="police" width="2.05" height="1.58" latAlignment="arbitrary"/>
+    <vehicle id="20.2" type="vehicle.dodge_charger.police" depart="28.46">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.2" type="vehicle.yamaha.cuxi" depart="28.46">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.nissan.micra" length="3.67" probability="0.05" vClass="passenger" guiShape="passenger" width="1.86" height="1.52" latAlignment="arbitrary"/>
+    <vehicle id="22.2" type="vehicle.nissan.micra" depart="38.71">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.2" type="vehicle.yamaha.cuxi" depart="38.71">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="14.1" type="vehicle.dodge_charger.police" depart="40.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="15.1" type="vehicle.sym.duke" depart="40.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.2" type="vehicle.carlamotors.carlacola" depart="40.45">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.2" type="vehicle.yamaha.cuxi" depart="40.45">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.3" type="vehicle.seat.leon" depart="41.54">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.3" type="vehicle.gogoro.gen2" depart="41.54">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.3" type="vehicle.seat.leon" depart="42.69">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.3" type="vehicle.sym.duke" depart="42.69">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.audi.a2" length="3.71" probability="0.05" vClass="passenger" guiShape="passenger" width="1.79" height="1.53" latAlignment="arbitrary"/>
+    <vehicle id="8.4" type="vehicle.audi.a2" depart="55.38">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.4" type="vehicle.yamaha.cuxi" depart="55.38">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.jeep.wrangler_rubicon" length="3.87" probability="0.05" vClass="passenger" guiShape="passenger" width="1.90" height="1.88" latAlignment="arbitrary"/>
+    <vehicle id="20.4" type="vehicle.jeep.wrangler_rubicon" depart="56.92">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.4" type="vehicle.yamaha.cuxi" depart="56.92">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.citroen.c3" length="3.98" probability="0.05" vClass="passenger" guiShape="passenger" width="1.86" height="1.63" latAlignment="arbitrary"/>
+    <vehicle id="22.3" type="vehicle.citroen.c3" depart="58.06">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.3" type="vehicle.gogoro.gen2" depart="58.06">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.3" type="vehicle.chevrolet.impala" depart="60.67">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.kawasaki.ninja" length="2.04" probability="0.04" vClass="motorcycle" guiShape="motorcycle" width="0.80" height="1.77" latAlignment="compact" minGapLat="0.40"/>
+    <vehicle id="3.3" type="vehicle.kawasaki.ninja" depart="60.67">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.5" type="vehicle.audi.etron" depart="69.23">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.5" type="vehicle.yamaha.cygnusx3" depart="69.23">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.5" type="vehicle.audi.tt" depart="71.15">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.5" type="vehicle.yamaha.cuxi" depart="71.15">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="22.4" type="vehicle.audi.etron" depart="77.42">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.4" type="vehicle.gogoro.gen2" depart="77.42">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="14.2" type="vehicle.bmw.isetta" depart="80.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="15.2" type="vehicle.sym.duke" depart="80.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.4" type="vehicle.volkswagen.t2" depart="80.90">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.4" type="vehicle.yamaha.cygnusx3" depart="80.90">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.nissan.patrol" length="4.51" probability="0.05" vClass="passenger" guiShape="passenger" width="1.92" height="1.89" latAlignment="arbitrary"/>
+    <vehicle id="8.6" type="vehicle.nissan.patrol" depart="83.08">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.harley-davidson.low_rider" length="2.35" probability="0.04" vClass="motorcycle" guiShape="motorcycle" width="0.77" height="2.06" latAlignment="compact" minGapLat="0.40"/>
+    <vehicle id="9.6" type="vehicle.harley-davidson.low_rider" depart="83.08">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.6" type="vehicle.carlamotors.carlacola" depart="85.37">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.6" type="vehicle.yamaha.cygnusx3" depart="85.37">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="18.1" type="vehicle.audi.tt" depart="90.00">
+        <routeDistribution last="0">
+            <route cost="70.39" probability="1.00000000" edges="0.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="19.1" type="vehicle.ducati.1199" depart="90.00">
+        <routeDistribution last="0">
+            <route cost="70.39" probability="1.00000000" edges="0.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="6.1" type="vehicle.bmw.grandtourer" depart="94.74">
+        <routeDistribution last="0">
+            <route cost="112.39" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="7.1" type="vehicle.yamaha.cygnusx3" depart="94.74">
+        <routeDistribution last="0">
+            <route cost="82.89" probability="1.00000000" edges="-25.0.00 -7.0.00 -4.0.00 -14.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="22.5" type="vehicle.seat.leon" depart="96.77">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.5" type="vehicle.yamaha.cygnusx3" depart="96.77">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.toyota.prius" length="4.53" probability="0.05" vClass="evehicle" guiShape="evehicle" width="2.00" height="1.54" latAlignment="arbitrary"/>
+    <vehicle id="8.7" type="vehicle.toyota.prius" depart="96.92">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.7" type="vehicle.gogoro.gen2" depart="96.92">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.7" type="vehicle.dodge_charger.police" depart="99.60">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.7" type="vehicle.sym.duke" depart="99.60">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.5" type="vehicle.tesla.model3" depart="101.12">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.5" type="vehicle.gogoro.gen2" depart="101.12">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.8" type="vehicle.tesla.model3" depart="110.77">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.8" type="vehicle.sym.duke" depart="110.77">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.8" type="vehicle.nissan.micra" depart="113.83">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.8" type="vehicle.harley-davidson.low_rider" depart="113.83">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="22.6" type="vehicle.chrysler.pacifica" depart="116.12">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.6" type="vehicle.gogoro.gen2" depart="116.12">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="14.3" type="vehicle.nissan.micra" depart="120.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="15.3" type="vehicle.yamaha.cygnusx3" depart="120.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.6" type="vehicle.dodge_charger.police" depart="121.34">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.6" type="vehicle.sym.duke" depart="121.34">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.9" type="vehicle.volkswagen.t2" depart="124.61">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.9" type="vehicle.harley-davidson.low_rider" depart="124.61">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vType id="vehicle.mercedes-benz.coupe" length="5.04" probability="0.05" vClass="passenger" guiShape="passenger" width="2.16" height="1.64" latAlignment="arbitrary"/>
+    <vehicle id="20.9" type="vehicle.mercedes-benz.coupe" depart="128.06">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.9" type="vehicle.yamaha.cygnusx3" depart="128.06">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="22.7" type="vehicle.chevrolet.impala" depart="135.48">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.7" type="vehicle.yamaha.fz" depart="135.48">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.10" type="vehicle.carlamotors.carlacola" depart="138.46">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.10" type="vehicle.yamaha.cuxi" depart="138.46">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.7" type="vehicle.audi.tt" depart="141.57">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.7" type="vehicle.sym.duke" depart="141.57">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.10" type="vehicle.chevrolet.impala" depart="142.29">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.10" type="vehicle.yamaha.yzf" depart="142.29">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="12.1" type="vehicle.jeep.wrangler_rubicon" depart="150.00">
+        <routeDistribution last="0">
+            <route cost="32.46" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="13.1" type="vehicle.sym.duke" depart="150.00">
+        <routeDistribution last="0">
+            <route cost="32.46" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.11" type="vehicle.chrysler.pacifica" depart="152.31">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.11" type="vehicle.sym.duke" depart="152.31">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="22.8" type="vehicle.bmw.grandtourer" depart="154.83">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.8" type="vehicle.gogoro.gen2" depart="154.83">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.11" type="vehicle.jeep.wrangler_rubicon" depart="156.52">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.11" type="vehicle.sym.duke" depart="156.52">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="14.4" type="vehicle.seat.leon" depart="160.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="15.4" type="vehicle.yamaha.cuxi" depart="160.00">
+        <routeDistribution last="0">
+            <route cost="72.98" probability="1.00000000" edges="-1.0.00 15.0.00 24.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.8" type="vehicle.chrysler.pacifica" depart="161.79">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.8" type="vehicle.yamaha.fz" depart="161.79">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.12" type="vehicle.audi.etron" depart="166.15">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.12" type="vehicle.yamaha.cuxi" depart="166.15">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.12" type="vehicle.bmw.isetta" depart="170.75">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.12" type="vehicle.gogoro.gen2" depart="170.75">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="22.9" type="vehicle.mini.cooperst" depart="174.19">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.9" type="vehicle.yamaha.fz" depart="174.19">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.13" type="vehicle.citroen.c3" depart="180.00">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.13" type="vehicle.yamaha.yzf" depart="180.00">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="18.2" type="vehicle.chrysler.pacifica" depart="180.00">
+        <routeDistribution last="0">
+            <route cost="70.39" probability="1.00000000" edges="0.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="19.2" type="vehicle.gogoro.gen2" depart="180.00">
+        <routeDistribution last="0">
+            <route cost="70.39" probability="1.00000000" edges="0.0.00 11.0.00 19.0.00 6.0.00 21.0.00 23.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="2.9" type="vehicle.mini.cooperst" depart="182.02">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="3.9" type="vehicle.sym.duke" depart="182.02">
+        <routeDistribution last="0">
+            <route cost="72.73" probability="1.00000000" edges="-23.0.00 -21.0.00 -6.0.00 -19.0.00 -11.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.13" type="vehicle.bmw.grandtourer" depart="184.98">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.13" type="vehicle.sym.duke" depart="184.98">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="6.2" type="vehicle.seat.leon" depart="189.47">
+        <routeDistribution last="0">
+            <route cost="112.39" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="7.2" type="vehicle.yamaha.cygnusx3" depart="189.47">
+        <routeDistribution last="0">
+            <route cost="82.89" probability="1.00000000" edges="-25.0.00 -7.0.00 -4.0.00 -14.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="22.10" type="vehicle.bmw.isetta" depart="193.54">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="23.10" type="vehicle.sym.duke" depart="193.54">
+        <routeDistribution last="0">
+            <route cost="34.21" probability="1.00000000" edges="0.0.00 -24.0.00 -15.0.00 1.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="8.14" type="vehicle.tesla.model3" depart="193.84">
+        <routeDistribution last="0">
+            <route cost="112.71" probability="1.00000000" edges="-13.0.00 -8.0.00 -20.0.00 -26.0.00 -27.0.00 -7.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="9.14" type="vehicle.sym.duke" depart="193.84">
+        <routeDistribution last="0">
+            <route cost="75.89" probability="1.00000000" edges="-16.0.00 -4.0.00 -14.0.00 -0.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="20.14" type="vehicle.nissan.patrol" depart="199.21">
+        <routeDistribution last="0">
+            <route cost="76.01" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 10.0.00"/>
+        </routeDistribution>
+    </vehicle>
+    <vehicle id="21.14" type="vehicle.yamaha.cuxi" depart="199.21">
+        <routeDistribution last="0">
+            <route cost="78.11" probability="1.00000000" edges="0.0.00 14.0.00 4.0.00 16.0.00"/>
+        </routeDistribution>
+    </vehicle>
+</routes>

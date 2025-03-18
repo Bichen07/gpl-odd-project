@@ -1,0 +1,25 @@
+<launch>
+
+    <arg name="signal_type" default="trapzoid_wave"/>
+    <arg name="amplitude" default="30"/>
+    <arg name="frequency" default="0.1"/>
+    <arg name="duration" default="20"/>
+    <arg name="deceleration" default="0.8"/>
+    <arg name="trapzoidHoldTime" default="5.0"/>
+
+    <!-- <include file="$(env SDC_CONFIG_DIR)/actuation.launch"/> -->
+
+    <node
+        pkg="speed_control_testing"
+        type="speed_control_test.py"
+        name="speed_control_testing"
+        output="screen">
+        <param name="signal_type" value="$(arg signal_type)"/>
+        <param name="amplitude" value="$(arg amplitude)"/>
+        <param name="frequency" value="$(arg frequency)"/>
+        <param name="duration" value="$(arg duration)"/>
+        <param name="deceleration" value="$(arg deceleration)"/>
+        <param name="trapzoidHoldTime" value="$(arg trapzoidHoldTime)"/>
+    </node>
+
+</launch>

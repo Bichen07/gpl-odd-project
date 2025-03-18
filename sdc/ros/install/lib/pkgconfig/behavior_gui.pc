@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: behavior_gui
+Description: Description of behavior_gui
+Version: 0.1.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: roscpp std_msgs sensor_msgs geometry_msgs message_generation roslib itri_msgs behavior

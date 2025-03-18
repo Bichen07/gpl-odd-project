@@ -1,0 +1,35 @@
+Header header
+
+float32 unfilteredTimeUncertainty
+int64 cycleSlipCount
+int64 unfilteredMeasurementIntegral
+MeasurementStatus measurementStatus
+float32 filteredSpeedUncertainty
+int64 predetectInterval
+float32 unfilteredMeasurementFraction
+float32 filteredTimeUncertainty
+int64 carrierNoise
+int64 postdetections
+int32 latency
+int64 filterStages
+int64 multipathEstimate
+int64 svId
+float32 filteredMeasurementFraction
+int64 rfLoss
+int64 observations
+int64 fCount
+float32 dopplerAcceleration
+float32 elevation
+float32 filteredSpeed
+float32 fineSpeed
+int64 goodObservations
+uint32 observationState # enum const: SVObservationState
+bool goodParity
+float32 carrierPhase
+int64 filteredMeasurementIntegral
+int64 parityErrorCount
+float32 unfilteredSpeedUncertainty
+float32 fineSpeedUncertainty
+float32 azimuth
+float32 unfilteredSpeed
+int32 glonassFrequencyIndex

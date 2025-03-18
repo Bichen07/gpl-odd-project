@@ -1,0 +1,225 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright (c) 2020-2022, Bayerische Motoren Werke Aktiengesellschaft (BMW AG) -->
+<OpenSCENARIO>
+
+  <FileHeader revMajor="1" revMinor="1" date="2021-07-09T10:00:00"
+    description="ALKS 4.3_2 FollowLeadVehicleEmergencyBrake" author="BMW AG">
+    <License name="Creative Commons Attribution-ShareAlike 4.0 International Public License"
+      resource="https://creativecommons.org/licenses/by-sa/4.0/legalcode" spdxId="CC-BY-SA-4.0" />
+  </FileHeader>
+
+  <ParameterDeclarations>
+    <ParameterDeclaration name="LeadVehicle_Model" parameterType="string" value="car" />
+    <ParameterDeclaration name="Ego_InitPosition_LaneId" parameterType="string" value="-4" />
+    <ParameterDeclaration name="LeadVehicle_Init_HeadwayTime_s" parameterType="double" value="2.0" />
+    <ParameterDeclaration name="LeadVehicle_Init_LateralOffset_m" parameterType="double" value="0.0" />
+
+    <ParameterDeclaration name="gx_max" unit="mps2" parameterType="double" value="9.81" />
+    <ParameterDeclaration name="ve0" unit="kph" parameterType="double" value="50.0" />
+  </ParameterDeclarations>
+
+  <CatalogLocations>
+    <VehicleCatalog>
+      <Directory path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Vehicles" />
+    </VehicleCatalog>
+    <PedestrianCatalog>
+      <Directory
+        path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Pedestrians" />
+    </PedestrianCatalog>
+    <ControllerCatalog>
+      <Directory
+        path="/project/mmsl_simulation/src/scenario/data/resources/xosc/Catalogs/Controllers" />
+    </ControllerCatalog>
+  </CatalogLocations>
+
+  <RoadNetwork>
+    <LogicFile
+      filepath="/project/mmsl_simulation/src/scenario/data/resources/xodr/alks_road_straight.xodr" />
+  </RoadNetwork>
+
+  <Entities>
+
+    <ScenarioObject name="Ego">
+
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_white"></CatalogReference>
+
+      <ObjectController>
+        <CatalogReference catalogName="ControllerCatalog" entryName="ALKSController"></CatalogReference>
+      </ObjectController>
+
+      <!-- <ObjectController> -->
+      <!--   <CatalogReference catalogName="ControllerCatalog" entryName="externalController" /> -->
+      <!-- </ObjectController> -->
+
+    </ScenarioObject>
+
+    <ScenarioObject name="LeadVehicle">
+      <CatalogReference catalogName="VehicleCatalog" entryName="car_red"></CatalogReference>
+    </ScenarioObject>
+
+  </Entities>
+
+  <Storyboard>
+
+    <Init>
+      <Actions>
+
+        <Private entityRef="Ego">
+
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <LanePosition roadId="0" laneId="$Ego_InitPosition_LaneId" offset="0.0" s="5.0"></LanePosition>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+
+          <PrivateAction>
+            <LongitudinalAction>
+              <SpeedAction>
+                <SpeedActionDynamics dynamicsShape="step" dynamicsDimension="time" value="0" />
+                <SpeedActionTarget>
+                  <AbsoluteTargetSpeed value="${$ve0 / 3.6}" />
+                </SpeedActionTarget>
+              </SpeedAction>
+            </LongitudinalAction>
+          </PrivateAction>
+
+        </Private>
+
+        <Private entityRef="LeadVehicle">
+
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <WorldPosition x="-10000" y="-10000" z="-10000" />
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+
+          <PrivateAction>
+            <LongitudinalAction>
+              <SpeedAction>
+                <SpeedActionDynamics dynamicsShape="step" dynamicsDimension="time" value="0" />
+                <SpeedActionTarget>
+                  <AbsoluteTargetSpeed value="${$ve0 / 3.6}" />
+                </SpeedActionTarget>
+              </SpeedAction>
+            </LongitudinalAction>
+          </PrivateAction>
+
+          <PrivateAction>
+            <LongitudinalAction>
+              <!--The
+              Lead vehicle shall start with a predefined headway time (bumper-to-bumper).-->
+              <LongitudinalDistanceAction continuous="false" coordinateSystem="entity"
+                displacement="leadingReferencedEntity" timeGap="$LeadVehicle_Init_HeadwayTime_s"
+                entityRef="Ego" freespace="true"></LongitudinalDistanceAction>
+            </LongitudinalAction>
+          </PrivateAction>
+
+        </Private>
+
+      </Actions>
+    </Init>
+
+    <Story name="BrakeStory">
+
+      <Act name="TeleportAgentAct">
+        <ManeuverGroup maximumExecutionCount="1" name="TeleportManeuverGroup">
+          <Actors selectTriggeringEntities="false">
+            <EntityRef entityRef="LeadVehicle" />
+          </Actors>
+          <Maneuver name="TeleportManeuver">
+            <Event name="TeleportEvent" priority="overwrite">
+              <Action name="TeleportAction">
+                <PrivateAction>
+                  <TeleportAction>
+                    <Position>
+                      <!--The
+                      Lead vehicle is positioned in front of the Ego. The headway time is not yet accurate
+                      because the bounding boxes are not considered in this action (origin-to-origin
+                      instead of bumper-to-bumper). Only an approximated 5m are added to the distance. The
+                      LongitudinalDistanceAction will position the Lead vehicle precisely.-->
+                      <RelativeLanePosition entityRef="Ego" dLane="0"
+                        ds="${($LeadVehicle_Init_HeadwayTime_s * ($ve0 / 3.6)) + 5.0}"
+                        offset="$LeadVehicle_Init_LateralOffset_m"></RelativeLanePosition>
+                    </Position>
+                  </TeleportAction>
+                </PrivateAction>
+              </Action>
+              <StartTrigger>
+                <ConditionGroup>
+                  <Condition name="TeleportStartCondition" delay="1" conditionEdge="none">
+                    <ByValueCondition>
+                      <SimulationTimeCondition value="0" rule="greaterThan" />
+                    </ByValueCondition>
+                  </Condition>
+                </ConditionGroup>
+              </StartTrigger>
+            </Event>
+          </Maneuver>
+        </ManeuverGroup>
+      </Act>
+
+      <Act name="BrakeAct">
+        <ManeuverGroup maximumExecutionCount="1" name="BrakeManeuverGroup">
+          <Actors selectTriggeringEntities="false">
+            <EntityRef entityRef="LeadVehicle" />
+          </Actors>
+          <Maneuver name="BrakeManeuver">
+            <Event name="BrakeEvent" priority="overwrite">
+              <Action name="BrakeAction">
+                <PrivateAction>
+                  <LongitudinalAction>
+                    <SpeedAction>
+                      <SpeedActionDynamics dynamicsShape="linear"
+                        value="$gx_max" dynamicsDimension="rate" />
+                      <SpeedActionTarget>
+                        <AbsoluteTargetSpeed value="0.0" />
+                      </SpeedActionTarget>
+                    </SpeedAction>
+                  </LongitudinalAction>
+                </PrivateAction>
+              </Action>
+              <StartTrigger>
+                <ConditionGroup>
+                  <Condition name="BrakeStartCondition" delay="0" conditionEdge="rising">
+                    <ByValueCondition>
+                      <SimulationTimeCondition value="10.0" rule="greaterOrEqual" />
+                    </ByValueCondition>
+                  </Condition>
+                </ConditionGroup>
+              </StartTrigger>
+            </Event>
+          </Maneuver>
+        </ManeuverGroup>
+        <StartTrigger>
+          <ConditionGroup>
+            <Condition name="BrakeActStart" delay="0" conditionEdge="none">
+              <ByValueCondition>
+                <SimulationTimeCondition value="0.0" rule="greaterOrEqual" />
+              </ByValueCondition>
+            </Condition>
+          </ConditionGroup>
+        </StartTrigger>
+      </Act>
+
+    </Story>
+
+    <StopTrigger>
+      <ConditionGroup>
+        <Condition name="End" delay="10.0" conditionEdge="rising">
+          <ByValueCondition>
+            <!--The
+            scenario ends 10.0 seconds after the lead vehicle has stopped.-->
+            <StoryboardElementStateCondition storyboardElementType="action"
+              storyboardElementRef="BrakeAction" state="completeState" />
+          </ByValueCondition>
+        </Condition>
+      </ConditionGroup>
+    </StopTrigger>
+
+  </Storyboard>
+
+</OpenSCENARIO>

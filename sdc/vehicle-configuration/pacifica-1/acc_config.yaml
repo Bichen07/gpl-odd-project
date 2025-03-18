@@ -1,0 +1,6 @@
+acc_config:
+   velo_setpoint_param: 0.7
+   dist_setpoint_param: 1.0
+   Kp: 1.0
+   Ki: 0.01
+   Kd: 0.0

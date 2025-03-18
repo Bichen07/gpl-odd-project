@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2021-09-08 15:55:05 by Eclipse SUMO netedit Version v1_10_0+0127-e05bfc0d021
+<configuration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
+
+    <input>
+        <sumo-net-file value="shuinan.net.xml"/>
+    </input>
+
+    <output>
+        <output-file value="/project/mmsl_simulation/src/sumo_cosimulation/data/shuinan/shuinan_tl.net.xml"/>
+    </output>
+
+    <processing>
+        <geometry.min-radius.fix.railways value="false"/>
+        <geometry.max-grade.fix value="false"/>
+        <offset.disable-normalization value="true"/>
+        <lefthand value="false"/>
+    </processing>
+
+    <junctions>
+        <no-turnarounds value="true"/>
+        <junctions.corner-detail value="5"/>
+        <junctions.limit-turn-speed value="5.5"/>
+        <rectangular-lane-cut value="true"/>
+    </junctions>
+
+    <pedestrian>
+        <walkingareas value="false"/>
+    </pedestrian>
+
+    <report>
+        <aggregate-warnings value="5"/>
+    </report>
+
+</configuration>
+-->
+
+<additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
+    <tlLogic id="79" type="static" programID="0" offset="0">
+        <phase duration="42" state="GGGgrrrGGGgrrr"/>
+        <phase duration="3" state="yyyyrrryyyyrrr"/>
+        <phase duration="42" state="rrrrGGgrrrrGGg"/>
+        <phase duration="3" state="rrrryyyrrrryyy"/>
+    </tlLogic>
+</additional>

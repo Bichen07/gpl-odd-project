@@ -1,0 +1,6 @@
+uint32 total_accident_numbers
+uint32 current_round_accident_numbers
+uint32[] past_rounds_accident_numbers
+
+uint8 collision_state
+string collision_state_str

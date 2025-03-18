@@ -1,0 +1,8 @@
+prefix=/repository/ros/install
+
+Name: object_path_prediction
+Description: Description of object_path_prediction
+Version: 0.0.0
+Cflags: -I${prefix}/include
+Libs: -L${prefix}/lib 
+Requires: roscpp rospy std_msgs pcl_ros itri_msgs

@@ -1,0 +1,10 @@
+string agent_id
+uint32 detected_object_id
+geometry_msgs/Pose pose
+geometry_msgs/Vector3 linear_velocity
+geometry_msgs/Vector3 size
+geometry_msgs/Polygon polygon
+float32 distance
+std_msgs/ColorRGBA color
+string objectClassId
+itri_msgs/turn_signal_cmd turn_signal
