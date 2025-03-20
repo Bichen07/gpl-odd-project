@@ -1,25 +1,4 @@
-# Web Interface
-
-## Deploy
-
-### With Docker Compose
-This app was added into the [docker-compose.yml](../docker-compose.yml).
-
-Simply use `docker compose up --build` to start it.
-
-### With Docker
-1. Make sure `.env` file is existed.
-2. Build the Docker Image
-
-   ```
-   docker build -t lssvip-result-client .
-   ```
-
-3. Run the Docker Container
-
-   ```
-   docker run -p 5000:5173 lssvip-result-client
-   ```
+# Dashboard
 
 ## Development
 
