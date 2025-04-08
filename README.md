@@ -203,9 +203,21 @@ tmux
   - Remove simulation/deploy/home/.ros
   - Remove simulation/ros/.cache/scneario_search
 
-#### View and Explore Simulation Result
+#### Patch Trials to Batch
+
+- Open scripts/patch_trials_to_batch.py
+- Modify the following variables as needed:
+  - PAYLOAD_API: Set to your Payload CMS API endpoint.
+  - batch_id: Specify the target batch ID.
+- Run the script:
+  ```bash
+  python3 patch_trials_to_batch.py
+  ```
+
+### View and Explore Simulation Result
 
 - Go to directory "app/dashboard"
+- Update environment variables in the .env file if needed
 - Start the web interface by:
 
 ```bash
@@ -213,3 +225,7 @@ bun run dev
 ```
 
 - Open the displaying url to see the visualization of the simulation result.
+
+#### Create and Save Trajectory Analysis
+
+TBI
