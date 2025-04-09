@@ -94,6 +94,8 @@ conda activate sampling
 
 ```
 
+- Navigate to app/sampling/src
+
 - Start the sampling server
 
 ```bash
