@@ -7,7 +7,48 @@
     <arg name="sim_with_external" default="false" />
 
     <arg name="sampling_suggestion_api" default="http://localhost:9009" />
-    <arg name="batch_id" default="67d93a2fd8da7e14046d3736" />
+    <!-- <arg name="sampling_suggestion_api" default="http://192.168.0.177:9009" /> -->
+    <!-- <arg name="search_id" default="6622a8c63abf3eab7ce7b641" /> -->
+    <!-- <arg name="search_id" default="6628cd68e1363c6484fc7e56" /> -->
+    <!-- <arg name="search_id" default="662fceb105185defa9998a52" /> -->
+    <!-- <arg name="search_id" default="663ad93fbee9da7635cbaabe" /> -->
+    <!-- <arg name="search_id" default="6640d664eceffeb41b047bad" /> -->
+    <!-- <arg name="search_id" default="6641851175c12617a7898597" /> -->
+    <!-- <arg name="search_id" default="6641992b75c12617a78ae7d6" /> -->
+    <!-- <arg name="search_id" default="66425a05bcce06f8aff2ee32" /> -->
+    <!-- <arg name="search_id" default="664f1064a45c09cb1a3af48f" /> -->
+    <!-- <arg name="search_id" default="664f70c5c3f4a1bc6bd59d8b" /> -->
+    <!-- <arg name="search_id" default="665025b3b81c5c189a667bf8" /> -->
+    <!-- <arg name="search_id" default="665f3d85a34737577698df22" /> -->
+    <!-- <arg name="batch_id" default="6678be3b711f7470a0956690" /> -->
+    <!-- <arg name="batch_id" default="667ab8fe5ece766810677b06" /> -->
+    <!-- <arg name="batch_id" default="667ae2e57a7fda8cfab8c133" /> -->
+    <!-- <arg name="batch_id" default="6685ecfbc25c36e55b5570c9" /> -->
+    <!-- <arg name="batch_id" default="66948722ca90a30a352c3f10" /> -->
+
+    <!-- <arg name="batch_id" default="66b33556840605cf386ea226" /> -->
+    <!-- <arg name="batch_id" default="66dc58e3102508adc0bcb34d" /> -->
+
+    <!-- <arg name="batch_id" default="6781103f1a9ac48913a8ee80" /> -->
+    <!-- <arg name="batch_id" default="6782124f1a9ac48913a8f138" /> -->
+    <!-- 678d9b132ed96a72d5a7c672 -->
+    <!-- <arg name="batch_id" default="678b17976b4a83255ebd8755" /> -->
+    <!-- <arg name="batch_id" default="678d0c572ed96a72d57d43b9" /> -->
+    <!-- <arg name="batch_id" default="67a8d03b4f53fc9c6abb134d" /> -->
+    <!-- <arg name="batch_id" default="67acb07c4f53fc9c6af207cf" /> -->
+    <!-- <arg name="batch_id" default="67bfca684f53fc9c6ac0c1f1" /> -->
+    <!-- <arg name="batch_id" default="67c804004f53fc9c6abcd84f" /> -->
+    <!-- <arg name="batch_id" default="67c85d5e4f53fc9c6ad87f66" /> -->
+    <!-- <arg name="batch_id" default="67d111ec4f53fc9c6a7ef9d8" /> -->
+    <!-- <arg name="batch_id" default="67e8cabb78b0824b7e8a976b" /> -->
+    <!-- <arg name="batch_id" default="67d4e8354f53fc9c6ae1aa2e" /> -->
+    <!-- <arg name="batch_id" default="67c1d0c84f53fc9c6afdd7c6" /> -->
+    <!-- <arg name="batch_id" default="68214112a1e337fefc8b027f" /> -->
+    <!-- <arg name="batch_id" default="68615bc05b12ad6636b1d3f2" /> -->
+    <!-- <arg name="batch_id" default="10" /> -->
+    <!-- <arg name="batch_id" default="6" /> -->
+    <arg name="batch_id" default="7" />
+    <arg name="ego_id" default="2" />
 
     <!-- <arg name="map_name" default="alks_road_straight" /> -->
     <!-- <arg name="route_name" default="operation" /> -->
@@ -15,15 +56,27 @@
 
     <arg name="map_name" default="hct_logistic" />
     <arg name="route_name" default="operation" />
+    <!-- <arg name="route_name" default="hsc-hsp-hsc-loop-demo" /> -->
+
+    <!-- drive in hct -->
+    <!-- <arg name="ego_position_seq" default="21" /> -->
 
     <!-- drive out hct -->
-    <!-- <arg name="ego_position_seq" default="22" /> -->
+    <arg name="ego_position_seq" default="22" />
 
     <!-- opposite overtake -->
-    <arg name="ego_position_seq" default="4" />
+    <!-- <arg name="ego_position_seq" default="4" /> -->
+    <!-- <arg name="ego_position_seq" default="30" /> -->
 
     <!-- Bicycle Cut-in with Oncoming Car from Back -->
     <!-- <arg name="ego_position_seq" default="27" /> -->
+
+    <!-- Bus BIke -->
+    <!-- <arg name="ego_position_seq" default="28" /> -->
+
+    <!-- Bridge Cut In -->
+    <!-- <arg name="ego_position_seq" default="29" /> -->
+    <!-- <arg name="ego_position_seq" default="26" /> -->
 
 
     <!-- <arg name="route_name" default="hsc-hsp-hsc-loop" /> -->
@@ -57,6 +110,11 @@
     <!-- <arg name="ego_position_seq" default="9" /> -->
     <!-- <arg name="ego_position_seq" default="4" /> -->
 
+    <!-- <node pkg="rosbag" type="record" name="rosbag_record" -->
+    <!--     args="-a -O /home/user/itri_new_stop_collision_from_right.bag" -->
+    <!--     output="screen"> -->
+    <!-- </node> -->
+
     <include file="$(find simulation_adv)/launch/run.launch">
         <arg name="sim_with_external" value="$(arg sim_with_external)" />
         <arg name="use_sim_time" value="false" />
@@ -88,6 +146,7 @@
     >
         <param name="sim_with_external" value="$(arg sim_with_external)" />
         <param name="batch_id" value="$(arg batch_id)" />
+        <param name="ego_id" value="$(arg ego_id)" />
         <param name="route_name" value="$(arg route_name)" />
         <param name="map_name" value="$(arg map_name)" />
         <param name="sampling_suggestion_api" value="$(arg sampling_suggestion_api)" />
@@ -101,6 +160,6 @@
     simulation_monitor)/config/simulation_monitor_setting.yaml"/> -->
     <!-- <node name="accident_recorder_node" pkg="simulation_monitor" type="accident_recorder.py"
     output="screen"/> -->
-    <node name="tag_tree_identifier" pkg="scenario_classification" type="run_tree_of_tags.py"
-        output="screen" />
+    <!-- <node name="tag_tree_identifier" pkg="scenario_classification" type="run_tree_of_tags.py" -->
+    <!--     output="screen" /> -->
 </launch>

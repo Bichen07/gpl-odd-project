@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import print_function
 
+import csv
 import threading
 import time
 import subprocess
@@ -71,7 +72,7 @@ class SingleParameterizedScenarioSearch:
 
         self._EGO_STABLE_QUEUE_SIZE = 100
         self._MIN_STEER_CMD_STABLE_RATE = 15
-        self._STEER_CMD_HZ_WINDOW_SIZE = 100
+        self._STEER_CMD_HZ_WINDOW_SIZE = 50
         self._ego_stable_queue = deque(maxlen=self._EGO_STABLE_QUEUE_SIZE)
         self._steer_cmd_hz = rostopic.ROSTopicHz(self._STEER_CMD_HZ_WINDOW_SIZE)
         self._scenario_stable_publisher = rospy.Publisher(
@@ -86,6 +87,9 @@ class SingleParameterizedScenarioSearch:
         # self.batch_id = str(
         #     rospy.get_param("/single_parameterized_scenario_search/search_id")
         # )
+        self.ego_id = int(
+            str(rospy.get_param("/single_parameterized_scenario_search/ego_id"))
+        )
         self.batch_id = str(
             rospy.get_param("/single_parameterized_scenario_search/batch_id")
         )
@@ -128,7 +132,7 @@ class SingleParameterizedScenarioSearch:
 
         response = requests.get(
             url=self.PAYLOAD_API
-            + "/scenarios/{}?depth=2".format(self.search_data["scenario"]["id"]),
+            + "/scenarios/{}?depth=1".format(self.search_data["scenario"]["id"]),
             headers=self.headers,
             verify=False,
         )
@@ -139,28 +143,32 @@ class SingleParameterizedScenarioSearch:
             value["id"]: value for value in self.scenario_data["parameters"]
         }
 
-        payload_base_url = "/".join(self.PAYLOAD_API.split("/")[:3])
-        openscenario_id = self.scenario_data["openScenarioField"]["openScenario"]["id"]
-        openscenario_filename = self.scenario_data["openScenarioField"]["openScenario"]["filename"]
-        print(payload_base_url + "/xosc/" + openscenario_filename)
+        url = self.scenario_data["openScenarioField"]["openScenario"]["url"]
+        print(
+            "/".join(self.PAYLOAD_API.split("/")[:3])
+            + "/"
+            + "/".join(url.split("/")[3:])
+        )
         response = requests.get(
-            payload_base_url + "/xosc/" + openscenario_filename,
+            "/".join(self.PAYLOAD_API.split("/")[:3])
+            + "/"
+            + "/".join(url.split("/")[3:]),
             verify=False,
         )
         response.raise_for_status()
-        self.openscenario_filepath = self.SHARE_FOLDER_PATH / openscenario_filename
+        self.openscenario_filepath = self.SHARE_FOLDER_PATH / url.split("/")[-1]
         self.openscenario_xml = response.content
 
-        opendrive_id = self.scenario_data["openDrive"]["id"]
-        opendrive_filename = self.scenario_data["openDrive"]["filename"]
-        print(payload_base_url + "/xodr/" + opendrive_filename)
+        url = self.scenario_data["openDrive"]["url"]
         response = requests.get(
-            payload_base_url + "/xodr/" + opendrive_filename,
+            "/".join(self.PAYLOAD_API.split("/")[:3])
+            + "/"
+            + "/".join(url.split("/")[3:]),
             verify=False,
         )
         response.raise_for_status()
         self.opendrive_xml = response.content
-        self.opendrive_filepath = self.SHARE_FOLDER_PATH / opendrive_filename
+        self.opendrive_filepath = self.SHARE_FOLDER_PATH / url.split("/")[-1]
         with open(str(self.opendrive_filepath), "wb") as f:
             f.write(self.opendrive_xml)
 
@@ -310,7 +318,8 @@ class SingleParameterizedScenarioSearch:
         rate = rospy.Rate(self.check_rate)
         is_init = True
         scenario_stable = False
-        self.record_root_dir_publisher.publish(String(self.record_root_dir))
+        pprint(self.record_root_dir)
+        self.record_root_dir_publisher.publish(String(str(self.record_root_dir)))
 
         current_config_filepath = None
         is_reference_model_turn = False
@@ -341,6 +350,9 @@ class SingleParameterizedScenarioSearch:
 
                     # Record score for result report generating at the end.
                     # [TBI] The score system is yet to be implemented
+                    # pprint("collided_to_temp")
+                    # pprint(self.scenario_checker.collided_to_temp)
+                    # if not is_init and not self.scenario_checker.collided_to_temp:
                     if not is_init:
                         end_by_scenario_control = (
                             self.scenario_checker.end_scenario_message
@@ -380,25 +392,50 @@ class SingleParameterizedScenarioSearch:
 
                             subprocess.call(
                                 [
-                                    "/project/mmsl_simulation/src/esmini/bin/dat2csv",
+                                    # "/project/mmsl_simulation/src/esmini/bin/dat2csv",
+                                    "python3", "/home/user/clones/esmini/scripts/dat2csv.py", "--extended", "--file_refs",
                                     str(self.current_esmini_record_filepath),
                                 ],
-                                cwd=str(
-                                    self.current_esmini_record_filepath.parent
-                                ),
+                                cwd=str(self.current_esmini_record_filepath.parent),
                             )
 
                             newfilepath = (
-                                self.current_esmini_record_filepath.with_suffix(
-                                    ".csv"
-                                )
+                                self.current_esmini_record_filepath.with_suffix(".csv")
                             )
-                            df = pd.read_csv(newfilepath, skiprows=1)
+
+                            # df = pd.read_csv(newfilepath, skiprows=1)
+                            # df.rename(columns=str.strip, inplace=True)
+                            # df["name"] = df["name"].astype(str).str.strip()
+
+                            with open(str(newfilepath)) as f:
+                                reader = csv.reader(f)
+                                next(reader)
+                                header = next(reader)
+                                ncols = len(header)
+                                rows = [row[:ncols] for row in reader]
+                            df = pd.DataFrame(rows, columns=header)
+                            print(df.head())
+                            print(df.columns)
                             df.rename(columns=str.strip, inplace=True)
-                            df["name"] = df["name"].str.strip()
-                            
+                            df["name"] = df["name"].astype(str).str.strip()
+                            df = df.astype(
+                                {
+                                    col: "float"
+                                    for col in df.columns
+                                    if col != "name" and col != "id"
+                                }
+                            )
+
                             print("SAMPLER CREATE OBSERVATIONS" * 20)
-                            self.sampler.create_observations(df, [agent["name"] for agent in self.scenario_data["observationRecordingAgents"]])
+                            self.sampler.create_observations(
+                                df,
+                                [
+                                    agent["name"]
+                                    for agent in self.scenario_data[
+                                        "observationRecordingAgents"
+                                    ]
+                                ],
+                            )
                             self.sampler.preprocess_saved_data()
 
                             score = self.scoring.get_score()
@@ -416,7 +453,7 @@ class SingleParameterizedScenarioSearch:
                                 or not is_reference_model_turn
                             ):
                                 current_register_data = {
-                                    "batch_id": self.search_data["id"],
+                                    "batch_id": str(self.search_data["id"]),
                                     "outcome": deepcopy(score),
                                     "trial_index": self.current_trial_index,
                                 }
@@ -499,7 +536,6 @@ class SingleParameterizedScenarioSearch:
                                         response.raise_for_status()
                                     esminiDat = response.json()
 
-
                                     # df.to_csv(newfilepath, index=False)
 
                                     # files = {
@@ -573,7 +609,7 @@ class SingleParameterizedScenarioSearch:
                                     print("file esmini dat response json")
                                     print(response.json())
                                     esmini_dat_id = esminiDat["doc"]["id"]
-                                    current_register_data["esmini_dat_id"] = (
+                                    current_register_data["esmini_dat_id"] = str(
                                         esmini_dat_id
                                     )
 
@@ -622,7 +658,8 @@ class SingleParameterizedScenarioSearch:
                                     pprint("PASSED: {}".format(passed))
 
                                     trial_db_data = {
-                                        "batch": self.search_data["id"],
+                                        "batch": int(self.search_data["id"]),
+                                        "ego": self.ego_id,
                                         # "samplingMethod": current_generation_step["method"],
                                         "parameters": [
                                             {
@@ -665,9 +702,9 @@ class SingleParameterizedScenarioSearch:
                                                 ]["criticalityMetrics"]
                                             ]
                                         },
-                                        "esminiDat": current_register_data[
-                                            "esmini_dat_id"
-                                        ],
+                                        "esminiDat": int(
+                                            current_register_data["esmini_dat_id"]
+                                        ),
                                     }
                                     new_trial_id = None
                                     new_trial = None
@@ -686,7 +723,7 @@ class SingleParameterizedScenarioSearch:
                                         print("Error:", str(e))
 
                                     if new_trial_id and new_trial:
-                                        self.sampler.store_to_db(new_trial_id)
+                                        self.sampler.store_to_db(new_trial_id, self.ego_id)
 
                                         # try:
                                         #     response = requests.get(
@@ -880,7 +917,7 @@ class SingleParameterizedScenarioSearch:
                                 None if hz_statistics == None else hz_statistics[0]
                             )
                             while not self._is_ego_stable():
-                                rospy.sleep(rospy.Duration(secs=1.0))
+                                rospy.sleep(rospy.Duration(secs=0.1))
                                 rospy.logwarn(
                                     "[ScenarioSampler] Wait for ego stable..."
                                 )
@@ -894,7 +931,7 @@ class SingleParameterizedScenarioSearch:
                                     )
                                 )
                                 self._start_time = rospy.Time.now()
-                            rospy.sleep(rospy.Duration(secs=1.0))
+                            rospy.sleep(rospy.Duration(secs=0.1))
                             rospy.logwarn(
                                 "[ScenarioSampler] Wait steer cmd stable... {}".format(
                                     avg_rate
@@ -950,7 +987,29 @@ class SingleParameterizedScenarioSearch:
             rospy.sleep(sleep_seconds)
 
         self.current_trial_index = response.json()["trial_index"]
+        # self.current_parameters = response.json()["parameters"]
         self.current_parameters = response.json()["parameters"]
+        # self.current_parameters["TriggerTime"] = 8.481417374685407
+        # self.current_parameters["OncomingSpeed"] = 3.5349813625216484
+
+        # self.current_parameters["TriggerTime"] = 8.404550752136856
+        # self.current_parameters["OncomingSpeed"] = 3.354968372732401
+
+        # self.current_parameters["TriggerTime"] = 4.013841624371707
+        # self.current_parameters["OncomingSpeed"] = 13.387735622934997
+        # self.current_parameters["TriggerTime"] = 1.5946869095787406
+        # self.current_parameters["OncomingSpeed"] = 11.279775903560221
+
+        # self.current_parameters["TriggerTime"] = 3.6261895271018147
+        # self.current_parameters["OncomingSpeed"] = 13.020549054257572
+
+        # self.current_parameters["TriggerTime"] = 8.617189821787179
+        # self.current_parameters["OncomingSpeed"] = 3.868002340197563
+        # 8.617189821787179
+        # 3.868002340197563
+        self.current_parameters["OncomingStartDelay"] = 12.5
+        self.current_parameters["OncomingSpeed"] = 11.3
+
         if self.current_trial_index == -1:
             return None  # Done
         new_config_filepath = self.suggest_new_config_file(

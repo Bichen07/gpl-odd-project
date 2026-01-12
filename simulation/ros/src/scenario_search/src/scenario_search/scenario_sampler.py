@@ -27,19 +27,14 @@ from scoring.scoring import Scoring
 from pathlib import Path
 import numpy as np
 from shapely.ops import nearest_points, split
-from shapely.geometry import Polygon, LineString
-from scenario_search.scoring.third_party.TwoDimTTC import getpoints
+from shapely.prepared import prep
+from shapely.geometry import Polygon, LineString, Point as SPoint
+from scenario_search.scoring.third_party.TwoDimTTC import getpoints, mygetpoints
 
-# def predict_position(x, y, v, theta, t):
-#     return {
-#         "x": x + v * math.cos(theta) * t,
-#         "y": y + v * math.sin(theta) * t
-#     }
+
 def predict_position(x, y, v, theta, t):
-    return [
-        x + v * math.cos(theta) * t,
-        y + v * math.sin(theta) * t
-    ]
+    return [x + v * math.cos(theta) * t, y + v * math.sin(theta) * t]
+
 
 def heading_vector_from_yaw(yaw):
     # type: (float) -> Tuple[float ,float]
@@ -47,13 +42,14 @@ def heading_vector_from_yaw(yaw):
     y_component = math.sin(yaw)
     return (x_component, y_component)
 
+
 def are_lines_parallel(p1, p2, q1, q2):
     """
     Check if the lines formed by points (p1, p2) and (q1, q2) are parallel.
 
     Parameters:
         p1, p2, q1, q2: Tuples representing the points (x, y).
-    
+
     Returns:
         True if the lines are parallel, False otherwise.
     """
@@ -69,63 +65,213 @@ def are_lines_parallel(p1, p2, q1, q2):
     cross_product = dx1 * dy2 - dy1 * dx2
     return cross_product < 0.001
 
+
 def extract_points(geom):
     points = []
     if geom.is_empty:
         return points
     # Single point
-    if geom.geom_type == 'Point':
+    if geom.geom_type == "Point":
         points.append([geom.x, geom.y])
     # Multiple points
-    elif geom.geom_type == 'MultiPoint':
+    elif geom.geom_type == "MultiPoint":
         points = [[pt.x, pt.y] for pt in geom.geoms]
     # A line segment (or several) - here we take the endpoints
-    elif geom.geom_type == 'LineString':
+    elif geom.geom_type == "LineString":
         coords = list(geom.coords)
         points.extend([[coords[0][0], coords[0][1]], [coords[-1][0], coords[-1][1]]])
     # If there are multiple line segments
-    elif geom.geom_type == 'MultiLineString':
+    elif geom.geom_type == "MultiLineString":
         for line in geom.geoms:
             coords = list(line.coords)
-            points.extend([[coords[0][0], coords[0][1]], [coords[-1][0], coords[-1][1]]])
+            points.extend(
+                [[coords[0][0], coords[0][1]], [coords[-1][0], coords[-1][1]]]
+            )
     # If a GeometryCollection, iterate through each part
     else:
         for part in geom.geoms:
             points.extend(extract_points(part))
     return points
 
+
+def predict_trajectory(pos, heading, speed, duration, dt):
+    """Predicts positions using constant velocity model."""
+    times = np.arange(0, duration, dt)
+    traj = np.array(
+        [
+            pos + speed * t * np.array([math.cos(heading), math.sin(heading)])
+            for t in times
+        ]
+    )
+    return times, traj
+
+
+def compute_SPrET(
+    p1,
+    h1,
+    v1,
+    p2,
+    h2,
+    v2,
+    w1,
+    l1,
+    w2,
+    l2,
+    polygon_points=None,
+    epsilon=0.01,
+    duration=5.0,
+    dt=0.1,
+):
+    """Computes Predictive Encroachment Time (PrET)."""
+    times1, traj1 = predict_trajectory(np.array(p1), h1, v1, duration, dt)
+    times2, traj2 = predict_trajectory(np.array(p2), h2, v2, duration, dt)
+
+    # Optional polygon gating
+    prepared_poly = None
+    if polygon_points is not None:
+        roi_poly = Polygon(polygon_points)
+        if not roi_poly.is_valid or roi_poly.is_empty:
+            raise ValueError("polygon_points define an invalid/empty polygon.")
+        prepared_poly = prep(roi_poly)
+
+    min_time_diff = float("inf")
+
+    found = False
+    for i, t1 in enumerate(times1):
+
+        ego_pos = traj1[i]
+        # If polygon provided, ensure ego sample is inside
+        if prepared_poly is not None and not prepared_poly.contains(
+            SPoint([float(ego_pos[0]), float(ego_pos[1])])
+        ):
+            continue
+
+        for j, t2 in enumerate(times2):
+            agent_pos = traj2[j]
+            # If polygon provided, ensure agent sample is inside
+            if prepared_poly is not None and not prepared_poly.contains(
+                SPoint([float(agent_pos[0]), float(agent_pos[1])])
+            ):
+                continue
+
+            dist = np.linalg.norm(traj1[i] - traj2[j])
+
+            # Optional fast rejection
+            if dist > max(w1 / 2, l1 / 2) + max(w2 / 2, l2 / 2) + 2 * epsilon:
+                continue
+
+            ego_heading = heading_vector_from_yaw(h1)
+            agent_heading = heading_vector_from_yaw(h2)
+
+            pair_sample = {
+                "x_i": np.array([ego_pos[0]]),
+                "y_i": np.array([ego_pos[1]]),
+                "vx_i": np.array([v1 * ego_heading[0]]),
+                "vy_i": np.array([v1 * ego_heading[1]]),
+                "hx_i": np.array([ego_heading[0]]),
+                "hy_i": np.array([ego_heading[1]]),
+                "length_i": np.array([l1]),
+                "width_i": np.array([w1]),
+                "x_j": np.array([agent_pos[0]]),
+                "y_j": np.array([agent_pos[1]]),
+                "vx_j": np.array([v2 * agent_heading[0]]),
+                "vy_j": np.array([v2 * agent_heading[1]]),
+                "hx_j": np.array([agent_heading[0]]),
+                "hy_j": np.array([agent_heading[1]]),
+                "length_j": np.array([l2]),
+                "width_j": np.array([w2]),
+            }
+
+            (
+                point_i1,
+                point_i2,
+                point_i3,
+                point_i4,
+                point_j1,
+                point_j2,
+                point_j3,
+                point_j4,
+            ) = mygetpoints(pair_sample)
+
+            point_i1 = point_i1.flatten()
+            point_i2 = point_i2.flatten()
+            point_i3 = point_i3.flatten()
+            point_i4 = point_i4.flatten()
+            point_j1 = point_j1.flatten()
+            point_j2 = point_j2.flatten()
+            point_j3 = point_j3.flatten()
+            point_j4 = point_j4.flatten()
+
+            ego_box = Polygon([point_i1, point_i2, point_i4, point_i3])
+            agent_box = Polygon([point_j1, point_j2, point_j4, point_j3])
+            dist = ego_box.distance(agent_box)
+
+            if dist < epsilon:
+                time_diff = abs(t1**2 - t2**2)
+                if time_diff < min_time_diff:
+                    min_time_diff = time_diff
+                    found = True
+                    break
+        if found:
+            break
+
+    return min_time_diff if min_time_diff != float("inf") else None
+
+
 def getprojpoints(samples, time):
     ## vehicle i
-    heading_i = samples[['hx_i','hy_i']].values
-    perp_heading_i = np.array([-heading_i[:,1], heading_i[:,0]]).T
-    heading_scale_i = np.tile(np.sqrt(heading_i[:,0]**2+heading_i[:,1]**2), (2,1)).T
-    length_i = np.tile(samples.length_i.values, (2,1)).T
-    width_i = np.tile(samples.width_i.values, (2,1)).T
-    speed_i = np.tile(samples.speed_i.values, (2,1)).T
+    heading_i = samples[["hx_i", "hy_i"]].values
+    perp_heading_i = np.array([-heading_i[:, 1], heading_i[:, 0]]).T
+    heading_scale_i = np.tile(
+        np.sqrt(heading_i[:, 0] ** 2 + heading_i[:, 1] ** 2), (2, 1)
+    ).T
+    length_i = np.tile(samples.length_i.values, (2, 1)).T
+    width_i = np.tile(samples.width_i.values, (2, 1)).T
+    speed_i = np.tile(samples.speed_i.values, (2, 1)).T
 
-    point_up = samples[['x_i','y_i']].values + heading_i/heading_scale_i*(length_i/2 + speed_i * time)
-    point_down = samples[['x_i','y_i']].values - heading_i/heading_scale_i*length_i/2
-    point_i1 = (point_up + perp_heading_i/heading_scale_i*width_i/2).T
-    point_i2 = (point_up - perp_heading_i/heading_scale_i*width_i/2).T
-    point_i3 = (point_down + perp_heading_i/heading_scale_i*width_i/2).T
-    point_i4 = (point_down - perp_heading_i/heading_scale_i*width_i/2).T
+    point_up = samples[["x_i", "y_i"]].values + heading_i / heading_scale_i * (
+        length_i / 2 + speed_i * time
+    )
+    point_down = (
+        samples[["x_i", "y_i"]].values - heading_i / heading_scale_i * length_i / 2
+    )
+    point_i1 = (point_up + perp_heading_i / heading_scale_i * width_i / 2).T
+    point_i2 = (point_up - perp_heading_i / heading_scale_i * width_i / 2).T
+    point_i3 = (point_down + perp_heading_i / heading_scale_i * width_i / 2).T
+    point_i4 = (point_down - perp_heading_i / heading_scale_i * width_i / 2).T
 
     ## vehicle j
-    heading_j = samples[['hx_j','hy_j']].values
-    perp_heading_j = np.array([-heading_j[:,1], heading_j[:,0]]).T
-    heading_scale_j= np.tile(np.sqrt(heading_j[:,0]**2+heading_j[:,1]**2), (2,1)).T
-    length_j = np.tile(samples.length_j.values, (2,1)).T
-    width_j = np.tile(samples.width_j.values, (2,1)).T
-    speed_j = np.tile(samples.speed_j.values, (2,1)).T
+    heading_j = samples[["hx_j", "hy_j"]].values
+    perp_heading_j = np.array([-heading_j[:, 1], heading_j[:, 0]]).T
+    heading_scale_j = np.tile(
+        np.sqrt(heading_j[:, 0] ** 2 + heading_j[:, 1] ** 2), (2, 1)
+    ).T
+    length_j = np.tile(samples.length_j.values, (2, 1)).T
+    width_j = np.tile(samples.width_j.values, (2, 1)).T
+    speed_j = np.tile(samples.speed_j.values, (2, 1)).T
 
-    point_up = samples[['x_j','y_j']].values + heading_j/heading_scale_j*(length_j/2 + speed_j * time)
-    point_down = samples[['x_j','y_j']].values - heading_j/heading_scale_j*length_j/2
-    point_j1 = (point_up + perp_heading_j/heading_scale_j*width_j/2).T
-    point_j2 = (point_up - perp_heading_j/heading_scale_j*width_j/2).T
-    point_j3 = (point_down + perp_heading_j/heading_scale_j*width_j/2).T
-    point_j4 = (point_down - perp_heading_j/heading_scale_j*width_j/2).T
+    point_up = samples[["x_j", "y_j"]].values + heading_j / heading_scale_j * (
+        length_j / 2 + speed_j * time
+    )
+    point_down = (
+        samples[["x_j", "y_j"]].values - heading_j / heading_scale_j * length_j / 2
+    )
+    point_j1 = (point_up + perp_heading_j / heading_scale_j * width_j / 2).T
+    point_j2 = (point_up - perp_heading_j / heading_scale_j * width_j / 2).T
+    point_j3 = (point_down + perp_heading_j / heading_scale_j * width_j / 2).T
+    point_j4 = (point_down - perp_heading_j / heading_scale_j * width_j / 2).T
 
-    return (point_i1, point_i2, point_i3, point_i4, point_j1, point_j2, point_j3, point_j4)
+    return (
+        point_i1,
+        point_i2,
+        point_i3,
+        point_i4,
+        point_j1,
+        point_j2,
+        point_j3,
+        point_j4,
+    )
+
 
 class ScenarioSampler:
     def __init__(self, period, payload_api, scoring=None):
@@ -211,8 +357,9 @@ class ScenarioSampler:
 
         self.ttce_max = 5
         self.ttc_max = 5
-        self.spret_max = 20
+        self.spret_max = 10000
         self.dce_max = 10
+        self.pret_max = 7
         self.score = {}
         self.agent_size = {}
 
@@ -224,13 +371,17 @@ class ScenarioSampler:
         for index, snapshot in enumerate(self.data):
             for agent in snapshot["agents"]:
                 if agent["name"] not in closest_distance.keys():
-                    closest_distance[agent["name"]] = float('inf')
+                    closest_distance[agent["name"]] = float("inf")
                 agent_distance = agent["relativeDistance"]
-                if agent_distance is not None and agent_distance < closest_distance[agent["name"]]:
+                if (
+                    agent_distance is not None
+                    and agent_distance < closest_distance[agent["name"]]
+                ):
                     closest_snapshot[agent["name"]] = snapshot
                     closest_distance[agent["name"]] = agent_distance
 
         ttc_min = self.ttc_max
+        pret_min = self.pret_max
         ttce_dce_min = self.dce_max + self.ttce_max
         rss_dce = 5
         dce_min = self.dce_max
@@ -240,6 +391,9 @@ class ScenarioSampler:
         collision_risk_max = 0
         print("PREPROCESSING...")
         for index, snapshot in enumerate(self.data):
+            # print("esminiSeconds")
+            # print(snapshot["esminiSeconds"])
+            is_last_snapshot = index == len(self.data) - 2
 
             next_snapshot = None
             if index + 1 < len(self.data):
@@ -258,15 +412,17 @@ class ScenarioSampler:
                 snapshot["egoVelocityLat"] = last_snapshot["egoVelocityLat"]
 
             for agent in snapshot["agents"]:
+                if "Temp" in agent["name"]:
+                    continue
+
                 agent["dce"] = self.dce_max
 
-                # temp 
+                # temp
                 agent["relativeAccelerationY"] = int(agent["pathIntersected"])
 
                 if not agent["isRssSafe"]:
                     rss_dce = min(rss_dce, agent["relativeDistance"])
                 if agent["pathIntersected"]:
-                    # print("DCEMIN" * 20)
                     dce_min = min(dce_min, agent["relativeDistance"])
                     # print(dce_min)
                     # print("DCEMIN" * 20)
@@ -283,20 +439,21 @@ class ScenarioSampler:
                 # agent["dce"] = agent_dce
                 agent["collisionRisk"] = math.exp(-1 * (agent_ttce + agent_dce))
                 ttce_dce_min = min(ttce_dce_min, agent_ttce + agent_dce)
-                collision_risk_max = max(
-                    collision_risk_max, 
-                    agent["collisionRisk"]
-                )
+                collision_risk_max = max(collision_risk_max, agent["collisionRisk"])
                 # # if (agent["name"] != "Parking") or (self.collided and agent["name"] == self.collided_agent):
                 # if agent["pathIntersected"]:
                 #     # dce_min = min(dce_min, agent_dce)
                 #     dce_min = min(dce_min, agent["relativeDistance"])
                 ttce_min = min(ttce_min, agent_ttce)
                 # acc_req_max = max(acc_req_max, agent["accReq"])
-                spret_min = min(spret_min, agent["spret"])
+                # spret_min = min(spret_min, agent["spret"])
 
                 if next_snapshot is not None:
-                    agent_next_snapshot = [next_frame_agent for next_frame_agent in next_snapshot["agents"] if next_frame_agent["name"] == agent["name"]][0]
+                    agent_next_snapshot = [
+                        next_frame_agent
+                        for next_frame_agent in next_snapshot["agents"]
+                        if next_frame_agent["name"] == agent["name"]
+                    ][0]
                     agent_heading = agent["yaw"]
                     agent_next_heading = agent_next_snapshot["yaw"]
                     theta = agent_next_heading - agent_heading
@@ -306,7 +463,11 @@ class ScenarioSampler:
                     agent["velocityLat"] = agent_velocity_lat
                 else:
                     last_snapshot = self.data[index - 1]
-                    agent_last_snapshot = [last_frame_agent for last_frame_agent in last_snapshot["agents"] if last_frame_agent["name"] == agent["name"]][0]
+                    agent_last_snapshot = [
+                        last_frame_agent
+                        for last_frame_agent in last_snapshot["agents"]
+                        if last_frame_agent["name"] == agent["name"]
+                    ][0]
                     agent["velocityLong"] = agent_last_snapshot["velocityLong"]
                     agent["velocityLat"] = agent_last_snapshot["velocityLat"]
 
@@ -340,6 +501,7 @@ class ScenarioSampler:
 
                 ego_heading = heading_vector_from_yaw(snapshot["egoYaw"])
                 agent_heading = heading_vector_from_yaw(agent["yaw"])
+
                 pair_sample = pd.DataFrame(
                     {
                         "x_i": [snapshot["egoX"]],
@@ -381,36 +543,321 @@ class ScenarioSampler:
                 point_j3 = point_j3.flatten()
                 point_j4 = point_j4.flatten()
 
-                ppi1 = predict_position(point_i1[0], point_i1[1], snapshot["egoSpeed"], snapshot["egoYaw"], self.ttc_max)
-                ppi2 = predict_position(point_i2[0], point_i2[1], snapshot["egoSpeed"], snapshot["egoYaw"], self.ttc_max)
-                ppi3 = predict_position(point_i3[0], point_i3[1], snapshot["egoSpeed"], snapshot["egoYaw"], self.ttc_max)
-                ppi4 = predict_position(point_i4[0], point_i4[1], snapshot["egoSpeed"], snapshot["egoYaw"], self.ttc_max)
-                ppj1 = predict_position(point_j1[0], point_j1[1], agent["speed"], agent["yaw"], self.ttc_max)
-                ppj2 = predict_position(point_j2[0], point_j2[1], agent["speed"], agent["yaw"], self.ttc_max)
-                ppj3 = predict_position(point_j3[0], point_j3[1], agent["speed"], agent["yaw"], self.ttc_max)
-                ppj4 = predict_position(point_j4[0], point_j4[1], agent["speed"], agent["yaw"], self.ttc_max)
+                ppi1 = predict_position(
+                    point_i1[0],
+                    point_i1[1],
+                    snapshot["egoSpeed"],
+                    snapshot["egoYaw"],
+                    self.ttc_max,
+                )
+                ppi2 = predict_position(
+                    point_i2[0],
+                    point_i2[1],
+                    snapshot["egoSpeed"],
+                    snapshot["egoYaw"],
+                    self.ttc_max,
+                )
+                ppi3 = predict_position(
+                    point_i3[0],
+                    point_i3[1],
+                    snapshot["egoSpeed"],
+                    snapshot["egoYaw"],
+                    self.ttc_max,
+                )
+                ppi4 = predict_position(
+                    point_i4[0],
+                    point_i4[1],
+                    snapshot["egoSpeed"],
+                    snapshot["egoYaw"],
+                    self.ttc_max,
+                )
+                ppj1 = predict_position(
+                    point_j1[0],
+                    point_j1[1],
+                    agent["speed"],
+                    agent["yaw"],
+                    self.ttc_max,
+                )
+                ppj2 = predict_position(
+                    point_j2[0],
+                    point_j2[1],
+                    agent["speed"],
+                    agent["yaw"],
+                    self.ttc_max,
+                )
+                ppj3 = predict_position(
+                    point_j3[0],
+                    point_j3[1],
+                    agent["speed"],
+                    agent["yaw"],
+                    self.ttc_max,
+                )
+                ppj4 = predict_position(
+                    point_j4[0],
+                    point_j4[1],
+                    agent["speed"],
+                    agent["yaw"],
+                    self.ttc_max,
+                )
+                ego_path_box = Polygon([ppi1, ppi2, point_i4, point_i3])
+                agent_path_box = Polygon([ppj1, ppj2, point_j4, point_j3])
+
+                ego_box = Polygon([point_i1, point_i2, point_i4, point_i3])
+                agent_box = Polygon([point_j1, point_j2, point_j4, point_j3])
+
+                pret = self.pret_max
+                spret = self.spret_max
+
+                # if ego_path_box.intersects(agent_path_box):
+                #     intersection = ego_path_box.boundary.intersection(
+                #         agent_path_box.boundary
+                #     )
+                #     intersected_points = extract_points(intersection)
+                #
+                #     min_p = None
+                #     min_dist = 1000
+                #     for p in intersected_points:
+                #         dist = math.sqrt(
+                #             (point_i1[0] - p[0]) ** 2 + (point_i1[1] - p[1]) ** 2
+                #         )
+                #         if dist < min_dist:
+                #             min_p = p
+                #         min_dist = dist if dist < min_dist else min_dist
+                #
+                #     # is_inside = False
+                #     # is_on_border = False
+                #     # if min_p is not None:
+                #     #     is_inside = Point(min_p).within(ego_box)               # strictly inside
+                #     #     is_on_border = Point(min_p).touches(ego_box)           # on the border (edge or vertex)
+                #
+                #     min_agent_p = None
+                #     min_dist_agent = 1000
+                #     for p in intersected_points:
+                #         dist = math.sqrt(
+                #             (point_j1[0] - p[0]) ** 2 + (point_j1[1] - p[1]) ** 2
+                #         )
+                #         if dist < min_dist_agent:
+                #             min_agent_p = p
+                #         min_dist_agent = (
+                #             dist if dist < min_dist_agent else min_dist_agent
+                #         )
+                #
+                #     # is_agent_inside = None
+                #     # is_agent_on_border = None
+                #     # if min_agent_p is not None:
+                #     #     is_agent_inside = Point(min_agent_p).within(agent_box)               # strictly inside
+                #     #     is_agent_on_border = Point(min_agent_p).touches(agent_box)           # on the border (edge or vertex)
+                #
+                #     t_ego = (
+                #         min_dist / 0.001
+                #         if snapshot["egoSpeed"] == 0
+                #         else min_dist / snapshot["egoSpeed"]
+                #     )
+                #     if ego_box.intersects(intersection):
+                #         t_ego = 0
+                #     t_agent = (
+                #         min_dist_agent / 0.001
+                #         if agent["speed"] == 0
+                #         else min_dist_agent / agent["speed"]
+                #     )
+                #     if agent_box.intersects(intersection):
+                #         t_agent = 0
+                #     pret = abs(t_ego - t_agent)
+                #     spret = abs(t_ego**2 - t_agent**2)
+                #     if t_ego > 3 and t_agent > 3:
+                #         spret = self.spret_max
+                #
+                #     print("agent_name")
+                #     print(agent["name"])
+                #     print("t_ego")
+                #     print(t_ego)
+                #     print("t_agent")
+                #     print(t_agent)
+                #     print("min_dist")
+                #     print(min_dist)
+                #     print("min_dist_agent")
+                #     print(min_dist_agent)
+                #     print("ego_speed")
+                #     print(snapshot["egoSpeed"])
+                #     print("agent_speed")
+                #     print(agent["speed"])
+                #     pprint([
+                #         (ppi1[0], ppi1[1]),
+                #         (ppi2[0], ppi2[1]),
+                #         (point_i4[0], point_i4[1]),
+                #         (point_i3[0], point_i3[1]),
+                #     ])
+                #     pprint([
+                #         (ppj1[0], ppj1[1]),
+                #         (ppj2[0], ppj2[1]),
+                #         (point_j4[0], point_j4[1]),
+                #         (point_j3[0], point_j3[1]),
+                #     ])
+                #     pprint([
+                #         (point_i1[0], point_i1[1]),
+                #         (point_i2[0], point_i2[1]),
+                #         (point_i4[0], point_i4[1]),
+                #         (point_i3[0], point_i3[1]),
+                #     ])
+                #     pprint([
+                #         (point_j1[0], point_j1[1]),
+                #         (point_j2[0], point_j2[1]),
+                #         (point_j4[0], point_j4[1]),
+                #         (point_j3[0], point_j3[1]),
+                #     ])
+                # print("spret")
+                # print(spret)
+                # print("index")
+                # print(index)
+                # print("\n")
+
+                # Agent 1: position, heading (radians), speed
+                p1 = (snapshot["egoX"], snapshot["egoY"])
+                h1 = snapshot["egoYaw"]
+                v1 = snapshot["egoSpeed"]  # m/s
+                w1 = snapshot["egoWidth"]
+                l1 = snapshot["egoLength"]
+
+                # Agent 2: position, heading (radians), speed
+                p2 = (agent["x"], agent["y"])
+                h2 = agent["yaw"]
+                v2 = agent["speed"]  # m/s
+                w2 = agent["width"]
+                l2 = agent["length"]
+
+                polygon_points = [
+                    (-47, -16),
+                    (13.7, -27.8),
+                    (31.8, 52.0),
+                    (-63, 69),
+                ]
+                # polygon_points = [
+                #     (-31.8, -31),
+                #     (12, -40),
+                #     (28, 29),
+                #     (-22, 30),
+                # ]
+                polygon_points = None
+                spret = compute_SPrET(
+                    p1, h1, v1, p2, h2, v2, w1, l1, w2, l2, polygon_points
+                )
+                # print("---------------------")
+                # print("ego pos")
+                # print(p1)
+                # print("ego yaw")
+                # print(h1)
+                # print("ego speed")
+                # print(v1)
+                # print("ego width")
+                # print(w1)
+                # print("ego length")
+                # print(l1)
+                # print("")
+                #
+                # print("agent pos")
+                # print(p2)
+                # print("agent yaw")
+                # print(h2)
+                # print("agent speed")
+                # print(v2)
+                # print("agent width")
+                # print(w2)
+                # print("agent length")
+                # print(l2)
+                # print("")
+                #
+                # print("spret")
+                # print(spret)
+                # print("---------------------")
+                # print("\n")
+                if spret is None:
+                    spret = self.spret_max
+
+                agent["pret"] = spret
+                pret_min = min(spret, pret_min)
+                agent["spret"] = spret
+
+                if spret_min > spret:
+                    print("agent")
+                    print(agent["name"])
+                    print("spret")
+                    print(spret)
+                    print(p1)
+                    print(p2)
+                    print(v1)
+                    print(v2)
+
+                spret_min = min(spret, spret_min)
+
+                ppi1 = predict_position(
+                    point_i1[0],
+                    point_i1[1],
+                    snapshot["egoSpeed"],
+                    snapshot["egoYaw"],
+                    self.ttc_max,
+                )
+                ppi2 = predict_position(
+                    point_i2[0],
+                    point_i2[1],
+                    snapshot["egoSpeed"],
+                    snapshot["egoYaw"],
+                    self.ttc_max,
+                )
+                ppi3 = predict_position(
+                    point_i3[0],
+                    point_i3[1],
+                    snapshot["egoSpeed"],
+                    snapshot["egoYaw"],
+                    self.ttc_max,
+                )
+                ppi4 = predict_position(
+                    point_i4[0],
+                    point_i4[1],
+                    snapshot["egoSpeed"],
+                    snapshot["egoYaw"],
+                    self.ttc_max,
+                )
+                ppj1 = predict_position(
+                    point_j1[0], point_j1[1], agent["speed"], agent["yaw"], self.ttc_max
+                )
+                ppj2 = predict_position(
+                    point_j2[0], point_j2[1], agent["speed"], agent["yaw"], self.ttc_max
+                )
+                ppj3 = predict_position(
+                    point_j3[0], point_j3[1], agent["speed"], agent["yaw"], self.ttc_max
+                )
+                ppj4 = predict_position(
+                    point_j4[0], point_j4[1], agent["speed"], agent["yaw"], self.ttc_max
+                )
 
                 ego_path_box = Polygon([ppi1, ppi2, point_i4, point_i3])
                 agent_path_box = Polygon([ppj1, ppj2, point_j3, point_j4])
 
                 found_smaller_ttc = False
                 if ego_path_box.intersects(agent_path_box):
+                    agent["dce"] = min(agent["relativeDistance"], self.dce_max)
 
                     # Compute the intersection of their boundaries
-                    intersection = ego_path_box.boundary.intersection(agent_path_box.boundary)
-                    intersected_points = extract_points(intersection)
-
-                    min_dist = 1000
-                    for p in intersected_points:
-                        dist = math.sqrt((point_i1[0] - p[0]) ** 2 + (point_i1[1] - p[1]) ** 2)
-                        min_dist = dist if dist < min_dist else min_dist
-
-                    min_dist_agent = 1000
-                    for p in intersected_points:
-                        dist = math.sqrt((point_j1[0] - p[0]) ** 2 + (point_j1[1] - p[1]) ** 2)
-                        min_dist_agent = dist if dist < min_dist_agent else min_dist_agent
-
-                    agent["dce"] = min(agent["relativeDistance"], self.dce_max)
+                    # intersection = ego_path_box.boundary.intersection(
+                    #     agent_path_box.boundary
+                    # )
+                    # intersected_points = extract_points(intersection)
+                    #
+                    # min_dist = 1000
+                    # for p in intersected_points:
+                    #     dist = math.sqrt(
+                    #         (point_i1[0] - p[0]) ** 2 + (point_i1[1] - p[1]) ** 2
+                    #     )
+                    #     min_dist = dist if dist < min_dist else min_dist
+                    #
+                    # min_dist_agent = 1000
+                    # for p in intersected_points:
+                    #     dist = math.sqrt(
+                    #         (point_j1[0] - p[0]) ** 2 + (point_j1[1] - p[1]) ** 2
+                    #     )
+                    #     min_dist_agent = (
+                    #         dist if dist < min_dist_agent else min_dist_agent
+                    #     )
 
                     # if snapshot["egoSpeed"] > 1:
                     #     ttc = min_dist / snapshot["egoSpeed"]
@@ -467,19 +914,91 @@ class ScenarioSampler:
                 prediction_time = 0
                 ego_predicted_position = None
                 while prediction_time <= self.ttc_max:
-                    ego_predicted_position = predict_position(snapshot["egoX"], snapshot["egoY"], snapshot["egoSpeed"], snapshot["egoYaw"], prediction_time)
+                    ego_predicted_position = predict_position(
+                        snapshot["egoX"],
+                        snapshot["egoY"],
+                        snapshot["egoSpeed"],
+                        snapshot["egoYaw"],
+                        prediction_time,
+                    )
 
-                    ppi1 = predict_position(point_i1[0], point_i1[1], snapshot["egoSpeed"], snapshot["egoYaw"], prediction_time)
-                    ppi2 = predict_position(point_i2[0], point_i2[1], snapshot["egoSpeed"], snapshot["egoYaw"], prediction_time)
-                    ppi3 = predict_position(point_i3[0], point_i3[1], snapshot["egoSpeed"], snapshot["egoYaw"], prediction_time)
-                    ppi4 = predict_position(point_i4[0], point_i4[1], snapshot["egoSpeed"], snapshot["egoYaw"], prediction_time)
-                    ppj1 = predict_position(point_j1[0], point_j1[1], agent["speed"], agent["yaw"], prediction_time)
-                    ppj2 = predict_position(point_j2[0], point_j2[1], agent["speed"], agent["yaw"], prediction_time)
-                    ppj3 = predict_position(point_j3[0], point_j3[1], agent["speed"], agent["yaw"], prediction_time)
-                    ppj4 = predict_position(point_j4[0], point_j4[1], agent["speed"], agent["yaw"], prediction_time)
+                    ppi1 = predict_position(
+                        point_i1[0],
+                        point_i1[1],
+                        snapshot["egoSpeed"],
+                        snapshot["egoYaw"],
+                        prediction_time,
+                    )
+                    ppi2 = predict_position(
+                        point_i2[0],
+                        point_i2[1],
+                        snapshot["egoSpeed"],
+                        snapshot["egoYaw"],
+                        prediction_time,
+                    )
+                    ppi3 = predict_position(
+                        point_i3[0],
+                        point_i3[1],
+                        snapshot["egoSpeed"],
+                        snapshot["egoYaw"],
+                        prediction_time,
+                    )
+                    ppi4 = predict_position(
+                        point_i4[0],
+                        point_i4[1],
+                        snapshot["egoSpeed"],
+                        snapshot["egoYaw"],
+                        prediction_time,
+                    )
+                    ppj1 = predict_position(
+                        point_j1[0],
+                        point_j1[1],
+                        agent["speed"],
+                        agent["yaw"],
+                        prediction_time,
+                    )
+                    ppj2 = predict_position(
+                        point_j2[0],
+                        point_j2[1],
+                        agent["speed"],
+                        agent["yaw"],
+                        prediction_time,
+                    )
+                    ppj3 = predict_position(
+                        point_j3[0],
+                        point_j3[1],
+                        agent["speed"],
+                        agent["yaw"],
+                        prediction_time,
+                    )
+                    ppj4 = predict_position(
+                        point_j4[0],
+                        point_j4[1],
+                        agent["speed"],
+                        agent["yaw"],
+                        prediction_time,
+                    )
 
                     ego_polygon = Polygon([ppi1, ppi2, ppi4, ppi3])
                     agent_polygon = Polygon([ppj1, ppj2, ppj4, ppj3])
+
+                    if is_last_snapshot:
+                        # print("Ego")
+                        ego_polygon_debug = (
+                            (ppi1[0], ppi1[1]),
+                            (ppi2[0], ppi2[1]),
+                            (ppi3[0], ppi3[1]),
+                            (ppi4[0], ppi4[1]),
+                        )
+                        # pprint(ego_polygon_debug)
+                        # print("Agent")
+                        agent_polygon_debug = (
+                            (ppj1[0], ppj1[1]),
+                            (ppj2[0], ppj2[1]),
+                            (ppj3[0], ppj3[1]),
+                            (ppj4[0], ppj4[1]),
+                        )
+                        # pprint(agent_polygon_debug)
 
                     if ego_polygon.intersects(agent_polygon):
                         collided = True
@@ -488,14 +1007,17 @@ class ScenarioSampler:
                         # pprint("COLLISION, TTC: {}".format(prediction_time))
                         # pprint("TTC MIN: {}".format(ttc_min))
                         # pprint(agent["name"])
-                        # print('\n')
+                        # print("\n")
                         break
 
                     prediction_time += time_step
 
                 if collided and ego_predicted_position is not None:
                     agent["ttc"] = ttc
-                    dist = math.sqrt((ego_predicted_position[0] - snapshot["egoX"]) ** 2 + (ego_predicted_position[1] - snapshot["egoY"]) ** 2)
+                    dist = math.sqrt(
+                        (ego_predicted_position[0] - snapshot["egoX"]) ** 2
+                        + (ego_predicted_position[1] - snapshot["egoY"]) ** 2
+                    )
                     if dist == 0:
                         dist = 0.001
                     # if agent["situationType"] > 2:
@@ -516,22 +1038,22 @@ class ScenarioSampler:
                     # agent["ttc"] = self.ttc_max
                     agent["accReq"] = 0
 
-
         self.score = {
             "ttce+dce_min": ttce_dce_min,
             "collision_risk": collision_risk_max,
             "ttce_min": ttce_min,
             "ttc_min": ttc_min,
+            "pret_min": pret_min,
             "dce_min": dce_min,
             "acc_req_max": acc_req_max,
             "spret_min": spret_min,
-            "rss_dce": rss_dce
+            "rss_dce": rss_dce,
         }
         print("SAMPLER PREPROCESS" * 100)
         pprint(self.score)
         print("SAMPLER PREPROCESS" * 100)
 
-    def store_to_db(self, trial_id):
+    def store_to_db(self, trial_id, ego_id):
         print("Trial ID")
         print(trial_id)
 
@@ -577,29 +1099,30 @@ class ScenarioSampler:
 
         for index, observation in enumerate(self.data):
             observation["trial"] = trial_id
+            observation["ego"] = ego_id
 
-        worst_ttc = {}
-        worst_ttc_index = {}
-        for index, observation in enumerate(self.data):
-            if "agents" not in observation:
-                continue
-            for agent in observation["agents"]:
-                worst_ttc.setdefault(agent["name"], float("inf"))
-                if worst_ttc[agent["name"]] > agent["ttc"]:
-                    worst_ttc[agent["name"]] = agent["ttc"]
-                    worst_ttc_index[agent["name"]] = index
-        for agent_name in worst_ttc.keys():
-            if worst_ttc[agent_name] < 10:
-                self.events.append(
-                    {
-                        "name": "worstTtcWith{}".format(agent_name),
-                        "time": self.data[worst_ttc_index[agent_name]]["time"],
-                        "esminiSeconds": self.data[worst_ttc_index[agent_name]][
-                            "esminiSeconds"
-                        ],
-                        "observationIndex": worst_ttc_index[agent_name],
-                    }
-                )
+        # worst_ttc = {}
+        # worst_ttc_index = {}
+        # for index, observation in enumerate(self.data):
+        #     if "agents" not in observation:
+        #         continue
+        #     for agent in observation["agents"]:
+        #         worst_ttc.setdefault(agent["name"], float("inf"))
+        #         if worst_ttc[agent["name"]] > agent["ttc"]:
+        #             worst_ttc[agent["name"]] = agent["ttc"]
+        #             worst_ttc_index[agent["name"]] = index
+        # for agent_name in worst_ttc.keys():
+        #     if worst_ttc[agent_name] < 10:
+        #         self.events.append(
+        #             {
+        #                 "name": "worstTtcWith{}".format(agent_name),
+        #                 "time": self.data[worst_ttc_index[agent_name]]["time"],
+        #                 "esminiSeconds": self.data[worst_ttc_index[agent_name]][
+        #                     "esminiSeconds"
+        #                 ],
+        #                 "observationIndex": worst_ttc_index[agent_name],
+        #             }
+        #         )
 
         score = self.scoring.get_score()
         if score and "stuck" in score and score["stuck"] == 1.0:
@@ -637,60 +1160,65 @@ class ScenarioSampler:
 
         try:
             observations_response = requests.post(
-                url=self.payload_api + "/observations/batch",
+                url=self.payload_api + "/observations/bulk",
                 headers=self.headers,
                 json=clean_data(self.data),
                 verify=False,
             )
             observations_response.raise_for_status()
             print("successfully upload observations")
-            print("WATCH LAST OBSERVATION" * 100)
-            pprint(self.data[-1])
-            observations = observations_response.json()
-            if observations:
-                def patch_observations(url, data):
-                    try:
-                        response = requests.patch(
-                            url=url,
-                            json=data,
-                            verify=False,
-                            headers=self.headers,
-                        )
-                        response.raise_for_status()
-                        print("successfully patch observations to trials")
-                    except Exception as e:
-                        print(
-                            "Patch Observations to Trials, Error:",
-                            str(e),
-                        )
-                print("PATCH OBSERVATIONS TO TRIAL")
-                observation_ids = [observation["id"] for observation in observations]
-                print(len(observation_ids))
-                patchData = {
-                    "observations": observation_ids,
-                }
-
-                thread = threading.Thread(target=patch_observations, args=(self.payload_api + "/trials/{}".format(trial_id), patchData))
-                thread.start()
-                time.sleep(10)
-                print("SLEEP 10 SECS")
-
-                # pprint(patchData)
-                # pprint(self.payload_api + "/trials/{}".format(trial_id))
-                # try:
-                #     response = requests.patch(
-                #         url=self.payload_api + "/trials/{}".format(trial_id),
-                #         json=patchData,
-                #         verify=False,
-                #         headers=self.headers,
-                #     )
-                #     response.raise_for_status()
-                #     print("successfully patch observations to trials")
-                # except Exception as e:
-                #     print(
-                #         "Patch Observations to Trials, Error:",
-                #         str(e),
-                #     )
+            # print("WATCH LAST OBSERVATION" * 100)
+            # pprint(self.data[-1])
+            # observations = observations_response.json()
+            # if observations:
+            #
+            #     def patch_observations(url, data):
+            #         try:
+            #             response = requests.patch(
+            #                 url=url,
+            #                 json=data,
+            #                 verify=False,
+            #                 headers=self.headers,
+            #             )
+            #             response.raise_for_status()
+            #             print("successfully patch observations to trials")
+            #         except Exception as e:
+            #             print(
+            #                 "Patch Observations to Trials, Error:",
+            #                 str(e),
+            #             )
+            #
+            #     print("PATCH OBSERVATIONS TO TRIAL")
+            #     observation_ids = [observation["id"] for observation in observations]
+            #     print(len(observation_ids))
+            #     patchData = {
+            #         "observations": observation_ids,
+            #     }
+            #
+            #     thread = threading.Thread(
+            #         target=patch_observations,
+            #         args=(self.payload_api + "/trials/{}".format(trial_id), patchData),
+            #     )
+            #     thread.start()
+            #     time.sleep(10)
+            #     print("SLEEP 10 SECS")
+            #
+            #     # pprint(patchData)
+            #     # pprint(self.payload_api + "/trials/{}".format(trial_id))
+            #     # try:
+            #     #     response = requests.patch(
+            #     #         url=self.payload_api + "/trials/{}".format(trial_id),
+            #     #         json=patchData,
+            #     #         verify=False,
+            #     #         headers=self.headers,
+            #     #     )
+            #     #     response.raise_for_status()
+            #     #     print("successfully patch observations to trials")
+            #     # except Exception as e:
+            #     #     print(
+            #     #         "Patch Observations to Trials, Error:",
+            #     #         str(e),
+            #     #     )
 
         except Exception as e:
             print(
@@ -698,40 +1226,44 @@ class ScenarioSampler:
                 str(e),
             )
 
-        try:
-            def patch_events(url, data):
-                response = requests.patch(
-                    url=self.payload_api + "/trials/{}".format(trial_id),
-                    json=patchData,
-                    verify=False,
-                    headers=self.headers,
-                )
-                response.raise_for_status()
-                print("successfully patch events to trials")
-
-            pprint(self.events)
-
-            print("PATCH EVENTS TO TRIAL")
-            patchData = {"events": self.events}
-            thread2 = threading.Thread(target=patch_events, args=(self.payload_api + "/trials/{}".format(trial_id), patchData))
-            thread2.start()
-            time.sleep(3)
-            print("SLEEP 3 SECS")
-
-            # patchData = {"events": self.events}
-            # response = requests.patch(
-            #     url=self.payload_api + "/trials/{}".format(trial_id),
-            #     json=patchData,
-            #     verify=False,
-            #     headers=self.headers,
-            # )
-            # response.raise_for_status()
-            # print("successfully patch events to trials")
-        except Exception as e:
-            print(
-                "Patch Events to Trials, Error:",
-                str(e),
-            )
+        # try:
+        #
+        #     def patch_events(url, data):
+        #         response = requests.patch(
+        #             url=self.payload_api + "/trials/{}".format(trial_id),
+        #             json=patchData,
+        #             verify=False,
+        #             headers=self.headers,
+        #         )
+        #         response.raise_for_status()
+        #         print("successfully patch events to trials")
+        #
+        #     pprint(self.events)
+        #
+        #     print("PATCH EVENTS TO TRIAL")
+        #     patchData = {"events": self.events}
+        #     thread2 = threading.Thread(
+        #         target=patch_events,
+        #         args=(self.payload_api + "/trials/{}".format(trial_id), patchData),
+        #     )
+        #     thread2.start()
+        #     time.sleep(3)
+        #     print("SLEEP 3 SECS")
+        #
+        #     # patchData = {"events": self.events}
+        #     # response = requests.patch(
+        #     #     url=self.payload_api + "/trials/{}".format(trial_id),
+        #     #     json=patchData,
+        #     #     verify=False,
+        #     #     headers=self.headers,
+        #     # )
+        #     # response.raise_for_status()
+        #     # print("successfully patch events to trials")
+        # except Exception as e:
+        #     print(
+        #         "Patch Events to Trials, Error:",
+        #         str(e),
+        #     )
 
         # return observations_response.json()
 
@@ -771,7 +1303,7 @@ class ScenarioSampler:
         print(start_time)
         self.data = []
         df = df[df["time"] > start_time - 0.01]
-        times = df['time'].unique().tolist()
+        times = df["time"].unique().tolist()
         sampling_period = 0.1
         period_start_time = start_time
         for i in range(1, len(times)):
@@ -780,6 +1312,7 @@ class ScenarioSampler:
 
             if i != len(times) - 1 and time - period_start_time < sampling_period:
                 continue
+
             period_start_time = time
 
             row = df[df["time"] == time]
@@ -791,22 +1324,28 @@ class ScenarioSampler:
             observation = {
                 "egoSpeedLon": 0,
                 "egoSpeedLat": 0,
-                "time": time,
-                "esminiSeconds": time,
+                "time": float(time),
+                "esminiSeconds": float(time),
                 "egoX": float(egoRow["x"].values[0]),
                 "egoY": float(egoRow["y"].values[0]),
                 "egoYaw": float(egoRow["h"].values[0]),
-                "egoYawRate": float((egoRow["h"].values[0] - egoPrevRow["h"].values[0]) / (time - prevTime)),
+                "egoYawRate": float(
+                    (egoRow["h"].values[0] - egoPrevRow["h"].values[0])
+                    / (float(time) - float(prevTime))
+                ),
                 "egoSpeed": float(egoRow["speed"].values[0]),
-                "egoAcceleration": float((egoRow["speed"].values[0] - egoPrevRow["speed"].values[0]) / (time - prevTime)),
+                "egoAcceleration": float(
+                    (egoRow["speed"].values[0] - egoPrevRow["speed"].values[0])
+                    / (float(time) - float(prevTime))
+                ),
                 "egoWidth": 2.2,
                 "egoLength": 5.17,
-                "egoRoadId": 0,
-                "egoS": 0,
-                "egoT": 0,
+                "egoRoadId": int(egoRow["roadId"].values[0]),
+                "egoS": float(egoRow["s"].values[0]),
+                "egoT": float(egoRow["t"].values[0]),
                 "egoJunctionId": 0,
-                "egoLaneId":0,
-                "egoLaneOffset": 0,
+                "egoLaneId": int(egoRow["laneId"].values[0]),
+                "egoLaneOffset": float(egoRow["offset"].values[0]),
                 "egoLaneHeading": 0,
                 "egoCurvature": 0,
                 "egoSpeedCmd": 0,
@@ -820,7 +1359,9 @@ class ScenarioSampler:
             ego_pose.position.x = observation["egoX"]
             ego_pose.position.y = observation["egoY"]
             ego_pose.position.z = 0
-            ego_pose.orientation = converter.EulerAngleToQuaternion([0.0, 0.0, observation["egoSpeed"]])
+            ego_pose.orientation = converter.EulerAngleToQuaternion(
+                [0.0, 0.0, observation["egoSpeed"]]
+            )
             ego_velocity = Vector3()
             ego_velocity.x = observation["egoSpeed"] * math.cos(observation["egoYaw"])
             ego_velocity.y = observation["egoSpeed"] * math.sin(observation["egoYaw"])
@@ -841,16 +1382,21 @@ class ScenarioSampler:
                     "x": float(agentRow["x"].values[0]),
                     "y": float(agentRow["y"].values[0]),
                     "speed": float(agentRow["speed"].values[0]),
-                    "acceleration": float((agentRow["speed"].values[0] - agentPrevRow["speed"].values[0]) / (time - prevTime)),
+                    "acceleration": float(
+                        (agentRow["speed"].values[0] - agentPrevRow["speed"].values[0])
+                        / (float(time) - float(prevTime))
+                    ),
                     "yaw": float(agentRow["h"].values[0]),
-                    "yawRate": float((agentRow["h"].values[0] - agentPrevRow["h"].values[0]) / (time - prevTime)),
+                    "yawRate": float(
+                        (agentRow["h"].values[0] - agentPrevRow["h"].values[0])
+                        / (float(time) - float(prevTime))
+                    ),
                     "relativeDistance": None,
                     "width": self.agent_size[agent_name]["width"],
                     "length": self.agent_size[agent_name]["length"],
                     "height": 1.0,
                     "ttc": None,
                     "dce": None,
-
                     "collisionRisk": None,
                     "ttce": None,
                     "pathIntersected": 0,
@@ -926,7 +1472,9 @@ class ScenarioSampler:
                 ego_polygon = Polygon([point_i1, point_i2, point_i4, point_i3])
                 agent_polygon = Polygon([point_j1, point_j2, point_j4, point_j3])
 
-                nearest_point_on_ego, nearest_point_on_agent = nearest_points(ego_polygon, agent_polygon)
+                nearest_point_on_ego, nearest_point_on_agent = nearest_points(
+                    ego_polygon, agent_polygon
+                )
                 nearest_distance = nearest_point_on_ego.distance(nearest_point_on_agent)
                 agent_observation["relativeDistance"] = nearest_distance
 
@@ -942,8 +1490,12 @@ class ScenarioSampler:
                 )  # type: Pose
 
                 agent_velocity = Vector3()
-                agent_velocity.x = agent_observation["speed"] * math.cos(agent_observation["yaw"])
-                agent_velocity.y = agent_observation["speed"] * math.sin(agent_observation["yaw"])
+                agent_velocity.x = agent_observation["speed"] * math.cos(
+                    agent_observation["yaw"]
+                )
+                agent_velocity.y = agent_observation["speed"] * math.sin(
+                    agent_observation["yaw"]
+                )
                 agent_local_velocity = transform.global_velocity_to_local_velocity(
                     ego_pose, agent_velocity
                 )
@@ -954,7 +1506,7 @@ class ScenarioSampler:
                     local_pose.orientation
                 ).z
                 agent_observation["relativeYawRate"] = (
-                    agent_observation['yawRate'] - observation["egoYawRate"]
+                    agent_observation["yawRate"] - observation["egoYawRate"]
                 )
 
                 agent_observation["relativeVelocityX"] = (
@@ -985,8 +1537,12 @@ class ScenarioSampler:
                 agent_back_j3 = agent_back_j3.flatten()
                 agent_back_j4 = agent_back_j4.flatten()
 
-                ego_vehicle_polygon = Polygon([ego_front_i1, ego_front_i2, ego_back_i4, ego_back_i3])
-                agent_vehicle_polygon = Polygon([agent_front_j1, agent_front_j2, agent_back_j4, agent_back_j3])
+                ego_vehicle_polygon = Polygon(
+                    [ego_front_i1, ego_front_i2, ego_back_i4, ego_back_i3]
+                )
+                agent_vehicle_polygon = Polygon(
+                    [agent_front_j1, agent_front_j2, agent_back_j4, agent_back_j3]
+                )
 
                 (
                     point_i1,
@@ -1028,7 +1584,7 @@ class ScenarioSampler:
 
         if not self.can_start_observation_sampling:
             return
-        
+
         if self.current_agent_states is None:
             print("msg is None")
 
@@ -1049,7 +1605,10 @@ class ScenarioSampler:
         # print(seconds)
         # print("start sampling seconds")
         # print(self.start_sampling_esmini_seconds)
-        if self.can_start_observation_sampling and self.start_sampling_esmini_seconds == 0:
+        if (
+            self.can_start_observation_sampling
+            and self.start_sampling_esmini_seconds == 0
+        ):
             print("SET START SAMPLING SECONDS" * 30)
             print(seconds)
             self.start_sampling_esmini_seconds = seconds

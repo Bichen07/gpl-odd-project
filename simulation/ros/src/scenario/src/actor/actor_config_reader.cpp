@@ -96,6 +96,7 @@ void ParseAgentConfig(
             utils::GetDoubleJsonValue(configJsonValue["size_overwrite"]["x"]),
             utils::GetDoubleJsonValue(configJsonValue["size_overwrite"]["y"]),
             utils::GetDoubleJsonValue(configJsonValue["size_overwrite"]["z"]));
+        ROS_WARN_STREAM(outputAgentConfig->size);
         ROS_WARN_STREAM("Overwrite agent's model size.");
         sizeSet = true;
     }
@@ -163,6 +164,8 @@ void ParseAgentConfig(
             throw std::invalid_argument(std::string(__FILE__":") + std::to_string(__LINE__));
         }
     }
+    ROS_WARN_STREAM(outputAgentConfig->objectClassId);
+    ROS_WARN_STREAM(outputAgentConfig->size);
 }
 
 void DummyFunctionForTemplateConstruction()

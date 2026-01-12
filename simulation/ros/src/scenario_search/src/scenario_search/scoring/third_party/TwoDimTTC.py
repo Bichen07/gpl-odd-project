@@ -67,6 +67,43 @@ def ison(line_start, line_end, point):
 def dist_p2l(point, line_start, line_end):
     return np.absolute((line_end[0]-line_start[0])*(line_start[1]-point[1])-(line_start[0]-point[0])*(line_end[1]-line_start[1]))/np.sqrt((line_end[0]-line_start[0])**2+(line_end[1]-line_start[1])**2)
 
+def mygetpoints(samples):
+    # Vehicle i
+    heading_i = np.stack([samples['hx_i'], samples['hy_i']], axis=1)  # shape: (N, 2)
+    perp_heading_i = np.stack([-heading_i[:, 1], heading_i[:, 0]], axis=1)
+    heading_scale_i = np.linalg.norm(heading_i, axis=1, keepdims=True)
+
+    center_i = np.stack([samples['x_i'], samples['y_i']], axis=1)
+    length_i = samples['length_i'][:, np.newaxis]
+    width_i = samples['width_i'][:, np.newaxis]
+
+    point_up_i = center_i + heading_i / heading_scale_i * length_i / 2
+    point_down_i = center_i - heading_i / heading_scale_i * length_i / 2
+
+    point_i1 = (point_up_i + perp_heading_i / heading_scale_i * width_i / 2).T
+    point_i2 = (point_up_i - perp_heading_i / heading_scale_i * width_i / 2).T
+    point_i3 = (point_down_i + perp_heading_i / heading_scale_i * width_i / 2).T
+    point_i4 = (point_down_i - perp_heading_i / heading_scale_i * width_i / 2).T
+
+    # Vehicle j
+    heading_j = np.stack([samples['hx_j'], samples['hy_j']], axis=1)
+    perp_heading_j = np.stack([-heading_j[:, 1], heading_j[:, 0]], axis=1)
+    heading_scale_j = np.linalg.norm(heading_j, axis=1, keepdims=True)
+
+    center_j = np.stack([samples['x_j'], samples['y_j']], axis=1)
+    length_j = samples['length_j'][:, np.newaxis]
+    width_j = samples['width_j'][:, np.newaxis]
+
+    point_up_j = center_j + heading_j / heading_scale_j * length_j / 2
+    point_down_j = center_j - heading_j / heading_scale_j * length_j / 2
+
+    point_j1 = (point_up_j + perp_heading_j / heading_scale_j * width_j / 2).T
+    point_j2 = (point_up_j - perp_heading_j / heading_scale_j * width_j / 2).T
+    point_j3 = (point_down_j + perp_heading_j / heading_scale_j * width_j / 2).T
+    point_j4 = (point_down_j - perp_heading_j / heading_scale_j * width_j / 2).T
+
+    return point_i1, point_i2, point_i3, point_i4, point_j1, point_j2, point_j3, point_j4
+
 def getpoints(samples):
     ## vehicle i
     heading_i = samples[['hx_i','hy_i']].values

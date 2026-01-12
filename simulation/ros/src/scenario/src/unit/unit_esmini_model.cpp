@@ -268,9 +268,9 @@ namespace unit
         mProperResponseSubscriber       = mNodeHandle.subscribe("/rss/proper_response", 1, &EsminiModel::ProperResponseCallback, this);
         mIsReferenceModelTurnSubscriber = mNodeHandle.subscribe("is_reference_model_turn", 1, &EsminiModel::IsReferenceModelTurnCallback, this);
 
-        mEsminiEventPublisher                 = mNodeHandle.advertise<std_msgs::String>("/esmini_event", 1);
-        userData.eventPublisherPtr            = &mEsminiEventPublisher;
-        mEgoSpeedCmdPublisher                 = mNodeHandle.advertise<itri_msgs::speed_cmd>("scenario_control_speed_cmd", 1);
+        mEsminiEventPublisher      = mNodeHandle.advertise<std_msgs::String>("/esmini_event", 1);
+        userData.eventPublisherPtr = &mEsminiEventPublisher;
+        // mEgoSpeedCmdPublisher                 = mNodeHandle.advertise<itri_msgs::speed_cmd>("scenario_control_speed_cmd", 1);
         mEndScenarioPublisher                 = mNodeHandle.advertise<std_msgs::Bool>("end_scenario", 1);
         mStartEsminiPublisher                 = mNodeHandle.advertise<std_msgs::Bool>("start_esmini", 1);
         mCollisionProfilePublisher            = mNodeHandle.advertise<simulation_msgs::CollisionProfile>("/simulation/collision_profile", 1);
@@ -626,7 +626,7 @@ namespace unit
             }
 
             // ROS_WARN_STREAM("[unit_esmini_model] ego external speed kph: " << speedCmd.kph);
-            mEgoSpeedCmdPublisher.publish(speedCmd);
+            // mEgoSpeedCmdPublisher.publish(speedCmd);
 
             if (mIsEsminiBegin)
             {
