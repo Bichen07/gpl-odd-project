@@ -1,10 +1,10 @@
-import { CollectionConfig } from "payload/types";
-import { usersAccess } from "../access";
+import { CollectionConfig } from 'payload'
+import { usersAccess } from '../access'
 
-const EsminiCsvs: CollectionConfig = {
-  slug: "documents",
+export const Documents: CollectionConfig = {
+  slug: 'documents',
   admin: {
-    group: "Uploads",
+    group: 'Uploads',
   },
   access: {
     read: () => true,
@@ -13,11 +13,19 @@ const EsminiCsvs: CollectionConfig = {
     update: usersAccess,
   },
   upload: {
-    staticURL: "/Documents",
-    staticDir: "/data/uploads/documents",
-    mimeTypes: ["text/csv", "application/json", "application/octet-stream"],
+    staticDir:
+      process.env.NODE_ENV == 'production' ? '/data/uploads/documents' : './uploads/documents',
+    mimeTypes: [
+      'text/csv',
+      'text/plain',
+      'application/json',
+      'application/octet-stream',
+      'application/zip',
+      'application/xml',
+      'image/png',
+      'image/jpeg',
+      'application/x-zip-compressed',
+    ],
   },
   fields: [],
-};
-
-export default EsminiCsvs;
+}

@@ -102,7 +102,7 @@ conda activate sampling
 litestar run --port 9009 --host 0.0.0.0 --debug --reload
 ```
 
-(Modify the parameters as needed.)
+(Modify the litestar parameters as needed.)
 
 #### Pass Batch ID you want to test to sampling server
 
@@ -218,16 +218,49 @@ tmux
 
 ### View and Explore Simulation Result
 
+#### Spin up The Dashboard
+
 - Go to directory "app/dashboard"
-- Update environment variables in the .env file if needed
 - Start the web interface by:
 
 ```bash
-bun run dev
+bun run start
 ```
 
 - Open the displaying url to see the visualization of the simulation result.
 
+#### Spin up The Analyzer for Clustering and Visualization Data
+
+- Activate the Conda environment:
+
+```bash
+conda activate analyzer
+
+```
+
+- Navigate to app/analyzer/src
+- Start the analyzer server
+
+```bash
+litestar run --port 9009 --host 0.0.0.0 --debug --reload
+# Or adjust the command arguments if needed
+```
+
+(Modify the litestar parameters as needed.)
+
 #### Create and Save Trajectory Analysis
 
-TBI
+From the dashboard, navigate to a batch and open the **Save** tab.\
+Click **Create New**, then press the **Analyze** button.\
+The analyzer will begin processing and may take several minutes.\
+The analysis results will be saved automatically.\
+You can manage these saves (add or delete) from the Payload Admin UI.
+
+#### Explore the analyzing result
+
+- Use the following views and tools:
+  - Scenario Parameter Space\
+  - Trajectory Projection Space\
+  - Replayer\
+  - Trajectory Heatmap\
+  - Apply filtering and selection tools

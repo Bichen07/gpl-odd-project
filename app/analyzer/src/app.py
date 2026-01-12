@@ -1,8 +1,7 @@
 from litestar import Litestar
 from litestar.openapi.config import OpenAPIConfig
 from litestar.openapi.plugins import SwaggerRenderPlugin
-
-from controller.trajectory_analysis import TrajectoryAnalysisController
+from controller import TrajectoryAnalysisController
 from litestar.config.cors import CORSConfig
 
 cors_config = CORSConfig(allow_origins=["*"])

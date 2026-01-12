@@ -1,14 +1,18 @@
 import { CodegenConfig } from "@graphql-codegen/cli";
+import "./envConfig.ts";
 
 const config: CodegenConfig = {
-  schema: process.env.VITE_API_ADDRESS + "/graphql",
+  schema: process.env.NEXT_PUBLIC_PAYLOAD_API_ADDRESS + "/api/graphql",
   documents: ["src/**/*.{ts,tsx}"],
   generates: {
-    "./src/__generated__/": {
+    "./src/app/_shared/graphql/__generated__/": {
       preset: "client",
       plugins: [],
       presetConfig: {
         gqlTagName: "gql",
+      },
+      config: {
+        avoidOptionals: true,
       },
     },
   },
