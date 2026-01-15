@@ -2,13 +2,15 @@
 
 # nycu-odd-project
 
-dotenv="$(dirname $0)/.env"
-if [ -f $dotenv ]
-then
-    export $(cat $dotenv | xargs)
-fi
+# dotenv="$(dirname $0)/.env"
+# if [ -f $dotenv ]
+# then
+#     export $(cat $dotenv | xargs)
+# fi
 
-export PROJECT_DIR=${HOME}/source_code/nycu-odd-project-release
+export PAYLOAD_API="http://localhost:3020/api"
+export USER_API_KEY="e6f0cadd-30f1-4d7d-b953-6239d46d7a69"
+export PROJECT_DIR=${HOME}/Downloads/code/gpl-odd-project
 
 VERSION_DETAILS_PATH="${PROJECT_DIR}/version_details.md"
 SDC_VERSION=$(grep -Po "\* sdc built from commit # \K[0-9a-z]*" $VERSION_DETAILS_PATH)
@@ -39,5 +41,5 @@ export SDC_DOCKER_CONTAINER_WORKING_DIRECTORY="/project/mmsl_simulation"
 # --device /dev/dri/card0
 
 # Uncomment this line if there's no Nvidia GPU on host machine.
-# export SDC_DOCKER_NVIDIA_SUPPORT_ENABLED=false
+export SDC_DOCKER_NVIDIA_SUPPORT_ENABLED=false
 export SDC_DOCKER_AUDIO_ENABLED=false

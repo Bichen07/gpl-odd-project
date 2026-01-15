@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   payload:
     build:
@@ -7,13 +5,13 @@ services:
       target: prod
     restart: unless-stopped
     ports:
-      - '3007:3000'
+      - '3020:3000'
     depends_on:
       - postgres
     env_file:
       - .env
     volumes:
-      - /mnt/hdd/gpl-odd-data/uploads:/data/uploads
+      - "${HOST_DATA_MOUNT_PATH}/uploads:/data/uploads"
 
   postgres:
     restart: always
@@ -23,6 +21,6 @@ services:
       POSTGRES_PASSWORD: payloadpass
       POSTGRES_DB: payloaddb
     volumes:
-      - /mnt/hdd/gpl-odd-data/data:/var/lib/postgresql/data
+      - "${HOST_DATA_MOUNT_PATH}/data:/var/lib/postgresql/data"
     # ports:
     #   - '5433:5432'

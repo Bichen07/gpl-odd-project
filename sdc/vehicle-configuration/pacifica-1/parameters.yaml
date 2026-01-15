@@ -1,69 +1,34 @@
-
-motion_compensation:
-    input_topic: /velodyne/velodyne
-    output_topic: /compensate_point
-
-nmea2pose:
-    use_xsens_gps: false
-
-vehicle_length: 5.17
-vehicle_width: 2.2
+behavior:
+  aeb:
+    gear_ratio: 18.0
+    vehicle_geometry: [3.0, 2.5, 5.17, 1.4, 1.0]
+  behavior_rate: 20
+  vehicle: pacifica
 center_to_rear: -1.1
-side_mirror_length: 0.3
-max_lateral_acceleration: 2.5
+collision_buffer: 0.05
+front_length: 1.146
 limit_speed_acceleration: 0.8
 limit_speed_deceleration: -0.5
-steer_angle_limit: 530.0
-wheel_base: 3.089
-front_length: 1.146
-rear_length: 0.935
+map_loader: {map_file_directory: /data/pcd-maps/}
+max_lateral_acceleration: 2.5
+motion_compensation: {input_topic: /velodyne/velodyne, output_topic: /compensate_point}
+ndt2veh: {base_link_to_center: -1.0}
+nmea2pose: {use_xsens_gps: false}
 radius_of_gyration: 8.0
-collision_buffer: 0.05
-use_openpilot: false
-
-behavior:
-    behavior_rate: 20
-    vehicle: pacifica
-    aeb:
-        gear_ratio: 18.0
-        vehicle_geometry: [3.0, 2.5, 5.17, 1.4, 1.0]
-
-waypoint_follower:
-    gear_ratio: 16.2
-    steer_type: "hybrid"
-
-vehicle_id: pacifica1
-
-map_loader:
-    map_file_directory: /data/pcd-maps/
+rear_length: 0.935
 route: hct
-
-traffic_light_projection_node:
-    json_filename: "/locations/shalun.json"
-    sub_camera_name: "/lucid_cameras_x00/gige_100_f"
-    sub_image_topic: "/h265/rgb8"
-    min_visible_distance: 8.0
-    max_visible_distance: 40.0
-    x_enlarge_factor: 1.5
-    y_enlarge_factor: 2.0
-    x_offset_factor: 0.0
-    y_offset_factor: 0.0
-
-traffic_sign_projection_node:
-    json_filename: "/locations/traffic_sign.json"
-    sub_camera_name: "/lucid_cameras_x00/gige_100_f"
-    sub_image_topic: "/h265/rgb8"
-    min_visible_distance: 1.0
-    max_visible_distance: 10.0
-    x_enlarge_factor: 1.0
-    y_enlarge_factor: 1.0
-    x_offset_factor: 0.0
-    y_offset_factor: 0.1
-
-route_mission_handler:
-    route: III_itri
-    fileName: operation
-    gui_open: false
-
-ndt2veh:
-    base_link_to_center: -1.0
+route_mission_handler: {fileName: operation, gui_open: false, route: hct_logistic}
+side_mirror_length: 0.3
+steer_angle_limit: 530.0
+traffic_light_projection_node: {json_filename: /locations/shalun.json, max_visible_distance: 40.0,
+  min_visible_distance: 8.0, sub_camera_name: /lucid_cameras_x00/gige_100_f, sub_image_topic: /h265/rgb8,
+  x_enlarge_factor: 1.5, x_offset_factor: 0.0, y_enlarge_factor: 2.0, y_offset_factor: 0.0}
+traffic_sign_projection_node: {json_filename: /locations/traffic_sign.json, max_visible_distance: 10.0,
+  min_visible_distance: 1.0, sub_camera_name: /lucid_cameras_x00/gige_100_f, sub_image_topic: /h265/rgb8,
+  x_enlarge_factor: 1.0, x_offset_factor: 0.0, y_enlarge_factor: 1.0, y_offset_factor: 0.1}
+use_openpilot: false
+vehicle_id: pacifica1
+vehicle_length: 5.17
+vehicle_width: 2.2
+waypoint_follower: {gear_ratio: 16.2, steer_type: hybrid}
+wheel_base: 3.089

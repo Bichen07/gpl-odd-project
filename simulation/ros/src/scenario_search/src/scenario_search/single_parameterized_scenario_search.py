@@ -392,8 +392,7 @@ class SingleParameterizedScenarioSearch:
 
                             subprocess.call(
                                 [
-                                    # "/project/mmsl_simulation/src/esmini/bin/dat2csv",
-                                    "python3", "/home/user/clones/esmini/scripts/dat2csv.py", "--extended", "--file_refs",
+                                    "python3", "/project/mmsl_simulation/src/esmini/scripts/dat2csv.py", "--extended", "--file_refs",
                                     str(self.current_esmini_record_filepath),
                                 ],
                                 cwd=str(self.current_esmini_record_filepath.parent),
@@ -1007,8 +1006,6 @@ class SingleParameterizedScenarioSearch:
         # self.current_parameters["OncomingSpeed"] = 3.868002340197563
         # 8.617189821787179
         # 3.868002340197563
-        self.current_parameters["OncomingStartDelay"] = 12.5
-        self.current_parameters["OncomingSpeed"] = 11.3
 
         if self.current_trial_index == -1:
             return None  # Done
