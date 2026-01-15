@@ -68,10 +68,10 @@ const StyledToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
     },
   },
   [`& .${toggleButtonGroupClasses.middleButton},& .${toggleButtonGroupClasses.lastButton}`]:
-  {
-    marginLeft: -1,
-    borderLeft: "1px solid transparent",
-  },
+    {
+      marginLeft: -1,
+      borderLeft: "1px solid transparent",
+    },
 }));
 
 const globalStorage = {
@@ -119,14 +119,14 @@ const Replayer = () => {
     return result;
   });
   const showFullTimeline = useAppSelector(
-    (state) => state.batch.showFullHeatmap
+    (state) => state.batch.showFullHeatmap,
   );
   const selectedMetric = useAppSelector((state) => state.batch.selectedMetric);
   const selectedBoundaryMetric = useAppSelector(
-    (state) => state.batch.selectedSafetyBoundaryMetric
+    (state) => state.batch.selectedSafetyBoundaryMetric,
   );
   const trajectoryAnalysis = useAppSelector(
-    (state) => state.batch.trajectoryAnalysis
+    (state) => state.batch.trajectoryAnalysis,
   );
   const timeOrS = useAppSelector((state) => state.batch.timeOrS);
   const durationMode = useAppSelector((state) => state.batch.durationMode);
@@ -156,17 +156,14 @@ const Replayer = () => {
     return result;
   }, [trajectoryAnalysis, durationMode]);
   const filteredTrialIds = useAppSelector(
-    (state) => state.batch.filteredTrialIds
+    (state) => state.batch.filteredTrialIds,
   );
   const selectedTrialId = useAppSelector(
-    (state) => state.batch.selectedTrialId
+    (state) => state.batch.selectedTrialId,
   );
   const selectedTrialIds = useAppSelector(
-    (state) => state.batch.selectedTrialIds
+    (state) => state.batch.selectedTrialIds,
   );
-  // const redrawHandled = useAppSelector(
-  //   (state) => state.batch.replayerRedrawHandled
-  // );
 
   const [sliderSRatio, setSliderSRatio] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -180,10 +177,10 @@ const Replayer = () => {
               graphics: Graphics | Sprite;
               sprite?: Sprite;
               getPositionAtTime: (
-                t: number
+                t: number,
               ) => ReturnType<typeof getPositionAtTime>;
               getPositionAtS: (
-                sRatio: number
+                sRatio: number,
               ) => ReturnType<typeof getPositionAtS>;
             };
           };
@@ -194,20 +191,20 @@ const Replayer = () => {
     };
   } | null>(null);
 
-  const [redrawHandled, setRedrawHandled] = useState(true);
+  const [redrawHandled, setRedrawHandled] = useState(false);
 
   const clusterInfo = useAppSelector(
-    (state) => state.batch.selectedClusterInfos
+    (state) => state.batch.selectedClusterInfos,
   );
   const clusteringResult = useAppSelector(
-    (state) => state.batch.selectedClusteringResults
+    (state) => state.batch.selectedClusteringResults,
   );
 
   const clipTimeManualOverride = useAppSelector(
-    (state) => state.batch.clipTimeManualOverride
+    (state) => state.batch.clipTimeManualOverride,
   );
   const clipTimePaused = useAppSelector((state) => state.batch.clipPaused);
-  const isBaseline = useAppSelector((state) => state.batch.baselineMode);
+  // const isBaseline = useAppSelector((state) => state.batch.baselineMode);
 
   const metricColorscale = useMemo(() => {
     if (selectedMetric && selectedMetric.kpi.rule === "lessThan") {
@@ -246,10 +243,10 @@ const Replayer = () => {
 
   const [trajectories, setTrajectories] = useState<
     | {
-      [egoName: string]: {
-        [trialId: string]: TrajectoryResponseData;
-      };
-    }
+        [egoName: string]: {
+          [trialId: string]: TrajectoryResponseData;
+        };
+      }
     | undefined
   >(undefined);
 
@@ -309,7 +306,7 @@ const Replayer = () => {
         const zip = await JSZip.loadAsync(zipBlob);
 
         const jsonFileName = Object.keys(zip.files).find((name) =>
-          name.endsWith(".json")
+          name.endsWith(".json"),
         );
         if (jsonFileName == null) throw new Error("No JSON file found in ZIP");
 
@@ -402,7 +399,7 @@ const Replayer = () => {
         const trial = trials?.find((t) => t?.id === Number(trialId));
         const passed = trial?.testObjectives?.criticalityMetrics.find(
           (m) =>
-            m.keyPerformanceIndicator.id === selectedBoundaryMetric?.kpi?.id
+            m.keyPerformanceIndicator.id === selectedBoundaryMetric?.kpi?.id,
         )?.passed;
         const label = passed ? "pass" : "fail";
         if (!(label in counter)) {
@@ -425,7 +422,7 @@ const Replayer = () => {
       console.log("INIT APP");
       const egoTexture = (await Assets.load("/car.png")) as Texture;
       if (
-        !isBaseline &&
+        clusteringResult != null &&
         // splitMode &&
         // clusterInfo != null &&
         viewerMode === "interaction-cluster"
@@ -456,10 +453,10 @@ const Replayer = () => {
           for (const label of Object.keys(egoClusterInfo)) {
             // await sleep(100);
             const container = document.getElementById(
-              `replayer-${egoName}-cluster${label}-canvas-container`
+              `replayer-${egoName}-cluster${label}-canvas-container`,
             );
             const canvas = document.getElementById(
-              `replayer-${egoName}-cluster${label}-canvas`
+              `replayer-${egoName}-cluster${label}-canvas`,
             ) as HTMLCanvasElement;
 
             // canvas.height =
@@ -468,7 +465,7 @@ const Replayer = () => {
 
             if (container == null || canvas == null) {
               console.log(
-                `no ${egoName} ${label} container or canvas, continue...`
+                `no ${egoName} ${label} container or canvas, continue...`,
               );
               continue;
             }
@@ -611,7 +608,7 @@ const Replayer = () => {
         }
       }
     };
-  }, [redrawHandled, isBaseline]);
+  }, [redrawHandled]);
 
   useEffect(() => {
     // if (clusterInfo != null) {
@@ -627,8 +624,8 @@ const Replayer = () => {
         dispatch(batchSlice.actions.setClipPaused(!appData.paused));
         dispatch(
           interactionSlice.actions.record(
-            panelName + (appData.paused ? ".pause" : ".resume")
-          )
+            panelName + (appData.paused ? ".pause" : ".resume"),
+          ),
         );
       }
     };
@@ -682,7 +679,7 @@ const Replayer = () => {
 
         newViewerData[egoName][viewerName] = {
           agentsData: {},
-          tick: (ticker: Ticker) => { },
+          tick: (ticker: Ticker) => {},
           shapes: new Container(),
         };
 
@@ -717,7 +714,7 @@ const Replayer = () => {
 
         const egoTrajectories = trajectories[egoName] ?? {};
         for (const [trialIndex, [trialId, trajectory]] of Object.entries(
-          egoTrajectories
+          egoTrajectories,
         ).entries()) {
           if (
             trajectoryAnalysis != null &&
@@ -729,9 +726,9 @@ const Replayer = () => {
           }
           const label =
             clusteringResult != null &&
-              egoName in clusteringResult &&
-              clusteringResult != null &&
-              clusteringResult[egoName] != null
+            egoName in clusteringResult &&
+            clusteringResult != null &&
+            clusteringResult[egoName] != null
               ? clusteringResult[egoName].data[trialId].label
               : "0";
           if (trajectoryAnalysis != null && label == null) {
@@ -740,7 +737,7 @@ const Replayer = () => {
 
           const trial = trials?.find((t) => t?.id === Number(trialId));
           const metricValue = trial?.testObjectives?.criticalityMetrics.find(
-            (m) => m.keyPerformanceIndicator.id === selectedMetric?.kpi?.id
+            (m) => m.keyPerformanceIndicator.id === selectedMetric?.kpi?.id,
           )?.value;
           if (metricValue) {
             metricValueMapping[trialId] = metricValue;
@@ -754,7 +751,7 @@ const Replayer = () => {
         const visited = new Set<string>();
 
         for (const [trialIndex, [trialId, trajectory]] of Object.entries(
-          egoTrajectories
+          egoTrajectories,
         ).entries()) {
           if (
             trajectoryAnalysis != null &&
@@ -767,19 +764,20 @@ const Replayer = () => {
 
           const label =
             clusteringResult != null &&
-              egoName in clusteringResult &&
-              clusteringResult != null &&
-              clusteringResult[egoName] != null
+            egoName in clusteringResult &&
+            clusteringResult != null &&
+            clusteringResult[egoName] != null
               ? clusteringResult[egoName].data[trialId].label
               : "0";
 
           newTimeMax = Math.max(
             newTimeMax,
-            trajectory["time"][trajectory["time"].length - 1]
+            trajectory["time"][trajectory["time"].length - 1],
           );
 
           if (
-            !isBaseline &&
+            // !isBaseline &&
+            clusteringResult != null &&
             viewerName !== label &&
             splitMode &&
             viewerMode === "interaction-cluster"
@@ -789,7 +787,7 @@ const Replayer = () => {
 
           const trial = trials?.find((t) => t?.id === Number(trialId));
           const metricValue = trial?.testObjectives?.criticalityMetrics.find(
-            (m) => m.keyPerformanceIndicator.id === selectedMetric?.kpi?.id
+            (m) => m.keyPerformanceIndicator.id === selectedMetric?.kpi?.id,
           )?.value;
 
           if (viewerName in criticalityViewMetrics && metricValue != null) {
@@ -799,14 +797,15 @@ const Replayer = () => {
 
           const metricColor = metricColorscale(
             ((metricValue ?? 0) - (selectedMetric?.min ?? 0)) /
-            ((selectedMetric?.max ?? 1) - (selectedMetric?.min ?? 0))
+              ((selectedMetric?.max ?? 1) - (selectedMetric?.min ?? 0)),
           ).hex();
           const passed = trial?.testObjectives?.criticalityMetrics.find(
             (m) =>
-              m.keyPerformanceIndicator.id === selectedBoundaryMetric?.kpi?.id
+              m.keyPerformanceIndicator.id === selectedBoundaryMetric?.kpi?.id,
           )?.passed;
           if (
-            !isBaseline &&
+            // !isBaseline &&
+            clusteringResult != null &&
             trajectoryAnalysis != null &&
             splitMode &&
             viewerMode === "pass/fail" &&
@@ -825,13 +824,14 @@ const Replayer = () => {
           const egoTraj = trajectory.trajectory["Ego"];
           const ss = egoTraj.map((i) => i["s_ratio"]);
           for (const [agentIndex, [agentName, agentTraj]] of Object.entries(
-            trajectory.trajectory ?? {}
+            trajectory.trajectory ?? {},
           ).entries()) {
             let color = agentName === "Ego" ? chroma("blue") : chroma("red");
             let alpha = 1.0;
 
             if (
-              !isBaseline &&
+              // !isBaseline &&
+              clusteringResult != null &&
               label != null &&
               clusterInfo != null &&
               clusterInfo[egoName] != null
@@ -840,12 +840,15 @@ const Replayer = () => {
             }
             if (viewerMode === "pass/fail") {
               color = chroma(
-                passed ? theme.palette.success.light : theme.palette.error.light
+                passed
+                  ? theme.palette.success.light
+                  : theme.palette.error.light,
               ).alpha(alpha);
             }
 
             if (
-              !isBaseline &&
+              // !isBaseline &&
+              clusteringResult != null &&
               viewerMode === "interaction-cluster" &&
               label != null &&
               clusterInfo != null &&
@@ -920,7 +923,7 @@ const Replayer = () => {
                         yaw: item.yaw,
                         s_ratio: item.s_ratio,
                       };
-                    })
+                    }),
                   );
                 },
                 getPositionAtS: (s: number) => {
@@ -934,7 +937,7 @@ const Replayer = () => {
                         yaw: item.yaw,
                         s_ratio: item.s_ratio,
                       };
-                    })
+                    }),
                   );
                 },
               };
@@ -968,14 +971,14 @@ const Replayer = () => {
               const agentUpdatedPosition = agent.getPositionAtTime(time);
               agent.graphics.position.set(
                 agentUpdatedPosition?.x ?? 10000,
-                agentUpdatedPosition?.y ?? 10000
+                agentUpdatedPosition?.y ?? 10000,
               );
               agent.graphics.rotation =
                 (agentUpdatedPosition?.yaw ?? 0) + 3.14 / 2;
               if (agent.sprite && agentName === "Ego") {
                 agent.sprite.position.set(
                   agentUpdatedPosition?.x ?? 10000,
-                  agentUpdatedPosition?.y ?? 10000
+                  agentUpdatedPosition?.y ?? 10000,
                 );
                 agent.sprite.rotation = (agentUpdatedPosition?.yaw ?? 0) + 3.14;
               }
@@ -1039,7 +1042,7 @@ const Replayer = () => {
     return () => {
       for (const egoName of Object.keys(newViewerData)) {
         for (const [viewerName, item] of Object.entries(
-          newViewerData[egoName]
+          newViewerData[egoName],
         )) {
           const app = viewers[egoName][viewerName].app;
           app.ticker.remove(item.tick);
@@ -1076,7 +1079,7 @@ const Replayer = () => {
     for (const egoName of Object.keys(viewerData)) {
       for (const viewerName of Object.keys(viewerData[egoName])) {
         for (const [trialId, item] of Object.entries(
-          viewerData[egoName][viewerName].agentsData
+          viewerData[egoName][viewerName].agentsData,
         )) {
           let alpha = 0.75;
           if (selectedTrialIds.by !== "" && selectedTrialIds.value.length > 0) {
@@ -1112,14 +1115,14 @@ const Replayer = () => {
             const agentUpdatedPosition = agent.getPositionAtS(sliderSRatio);
             agent.graphics.position.set(
               agentUpdatedPosition?.x ?? 10000,
-              agentUpdatedPosition?.y ?? 10000
+              agentUpdatedPosition?.y ?? 10000,
             );
             agent.graphics.rotation =
               (agentUpdatedPosition?.yaw ?? 0) + 3.14 / 2;
             if (agent.sprite && agentName === "Ego") {
               agent.sprite.position.set(
                 agentUpdatedPosition?.x ?? 10000,
-                agentUpdatedPosition?.y ?? 10000
+                agentUpdatedPosition?.y ?? 10000,
               );
               agent.sprite.rotation = (agentUpdatedPosition?.yaw ?? 0) + 3.14;
             }
@@ -1131,7 +1134,8 @@ const Replayer = () => {
 
   let canvases: ReactNode = null;
   if (
-    !isBaseline &&
+    // !isBaseline &&
+    clusteringResult != null &&
     splitMode &&
     viewerMode === "interaction-cluster"
     // clusterInfo != null
@@ -1209,9 +1213,9 @@ const Replayer = () => {
                 sx={{
                   display:
                     label in
-                      (clusterCounter && egoName in clusterCounter
-                        ? clusterCounter[egoName]
-                        : {})
+                    (clusterCounter && egoName in clusterCounter
+                      ? clusterCounter[egoName]
+                      : {})
                       ? "inherit"
                       : "none",
                   overflow: "hidden",
@@ -1234,10 +1238,10 @@ const Replayer = () => {
                   width={containerRef.current?.offsetWidth ?? 0}
                   height={
                     clusteringResult == null ||
-                      clusteringResult[egoName] == null
+                    clusteringResult[egoName] == null
                       ? "500px"
                       : (containerRef.current?.offsetHeight ?? 0) /
-                      totalWindowsCount
+                        totalWindowsCount
                   }
                   style={{
                     display: "block",
@@ -1246,10 +1250,11 @@ const Replayer = () => {
                     // border: `solid 3px ${color}`,
                     height:
                       clusteringResult == null ||
-                        clusteringResult[egoName] == null
+                      clusteringResult[egoName] == null
                         ? "500px"
-                        : `calc(${containerRef.current?.offsetHeight ?? 0
-                        }px / ${totalWindowsCount})`,
+                        : `calc(${
+                            containerRef.current?.offsetHeight ?? 0
+                          }px / ${totalWindowsCount})`,
                     width: "100%",
                   }}
                   id={`replayer-${egoName}-cluster${label}-canvas`}
@@ -1328,15 +1333,15 @@ const Replayer = () => {
               const message = event.detail?.message;
               if (message !== "auto-updated") {
                 dispatch(
-                  interactionSlice.actions.record(panelName + ".time_slider")
+                  interactionSlice.actions.record(panelName + ".time_slider"),
                 );
                 dispatch(
                   batchSlice.actions.setClipTimeManualOverride(
-                    ((value as number) / 100) * appData.timeMax
+                    ((value as number) / 100) * appData.timeMax,
                     // (mfpca?.durationIndices != null && !showFullTimeline
                     //   ? clusteringDuration + afterClusteringDuration
                     //   : appData.timeMax),
-                  )
+                  ),
                 );
               }
             } else {
@@ -1462,7 +1467,7 @@ const Replayer = () => {
               setRedrawHandled((prev) => !prev);
             }}
           >
-            {/* <Redo /> */}
+            <Redo />
           </ToggleButton>
         </StyledToggleButtonGroup>
       </Stack>
@@ -1478,7 +1483,7 @@ function interpolateLinear(
   t0: number,
   t1: number,
   p0: Position,
-  p1: Position
+  p1: Position,
 ): Position {
   const ratio = (t - t0) / (t1 - t0);
   let yaw = p0.yaw + ratio * (p1.yaw - p0.yaw);
@@ -1503,7 +1508,7 @@ function getPositionAtTime(
   t: number,
   times: number[],
   positions: Position[],
-  durationIndices?: number[]
+  durationIndices?: number[],
 ): Position | null {
   // Ensure the time is within bounds
   if (t < times[0]) {
@@ -1551,7 +1556,7 @@ function getPositionAtTime(
 function getPositionAtS(
   sRatio: number,
   ss: number[],
-  positions: Position[]
+  positions: Position[],
 ): Position | null {
   let low = 0;
   let high = ss.length - 1;

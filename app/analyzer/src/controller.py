@@ -69,7 +69,7 @@ from shapely.ops import nearest_points, split
 
 from graphql import batch_query, trials_query
 from timer import Timer
-from env import PAYLOAD_API, PAYLOAD_GRAPHQL_API
+from env import PAYLOAD_API, PAYLOAD_GRAPHQL_API, PAYLOAD_API_KEY
 from predict import calculate_gradients, train_surrogate_model, predict
 from TwoDimTTC import getpoints, getpoints_np
 from gradient import train_surrogate_nn_model
@@ -1075,8 +1075,7 @@ ClusteringMethod = Literal[
     "hdbscan+dtw+umap",
     "hierarchy+dtw+umap",
 ]
-# headers = {"Authorization": "users API-Key 0335d171-5227-4dee-a8f1-7fbd50d96331"}
-headers = {"Authorization": "users API-Key fca12850-1a88-43c0-a547-e9fabf061439"}
+headers = {"Authorization": f"users API-Key {PAYLOAD_API_KEY}"}
 
 
 @dataclass
@@ -1204,13 +1203,8 @@ class TrajectoryAnalysisController(Controller):
     async def clustering(
         self, data: TrajectoryAnalysisRequest
     ) -> Dict[str, TrajectoryAnalysisResponse]:
-        # pprint(data)
+        egoIds = [1]
 
-        # egoIds = [1, 2]
-        # egoIds = [2, 3]
-        egoIds = [2]
-
-        # egoIds = [2, 3]
         returned = {}
         docsave = {}
 
@@ -1221,43 +1215,44 @@ class TrajectoryAnalysisController(Controller):
         road_id_order = []
 
         for egoId in egoIds:
-            # trajectories, rawTrajectories, trial_mappings, batch_mappings, columns = (
-            #     self.get_trajectories(data, egoId)
-            # )
-            # with open("./.temp/.datatemp/scenario3-1.json", "r") as file:
-            # with open("./.temp/.datatemp2/sc2_ttc.json", "r") as file:
-            with open("./.temp/.datatemp1/sc1_spret.json", "r") as file:
-            # with open("./.temp/temp1-2/sc1-4.json", "r") as file:
-                # with open("./.temp/no_collision_stop_3-1.json", "r") as file:
-                # with open("./.temp/no_collision_2_2000.json", "r") as file:
-                saved_clustering = json.load(file)
-                batch_mappings = saved_clustering["ITRI"]["batches"]
-                trial_mappings = saved_clustering["ITRI"]["trials"]
-            # with open("./.temp/databackup/trajectories.json", "r") as file:
-            # with open("./.temp/.datatemp/trajectories.json", "r") as file:
-            # with open("./.temp/.datatemp2/trajectories.json", "r") as file:
-            with open("./.temp/.datatemp1/trajectories.json", "r") as file:
-            # with open("./.temp/temp1-2/trajectories.json", "r") as file:
-                trajectories = json.load(file)
-                json_load = {}
-                for trial_id, value in trajectories.items():
-                    json_load[str(trial_id)] = object_to_array(value)
-                trajectories = json_load
-            # with open("./.temp/.datatemp/rawTrajectories.json", "r") as file:
-            # with open("./.temp/.datatemp2/rawTrajectories.json", "r") as file:
-            # with open("./.temp/temp1-2/rawTrajectories.json", "r") as file:
-                # with open("./.temp/databackup/rawTrajectories.json", "r") as file:
-            with open("./.temp/.datatemp1/rawTrajectories.json", "r") as file:
-                rawTrajectories = json.load(file)
+            trajectories, rawTrajectories, trial_mappings, batch_mappings, columns = (
+                self.get_trajectories(data, egoId)
+            )
+            # # with open("./.temp/.datatemp/scenario3-1.json", "r") as file:
+            # # with open("./.temp/.datatemp2/sc2_ttc.json", "r") as file:
+            # with open("./.temp/.datatemp1/sc1_spret.json", "r") as file:
+            # # with open("./.temp/temp1-2/sc1-4.json", "r") as file:
+            #     # with open("./.temp/no_collision_stop_3-1.json", "r") as file:
+            #     # with open("./.temp/no_collision_2_2000.json", "r") as file:
+            #     saved_clustering = json.load(file)
+            #     batch_mappings = saved_clustering["ITRI"]["batches"]
+            #     trial_mappings = saved_clustering["ITRI"]["trials"]
+            # # with open("./.temp/databackup/trajectories.json", "r") as file:
+            # # with open("./.temp/.datatemp/trajectories.json", "r") as file:
+            # # with open("./.temp/.datatemp2/trajectories.json", "r") as file:
+            # with open("./.temp/.datatemp1/trajectories.json", "r") as file:
+            # # with open("./.temp/temp1-2/trajectories.json", "r") as file:
+            #     trajectories = json.load(file)
+            #     json_load = {}
+            #     for trial_id, value in trajectories.items():
+            #         json_load[str(trial_id)] = object_to_array(value)
+            #     trajectories = json_load
+            # # with open("./.temp/.datatemp/rawTrajectories.json", "r") as file:
+            # # with open("./.temp/.datatemp2/rawTrajectories.json", "r") as file:
+            # # with open("./.temp/temp1-2/rawTrajectories.json", "r") as file:
+            #     # with open("./.temp/databackup/rawTrajectories.json", "r") as file:
+            # with open("./.temp/.datatemp1/rawTrajectories.json", "r") as file:
+            #     rawTrajectories = json.load(file)
+            #
+            # for trialId in trajectories.keys():
+            #     for index, item in enumerate(trajectories[trialId]):
+            #         item["EgoX"] = rawTrajectories[trialId]["trajectory"]["Ego"][index][
+            #             "x"
+            #         ]
+            #         item["EgoY"] = rawTrajectories[trialId]["trajectory"]["Ego"][index][
+            #             "y"
+            #         ]
 
-            for trialId in trajectories.keys():
-                for index, item in enumerate(trajectories[trialId]):
-                    item["EgoX"] = rawTrajectories[trialId]["trajectory"]["Ego"][index][
-                        "x"
-                    ]
-                    item["EgoY"] = rawTrajectories[trialId]["trajectory"]["Ego"][index][
-                        "y"
-                    ]
             columns = [
                 # "EgoX",
                 # "EgoY",
@@ -1542,7 +1537,7 @@ class TrajectoryAnalysisController(Controller):
             zip_buffer.seek(0)
             files = {"file": ("heatmap.zip", zip_buffer, "application/zip")}
             response = requests.post(
-                "https://gpl-odd-payloadcms.chiu41.com/api/documents",
+                f"{PAYLOAD_API}/api/documents",
                 files=files,
                 headers=headers,
             )
@@ -1647,7 +1642,7 @@ class TrajectoryAnalysisController(Controller):
             zip_buffer.seek(0)
             files = {"file": ("trajectories.zip", zip_buffer, "application/zip")}
             response = requests.post(
-                "https://gpl-odd-payloadcms.chiu41.com/api/documents",
+                f"{PAYLOAD_API}/api/documents",
                 files=files,
                 headers=headers,
             )
@@ -1768,7 +1763,7 @@ class TrajectoryAnalysisController(Controller):
                         "file": (output_path, f, "image/png")
                     }
                     response = requests.post(
-                        "https://gpl-odd-payloadcms.chiu41.com/api/documents",
+                        f"{PAYLOAD_API}/api/documents",
                         files=files,
                         headers=headers
                     )
@@ -1796,7 +1791,7 @@ class TrajectoryAnalysisController(Controller):
                 #         "file": (output_path, f, "image/png")
                 #     }
                 #     response = requests.post(
-                #         "https://gpl-odd-payloadcms.chiu41.com/api/documents",
+                #         "{PAYLOAD_API}/documents",
                 #         files=files,
                 #         headers=headers
                 #     )
@@ -1818,7 +1813,7 @@ class TrajectoryAnalysisController(Controller):
         zip_buffer.seek(0)
         files = {"file": ("analysis.zip", zip_buffer, "application/zip")}
         response = requests.post(
-            "https://gpl-odd-payloadcms.chiu41.com/api/documents",
+            f"{PAYLOAD_API}/api/documents",
             files=files,
             headers=headers,
         )
@@ -1835,7 +1830,7 @@ class TrajectoryAnalysisController(Controller):
         for batchId in data.batchIds:
             variables = {"id": batchId}
 
-            response = requests.get(f"{str(PAYLOAD_API)}/batches/{batchId}?depth=3")
+            response = requests.get(f"{PAYLOAD_API}/api/batches/{batchId}?depth=3")
             response.raise_for_status()
             response_data = response.json()
             batch = response_data
@@ -1861,8 +1856,8 @@ class TrajectoryAnalysisController(Controller):
                 "where": {"batch": {"equals": batchId}, "ego": {"equals": egoId}},
             }
             qs = qs_stringify(params)
-            response = requests.get(f"{PAYLOAD_API}/trials?{qs}")
-            pprint(f"{PAYLOAD_API}/trials?{qs}")
+            response = requests.get(f"{PAYLOAD_API}/api/trials?{qs}")
+            pprint(f"{PAYLOAD_API}/api/trials?{qs}")
             trials_response_data = response.json()
             response.raise_for_status()
 
@@ -1885,7 +1880,7 @@ class TrajectoryAnalysisController(Controller):
             t = Timer("Get Trajectories" + f", chunk: {index}")
             t.start()
             response = requests.post(
-                "https://gpl-odd-payloadcms.chiu41.com/api/trials/trajectories",
+                f"{PAYLOAD_API}/api/trials/trajectories",
                 json={"trialIds": [int(v) for v in chunk], "framePeriod": 0.1},
             )
             response.raise_for_status()
@@ -1894,10 +1889,10 @@ class TrajectoryAnalysisController(Controller):
             t.stop()
             # if index >= 30:
             #     break
-            # if index >= 10:
-            #     break
-            if index >= 5:
+            if index >= 10:
                 break
+            # if index >= 5:
+            #     break
             # if index >= 1:
             #     break
 
