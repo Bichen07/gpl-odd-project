@@ -56,10 +56,10 @@ const StyledToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
     },
   },
   [`& .${toggleButtonGroupClasses.middleButton},& .${toggleButtonGroupClasses.lastButton}`]:
-    {
-      marginLeft: -1,
-      borderLeft: "1px solid transparent",
-    },
+  {
+    marginLeft: -1,
+    borderLeft: "1px solid transparent",
+  },
 }));
 
 export const glyphModes = ["pass/fail", "interaction-cluster"] as const;
@@ -120,7 +120,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   const batchTrials = useAppSelector((state) => state.batch.trials);
   const batch = useAppSelector((state) => state.batch.batch);
   const mouseOnPanel = useAppSelector(
-    (state) => state.interaction.currentPanel
+    (state) => state.interaction.currentPanel,
   );
 
   useEffect(() => {
@@ -155,7 +155,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   }, [mouseOnPanel]);
 
   const interactionRecords = useAppSelector(
-    (state) => state.interaction.records
+    (state) => state.interaction.records,
   );
   const interactionCamera = useAppSelector((state) => state.interaction.camera);
   const trajectoryAnalysisAll = useAppSelector((state) => {
@@ -176,26 +176,26 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   }, [trajectoryAnalysis, durationMode]);
   const clusteringResult = useAppSelector((state) =>
     state.batch.selectedClusteringResults != null &&
-    egoName in state.batch.selectedClusteringResults
+      egoName in state.batch.selectedClusteringResults
       ? state.batch.selectedClusteringResults[egoName]
-      : null
+      : null,
   );
   const clusterInfo = useAppSelector((state) =>
     state.batch.selectedClusterInfos != null &&
-    egoName in state.batch.selectedClusterInfos
+      egoName in state.batch.selectedClusterInfos
       ? state.batch.selectedClusterInfos[egoName]
-      : null
+      : null,
   );
   const metrics = useAppSelector((state) => state.batch.metrics);
   const selectedMetric = useAppSelector((state) => state.batch.selectedMetric);
   const selectedSafetyBoundaryMetric = useAppSelector(
-    (state) => state.batch.selectedSafetyBoundaryMetric
+    (state) => state.batch.selectedSafetyBoundaryMetric,
   );
   const filteredTrialIds = useAppSelector(
-    (state) => state.batch.filteredTrialIds
+    (state) => state.batch.filteredTrialIds,
   );
   const selectedTrialIds = useAppSelector(
-    (state) => state.batch.selectedTrialIds
+    (state) => state.batch.selectedTrialIds,
   );
   const gridMode = useAppSelector((state) => state.batch.gridMode);
 
@@ -219,7 +219,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
 
   useEffect(() => {
     dispatch(
-      batchSlice.actions.setGridMode(showGradient ? "gradient" : "prediction")
+      batchSlice.actions.setGridMode(showGradient ? "gradient" : "prediction"),
     );
   }, [showGradient]);
 
@@ -335,7 +335,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       // scatterplot.set({"lassoLongPressTime"})
       scatterplot.zoomToLocation(
         [globalStorage.camera.x, globalStorage.camera.y],
-        globalStorage.camera.distance
+        globalStorage.camera.distance,
       );
     }
   }, [globalStorage.camera]);
@@ -462,7 +462,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
           batchSlice.actions.setSelectedTrialIds({
             by: "parameterSpace",
             value: [trialId],
-          })
+          }),
         );
       } else {
         const selectedTrialIdValues = [];
@@ -473,7 +473,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
           batchSlice.actions.setSelectedTrialIds({
             by: "parameterSpace",
             value: selectedTrialIdValues,
-          })
+          }),
         );
       }
 
@@ -662,7 +662,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         spatialIndex?: ArrayBuffer,
         selectedMetric?: CriticalityMetric | null,
         selectedSafetyBoundaryMetric?: CriticalityMetric | null,
-        showPoints: boolean = true
+        showPoints: boolean = true,
       ) => {
         console.log("DRAW POINTS PARAMERTER SPACE");
 
@@ -705,8 +705,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             trial?.testObjectives?.criticalityMetrics.find(
               (m) =>
                 m.keyPerformanceIndicator.id ===
-                selectedSafetyBoundaryMetric?.kpi?.id
-            )?.passed
+                selectedSafetyBoundaryMetric?.kpi?.id,
+            )?.passed,
           );
           newPoints[i][3] = passed ? 0 : 1;
           // if (
@@ -731,14 +731,14 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
           if (colorMode == "criticality change" && trajectoryAnalysis != null) {
             let gradients =
               trajectoryAnalysis.metricGradients[
-                selectedMetric?.kpi?.name ?? ""
+              selectedMetric?.kpi?.name ?? ""
               ];
             let gradient =
               gradients != null && (trialId ?? "") in gradients
                 ? gradients[trialId ?? ""]
                 : [0, 0];
             let mag = Math.sqrt(
-              gradient[0] * gradient[0] + gradient[1] * gradient[1]
+              gradient[0] * gradient[0] + gradient[1] * gradient[1],
             );
             let value =
               (mag - (selectedMetric?.gradMin ?? 0)) /
@@ -751,7 +751,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             trial != null
           ) {
             let metricValue = trial.testObjectives?.criticalityMetrics.find(
-              (m) => m.keyPerformanceIndicator.id === selectedMetric.kpi?.id
+              (m) => m.keyPerformanceIndicator.id === selectedMetric.kpi?.id,
             )?.value;
 
             metricValue =
@@ -772,9 +772,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         });
         setPointsDrawn(true);
       },
-      100
+      100,
     ),
-    []
+    [],
   );
 
   // create and draw points
@@ -806,7 +806,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       ]);
     }
     globalStorage.trialOrder[egoName] = (trials ?? []).map(
-      (t) => String(t?.id) ?? "unknown"
+      (t) => String(t?.id) ?? "unknown",
     );
 
     drawPoints(
@@ -821,7 +821,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       clusterInfo,
       undefined,
       selectedMetric,
-      selectedSafetyBoundaryMetric
+      selectedSafetyBoundaryMetric,
     );
 
     globalStorage.points[egoName] = points;
@@ -858,7 +858,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         if (trajectoryAnalysis != null && trajectoryAnalysisAll != null) {
           trials = [];
           for (const trialId of Object.keys(
-            trajectoryAnalysisAll[ego].mfpca[durationMode]?.scores ?? {}
+            trajectoryAnalysisAll[ego].mfpca[durationMode]?.scores ?? {},
           )) {
             trials.push(trajectoryAnalysisAll[ego].trials[trialId]);
           }
@@ -878,7 +878,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         batchSlice.actions.setSelectedTrialIds({
           by: "parameter_space",
           value: [...addedSelected],
-        })
+        }),
       );
       // dispatch(state => state.actions)
 
@@ -924,7 +924,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         scatterplot.get("spatialIndex"),
         selectedMetric,
         selectedSafetyBoundaryMetric,
-        showPoints
+        showPoints,
       );
 
       globalStorage.points[egoName] = newPoints;
@@ -967,7 +967,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       }}
       onMouseEnter={() => {
         dispatch(
-          interactionSlice.actions.setCurrentPanel(egoName + "_parameterSpace")
+          interactionSlice.actions.setCurrentPanel(egoName + "_parameterSpace"),
         );
         if (!trajectoryAnalysis) {
           return;
@@ -1080,103 +1080,103 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             {!pointsDrawn
               ? null
               : Object.entries(clusterHulls)
-                  .sort((a, b) => {
-                    let aPoints: [number, number][] = [];
-                    for (const pointIdx of a[1]) {
-                      try {
-                        const point = scatterplot?.getScreenPosition(pointIdx);
-                        if (point) {
-                          aPoints.push(point);
-                        }
-                      } catch (error) {
-                        // console.error(error);
+                .sort((a, b) => {
+                  let aPoints: [number, number][] = [];
+                  for (const pointIdx of a[1]) {
+                    try {
+                      const point = scatterplot?.getScreenPosition(pointIdx);
+                      if (point) {
+                        aPoints.push(point);
                       }
+                    } catch (error) {
+                      // console.error(error);
                     }
-                    let bPoints: [number, number][] = [];
-                    for (const pointIdx of b[1]) {
-                      try {
-                        const point = scatterplot?.getScreenPosition(pointIdx);
-                        if (point) {
-                          bPoints.push(point);
-                        }
-                      } catch (error) {
-                        // console.error(error);
+                  }
+                  let bPoints: [number, number][] = [];
+                  for (const pointIdx of b[1]) {
+                    try {
+                      const point = scatterplot?.getScreenPosition(pointIdx);
+                      if (point) {
+                        bPoints.push(point);
                       }
+                    } catch (error) {
+                      // console.error(error);
                     }
-                    const aArea = polygonArea(aPoints);
-                    const bArea = polygonArea(bPoints);
-                    return aArea - bArea;
-                  })
-                  .map(([label, hull]) => {
-                    if (label == "-1") {
-                      return null;
+                  }
+                  const aArea = polygonArea(aPoints);
+                  const bArea = polygonArea(bPoints);
+                  return aArea - bArea;
+                })
+                .map(([label, hull]) => {
+                  if (label == "-1") {
+                    return null;
+                  }
+                  let points: [number, number][] = [];
+                  let pointsStr = "";
+                  for (const pointIdx of hull) {
+                    try {
+                      const point = scatterplot?.getScreenPosition(pointIdx);
+                      if (point) {
+                        pointsStr += `${point[0]},${point[1]} `;
+                        points.push(point);
+                      }
+                    } catch (error) {
+                      // console.error(error);
+                      // console.log(pointIdx);
                     }
-                    let points: [number, number][] = [];
-                    let pointsStr = "";
-                    for (const pointIdx of hull) {
+                  }
+                  // points = points.slice(0, -1);
+                  pointsStr.trim();
+                  let color = "black";
+                  if (clusterInfo && clusterInfo[label]) {
+                    color = clusterInfo[label].color;
+                  }
+
+                  let failHull = clusterFailHulls[label];
+                  let failPoints: [number, number][] = [];
+                  if (failHull) {
+                    for (const pointIdx of failHull) {
                       try {
-                        const point = scatterplot?.getScreenPosition(pointIdx);
+                        const point =
+                          scatterplot?.getScreenPosition(pointIdx);
                         if (point) {
-                          pointsStr += `${point[0]},${point[1]} `;
-                          points.push(point);
+                          failPoints.push(point);
                         }
                       } catch (error) {
                         // console.error(error);
                         // console.log(pointIdx);
                       }
                     }
-                    // points = points.slice(0, -1);
-                    pointsStr.trim();
-                    let color = "black";
-                    if (clusterInfo && clusterInfo[label]) {
-                      color = clusterInfo[label].color;
-                    }
-
-                    let failHull = clusterFailHulls[label];
-                    let failPoints: [number, number][] = [];
-                    if (failHull) {
-                      for (const pointIdx of failHull) {
-                        try {
-                          const point =
-                            scatterplot?.getScreenPosition(pointIdx);
-                          if (point) {
-                            failPoints.push(point);
-                          }
-                        } catch (error) {
-                          // console.error(error);
-                          // console.log(pointIdx);
-                        }
-                      }
-                    }
-                    return (
-                      <Box key={label}>
-                        <PatternLines
-                          id={`lines-${label}`}
-                          height={7}
-                          width={7}
-                          stroke={color}
-                          strokeWidth={1}
-                          orientation={["diagonal"]}
-                        />
-                        <polygon
-                          style={{ display: showPolygons ? "inherit" : "none" }}
-                          points={pointsStr}
-                          fill={color}
-                          fillOpacity={0.3}
-                          stroke={color}
-                          strokeWidth={3}
-                        />
-                        <AreaClosed
-                          style={{ display: showPolygons ? "inherit" : "none" }}
-                          data={failPoints}
-                          x={(p) => p[0]}
-                          y={(p) => p[1]}
-                          fill={`url(#lines-${label})`}
-                          yScale={scaleLinear()}
-                        />
-                      </Box>
-                    );
-                  })}
+                  }
+                  return (
+                    <Box key={label}>
+                      <PatternLines
+                        id={`lines-${label}`}
+                        height={7}
+                        width={7}
+                        stroke={color}
+                        strokeWidth={1}
+                        orientation={["diagonal"]}
+                      />
+                      <polygon
+                        style={{ display: showPolygons ? "inherit" : "none" }}
+                        points={pointsStr}
+                        fill={color}
+                        fillOpacity={0.3}
+                        stroke={color}
+                        strokeWidth={3}
+                      />
+                      <AreaClosed
+                        style={{ display: showPolygons ? "inherit" : "none" }}
+                        data={failPoints}
+                        x={(p) => p[0]}
+                        y={(p) => p[1]}
+                        fill={`url(#lines-${label})`}
+                        yScale={scaleLinear()}
+                      />
+                    </Box>
+                  );
+                })}
           </Group>
         </svg>
 
@@ -1218,8 +1218,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
                   if (colorMode !== option) {
                     dispatch(
                       interactionSlice.actions.record(
-                        panelName + ".change_points_color"
-                      )
+                        panelName + ".change_points_color",
+                      ),
                     );
                   }
                   handleMenuClose();
@@ -1245,7 +1245,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
               textWrap: "nowrap",
             }}
           >
-            {"Criticality Metric"}
+            {/* {"Criticality Metric"} */}
+            {"Point Color"}
             <ArrowDropDownIcon />
           </ToggleButton>
           <ToggleButton
@@ -1256,8 +1257,10 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
               dispatch(
                 interactionSlice.actions.record(
                   panelName +
-                    (showGradient ? ".toggleMetricBg" : ".toggleMetricChangeBg")
-                )
+                  (showGradient
+                    ? ".toggleMetricBg"
+                    : ".toggleMetricChangeBg"),
+                ),
               );
               setShowGradient((prev) => !prev);
             }}
@@ -1275,8 +1278,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             onChange={(event) => {
               dispatch(
                 interactionSlice.actions.record(
-                  panelName + (showBg ? ".hideBg" : "showBg")
-                )
+                  panelName + (showBg ? ".hideBg" : "showBg"),
+                ),
               );
               setShowBg((prev) => !prev);
             }}
@@ -1293,8 +1296,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             onChange={(event) => {
               dispatch(
                 interactionSlice.actions.record(
-                  panelName + (showPoints ? ".hidePoints" : ".showPoints")
-                )
+                  panelName + (showPoints ? ".hidePoints" : ".showPoints"),
+                ),
               );
               setShowPoints((prev) => !prev);
             }}

@@ -35,7 +35,7 @@ type Props = {
 };
 export default function Saves(props: Props) {
   const trajectoryAnalysis = useAppSelector(
-    (state) => state.batch.trajectoryAnalysis
+    (state) => state.batch.trajectoryAnalysis,
   );
   const dispatch = useAppDispatch();
 
@@ -44,7 +44,7 @@ export default function Saves(props: Props) {
   const { batchId, saves } = props;
   const [loadingFilename, setLoadingFilename] = useState<string | null>(null);
   const [savingName, setSavingName] = useState<string>(
-    new Date().toLocaleString("en", { timeZone: "Asia/Taipei" })
+    new Date().toLocaleString("en", { timeZone: "Asia/Taipei" }),
   );
 
   const [modalOpened, setModalOpened] = useState(false);
@@ -207,7 +207,7 @@ export default function Saves(props: Props) {
                       const response = await axios.get(
                         // `${process.env.NEXT_PUBLIC_PAYLOAD_API_ADDRESS}/api/documents/${item.filename}`,
                         item?.url ?? "",
-                        { responseType: "arraybuffer" }
+                        { responseType: "arraybuffer" },
                       );
                       const zipBlob = await response.data;
 
@@ -217,12 +217,12 @@ export default function Saves(props: Props) {
                       console.log(item.filename);
                       console.log("Files in ZIP:");
                       Object.keys(zip.files).forEach((name) =>
-                        console.log(name)
+                        console.log(name),
                       );
 
                       // Find the first `.json` file (or any file you want)
                       const jsonFileName = Object.keys(zip.files).find((name) =>
-                        name.endsWith(".json")
+                        name.endsWith(".json"),
                       );
                       if (jsonFileName == null)
                         throw new Error("No JSON file found in ZIP");
@@ -238,7 +238,7 @@ export default function Saves(props: Props) {
                         jsonObject[key]["id"] = item.id;
                       }
                       dispatch(
-                        batchSlice.actions.setTrajectoryAnalysis(jsonObject)
+                        batchSlice.actions.setTrajectoryAnalysis(jsonObject),
                       );
                       setLoadingFilename(null);
                     } catch (err) {
@@ -310,8 +310,8 @@ export default function Saves(props: Props) {
                     console.log(newResponse);
                     dispatch(
                       batchSlice.actions.setTrajectoryAnalysis(
-                        newResponse as any
-                      )
+                        newResponse as any,
+                      ),
                     );
                   } catch (error) {
                     console.error(error);
@@ -359,7 +359,7 @@ export default function Saves(props: Props) {
                           [JSON.stringify(trajectoryAnalysis)],
                           {
                             type: "application/json",
-                          }
+                          },
                         );
                         const form = new FormData();
                         form.append("file", jsonBlob, savingName + ".json");
@@ -369,7 +369,7 @@ export default function Saves(props: Props) {
                             console.error(error);
                             setAnalysisSavingLoading(false);
                             toast.error(
-                              "Fail to save. Cannot upload the json document."
+                              "Fail to save. Cannot upload the json document.",
                             );
                           });
                         setAnalysisSavingLoading(false);
@@ -396,16 +396,16 @@ export default function Saves(props: Props) {
         </AccordionDetails>
       </Accordion>
 
-      <ToggleButton
-        value="baseline_toggle"
-        size="small"
-        selected={false}
-        onChange={(_event) => {
-          dispatch(batchSlice.actions.setBaselineMode(!isBaseline));
-        }}
-      >
-        {isBaseline ? "Baseline On" : "Baseline Off"}
-      </ToggleButton>
+      {/* <ToggleButton */}
+      {/*   value="baseline_toggle" */}
+      {/*   size="small" */}
+      {/*   selected={false} */}
+      {/*   onChange={(_event) => { */}
+      {/*     dispatch(batchSlice.actions.setBaselineMode(!isBaseline)); */}
+      {/*   }} */}
+      {/* > */}
+      {/*   {isBaseline ? "Baseline On" : "Baseline Off"} */}
+      {/* </ToggleButton> */}
     </Stack>
   );
 }
