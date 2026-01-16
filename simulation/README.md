@@ -1,12 +1,5 @@
 # 2022 GPL + ITRI Simulation Environment
 
-## Table of Contents
-
-1. [Installation](#Setup)
-2. [Setup Instruction](#Running)
-3. [Usage](#Running)
-4. [Development](#Running)
-
 ## Installation
 
 ### Prerequisites
@@ -49,7 +42,7 @@ $ sdc-docker-update-image
 ### container settings
 
 ```bash
-# Add container-settings to source list under .bashrc
+# Add container-settings to source list under .bashrc for automatically source
 $ echo "source ${HOME}/source_code/gpl-odd-project/deploy/container_settings" >> ${HOME}/.bashrc
 ```
 
@@ -59,6 +52,12 @@ $ echo "source ${HOME}/source_code/gpl-odd-project/deploy/container_settings" >>
 [container] $ source /repository/ros/install/setup.bash
 [container] $ cd /project/mmsl_simulation
 [container] $ time catkin_make
+```
+
+### install custom python package
+
+```bash
+[container] $ pip2 install pandas beautifulsoup4 lxml python-dotenv
 ```
 
 ## Usage

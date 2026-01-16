@@ -7,7 +7,8 @@
     <arg name="sim_with_external" default="false" />
 
     <arg name="sampling_suggestion_api" default="http://localhost:9009" />
-    <arg name="batch_id" default="67d93a2fd8da7e14046d3736" />
+    <arg name="batch_id" default="1" />
+    <arg name="ego_id" default="1" />
 
     <!-- <arg name="map_name" default="alks_road_straight" /> -->
     <!-- <arg name="route_name" default="operation" /> -->
@@ -15,15 +16,27 @@
 
     <arg name="map_name" default="hct_logistic" />
     <arg name="route_name" default="operation" />
+    <!-- <arg name="route_name" default="hsc-hsp-hsc-loop-demo" /> -->
+
+    <!-- drive in hct -->
+    <!-- <arg name="ego_position_seq" default="21" /> -->
 
     <!-- drive out hct -->
-    <!-- <arg name="ego_position_seq" default="22" /> -->
+    <arg name="ego_position_seq" default="22" />
 
     <!-- opposite overtake -->
-    <arg name="ego_position_seq" default="4" />
+    <!-- <arg name="ego_position_seq" default="4" /> -->
+    <!-- <arg name="ego_position_seq" default="30" /> -->
 
     <!-- Bicycle Cut-in with Oncoming Car from Back -->
     <!-- <arg name="ego_position_seq" default="27" /> -->
+
+    <!-- Bus BIke -->
+    <!-- <arg name="ego_position_seq" default="28" /> -->
+
+    <!-- Bridge Cut In -->
+    <!-- <arg name="ego_position_seq" default="29" /> -->
+    <!-- <arg name="ego_position_seq" default="26" /> -->
 
 
     <!-- <arg name="route_name" default="hsc-hsp-hsc-loop" /> -->
@@ -57,6 +70,11 @@
     <!-- <arg name="ego_position_seq" default="9" /> -->
     <!-- <arg name="ego_position_seq" default="4" /> -->
 
+    <!-- <node pkg="rosbag" type="record" name="rosbag_record" -->
+    <!--     args="-a -O /home/user/itri_new_stop_collision_from_right.bag" -->
+    <!--     output="screen"> -->
+    <!-- </node> -->
+
     <include file="$(find simulation_adv)/launch/run.launch">
         <arg name="sim_with_external" value="$(arg sim_with_external)" />
         <arg name="use_sim_time" value="false" />
@@ -88,6 +106,7 @@
     >
         <param name="sim_with_external" value="$(arg sim_with_external)" />
         <param name="batch_id" value="$(arg batch_id)" />
+        <param name="ego_id" value="$(arg ego_id)" />
         <param name="route_name" value="$(arg route_name)" />
         <param name="map_name" value="$(arg map_name)" />
         <param name="sampling_suggestion_api" value="$(arg sampling_suggestion_api)" />
@@ -101,6 +120,6 @@
     simulation_monitor)/config/simulation_monitor_setting.yaml"/> -->
     <!-- <node name="accident_recorder_node" pkg="simulation_monitor" type="accident_recorder.py"
     output="screen"/> -->
-    <node name="tag_tree_identifier" pkg="scenario_classification" type="run_tree_of_tags.py"
-        output="screen" />
+    <!-- <node name="tag_tree_identifier" pkg="scenario_classification" type="run_tree_of_tags.py" -->
+    <!--     output="screen" /> -->
 </launch>

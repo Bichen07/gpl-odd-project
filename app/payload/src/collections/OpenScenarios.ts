@@ -1,24 +1,20 @@
-import path from "path";
-import { CollectionConfig } from "payload/types";
-import { usersAccess } from "../access";
+import { usersAccess } from '@/access'
+import { CollectionConfig } from 'payload'
 
-const OpenScenarios: CollectionConfig = {
-  slug: "openScenarios",
+export const OpenScenarios: CollectionConfig = {
+  slug: 'openScenarios',
   admin: {
-    group: "Uploads",
+    group: 'Uploads',
   },
   access: {
     read: () => true,
     create: usersAccess,
-    delete: usersAccess,
     update: usersAccess,
+    delete: usersAccess,
   },
   upload: {
-    staticURL: "/xosc",
-    staticDir: "/data/uploads/xosc",
-    mimeTypes: ["application/octet-stream"],
+    staticDir: process.env.NODE_ENV == 'production' ? '/data/uploads/xosc' : './uploads/xosc',
+    mimeTypes: ['application/octet-stream', 'application/xml'],
   },
   fields: [],
-};
-
-export default OpenScenarios;
+}

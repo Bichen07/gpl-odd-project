@@ -107,8 +107,7 @@ Simulation::Simulation(bool publishScenarioVisualization)
 
     mScenarioStableSubscriber = mNodeHandle.subscribe("scenario_monitor/scenario_stable", 1, &Simulation::ScenarioStableCallback, this);
 
-    ROS_INFO_STREAM("[SimulationAdv] Settings:"
-                    << "\n    filtered_cluster_hulls_topic: " << mFilteredClusterHullsTopic << "\n");
+    ROS_INFO_STREAM("[SimulationAdv] Settings:" << "\n    filtered_cluster_hulls_topic: " << mFilteredClusterHullsTopic << "\n");
 }
 
 void Simulation::OneStepSync()
@@ -183,18 +182,9 @@ void Simulation::UpdateSimulation(bool simulationPaused)
 
             if (agent.second->mIsEgo)
             {
-                if (mEgoHandlers[agent.first]->IsSimWithExternalVehicle())
-                {
-                    isSimWithExternalVehicle = true;
-                    agent.second->SetStatus(mEgoHandlers[agent.first]->GetRealWorldStatus());
-                }
-                else
-                {
-                    ControlCommand cmd = mEgoHandlers[agent.first]->GetControlCommand();
-
-                    float speed = mScenarioStable && mScenarioControlSpeedCmdMsg.kph != 0.0 ? mScenarioControlSpeedCmdMsg.kph : cmd.speed;
-                    agent.second->SetControlCommand(cmd.steering, speed);
-                }
+                ControlCommand cmd   = mEgoHandlers[agent.first]->GetControlCommand();
+                float          speed = cmd.speed;
+                agent.second->SetControlCommand(cmd.steering, speed);
                 agent.second->SetTurnSignal(mEgoHandlers[agent.first]->GetTurnSignal());
             }
             else
@@ -274,10 +264,8 @@ void Simulation::SetCreateCommon(const std::string& agentId, std::shared_ptr<Veh
 
     if (mUseCarla)
     {
-        ROS_ERROR_STREAM("Ros param simulation/using_carla is set to "
-                         << "true but it was not supported by sim_adv for now, "
-                         << "please check the setting or use the "
-                         << "carla_simulation_adv package.");
+        ROS_ERROR_STREAM("Ros param simulation/using_carla is set to " << "true but it was not supported by sim_adv for now, "
+                                                                       << "please check the setting or use the " << "carla_simulation_adv package.");
     }
     else if (simWithExternalVehicle)
     {

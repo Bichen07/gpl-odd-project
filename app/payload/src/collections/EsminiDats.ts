@@ -1,23 +1,23 @@
-import { CollectionConfig } from "payload/types";
-import { usersAccess } from "../access";
+import { usersAccess } from '@/access'
+import { CollectionConfig } from 'payload'
 
 const EsminiDats: CollectionConfig = {
-  slug: "esminiDats",
+  slug: 'esminiDats',
   admin: {
-    group: "Uploads",
+    group: 'Uploads',
   },
   access: {
     read: () => true,
     create: usersAccess,
-    delete: usersAccess,
     update: usersAccess,
+    delete: usersAccess,
   },
   upload: {
-    staticURL: "/esminiDats",
-    staticDir: "/data/uploads/esminiDat",
-    mimeTypes: ["application/octet-stream"],
+    staticDir:
+      process.env.NODE_ENV == 'production' ? '/data/uploads/esminiDat' : './uploads/esminiDat',
+    mimeTypes: ['application/octet-stream'],
   },
   fields: [],
-};
+}
 
-export default EsminiDats;
+export default EsminiDats

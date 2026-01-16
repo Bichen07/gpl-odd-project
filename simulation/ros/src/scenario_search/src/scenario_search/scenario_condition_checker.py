@@ -64,6 +64,7 @@ class ScenarioConditionChecker:
         self.sim_with_external_ego = rospy.get_param(
             "/single_parameterized_scenario_search/sim_with_external"
         )
+        self.collided_to_temp = False
 
     @property
     def ignore_first_n_seconds(self):
@@ -80,6 +81,9 @@ class ScenarioConditionChecker:
         frame_id = msg.header.frame_id
         print("collision callback trigger, frame_id: {}".format(frame_id))
         print(frame_id)
+
+        # if not self.collided_to_temp:
+        #     self.collided_to_temp = ("Temp" in frame_id)
         if "esmini_collision" in frame_id:
             self.collision_profile = msg
         # self.collision_profile = msg
@@ -101,6 +105,7 @@ class ScenarioConditionChecker:
         self.end_scenario_message = None
         self.agent_moved_before = False
         self.collision_profile = None
+        self.collided_to_temp = False
 
     def check_end_condition(self):
         debug_info = {}

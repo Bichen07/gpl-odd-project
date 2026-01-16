@@ -4,7 +4,7 @@
 
 Sample points in a parameter space of a logical scenario for simulation processes.
 
-## Setup
+## Sampling Configuration in PayloadCMS
 
 1. Log in to the Admin UI of Payload CMS.
 2. Navigate to the Samplings collection and create the sampling steps you want to use. Availlable sampling steps:
@@ -20,21 +20,47 @@ Sample points in a parameter space of a logical scenario for simulation processe
      - **Acquisition Exploration Factor**: This factor influences the exploration in the straddle acquisition function. A value of 0.1 is generally effective based on experience. Adjusting this value can impact the balance between exploration and exploitation during sampling.
 3. Navigate to the Sessions collection and create a new Session.
 4. Navigate to the Batches collection and open the batch (or logical scenario) you want to do the sampling search.
-5. In the selected batch:
-   1. Choose the sampling you want to use.
-   2. Enter the URL where you will deploy the sampling server for simulation processes.
-6. Prepare the sampling server.
-   1. Open the terminal on the machine you want to deploy the sampling server.
-   2. Navigate to the /app directory in the project root.
-   3. Create a .env file from .env.example if not done yet.
-   4. Modify the EXPOSE_SAMPLING_PORT in the .env file if needed. Ensure that the sampling URL matches the URL set in the batch.
-7. Deploy the sampling server. (Should take several minutes)
+5. In the selected batch: Choose the sampling you want to use.
 
-```
-docker compose up --force-recreate --build sampling
+## Setup
+
+### Install miniconda
+
+- Find steps [here](https://docs.anaconda.com/miniconda/).
+
+### Create Environment
+
+All dependencies are listed in environment.yml. Simply create conda with the following command:
+
+```bash
+conda env create -f environment.yml
 ```
 
-8. Initialize the Sampling Server by passing the Batch ID you want to do the sampling for.
+## Run the Server
+
+### Activate Conda Environment
+
+```bash
+conda activate sampling
+```
+
+### Prepare the sampling server.
+
+1.  Open the terminal on the machine you want to deploy the sampling server.
+2.  Navigate to the /app directory in the project root.
+3.  Create a .env file from .env.example if not done yet.
+4.  Modify the EXPOSE_SAMPLING_PORT in the .env file if needed. Ensure that the sampling URL matches the URL set in the batch.
+
+### Start The Server
+
+```bash
+litestar run --port 9009 --debug --host 0.0.0.0 --reload
+# Or adjust the command arguments if needed
+```
+
+### Initialize the Sampling Server
+
+- Passing the Batch ID you want to do the sampling for.
 
 ```
 curl --request POST <your_sampling_server_url>/initialize \
@@ -78,32 +104,3 @@ curl --request POST <your_sampling_server_url>/initialize \
        verify=False,
    )
    ```
-
-## Develop Locally
-
-### Install miniconda
-
-- Find steps [here](https://docs.anaconda.com/miniconda/).
-- Make sure you `~/miniconda3/bin/conda init bash`. After this, source `~/.bashrc` then you'll able to use conda.
-
-### Create Environment
-
-All dependencies are listed in environment.yml. Simply create conda with the following command:
-
-```bash
-conda env create -f environment.yml
-```
-
-### Activate Conda Environment
-
-```bash
-conda activate sampling
-```
-
-### Start The Server
-
-```bash
-litestar run
-# Or you can run Uvicorn directly:
-uvicorn app:app --reload
-```

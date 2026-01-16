@@ -1,4 +1,4 @@
-name: gpl-odd-analyzer
+name: analyzer
 channels:
   - pytorch
   - nvidia
@@ -14,6 +14,7 @@ dependencies:
   - certifi=2024.8.30=pyhd8ed1ab_0
   - charset-normalizer=3.3.2=pyhd3eb1b0_0
   - colorama=0.4.6=pyhd8ed1ab_0
+  - cpython=3.9.23=py39hd8ed1ab_0
   - cuda-cudart=11.8.89=0
   - cuda-cupti=11.8.87=0
   - cuda-libraries=11.8.0=0
@@ -201,6 +202,8 @@ dependencies:
       - sympy==1.13.1
       - tenacity==9.0.0
       - traitlets==5.14.3
+      - tsaug==0.2.1
+      - tslearn==0.6.4
       - typeguard==2.13.3
       - typing-inspect==0.9.0
       - tzdata==2024.2

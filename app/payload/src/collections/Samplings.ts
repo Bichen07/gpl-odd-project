@@ -1,9 +1,8 @@
-import { CollectionConfig } from "payload/types";
-import { usersAccess } from "../access";
-import _ from "lodash";
+import { CollectionConfig, FieldAccess } from 'payload'
+import { usersAccess } from '../access'
 
 const Samplings: CollectionConfig = {
-  slug: "samplings",
+  slug: 'samplings',
   access: {
     read: () => true,
     create: usersAccess,
@@ -11,138 +10,69 @@ const Samplings: CollectionConfig = {
     update: usersAccess,
   },
   admin: {
-    group: "Configs",
+    group: 'Configs',
   },
   versions: {
     drafts: true,
   },
   fields: [
     {
-      name: "steps",
-      type: "array",
+      name: 'steps',
+      type: 'array',
       fields: [
         {
-          name: "method",
-          label: "Method",
-          type: "select",
+          name: 'method',
+          label: 'Method',
+          type: 'select',
           hasMany: false,
           options: [
-            {
-              value: "sobol",
-              label: "Sobol",
-            },
-            {
-              value: "uniform",
-              label: "Uniform",
-            },
-            {
-              value: "straddle",
-              label: "Straddle",
-            },
+            { value: 'sobol', label: 'Sobol' },
+            { value: 'uniform', label: 'Uniform' },
+            { value: 'straddle', label: 'Straddle' },
           ],
         },
         {
-          name: "sampleSize",
-          label: "Sample Size",
-          type: "number",
+          name: 'sampleSize',
+          label: 'Sample Size',
+          type: 'number',
           required: true,
-          validate: async (val) => {
-            return val === -1 || val > 0
-              ? true
-              : "Sampling size must be positive or -1 for unlimited samples.";
-          },
         },
         {
-          name: "parallelCounts",
-          type: "number",
+          name: 'parallelCounts',
+          label: 'Parallel Counts',
+          type: 'number',
           required: true,
-          validate: async (val, { sibilingData }) => {
-            if (
-              sibilingData &&
-              sibilingData.method === "straddle" &&
-              val === undefined
-            ) {
-              return "Cannot be empty for straddle generation method!";
-            }
-            return val > 0 ? true : "Value must be positive!";
-          },
           admin: {
-            condition: (_data, sibilingData) => {
-              return (
-                sibilingData !== undefined && sibilingData.method === "straddle"
-              );
-            },
+            condition: (_data, siblingData) => siblingData?.method === 'straddle',
           },
         },
         {
-          name: "maxSurrogateTrainingSampleSize",
-          label: "Max Surrogate Training Sample Size",
-          type: "number",
+          name: 'maxSurrogateTrainingSampleSize',
+          label: 'Max Surrogate Training Sample Size',
+          type: 'number',
           admin: {
-            condition: (_data, sibilingData) => {
-              return (
-                sibilingData !== undefined && sibilingData.method === "straddle"
-              );
-            },
-          },
-          validate: async (val, { sibilingData }) => {
-            if (
-              sibilingData &&
-              sibilingData.method === "straddle" &&
-              val === undefined
-            ) {
-              return "Cannot be empty for straddle generation method!";
-            }
-            return val > 0 ? true : "Value must be positive!";
+            condition: (_data, siblingData) => siblingData?.method === 'straddle',
           },
         },
         {
-          name: "acquisitionSampleSize",
-          label: "Acquisition Sample Size",
-          type: "number",
+          name: 'acquisitionSampleSize',
+          label: 'Acquisition Sample Size',
+          type: 'number',
           admin: {
-            condition: (_data, sibilingData) => {
-              return (
-                sibilingData !== undefined && sibilingData.method === "straddle"
-              );
-            },
-          },
-          validate: async (val, { sibilingData }) => {
-            if (
-              sibilingData &&
-              sibilingData.method === "straddle" &&
-              val === undefined
-            ) {
-              return "Cannot be empty for straddle generation method!";
-            }
-            return val > 0 ? true : "Value must be positive!";
+            condition: (_data, siblingData) => siblingData?.method === 'straddle',
           },
         },
         {
-          name: "acquisitionExplorationFactor",
-          label: "Acquisition Exploration Factor",
-          type: "number",
+          name: 'acquisitionExplorationFactor',
+          label: 'Acquisition Exploration Factor',
+          type: 'number',
           admin: {
-            condition: (_data, sibilingData) => {
-              return (
-                sibilingData !== undefined && sibilingData.method === "straddle"
-              );
-            },
-          },
-          validate: async (val, { sibilingData }) => {
-            if (
-              sibilingData &&
-              sibilingData.method === "straddle" &&
-              val === undefined
-            ) {
-              return "Cannot be empty for straddle generation method!";
-            }
-            return true;
+            condition: (_data, siblingData) => siblingData?.method === 'straddle',
           },
         },
       ],
     },
   ],
-};
+}
 
-export default Samplings;
+export default Samplings

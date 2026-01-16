@@ -39,6 +39,34 @@
             </Properties>
         </Vehicle>
 
+        <Vehicle name="bus_blue" vehicleCategory="car"
+            model3d="/project/mmsl_simulation/src/esmini/resources/models/bus_blue.osgb">
+            <!-- model bounding box xyz: 2.55, 0.00, 1.41 lwh: 12.01, 2.60, 2.75 -->
+            <ParameterDeclarations>
+                <ParameterDeclaration name="width" parameterType="double" value="2.6" />
+                <ParameterDeclaration name="length" parameterType="double" value="12.01" />
+            </ParameterDeclarations>
+            <BoundingBox>
+                <Center x="0.0" y="0.0" z="0.8" />
+                <Dimensions width="$width" length="$length" height="2.75" />
+            </BoundingBox>
+            <Performance
+                maxSpeed="70" maxDeceleration="10" maxAcceleration="5" />
+            <Axles>
+                <FrontAxle maxSteering="0.523598775598" wheelDiameter="0.8" trackWidth="1.68"
+                    positionX="2.98" positionZ="0.4" />
+                <RearAxle maxSteering="0.523598775598" wheelDiameter="0.8" trackWidth="1.68"
+                    positionX="0" positionZ="0.4" />
+            </Axles>
+            <Properties>
+                <!-- Scale modes: None, BBToModel, ModelToBB -->
+                <!-- <Property name="scaleMode" value="BBToModel" /> -->
+                <Property name="scaleMode" value="ModelToBB" />
+                <Property name="model_id" value="6" />
+            </Properties>
+        </Vehicle>
+
+
         <Vehicle name="car_ped" vehicleCategory="car"
             model3d="/project/mmsl_simulation/src/esmini/resources/models/walkman.osgb">
             <BoundingBox>
@@ -179,30 +207,6 @@
             </Properties>
         </Vehicle>
 
-        <Vehicle name="bus_blue" vehicleCategory="bus" model3d="../models/bus_blue.osgb">
-            <!-- model bounding box xyz: 2.55, 0.00, 1.41 lwh: 12.01, 2.60, 2.75 -->
-            <ParameterDeclarations>
-                <ParameterDeclaration name="width" parameterType="double" value="1.8" />
-                <ParameterDeclaration name="length" parameterType="double" value="4.5" />
-            </ParameterDeclarations>
-            <BoundingBox>
-                <Center x="1.3" y="0.0" z="0.8" />
-                <Dimensions width="$width" length="$length" height="1.5" />
-            </BoundingBox>
-            <Performance maxSpeed="70" maxDeceleration="10" maxAcceleration="5" />
-            <Axles>
-                <FrontAxle maxSteering="0.523598775598" wheelDiameter="0.8" trackWidth="1.68"
-                    positionX="2.98" positionZ="0.4" />
-                <RearAxle maxSteering="0.523598775598" wheelDiameter="0.8" trackWidth="1.68"
-                    positionX="0" positionZ="0.4" />
-            </Axles>
-            <Properties>
-                <!-- Scale modes: None, BBToModel, ModelToBB -->
-                <Property name="scaleMode" value="BBToModel" />
-                <Property name="model_id" value="6" />
-            </Properties>
-        </Vehicle>
-
         <Vehicle name="bicycle" vehicleCategory="bicycle"
             model3d="/project/mmsl_simulation/src/esmini/resources/models/cyclist.osgb">
             <!-- model bounding box xyz: 0.54, 0.01, 0.82 lwh: 1.83, 0.25, 1.58 -->
@@ -249,7 +253,7 @@
             <Properties>
                 <Property name="model_id" value="10" />
                 <!-- Scale modes: None, BBToModel, ModelToBB -->
-                <Property name="scaleMode" value="BBToModel" />
+                <Property name="scaleMode" value="ModelToBB" />
             </Properties>
         </Vehicle>
 

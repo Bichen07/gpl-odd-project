@@ -3,10 +3,11 @@
 shopt -s expand_aliases
 source ~/.bash_aliases
 
+source /repository/ros/install/setup.bash
 psw
 rmp $1
 if [ "$2" == "--sdc" ]; then
-    roslaunch --wait sdc run.launch
+    roslaunch --wait sdc run.launch simulation:=true
 elif [ "$2" == "--simulation" ]; then
     roslaunch simulation_adv run.launch
 elif [ "$2" == "--scenario_updater" ]; then

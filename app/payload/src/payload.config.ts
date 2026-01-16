@@ -1,81 +1,79 @@
-import path from "path";
+// storage-adapter-import-placeholder
+import { postgresAdapter } from '@payloadcms/db-postgres'
+import { payloadCloudPlugin } from '@payloadcms/payload-cloud'
+import { lexicalEditor } from '@payloadcms/richtext-lexical'
+import path from 'path'
+import { buildConfig, PayloadRequest } from 'payload'
+import { fileURLToPath } from 'url'
+import sharp from 'sharp'
 
-import { payloadCloud } from "@payloadcms/plugin-cloud";
-import { mongooseAdapter } from "@payloadcms/db-mongodb";
-import { webpackBundler } from "@payloadcms/bundler-webpack";
-import { slateEditor } from "@payloadcms/richtext-slate";
-import { buildConfig } from "payload/config";
+import { Users } from './collections/Users'
+import { Media } from './collections/Media'
+import { Observations } from './collections/Observations'
+import { Trials } from './collections/Trials'
+import EsminiDats from './collections/EsminiDats'
+import { OpenDrives } from './collections/OpenDrives'
+import { OpenScenarios } from './collections/OpenScenarios'
+import Samplings from './collections/Samplings'
+import Scenarios from './collections/Scenarios'
+import Batches from './collections/Batches'
+import Sessions from './collections/Sessions'
+import { KeyPerformanceIndicators } from './collections/KeyPerformanceIndicator'
+import { Documents } from './collections/Documents'
+import { Egos } from './collections/Egos'
+import { heatmapOrdering } from './endpoints/heatmapOrdering'
 
-import Clients from "./collections/Clients";
-import KeyPerformanceIndicators from "./collections/KeyPerformanceIndicators";
-import EsminiDats from "./collections/EsminiDats";
-import Media from "./collections/Media";
-import Observations from "./collections/Observations";
-import OpenScenarios from "./collections/OpenScenarios";
-import OpenDrives from "./collections/OpenDrives";
-import Routes from "./collections/Routes";
-import Scenarios from "./collections/Scenarios";
-import SemanticMap from "./collections/SemanticMap";
-import Trials from "./collections/Trials";
-import Users from "./collections/Users";
-import Vehicles from "./collections/Vehicles";
-import Batches from "./collections/Batches";
-import Sessions from "./collections/Sessions";
-import Tags from "./collections/Tags";
-import Samplings from "./collections/Samplings";
-import EsminiCsvs from "./collections/EsminiCsvs";
-import Documents from "./collections/Documents";
-import { trajectories } from "./endpoints/trajectory";
-import { collisionTrajectories } from "./endpoints/collisionTrajectories";
-import { cluster } from "./endpoints/analysis";
+const filename = fileURLToPath(import.meta.url)
+const dirname = path.dirname(filename)
 
 export default buildConfig({
-  serverURL: process.env.SERVER_URL,
-  cors: "*",
+  serverURL: process.env.PAYLOAD_PUBLIC_SERVER_URL,
+  cors: [
+    process.env.PAYLOAD_PUBLIC_SERVER_URL,
+    process.env.PAYLOAD_CLIENT_URL,
+    'http://localhost:9099',
+    'http://localhost:3000',
+    'https://gpl-odd-dashboard.chiu41.com',
+  ].filter((url) => url !== null && url !== undefined),
   admin: {
     user: Users.slug,
-    bundler: webpackBundler(),
-  },
-  rateLimit: {
-    window: 1 * 1000,
-    max: 100000,
-  },
-  editor: slateEditor({}),
-  endpoints: [cluster, trajectories, collisionTrajectories],
-  collections: [
-    Users,
-    Batches,
-    Trials,
-    Observations,
-    Clients,
-    Vehicles,
-    KeyPerformanceIndicators,
-    Scenarios,
-    Samplings,
-    SemanticMap,
-    Routes,
-    OpenScenarios,
-    OpenDrives,
-    EsminiDats,
-    Media,
-    EsminiCsvs,
-    Documents,
-    Tags,
-    Sessions,
-  ],
-  typescript: {
-    outputFile: path.resolve(__dirname, "payload-types.ts"),
-  },
-  graphQL: {
-    schemaOutputFile: path.resolve(__dirname, "generated-schema.graphql"),
-  },
-  plugins: [payloadCloud()],
-  db: mongooseAdapter({
-    url: process.env.DATABASE_URI,
-  }),
-  express: {
-    json: {
-      limit: 5000000000,
+    importMap: {
+      baseDir: path.resolve(dirname),
     },
   },
-});
+  collections: [
+    Users,
+    Media,
+    Observations,
+    Trials,
+    EsminiDats,
+    OpenDrives,
+    OpenScenarios,
+    Samplings,
+    Scenarios,
+    Batches,
+    Sessions,
+    KeyPerformanceIndicators,
+    Documents,
+    Egos,
+  ],
+  endpoints: [heatmapOrdering],
+  editor: lexicalEditor(),
+  secret: process.env.PAYLOAD_SECRET || '',
+  typescript: {
+    outputFile: path.resolve(dirname, 'payload-types.ts'),
+  },
+  graphQL: {
+    disableIntrospectionInProduction: false,
+  },
+  db: postgresAdapter({
+    pool: {
+      connectionString: process.env.DATABASE_URI || '',
+    },
+  }),
+  sharp,
+  plugins: [
+    payloadCloudPlugin(),
+    // storage-adapter-placeholder
+  ],
+})

@@ -1,27 +1,26 @@
-version: "3"
- 
 services:
   payload:
-    container_name: gpl-odd-payloadcms
     build:
-      context: .
+      context: ./
+      target: prod
     restart: unless-stopped
-    volumes:
-      - ${HOST_DATA_MOUNT_PATH}/uploads:/data/uploads
     ports:
-      - 3020:3000
+      - '3020:3000'
     depends_on:
-      - mongo
-    command: ["node", "dist/server.js"]
- 
-  mongo:
-    container_name: gpl-odd-mongo
-    image: mongo:7.0.8
+      - postgres
+    env_file:
+      - .env
     volumes:
-      - ${HOST_DATA_MOUNT_PATH}/db:/data/db
-    logging:
-      driver: none
+      - "${HOST_DATA_MOUNT_PATH}/uploads:/data/uploads"
+
+  postgres:
+    restart: always
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: payloadpass
+      POSTGRES_DB: payloaddb
+    volumes:
+      - "${HOST_DATA_MOUNT_PATH}/data:/var/lib/postgresql/data"
     # ports:
-    #   - 27018:27017
-    command:
-      - --storageEngine=wiredTiger
+    #   - '5433:5432'

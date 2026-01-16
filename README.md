@@ -59,69 +59,16 @@ Clustering trajectories patterns for a logical scenario.
 
 #### Payload CMS
 
-- Log in to the Admin UI of Payload CMS.
-- Navigate to the Key Perofrmance Indicators collection to create a new KPI.
-- Navigate to the Sampling collection to create a new sampling plan.
-  - **Uniform** (Random)
-    - **Sample Size**: Specify the number of samples to generate using this method. Use -1 for an infinite number of samples.
-  - **Sobol** (Semi-Random)
-    - **Sample Size**: Specify the number of samples to generate using this method. Use -1 for an infinite number of samples.
-  - **Straddle** (Adaptive sampling on the boundary)
-    - **Sample Size**: Specify the number of samples to generate using this method. Use -1 for an infinite number of samples.
-    - **Max Surrogate Training Sample Size**: Define the maximum number of samples used to train the surrogate model. If the samples (or trials) in a batch exceed this size, the training data will be downsampled to this size. This is crucial as training the surrogate model (Gaussian Process) becomes time-consuming with large sample sizes (serveral minutes on thousands of samples). Typically, a value around 1000 is sufficient based on experience.
-    - **Acquisition Sample Size**: After training the surrogate model, we will do the random sampling in the parameter space, and let the surrogate model to predict the outcome of these samples. We will use these samples to find where are the next best spot to samples close to the boundary. This value is the sample size of this step. To understand more detail behind this, you can refer to the article [here](https://community.arm.com/arm-research/b/articles/posts/scalable-hyperparameter-tuning-for-automl).
-    - **Parallel Counts**: Specify how many next samples are needed to suggest at a time for parallel simulation processes to consume. This parameter determines the number of samples recommended concurrently for parallel execution in simulation processes.
-    - **Acquisition Exploration Factor**: This factor influences the exploration in the straddle acquisition function. A value of 0.1 is generally effective based on experience. Adjusting this value can impact the balance between exploration and exploitation during sampling.
+You can duplicate an existing configuration to simplify setup.
+
+- Log in to the Admin UI of Payload CMS. (e.g. http://140.113.208.174:3020/admin)
 - Navigate to the Scenarios collection to create a new Scenario.
-  - Upload OpenSCENARIO and OpenDrive files
-  - Specify parameters and define their search range
-  - Speicfy KPIs and their critical thresholds
-  - Specify the conditions used for simulation
-  - Fill in all other necessary information
-- Navigate to the Sessions collection to create a new Session. (please select a tag that no any scenario use and make sure there is no scenarios in filter for now)
+- Navigate to the Sessions collection to create a new Session.
 - Navigate to the Batches collection to create a new Batch you want to do the sampling search.
   - In the selected batch:
     1. Choose the scenario you want to use.
     2. Choose the session you want your batch located in.
     3. Choose the sampling you want to use.
-
-### Spin up sampling server
-
-- Activate the Conda environment:
-
-```bash
-conda activate sampling
-
-```
-
-- Navigate to app/sampling/src
-
-- Start the sampling server
-
-```bash
-litestar run --port 9009 --host 0.0.0.0 --debug --reload
-```
-
-(Modify the parameters as needed.)
-
-#### Pass Batch ID you want to test to sampling server
-
-- Access the Sampling Server:
-
-  - Open your browser and go to:
-
-  ```
-  <your sampling server ip>:<port>/schema
-  ```
-
-- Initialize Your Batch:
-
-  - Locate the "initialize" API
-  - Click "Test it Out"
-  - Replace "string" with your Batch ID
-  - Click "Execute" to initialize the sampling plan for your batch
-
-- The sampling server is now prepared to suggest new sample points for the simulator.
 
 ### Additional Configuration in Simulator
 
@@ -159,6 +106,42 @@ litestar run --port 9009 --host 0.0.0.0 --debug --reload
 - Change headless:=true to headless:=false or vice versa
 - If set to false, the simulation windows will be displayed
 
+### Spin up sampling server (On Simulation Host)
+
+- Activate the Conda environment:
+
+```bash
+conda activate sampling
+
+```
+
+- Navigate to app/sampling/src
+
+- Start the sampling server
+
+```bash
+litestar run --port 9009 --host 0.0.0.0 --debug --reload
+```
+
+#### Pass Batch ID you want to test to sampling server
+
+- Access the Sampling Server:
+
+  - Open your browser and go to:
+
+  ```
+  <your sampling server ip>:9009/schema
+  ```
+
+- Initialize Your Batch:
+
+  - Locate the "initialize" API
+  - Click "Test it Out"
+  - Replace "string" with your Batch ID
+  - Click "Execute" to initialize the sampling plan for your batch
+
+- The sampling server is now prepared to suggest new sample points for the simulator.
+
 ### Execute Scenario Search
 
 - Go to directory "app/simulation/scripts"
@@ -181,53 +164,80 @@ tmux
 
 (Replace <parallel number> with the desired number of parallel executions.)
 
-- To view the simulation windows, press Ctrl-B S to switch to the next session.
-
-#### Closing the Simulation
-
-- Stop the ./run.sh script by pressing Ctrl-C.
-
 - Navigate between simulation windows using:
-
-  - Open the session list with Ctrl-B S.
+  - Open the session list with Ctrl-B S
+  - Select the simulation session (usually the second one)
   - Ctrl-B N → Next window
   - Ctrl-B P → Previous window
 
-- Close each simulation window by pressing Ctrl-X.
+#### Closing the Simulation
+
+- Attach tmux if not attach yet
+```bash
+tmux attach
+```
+
+- Stop the ./run.sh script.
+  - Open the session list with Ctrl-B S.
+  - Select the session that running the script.
+  - Pressing Ctrl-C to stop it.
 
 - Kill the simulation session:
-
   - Open the session list with Ctrl-B S.
-  - Select the simulation session and press Ctrl-B X to terminate it.
+  - Select the simulation session.
+  - Navigate between windows and press Ctrl-C to stop the simulations.
+  - Press Ctrl-B X to terminate and close the simulation window.
 
-- Clean Logs and Cache Files
+- Clean Logs and Cache Files (if taking too much space)
 
   - Remove simulation/deploy/home/.ros
   - Remove simulation/ros/.cache/scneario_search
 
-#### Patch Trials to Batch
-
-- Open scripts/patch_trials_to_batch.py
-- Modify the following variables as needed:
-  - PAYLOAD_API: Set to your Payload CMS API endpoint.
-  - batch_id: Specify the target batch ID.
-- Run the script:
-  ```bash
-  python3 patch_trials_to_batch.py
-  ```
-
 ### View and Explore Simulation Result
 
-- Go to directory "app/dashboard"
-- Update environment variables in the .env file if needed
+#### Spin up The Dashboard
+
+- Go to the Dashboard Readme to setup the project if not yet.
+- Go to directory "app/dashboard".
 - Start the web interface by:
 
 ```bash
-bun run dev
+bun run start
 ```
 
 - Open the displaying url to see the visualization of the simulation result.
 
+#### Spin up The Analyzer for Clustering and Visualization Data
+
+- Activate the Conda environment:
+
+```bash
+conda activate analyzer
+
+```
+
+- Navigate to app/analyzer/src
+- Start the analyzer server
+
+```bash
+litestar run --port 9010 --host 0.0.0.0 --debug --reload
+```
+
 #### Create and Save Trajectory Analysis
 
-TBI
+From the dashboard, navigate to a batch and open the Save tab.
+Click Create New, then select Analyze.
+
+The analyzer will begin processing, which may take several minutes.
+When complete, the analysis output (for example, analyze.zip) will be saved in PayloadCMS Documents.
+
+You can manage these saved files (add new ones or delete existing ones) from the batch in the Payload Admin UI.
+
+#### Explore the analyzing result
+
+- Use the following views and tools:
+  - Scenario Parameter Space
+  - Trajectory Projection Space
+  - Replayer
+  - Trajectory Heatmap
+  - Apply filtering and selection tools

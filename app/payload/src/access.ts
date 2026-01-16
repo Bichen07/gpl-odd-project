@@ -1,31 +1,24 @@
-import { Access } from "payload/config";
-import { FieldAccess } from "payload/types";
+import type { Access, FieldAccess } from 'payload'
 
+/**
+ * Allow logged-in users
+ */
 export const usersAccess: Access = ({ req: { user } }) => {
-  if (user) {
-    return true;
-  }
-  return false;
-};
+  return !!user
+}
 
-export const selfAccess: Access = ({ data, id, req: { user } }) => {
-  return user && (id === user.id || user.role === "admin");
-};
+/**
+ * Allow users to act on themselves OR admin
+ */
+export const selfAccess: Access = ({ id, req: { user } }) => {
+  if (!user) return false
+  return id === user.id
+}
 
-export const selfFieldAccess: FieldAccess = ({ data, id, req: { user } }) => {
-  return user && (id === user.id || user.role === "admin");
-};
-
-export const developerAccess: Access = ({ req: { user } }) => {
-  return user && (user.role === "admin" || user.role === "developer");
-};
-export const developerFieldAccess: FieldAccess = ({ req: { user } }) => {
-  return user && (user.role === "admin" || user.role === "developer");
-};
-
-export const adminAccess: Access = ({ req: { user } }) => {
-  return user && user.role === "admin";
-};
-export const adminFieldAccess: FieldAccess = ({ req: { user } }) => {
-  return user && user.role === "admin";
-};
+/**
+ * Field-level version of selfAccess
+ */
+export const selfFieldAccess: FieldAccess = ({ id, req: { user } }) => {
+  if (!user) return false
+  return id === user.id
+}

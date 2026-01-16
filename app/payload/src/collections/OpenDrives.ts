@@ -1,24 +1,20 @@
-import path from "path";
-import { CollectionConfig } from "payload/types";
-import { usersAccess } from "../access";
+import { usersAccess } from '@/access'
+import { CollectionConfig } from 'payload'
 
-const OpenDrives: CollectionConfig = {
-  slug: "openDrives",
+export const OpenDrives: CollectionConfig = {
+  slug: 'openDrives',
   admin: {
-    group: "Uploads",
+    group: 'Uploads',
   },
   access: {
     read: () => true,
     create: usersAccess,
-    delete: usersAccess,
     update: usersAccess,
+    delete: usersAccess,
   },
   upload: {
-    staticURL: "/xodr",
-    staticDir: "/data/uploads/xodr",
-    mimeTypes: ["application/octet-stream"],
+    staticDir: process.env.NODE_ENV == 'production' ? '/data/uploads/xodr' : './uploads/xodr',
+    mimeTypes: ['application/octet-stream', 'application/xml'],
   },
   fields: [],
-};
-
-export default OpenDrives;
+}

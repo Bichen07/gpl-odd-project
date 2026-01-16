@@ -477,8 +477,8 @@
           {
             "alias": "turn_right_at_bridge",
             "index": 26,
-            "x": 338.0,
-            "y": 84.5,
+            "x": 505.16,
+            "y": 199.78,
             "orientation": 0.6018
           },
           {
@@ -487,6 +487,46 @@
             "x": 314.3,
             "y": -56.4,
             "orientation": 5.318
+          },
+          {
+            "alias": "BusBike",
+            "index": 28,
+            "x": 536,
+            "y": -1,
+            "orientation": -2.532
+          },
+          {
+            "alias": "bridge-overtake-cutin-from-left",
+            "index": 29,
+            "x": 545,
+            "y": 224,
+            "orientation": -0.84
+          },
+          {
+            "alias": "opposite_overtake_or_cutin",
+            "index": 30,
+            "x": 273.77,
+            "y": 39.62,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "5-way-turn-left-drive-out-hct-system-b",
+            "index": 22,
+            "x": -11,
+            "y": 39,
+            "orientation": -1.91
+          },
+          {
+            "alias": "bridge-overtake-cutin-from-left",
+            "x": 525,
+            "y": 213,
+            "orientation": 0.6018
+          },
+          {
+            "alias": "bridge-overtake-cutin-from-left",
+            "x": 545,
+            "y": 224,
+            "orientation": -0.84
           },
           {
             "alias": "ppt8",
@@ -567,9 +607,9 @@
         "operation": [
           {
             "alias": "alks_road_straight_0",
-            "x": 10,
-            "y": -8,
-            "orientation": 0
+            "x": 11.5,
+            "y": 20,
+            "orientation": 1.57
           }
         ]
       },

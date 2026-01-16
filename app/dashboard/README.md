@@ -1,48 +1,45 @@
-# Dashboard
+# Project Setup
 
-## Development
+## Prerequisites
 
-### Prerequisites
+- [Node.js](https://nodejs.org/) installed
+- [Bun](https://bun.sh/docs/installation) installed
 
-1. Install Node.js. It's recommended to use [Node Version Manager (nvm)](https://github.com/nvm-sh/nvm).
+## 1. Setup the Customized `regl-scatterplot` Submodule
 
-2. Install [Bun](https://bun.sh/) (globally).
+> **Note:** The `regl-scatterplot` package has been customized.
+> You need to manually install and build it locally before using it in the main project.
 
-   ```
-   npm install -g bun
-   ```
+```bash
+# Navigate to the submodule directory
+cd ./third_party/regl-scatterplot
 
-3. Install packages.
+# Install submodule dependencies
+npm install
 
-   ```
-   bun install
-   ```
+# Build the submodule
+npm run build
 
-### Environment Setup
-
-1. Create a new .env file from .env.example. Copy the example environment file to create your own .env file:
-
-   ```
-   cp .env.example .env
-   ```
-
-2. Configure the .env file.
-
-   - Make sure you have the correct Payload CMS API settings in your .env file.
-   - Update the necessary variables with the appropriate values.
-
-### Running the Development Server
-
-To start the development server, use the following command:
-
-```
-bun run dev
+# Return to the project root
+cd ../../
 ```
 
-### Updating Payload Types
+## 2. Link Submodule and Install Main Project Dependencies
 
-If there are updates to the payload CMS types, you need to regenerate the payload types. To do this, run:
+```bash
+# Add the local customized package to your Bun project
+bun add ./third_party/regl-scatterplot
 
+# Install main project dependencies
+bun install
 ```
-bun run codegen
+
+## 3. Build and Run
+
+```bash
+# Build the project
+bun run build
+
+# Start the project
+bun run start
 ```
