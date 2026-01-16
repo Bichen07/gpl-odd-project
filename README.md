@@ -61,7 +61,7 @@ Clustering trajectories patterns for a logical scenario.
 
 You can duplicate an existing configuration to simplify setup.
 
-- Log in to the Admin UI of Payload CMS.
+- Log in to the Admin UI of Payload CMS. (e.g. http://140.113.208.174:3020/admin)
 - Navigate to the Scenarios collection to create a new Scenario.
 - Navigate to the Sessions collection to create a new Session.
 - Navigate to the Batches collection to create a new Batch you want to do the sampling search.
@@ -164,23 +164,29 @@ tmux
 
 (Replace <parallel number> with the desired number of parallel executions.)
 
-- To view the simulation windows, press Ctrl-B S to switch to the next session.
-
-#### Closing the Simulation
-
-- Stop the ./run.sh script by pressing Ctrl-C.
-
 - Navigate between simulation windows using:
-
-  - Open the session list with Ctrl-B S.
+  - Open the session list with Ctrl-B S
+  - Select the simulation session (usually the second one)
   - Ctrl-B N → Next window
   - Ctrl-B P → Previous window
 
-- Kill the simulation session:
+#### Closing the Simulation
 
-  - Select the simulation session and press Ctrl-C to stop the simulation.
-  - Press Ctrl-B X to terminate the simulation window.
+- Attach tmux if not attach yet
+```bash
+tmux attach
+```
+
+- Stop the ./run.sh script.
   - Open the session list with Ctrl-B S.
+  - Select the session that running the script.
+  - Pressing Ctrl-C to stop it.
+
+- Kill the simulation session:
+  - Open the session list with Ctrl-B S.
+  - Select the simulation session.
+  - Navigate between windows and press Ctrl-C to stop the simulations.
+  - Press Ctrl-B X to terminate and close the simulation window.
 
 - Clean Logs and Cache Files (if taking too much space)
 
@@ -191,7 +197,8 @@ tmux
 
 #### Spin up The Dashboard
 
-- Go to directory "app/dashboard"
+- Go to the Dashboard Readme to setup the project if not yet.
+- Go to directory "app/dashboard".
 - Start the web interface by:
 
 ```bash
@@ -218,11 +225,13 @@ litestar run --port 9010 --host 0.0.0.0 --debug --reload
 
 #### Create and Save Trajectory Analysis
 
-From the dashboard, navigate to a batch and open the **Save** tab.
-Click **Create New**, then press the **Analyze** button.
-The analyzer will begin processing and may take several minutes.
-The analysis results will be saved automatically.
-You can manage these saves (add or delete) from the Payload Admin UI.
+From the dashboard, navigate to a batch and open the Save tab.
+Click Create New, then select Analyze.
+
+The analyzer will begin processing, which may take several minutes.
+When complete, the analysis output (for example, analyze.zip) will be saved in PayloadCMS Documents.
+
+You can manage these saved files (add new ones or delete existing ones) from the batch in the Payload Admin UI.
 
 #### Explore the analyzing result
 
