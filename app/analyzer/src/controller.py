@@ -12,7 +12,6 @@ from matplotlib.colors import ListedColormap, BoundaryNorm, LinearSegmentedColor
 import numpy.typing as npt
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 from urllib.parse import urlencode, parse_qs, urlparse, quote
-import math
 from dataclasses import dataclass, asdict
 import itertools
 from concurrent.futures import ThreadPoolExecutor
@@ -1581,25 +1580,30 @@ class TrajectoryAnalysisController(Controller):
                 for agent_name, agent in trajectory["trajectory"].items():
                     agents[agent_name] = []
                     for i, item in enumerate(agent):
-                        # FIXED: Use safe fallback that preserves last known valid roadId
-                        # instead of hard-coding 0. This prevents the roadId=0 bug.
+                        # FIXED: Propagate last known valid roadId instead of defaulting
+                        # to 0.  Handles None, NaN, non-numeric, and missing key safely.
                         roadId = 0
-                        s = 0
-                        if "roadId" in item and item["roadId"] is not None:
-                            try:
-                                if isinstance(item["roadId"], (int, float)) and not math.isnan(item["roadId"]):
-                                    roadId = int(item["roadId"])
-                                else:
-                                    # Fallback to previous frame's valid value (safer than default 0)
-                                    roadId = agents[agent_name][-1]["roadId"] if agents[agent_name] else 0
-                            except (ValueError, TypeError, IndexError, KeyError):
+                        s = 0.0
+                        if "roadId" in item:
+                            if item["roadId"] is None:
                                 roadId = agents[agent_name][-1]["roadId"] if agents[agent_name] else 0
+                            else:
+                                try:
+                                    if isinstance(item["roadId"], (int, float)) and not math.isnan(item["roadId"]):
+                                        roadId = int(item["roadId"])
+                                    else:
+                                        roadId = agents[agent_name][-1]["roadId"] if agents[agent_name] else 0
+                                except (ValueError, TypeError, IndexError, KeyError):
+                                    roadId = agents[agent_name][-1]["roadId"] if agents[agent_name] else 0
 
-                        if "s" in item and item["s"] is not None:
-                            try:
-                                s = float(item["s"])
-                            except (ValueError, TypeError):
+                        if "s" in item:
+                            if item["s"] is None:
                                 s = agents[agent_name][-1]["s"] if agents[agent_name] else 0.0
+                            else:
+                                try:
+                                    s = float(item["s"])
+                                except (ValueError, TypeError):
+                                    s = agents[agent_name][-1]["s"] if agents[agent_name] else 0.0
 
                         agents[agent_name].append({
                             "x": item["x"],
