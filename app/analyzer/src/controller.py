@@ -1,4 +1,8 @@
 import subprocess
+import sys
+import time
+import math
+from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
@@ -9,7 +13,6 @@ from matplotlib.colors import ListedColormap, BoundaryNorm, LinearSegmentedColor
 import numpy.typing as npt
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 from urllib.parse import urlencode, parse_qs, urlparse, quote
-import math
 from dataclasses import dataclass, asdict
 import itertools
 from concurrent.futures import ThreadPoolExecutor
@@ -83,6 +86,25 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 from matplotlib.colors import Normalize
 import colorsys
+
+
+def _load_capture():
+    here = Path(__file__).resolve()
+    repo_root = next((p for p in [here, *here.parents] if p.name == "gpl-odd-project"), None)
+    if repo_root is None:
+        return None
+    llm_pkg = repo_root / "app" / "llm_pipeline" / "python"
+    if str(llm_pkg) not in sys.path:
+        sys.path.append(str(llm_pkg))
+    try:
+        from llm_pipeline.capture import PipelineCapture
+
+        return PipelineCapture(__file__)
+    except Exception:
+        return None
+
+
+_capture = _load_capture()
 
 def interpolate_angles(sample_s, route_s, angles_rad):
     """
@@ -1203,6 +1225,14 @@ class TrajectoryAnalysisController(Controller):
     async def clustering(
         self, data: TrajectoryAnalysisRequest
     ) -> Dict[str, TrajectoryAnalysisResponse]:
+        run_id = f"analyzer_{int(time.time())}"
+        if _capture is not None:
+            _capture.record(
+                "stage1_capture",
+                run_id,
+                "analyzer_request",
+                {"batchIds": data.batchIds, "framePeriod": data.framePeriod, "tasks": [asdict(t) for t in data.tasks]},
+            )
         egoIds = [1]
 
         returned = {}
@@ -1551,18 +1581,37 @@ class TrajectoryAnalysisController(Controller):
                 for agent_name, agent in trajectory["trajectory"].items():
                     agents[agent_name] = []
                     for i, item in enumerate(agent):
+                        # FIXED: Propagate last known valid roadId instead of defaulting
+                        # to 0.  Handles None, NaN, non-numeric, and missing key safely.
                         roadId = 0
-                        s = 0
+                        s = 0.0
                         if "roadId" in item:
-                            roadId = item["roadId"] if int(item["roadId"]) == item["roadId"] else agents[agent_name][i-1]["roadId"]
-                            s = item["s"] if int(item["roadId"]) == item["roadId"] else agents[agent_name][i-1]["s"]
+                            if item["roadId"] is None:
+                                roadId = agents[agent_name][-1]["roadId"] if agents[agent_name] else 0
+                            else:
+                                try:
+                                    if isinstance(item["roadId"], (int, float)) and not math.isnan(item["roadId"]):
+                                        roadId = int(item["roadId"])
+                                    else:
+                                        roadId = agents[agent_name][-1]["roadId"] if agents[agent_name] else 0
+                                except (ValueError, TypeError, IndexError, KeyError):
+                                    roadId = agents[agent_name][-1]["roadId"] if agents[agent_name] else 0
+
+                        if "s" in item:
+                            if item["s"] is None:
+                                s = agents[agent_name][-1]["s"] if agents[agent_name] else 0.0
+                            else:
+                                try:
+                                    s = float(item["s"])
+                                except (ValueError, TypeError):
+                                    s = agents[agent_name][-1]["s"] if agents[agent_name] else 0.0
 
                         agents[agent_name].append({
                             "x": item["x"],
                             "y": item["y"],
                             "yaw": item["yaw"],
-                            "width": item["width"] if "width" in item else 0,
-                            "length": item["length"] if "length" in item else 0,
+                            "width": item.get("width", 0),
+                            "length": item.get("length", 0),
                             "s": s,
                             "roadId": roadId
                         })
@@ -1819,6 +1868,13 @@ class TrajectoryAnalysisController(Controller):
         )
         response.raise_for_status()
 
+        if _capture is not None:
+            _capture.record(
+                "stage1_capture",
+                run_id,
+                "analyzer_response",
+                {"egos": list(returned.keys()), "response_keys": list(docsave.keys())},
+            )
         return returned
 
     def get_trajectories(self, data: TrajectoryAnalysisRequest, egoId: int):
