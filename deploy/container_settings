@@ -10,7 +10,7 @@
 
 export PAYLOAD_API="http://localhost:3020/api"
 export USER_API_KEY="e6f0cadd-30f1-4d7d-b953-6239d46d7a69"
-export PROJECT_DIR=${HOME}/Downloads/code/gpl-odd-project
+export PROJECT_DIR=${HOME}/Downloads/code/LAB/41_Git/gpl-odd-project
 
 VERSION_DETAILS_PATH="${PROJECT_DIR}/version_details.md"
 SDC_VERSION=$(grep -Po "\* sdc built from commit # \K[0-9a-z]*" $VERSION_DETAILS_PATH)

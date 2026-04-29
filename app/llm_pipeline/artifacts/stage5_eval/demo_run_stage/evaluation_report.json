@@ -1,0 +1,22 @@
+{
+  "run_id": "demo_run_stage",
+  "stages": {
+    "stage1_capture": {
+      "ok": true,
+      "missing": []
+    },
+    "stage2_context": {
+      "ok": true,
+      "missing": []
+    },
+    "stage3_prompt": {
+      "ok": true,
+      "missing": []
+    },
+    "stage4_llm": {
+      "ok": true,
+      "missing": []
+    }
+  },
+  "ok": true
+}

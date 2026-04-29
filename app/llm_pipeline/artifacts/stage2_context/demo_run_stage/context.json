@@ -1,0 +1,15 @@
+{
+  "run_id": "demo_run_stage",
+  "stage": "stage2_context",
+  "summary": "Captured 1 stage1 events for run demo_run_stage.",
+  "sections": [
+    {
+      "title": "Observed Events",
+      "content": "sampling_suggest"
+    },
+    {
+      "title": "Sample Payload Preview",
+      "content": "[\n  {\n    \"batch_id\": \"1\",\n    \"suggestion\": {\n      \"trial_index\": 1,\n      \"parameters\": {\n        \"d\": 1\n      }\n    }\n  }\n]"
+    }
+  ]
+}

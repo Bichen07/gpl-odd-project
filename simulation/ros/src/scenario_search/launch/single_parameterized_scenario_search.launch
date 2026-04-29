@@ -7,7 +7,7 @@
     <arg name="sim_with_external" default="false" />
 
     <arg name="sampling_suggestion_api" default="http://localhost:9009" />
-    <arg name="batch_id" default="1" />
+    <arg name="batch_id" default="3" />
     <arg name="ego_id" default="1" />
 
     <!-- <arg name="map_name" default="alks_road_straight" /> -->
@@ -22,7 +22,7 @@
     <!-- <arg name="ego_position_seq" default="21" /> -->
 
     <!-- drive out hct -->
-    <arg name="ego_position_seq" default="22" />
+    <!-- <arg name="ego_position_seq" default="22" /> -->
 
     <!-- opposite overtake -->
     <!-- <arg name="ego_position_seq" default="4" /> -->
@@ -36,7 +36,7 @@
 
     <!-- Bridge Cut In -->
     <!-- <arg name="ego_position_seq" default="29" /> -->
-    <!-- <arg name="ego_position_seq" default="26" /> -->
+    <arg name="ego_position_seq" default="26" />
 
 
     <!-- <arg name="route_name" default="hsc-hsp-hsc-loop" /> -->

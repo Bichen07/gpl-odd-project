@@ -1,0 +1,10 @@
+{
+  "run_id": "demo_run_stage",
+  "stage": "stage3_prompt",
+  "template_version": "v1",
+  "system_prompt": "You are an autonomous-driving scenario analysis assistant.\nUse only the provided context. If data is missing, explicitly say so.\nOutput concise findings, key risks, and follow-up checks.\n",
+  "prompt": "Analyze the following GPL-ODD run context.\n\nReturn:\n1) Scenario summary in 3-5 bullet points.\n2) Risk assessment (low/medium/high) with reasons.\n3) Critical observations by stage (sampling, simulation, analyzer).\n4) Suggested next experiments.\n\nContext:\n# Context for Run `demo_run_stage`\n\nCaptured 1 stage1 events for run demo_run_stage.\n\n## Observed Events\nsampling_suggest\n\n## Sample Payload Preview\n```json\n[\n  {\n    \"batch_id\": \"1\",\n    \"suggestion\": {\n      \"trial_index\": 1,\n      \"parameters\": {\n        \"d\": 1\n      }\n    }\n  }\n]\n```\n\n",
+  "metadata": {
+    "context_sha256": "688d693ffc769b5b00e934d1a815e0cf6d87f3c68c44f9c18e7c6eb2d543d200"
+  }
+}

@@ -1,0 +1,31 @@
+Analyze the following GPL-ODD run context.
+
+Return:
+1) Scenario summary in 3-5 bullet points.
+2) Risk assessment (low/medium/high) with reasons.
+3) Critical observations by stage (sampling, simulation, analyzer).
+4) Suggested next experiments.
+
+Context:
+# Context for Run `demo_run_stage`
+
+Captured 1 stage1 events for run demo_run_stage.
+
+## Observed Events
+sampling_suggest
+
+## Sample Payload Preview
+```json
+[
+  {
+    "batch_id": "1",
+    "suggestion": {
+      "trial_index": 1,
+      "parameters": {
+        "d": 1
+      }
+    }
+  }
+]
+```
+
