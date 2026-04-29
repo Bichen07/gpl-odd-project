@@ -1,1 +1,12 @@
 .temp
+
+# Large local datasets — do not push to GitHub (files exceed 100MB limit)
+alldatasets/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Temporary BEV output
+/tmp/bev_output/
