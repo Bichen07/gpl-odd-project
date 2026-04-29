@@ -123,27 +123,32 @@ def _sample_param_poly3(x0, y0, hdg, length, au, bu, cu, du, av, bv, cv, dv,
 
 
 # ---------------------------------------------------------------------------
-# XodrParser: parses OpenDRIVE XML and returns road centre-line samples
+# XodrParser: parses OpenDRIVE XML and returns road centre-line + lane boundaries
 # ---------------------------------------------------------------------------
 
 @dataclass
-class RoadGeometry:
+class LaneLine:
+    """One sampled polyline: either a road ref-line or an actual lane boundary."""
     road_id: str
-    points: List[Tuple[float, float]]  # sampled (x, y) along reference line
-    lane_width: float = 3.5            # rough average for outline drawing
+    lane_id: int          # 0 = reference line, ±N = driving/shoulder lanes
+    lane_type: str        # "ref", "driving", "shoulder", "border", etc.
+    points: List[Tuple[float, float]]
 
 
 class XodrParser:
     """
-    Parses an OpenDRIVE .xodr file and samples road reference lines.
-    Only geometry needed for visualisation is extracted.
+    Parses an OpenDRIVE .xodr file and produces:
+      - reference lines (centerline of each road)
+      - lane boundaries (computed by perpendicular offset from the ref-line)
+
+    This gives a richer map matching what odrplot/MapPlotter produce.
     """
 
     SAMPLE_STEP = 2.0   # metres between sample points
 
     def __init__(self, xodr_path: str):
         self.xodr_path = xodr_path
-        self._roads: List[RoadGeometry] = []
+        self._lines: List[LaneLine] = []   # all lines (ref + lane boundaries)
         self._parse()
 
     def _parse(self):
@@ -151,14 +156,20 @@ class XodrParser:
         root = tree.getroot()
         for road_elem in root.findall(".//road"):
             road_id = road_elem.get("id", "?")
-            pts = self._sample_road(road_elem)
-            if len(pts) >= 2:
-                # Get a representative lane width
-                lw = self._get_lane_width(road_elem)
-                self._roads.append(RoadGeometry(road_id=road_id, points=pts,
-                                                lane_width=lw))
+            ref_pts = self._sample_ref_line(road_elem)
+            if len(ref_pts) < 2:
+                continue
+            # Reference line (drawn as red/centerline)
+            self._lines.append(LaneLine(road_id=road_id, lane_id=0,
+                                        lane_type="ref", points=ref_pts))
+            # Lane boundaries
+            self._lines.extend(self._compute_lane_boundaries(road_elem, ref_pts))
 
-    def _sample_road(self, road_elem) -> List[Tuple[float, float]]:
+    # ------------------------------------------------------------------
+    # Reference line sampling (same as before)
+    # ------------------------------------------------------------------
+
+    def _sample_ref_line(self, road_elem) -> List[Tuple[float, float]]:
         all_pts: List[Tuple[float, float]] = []
         plan_view = road_elem.find("planView")
         if plan_view is None:
@@ -171,58 +182,158 @@ class XodrParser:
             if length < 0.01:
                 continue
             child = list(geom)
-            if not child:
+            tag = child[0].tag if child else "line"
+            if tag == "line":
                 pts = _sample_line(x0, y0, hdg, length, self.SAMPLE_STEP)
+            elif tag == "arc":
+                k = float(child[0].get("curvature", 0))
+                pts = _sample_arc(x0, y0, hdg, length, k, self.SAMPLE_STEP)
+            elif tag == "spiral":
+                k0 = float(child[0].get("curvStart", 0))
+                k1 = float(child[0].get("curvEnd", 0))
+                pts = _sample_spiral(x0, y0, hdg, length, k0, k1, self.SAMPLE_STEP)
+            elif tag == "paramPoly3":
+                au = float(child[0].get("aU", 0))
+                bu = float(child[0].get("bU", 0))
+                cu = float(child[0].get("cU", 0))
+                du = float(child[0].get("dU", 0))
+                av = float(child[0].get("aV", 0))
+                bv = float(child[0].get("bV", 0))
+                cv = float(child[0].get("cV", 0))
+                dv = float(child[0].get("dV", 0))
+                p_range = child[0].get("pRange", "normalized")
+                pts = _sample_param_poly3(x0, y0, hdg, length,
+                                          au, bu, cu, du, av, bv, cv, dv,
+                                          p_range, self.SAMPLE_STEP)
             else:
-                tag = child[0].tag
-                if tag == "line":
-                    pts = _sample_line(x0, y0, hdg, length, self.SAMPLE_STEP)
-                elif tag == "arc":
-                    k = float(child[0].get("curvature", 0))
-                    pts = _sample_arc(x0, y0, hdg, length, k, self.SAMPLE_STEP)
-                elif tag == "spiral":
-                    k0 = float(child[0].get("curvStart", 0))
-                    k1 = float(child[0].get("curvEnd", 0))
-                    pts = _sample_spiral(x0, y0, hdg, length, k0, k1,
-                                         self.SAMPLE_STEP)
-                elif tag == "paramPoly3":
-                    au = float(child[0].get("aU", 0))
-                    bu = float(child[0].get("bU", 0))
-                    cu = float(child[0].get("cU", 0))
-                    du = float(child[0].get("dU", 0))
-                    av = float(child[0].get("aV", 0))
-                    bv = float(child[0].get("bV", 0))
-                    cv = float(child[0].get("cV", 0))
-                    dv = float(child[0].get("dV", 0))
-                    p_range = child[0].get("pRange", "normalized")
-                    pts = _sample_param_poly3(x0, y0, hdg, length,
-                                              au, bu, cu, du,
-                                              av, bv, cv, dv,
-                                              p_range, self.SAMPLE_STEP)
-                else:
-                    pts = _sample_line(x0, y0, hdg, length, self.SAMPLE_STEP)
-            # Skip first point of each segment except the first (avoids duplicate)
+                pts = _sample_line(x0, y0, hdg, length, self.SAMPLE_STEP)
             if all_pts:
                 pts = pts[1:]
             all_pts.extend(pts)
         return all_pts
 
-    def _get_lane_width(self, road_elem) -> float:
-        for w_elem in road_elem.findall(".//lane/width"):
-            try:
-                return float(w_elem.get("a", 3.5))
-            except ValueError:
-                pass
-        return 3.5
+    # ------------------------------------------------------------------
+    # Lane boundary computation by perpendicular offset from ref line
+    # ------------------------------------------------------------------
+
+    def _compute_lane_boundaries(
+        self, road_elem, ref_pts: List[Tuple[float, float]]
+    ) -> List[LaneLine]:
+        """
+        For each laneSection, offset from the reference line outward (left = positive,
+        right = negative side) by cumulative lane widths to get lane boundaries.
+
+        Uses a simple "width(s) = a + b*s + c*s² + d*s³" polynomial for each lane.
+        The offset vector at each sampled point is perpendicular to the local heading.
+        """
+        lines: List[LaneLine] = []
+        road_id = road_elem.get("id", "?")
+
+        # Build a cumulative arc-length array for ref_pts
+        n = len(ref_pts)
+        s_arr = np.zeros(n)
+        for i in range(1, n):
+            dx = ref_pts[i][0] - ref_pts[i - 1][0]
+            dy = ref_pts[i][1] - ref_pts[i - 1][1]
+            s_arr[i] = s_arr[i - 1] + math.hypot(dx, dy)
+        total_s = s_arr[-1]
+        if total_s < 0.01:
+            return lines
+
+        # Compute heading at each sampled point (finite differences)
+        headings = np.zeros(n)
+        for i in range(n):
+            if i == 0:
+                dx = ref_pts[1][0] - ref_pts[0][0]
+                dy = ref_pts[1][1] - ref_pts[0][1]
+            elif i == n - 1:
+                dx = ref_pts[-1][0] - ref_pts[-2][0]
+                dy = ref_pts[-1][1] - ref_pts[-2][1]
+            else:
+                dx = ref_pts[i + 1][0] - ref_pts[i - 1][0]
+                dy = ref_pts[i + 1][1] - ref_pts[i - 1][1]
+            headings[i] = math.atan2(dy, dx)
+
+        ref_x = np.array([p[0] for p in ref_pts])
+        ref_y = np.array([p[1] for p in ref_pts])
+
+        def eval_width_poly(w_elem, s: np.ndarray) -> np.ndarray:
+            """Evaluate the cubic width polynomial at arc-length positions s."""
+            if w_elem is None:
+                return np.zeros_like(s)
+            s0 = float(w_elem.get("sOffset", 0))
+            a = float(w_elem.get("a", 0))
+            b = float(w_elem.get("b", 0))
+            c = float(w_elem.get("c", 0))
+            d = float(w_elem.get("d", 0))
+            ds = s - s0
+            ds = np.clip(ds, 0, None)
+            return a + b * ds + c * ds ** 2 + d * ds ** 3
+
+        def offset_pts(offset_arr: np.ndarray) -> List[Tuple[float, float]]:
+            """Shift ref_pts perpendicularly by offset_arr (left=+, right=-)."""
+            # Left is perpendicular in the direction heading + π/2
+            ox = ref_x - offset_arr * np.sin(headings)
+            oy = ref_y + offset_arr * np.cos(headings)
+            return list(zip(ox.tolist(), oy.tolist()))
+
+        for ls_elem in road_elem.findall(".//lanes/laneSection"):
+            ls_s = float(ls_elem.get("s", 0))
+            # Mask points that belong to this lane section
+            # (simple: use all points for single-section roads, or filter by s)
+            mask = s_arr >= ls_s
+            if not np.any(mask):
+                continue
+            s_local = s_arr[mask]
+
+            for side_tag, sign in [("left", 1.0), ("right", -1.0)]:
+                side_elem = ls_elem.find(side_tag)
+                if side_elem is None:
+                    continue
+                cumulative = np.zeros(len(s_local))
+                for lane_elem in sorted(
+                    side_elem.findall("lane"),
+                    key=lambda e: abs(int(e.get("id", 0)))
+                ):
+                    lane_id = int(lane_elem.get("id", 0))
+                    lane_type = lane_elem.get("type", "none")
+                    w_elem = lane_elem.find("width")
+                    width = eval_width_poly(w_elem, s_local)
+                    cumulative = cumulative + width
+
+                    if lane_type in ("driving", "shoulder", "border", "parking"):
+                        # Draw the outer boundary of this lane
+                        boundary_offset = sign * cumulative
+                        # Map local mask indices back to full ref arrays
+                        full_offset = np.zeros(n)
+                        full_offset[mask] = boundary_offset
+                        pts = offset_pts(full_offset)
+                        if len(pts) >= 2:
+                            lines.append(LaneLine(
+                                road_id=road_id,
+                                lane_id=lane_id,
+                                lane_type=lane_type,
+                                points=pts,
+                            ))
+        return lines
+
+    # ------------------------------------------------------------------
+    # Public interface
+    # ------------------------------------------------------------------
 
     @property
-    def roads(self) -> List[RoadGeometry]:
-        return self._roads
+    def lines(self) -> List[LaneLine]:
+        """All sampled lines (ref + lane boundaries)."""
+        return self._lines
+
+    # Keep backward-compatible .roads property: return ref lines only
+    @property
+    def roads(self):
+        return [l for l in self._lines if l.lane_type == "ref"]
 
     def get_bounds(self) -> Tuple[float, float, float, float]:
-        """Returns (xmin, xmax, ymin, ymax) of the full road network."""
-        xs = [p[0] for r in self._roads for p in r.points]
-        ys = [p[1] for r in self._roads for p in r.points]
+        xs = [p[0] for l in self._lines for p in l.points]
+        ys = [p[1] for l in self._lines for p in l.points]
         return min(xs), max(xs), min(ys), max(ys)
 
 
@@ -365,19 +476,55 @@ class BevRenderer:
         collision_t: Optional[float],
     ) -> List[Tuple[int, str]]:
         """
-        Selects up to n frame indices that cover important events:
-        start, close approach, max deceleration, collision, end.
-        Always includes start (0) and end (-1).
+        Selects up to n frame indices using a curvature-based approach
+        (adapted from xosc_gen/scripts/trajectory_feature.py) combined with
+        interaction-aware events.
+
+        Priority order:
+          1. Start (always)
+          2. Curvature peaks of Ego trajectory (decision moments: turns, braking arcs)
+          3. Closest approach between Ego and other agents
+          4. Collision frame (if known)
+          5. End (always)
+          6. Evenly spaced fill-ins if still under n
         """
         n_frames = len(time_steps)
+        agents = list(trajectory.keys())
+        ego_frames = trajectory[agents[0]]
+
         candidates: List[Tuple[int, str]] = [
             (0, f"t={time_steps[0]:.1f}s (start)"),
         ]
 
-        # Find closest-approach frame (min Euclidean distance between Ego and first other agent)
-        agents = list(trajectory.keys())
+        # ---- 1. Curvature-based key frames (xosc_gen approach) --------
+        ego_x = np.array([f["x"] for f in ego_frames], dtype=float)
+        ego_y = np.array([f["y"] for f in ego_frames], dtype=float)
+        t_arr = np.array(time_steps[:len(ego_x)], dtype=float)
+
+        if len(ego_x) >= 5:
+            # Numerical derivatives (central differences)
+            dx  = np.gradient(ego_x, t_arr)
+            dy  = np.gradient(ego_y, t_arr)
+            ddx = np.gradient(dx, t_arr)
+            ddy = np.gradient(dy, t_arr)
+            denom = (dx**2 + dy**2)**1.5 + 1e-8
+            curvature = np.abs(dx * ddy - dy * ddx) / denom
+
+            max_k = curvature.max()
+            if max_k > 1e-4:
+                # Find all local maxima of curvature above 20% of max
+                from scipy.signal import argrelextrema
+                local_max_idx = argrelextrema(curvature, np.greater, order=3)[0]
+                thresh = max_k * 0.20
+                for idx in local_max_idx:
+                    if curvature[idx] >= thresh:
+                        candidates.append((
+                            int(idx),
+                            f"t={time_steps[idx]:.1f}s (κ-peak, curvature={curvature[idx]:.3f})"
+                        ))
+
+        # ---- 2. Closest approach ----------------------------------------
         if len(agents) >= 2:
-            ego_frames = trajectory[agents[0]]
             other_frames = trajectory[agents[1]]
             min_len = min(len(ego_frames), len(other_frames))
             dists = [
@@ -385,53 +532,57 @@ class BevRenderer:
                            ego_frames[i]["y"] - other_frames[i]["y"])
                 for i in range(min_len)
             ]
-            if dists:
-                close_idx = int(np.argmin(dists))
-                candidates.append(
-                    (close_idx, f"t={time_steps[close_idx]:.1f}s (closest approach, d={dists[close_idx]:.1f}m)")
-                )
+            close_idx = int(np.argmin(dists))
+            candidates.append((
+                close_idx,
+                f"t={time_steps[close_idx]:.1f}s (closest, d={dists[close_idx]:.1f}m)"
+            ))
 
-        # Find max deceleration frame for Ego
-        ego_frames = trajectory[agents[0]]
-        if len(ego_frames) >= 3:
-            speeds = [f.get("speed", 0.0) for f in ego_frames]
-            dt = (time_steps[-1] - time_steps[0]) / max(len(time_steps) - 1, 1)
-            accels = [(speeds[i + 1] - speeds[i - 1]) / (2 * dt)
-                      for i in range(1, len(speeds) - 1)]
-            if accels:
-                min_a_idx = int(np.argmin(accels)) + 1
-                if accels[min_a_idx - 1] < DECEL_THRESHOLD_MS2:
-                    candidates.append(
-                        (min_a_idx,
-                         f"t={time_steps[min_a_idx]:.1f}s (max decel {accels[min_a_idx-1]:.1f} m/s²)")
-                    )
-
-        # Collision frame
+        # ---- 3. Collision -----------------------------------------------
         if collision_t is not None:
             col_idx = min(range(len(time_steps)),
                           key=lambda i: abs(time_steps[i] - collision_t))
             candidates.append((col_idx, f"t={time_steps[col_idx]:.1f}s (collision)"))
 
-        candidates.append((n_frames - 1, f"t={time_steps[-1]:.1f}s (end)"))
+        # ---- 4. End -------------------------------------------------------
+        end_entry = (n_frames - 1, f"t={time_steps[-1]:.1f}s (end)")
 
-        # Deduplicate and sort
-        seen: set = set()
-        unique: List[Tuple[int, str]] = []
-        for idx, lbl in sorted(candidates, key=lambda x: x[0]):
+        # ---- Deduplicate middle candidates, sort, limit to n-2 ----------
+        # Always reserve slots 0 and -1 for start and end so they can't be
+        # pushed out by evenly-spaced fill-ins.
+        start_entry = candidates[0]
+        middle_candidates = candidates[1:]  # everything that's not "start"
+
+        seen: set = {0, n_frames - 1}
+        middle: List[Tuple[int, str]] = []
+        for idx, lbl in sorted(middle_candidates, key=lambda x: x[0]):
             if idx not in seen:
                 seen.add(idx)
-                unique.append((idx, lbl))
+                middle.append((idx, lbl))
 
-        # If we still need more, add evenly spaced
-        if len(unique) < n:
-            step = n_frames // (n - len(unique) + 1)
+        # Fill up with evenly-spaced frames if still under n-2
+        slots_left = n - 2 - len(middle)
+        if slots_left > 0:
+            step = max(1, n_frames // (n + 1))
             for i in range(step, n_frames - step, step):
                 if i not in seen:
                     seen.add(i)
-                    unique.append((i, f"t={time_steps[i]:.1f}s"))
+                    middle.append((i, f"t={time_steps[i]:.1f}s"))
+                    slots_left -= 1
+                    if slots_left <= 0:
+                        break
 
-        unique.sort(key=lambda x: x[0])
-        return unique[:n]
+        middle.sort(key=lambda x: x[0])
+        result = [start_entry] + middle[: n - 2] + [end_entry]
+        result.sort(key=lambda x: x[0])
+        # Deduplicate again in case start == end (trivially short trial)
+        final: List[Tuple[int, str]] = []
+        seen2: set = set()
+        for entry in result:
+            if entry[0] not in seen2:
+                seen2.add(entry[0])
+                final.append(entry)
+        return final[:n]
 
     def _render_frame(
         self,
@@ -455,14 +606,20 @@ class BevRenderer:
         if self._map_bounds:
             xmin, xmax, ymin, ymax = self._map_bounds
 
-        # 2. Draw road network (only roads whose points fall in the view)
-        for road in self._parser.roads:
-            xs = [p[0] for p in road.points]
-            ys = [p[1] for p in road.points]
-            # Quick visibility check
+        # 2. Draw road network (ref lines + lane boundaries)
+        for lane_line in self._parser.lines:
+            xs = [p[0] for p in lane_line.points]
+            ys = [p[1] for p in lane_line.points]
             if max(xs) < xmin or min(xs) > xmax or max(ys) < ymin or min(ys) > ymax:
                 continue
-            ax.plot(xs, ys, color="#AAAAAA", linewidth=1.0, zorder=1)
+            if lane_line.lane_type == "ref":
+                ax.plot(xs, ys, color="#CC6666", linewidth=0.8, alpha=0.5, zorder=1)
+            elif lane_line.lane_type == "driving":
+                ax.plot(xs, ys, color="#888888", linewidth=1.2, zorder=1)
+            elif lane_line.lane_type in ("shoulder", "border"):
+                ax.plot(xs, ys, color="#BBBBBB", linewidth=0.7, zorder=1)
+            else:
+                ax.plot(xs, ys, color="#DDDDDD", linewidth=0.5, zorder=1)
 
         # 3. Draw trajectory paths (faded lines)
         agent_names = list(full_trajectory.keys())
