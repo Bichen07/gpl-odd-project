@@ -2833,3 +2833,96 @@ class TrajectoryAnalysisController(Controller):
         execute_tasks_in_parallel(data.tasks)
 
         return results
+
+    # ------------------------------------------------------------------
+    # Phase 2 — Cluster Medoid Selection
+    # ------------------------------------------------------------------
+
+    def get_cluster_medoids(
+        self,
+        X_rep: np.ndarray,
+        trial_ids: List[str],
+        cluster_labels: np.ndarray,
+    ) -> Dict[int, str]:
+        """
+        For each cluster, find the single trial whose MFPCA score vector
+        is closest (L2) to the cluster centroid.  This is the medoid —
+        the most representative, replayable trial for that cluster.
+
+        Args:
+            X_rep:          2-D float array of shape (n_trials, n_components).
+                            MFPCA scores produced by ``mfpca.transform()``.
+            trial_ids:      List of trial-ID strings, same order as X_rep rows.
+            cluster_labels: 1-D int array, one label per trial.
+                            Label -1 means HDBSCAN noise — excluded.
+
+        Returns:
+            Dict mapping cluster_label (int) → medoid_trial_id (str).
+
+        Example:
+            >>> medoids = controller.get_cluster_medoids(X_rep, trial_ids, labels)
+            >>> medoids
+            {0: "1042", 1: "887", 2: "1193"}
+        """
+        from sklearn.metrics import pairwise_distances_argmin
+
+        X = np.asarray(X_rep, dtype=np.float64)
+        ids = np.asarray(trial_ids)
+        labels = np.asarray(cluster_labels, dtype=int)
+
+        unique_labels = sorted(set(labels.tolist()) - {-1})
+        medoids: Dict[int, str] = {}
+
+        for label in unique_labels:
+            mask = labels == label
+            X_cluster = X[mask]
+            ids_cluster = ids[mask]
+
+            centroid = X_cluster.mean(axis=0, keepdims=True)
+            idx = pairwise_distances_argmin(centroid, X_cluster, metric="euclidean")[0]
+            medoids[label] = str(ids_cluster[idx])
+
+        return medoids
+
+    def get_medoid_observations(self, trial_id: str) -> List[Dict]:
+        """
+        Fetch raw Observations for *trial_id* directly from Payload CMS.
+
+        This bypasses the ``replayerTrajectories`` reconstruction (which
+        used to corrupt roadId/laneId values) and returns the authoritative
+        esmini ground-truth values stored in the Observations collection.
+
+        Each returned observation dict contains at minimum:
+            egoX, egoY, egoYaw, egoSpeed,
+            egoRoadId, egoLaneId,
+            timestep, agents (list of per-agent dicts with roadId, laneId)
+
+        Args:
+            trial_id: String trial ID (as stored in Payload).
+
+        Returns:
+            List of observation dicts ordered by timestep.
+            Returns [] on any API error (logged to stderr).
+        """
+        try:
+            params = {
+                "limit": 0,
+                "where": {"trial": {"equals": trial_id}},
+                "sort": "timestep",
+            }
+            qs = qs_stringify(params)
+            response = requests.get(
+                f"{PAYLOAD_API}/api/observations?{qs}",
+                headers=headers,
+                timeout=60,
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data.get("docs", [])
+        except Exception as exc:
+            print(
+                f"[get_medoid_observations] WARNING: could not fetch observations "
+                f"for trial {trial_id}: {exc}",
+                file=sys.stderr,
+            )
+            return []

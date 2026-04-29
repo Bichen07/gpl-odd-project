@@ -23,6 +23,23 @@ All notable changes to this project will be documented in this file.
 
 ---
 
-**Next steps (Phase 2)**: Add `get_cluster_medoids()` and `get_medoid_observations()` helpers.
+## [Phase 2] feature/cluster-medoid — 2026-04-29
 
-Last updated: 2026-04-28
+### Added
+- `TrajectoryAnalysisController.get_cluster_medoids(X_rep, trial_ids, cluster_labels)`:
+  Selects the medoid trial for each cluster by finding the point closest (L2)
+  to the cluster centroid in MFPCA score space. Noise points (label -1) excluded.
+  Returns `{cluster_label (int): trial_id (str)}`.
+- `TrajectoryAnalysisController.get_medoid_observations(trial_id)`:
+  Fetches raw Observations directly from Payload CMS, bypassing the broken
+  `replayerTrajectories` path. Returns authoritative esmini `egoRoadId`,
+  `egoLaneId` values. Returns `[]` on API error.
+- `test_cluster_medoid.py`: 9 unit tests (medoid correctness, noise exclusion,
+  string type safety, 3-cluster geometry, Payload mock).
+- `HOW_TO_RUN.md`: Full developer guide — services, test commands,
+  branch strategy, per-phase result visibility.
+
+**Next steps (Phase 3)**: Build `bev_renderer.py` to produce top-down map
+snapshots of the medoid trial for LLM visual input.
+
+Last updated: 2026-04-29
