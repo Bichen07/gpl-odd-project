@@ -8,5 +8,7 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Temporary BEV output
-/tmp/bev_output/
+# BEV output images — generated locally, not committed
+bev_output/**/*.jpg
+bev_output/**/*.png
+# (bev_output/.gitkeep IS committed to preserve the folder)
