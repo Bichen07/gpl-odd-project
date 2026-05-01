@@ -349,6 +349,37 @@ git remote -v
 
 ## 8. Debugging
 
+### `[Errno 98] Address already in use` on port 9010
+
+That means **another process is already listening on 9010** (usually an older Litestar analyzer you forgot to stop). The second terminal cannot bind the same port, so **that second start fails** — but the **first** analyzer may still be running fine.
+
+Check who owns the port:
+
+```bash
+ss -tlnp | grep 9010
+# or:  lsof -i :9010
+```
+
+**Fix:** Either keep using the existing analyzer only (do not start a second one), or stop the old one (`Ctrl+C` in its terminal, or `kill <pid>`), then start fresh.
+
+---
+
+### Dashboard “Analysis” never finishes or no clustering appears
+
+Work through these in order:
+
+1. **Exactly one analyzer on 9010** — `curl -s -o /dev/null -w "%{http_code}\n" http://localhost:9010/schema` should print `200`.
+
+2. **Same Payload as the dashboard** — Analyzer loads `app/analyzer/.env` (`PAYLOAD_API`, `PAYLOAD_API_KEY`). Dashboard uses `app/dashboard/.env` (`NEXT_PUBLIC_PAYLOAD_API_*`). Both must point at the **same** Payload server (lab IP vs `localhost:3020`). If the analyzer talks to an empty local DB while the dashboard shows lab batches, clustering will fail or return nothing useful.
+
+3. **Browser errors** — Open DevTools (F12) → **Network**. Click **Create New → Analysis** and watch for `POST .../trajectory_analysis` (via `NEXT_PUBLIC_ANALYZER_API_ADDRESS`). Red status / `ECONNREFUSED` / `502` means the dashboard cannot reach the analyzer.
+
+4. **Very long runtime** — The dashboard sends **many** clustering tasks in one request (see `app/dashboard/.../Saves/index.tsx`). Processing can take **much longer** than a few minutes and may look stuck; watch the **analyzer terminal** for logs.
+
+5. **Scatter plots stay black** — After analysis completes or after loading a ZIP, **click one clustering result row** in the per-ego clustering list (auto-select is disabled in code today). See §3 “Why points look black”.
+
+---
+
 **Check which services are running:**
 ```bash
 ps aux | grep -E "litestar|next-server|bun" | grep -v grep
@@ -426,7 +457,7 @@ Do not delete the per-app READMEs — they complement this root overview.
 |---|---|
 | `HOW_TO_RUN.md` | Short quick-reference for commands |
 | `CHANGELOG.md` | Record of code changes |
-| `ISSUES.md` | Known problems and open questions |
+| `ISSUES.md` | **Unresolved** problems and directions to verify (not a changelog of fixes) |
 | `cluster_interpreter_integration_plan.md` | Research integration plan (may live next to the repo clone in your LAB folder) |
 | `app/analyzer/README.md` | Analyzer-specific setup details |
 | `app/sampling/README.md` | Sampling server API reference |
