@@ -13,7 +13,25 @@ This project has **two very different use cases**. Decide which one you need bef
 | **A. View existing data** — explore already-collected simulation results in the dashboard | Analyzer + Dashboard only | Easy — 10 min |
 | **B. Run new simulations** — collect new trajectory data by running the AV in the simulator | Everything: Sampling + Simulator (Docker + ROS) + Analyzer + Dashboard | Hard — requires ITRI Docker image |
 
-> **If you are a new team member just getting started:** start with Goal A. The lab server already has **1178 simulation trials** stored and ready to explore.
+> **If you are a new team member just getting started:** start with Goal A. The lab server already has **many simulation trials** stored (count grows over time; quick check: open `/api/trials?limit=1` and read `totalDocs` in the JSON).
+
+### Where trials are stored (Payload CMS)
+
+Trials are **not** files on your laptop by default. Each simulation run creates:
+
+| Layer | Where | What |
+|---|---|---|
+| **Database** | PostgreSQL behind Payload CMS | All structured records |
+| **`trials` collection** | One row per simulation run | Trial ID, link to batch, scenario parameters (speed, delay), pass/fail vs KPIs |
+| **`observations` collection** | Many rows per trial | Per-frame trajectory: world x/y, yaw, speed, **roadId**, **laneId** — this is the raw data the Analyzer reads |
+
+The Dashboard loads trials via Payload's GraphQL/REST API. The Analyzer service connects to the same Payload API using `PAYLOAD_API_KEY` in its environment.
+
+To inspect counts in a browser or terminal:
+
+```bash
+curl -s "http://140.113.208.174:3020/api/trials?limit=1" | python3 -c "import json,sys; print('total trials:', json.load(sys.stdin).get('totalDocs'))"
+```
 
 ---
 
@@ -28,6 +46,7 @@ This project has **two very different use cases**. Decide which one you need bef
 7. [Branch & Git Strategy](#7-branch--git-strategy)
 8. [Debugging](#8-debugging)
 9. [Payload CMS Reference](#9-payload-cms-reference)
+10. [Documentation layout](#10-documentation-layout)
 
 ---
 
@@ -75,9 +94,11 @@ You need **two terminals** running at the same time, plus a browser.
 
 The analyzer reads trajectory data from Payload and does the clustering math.
 
+From the **repository root** (the folder that contains `app/`, `README.md`, `tests/`):
+
 ```bash
 conda activate analyzer
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/analyzer/src
+cd app/analyzer/src
 litestar run --port 9010 --host 0.0.0.0 --debug --reload
 ```
 
@@ -87,18 +108,32 @@ You should see:
 ✓ Application startup complete.
 ```
 
-**Verify it works** — open this URL in your browser:
-```
-http://localhost:9010/schema
-```
-You will see a page titled "Litestar" with a list of API endpoints. That page is for developers to test the API — you do not need to use it manually. If you can see it, the server is working.
+#### What is `http://localhost:9010/schema`?
+
+That URL is the **OpenAPI / Swagger** documentation page Litestar generates automatically from Python types in the analyzer code.
+
+- **You do not need to fill in forms there** for normal use. Seeing the page means the server is up.
+- The long lists (`TrajectoryAnalysisRequest`, `ClusteringScores`, `silhouetteScore`, …) are **JSON request/response shapes**, not errors.
+
+They are defined as `@dataclass` types in `app/analyzer/src/controller.py` (around lines 1103–1198). Short glossary:
+
+| Name | Meaning |
+|---|---|
+| `TrajectoryAnalysisRequest` | What the Dashboard sends when you click **Analyze**: batch IDs, frame period, list of clustering tasks (HDBSCAN parameters, etc.). |
+| `TrajectoryAnalysisResponse` | Full analyzer output: trials, MFPCA scores, UMAP coords, heatmap metadata, clustering results for each task. |
+| `ClusteringTask` | One clustering configuration (method string like `hdbscan+mfpca`, `minClusterSize`, `minSamples`, …). |
+| `ClusteringResult` | Labels per trial + validation scores for one task. |
+| `ClusteringScores` | Optional metrics: silhouette, Calinski–Harabasz, Davies–Bouldin, relative validity (may be `null` if not computed). |
+| `Mfpca` | Functional PCA scores and nested clustering / UMAP projections. |
+
+So when the schema UI shows `#0 null` / `#1 number` under nested fields, it means “this field can be null **or** a number” in the API contract — not that something is broken.
 
 ---
 
 ### Terminal 2 — Start the Dashboard
 
 ```bash
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/dashboard
+cd app/dashboard
 
 # First time only: build the project
 bun run build
@@ -123,18 +158,39 @@ Open **http://localhost:3000** in your browser. This is the main dashboard.
 
 1. Open http://localhost:3000
 2. Click **Sessions** in the top menu
-3. Click a session (1, 2, or 3) → then click the batch inside it
-4. You will see the batch page with several views:
-   - **Scenario Parameter Space** — a scatter plot of all trials coloured by collision outcome
-   - **Trajectory Projection Space** — UMAP view of trajectory clusters
-   - **Replayer** — click any trial to animate the Ego vehicle
-   - **Trajectory Heatmap** — density map of all trajectories overlaid on the road
+3. Click a session → open the batch inside it
+4. You will see several dock panels:
+   - **Scenario Parameter Space** — scatter plot of sampled parameters (e.g. delay vs speed)
+   - **Trajectory Projection Space** — UMAP / MFPCA projection of trajectories
+   - **Replayer** — animate a selected trial
+   - **Trajectory Heatmap** — spatial density on the map
 
-5. To run the clustering analysis on a batch:
-   - Click the **Save** tab in the batch page
-   - Click **Create New** → then click **Analyze**
-   - Wait a few minutes — progress appears in the analyzer terminal
-   - When done, the result appears in the batch's Documents tab
+#### Why points look **black** instead of colourful clusters
+
+Cluster colours come from **which clustering run you selected**, not from opening the batch alone.
+
+After you click **Analyze** or load a saved ZIP:
+
+1. Open the **clustering result list** for each ego (often under **Clustering Selection** / per-ego panel — a vertical list of small cards, one per HDBSCAN parameter combination).
+2. **Click one row/card** in that list to activate it.
+
+Until you do that, Redux keeps `selectedClusterInfos` empty and the scatter plots deliberately paint every point **black** (see `Legends/index.tsx` fallback and `ParameterSpace/Plot/index.tsx` when `clusterInfo == null`).
+
+The code that would auto-select the first clustering result is **commented out** in `app/dashboard/src/app/batch/[id]/_tabs/explore/redux/slices/batch.ts` (search for `selectFirst`), so manual selection is expected behaviour today.
+
+**Colour mode:** ensure the Parameter Space / Projection panels use **interaction-cluster** (not only pass/fail) if you want cluster colours.
+
+#### **Saves** vs **Create New → Analysis**
+
+| UI section | What it does |
+|---|---|
+| **Saves** | Loads a previously uploaded **`analyze.zip`** (or similar) from Payload **Documents** attached to this batch. Someone must have run Analyze + Save once to create that file. |
+| **Create New → Analysis** | Calls your **local** Analyzer (`localhost:9010`) with a large grid of predefined `hdbscan+mfpca` tasks (see `app/dashboard/.../Saves/index.tsx`). Can take **many minutes** — watch the analyzer terminal. |
+
+So:
+
+- If Session / Batch **has no ZIP under Saves**, nothing is “lost” — it usually means **nobody saved an analysis document for that batch yet**. Run **Analysis** once, then optionally use **Save** to upload a named ZIP for faster reload later.
+- Session 1 showing `analysis-3.zip` simply means that batch has at least one saved document in Payload.
 
 ---
 
@@ -150,7 +206,7 @@ The sampling server tells the simulator which parameter values to try next (it u
 
 ```bash
 conda activate sampling
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/sampling/src
+cd app/sampling/src
 litestar run --port 9009 --host 0.0.0.0 --debug --reload
 ```
 
@@ -181,7 +237,7 @@ Expected response: `{"status": "initialized"}` or similar. If you get an error, 
 
 ```bash
 conda activate analyzer
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/analyzer/src
+cd app/analyzer/src
 litestar run --port 9010 --host 0.0.0.0 --debug --reload
 ```
 
@@ -236,7 +292,7 @@ Generates top-down Bird's Eye View images of the most representative trial per c
 
 ```bash
 conda activate analyzer
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project
+cd /path/to/gpl-odd-project   # repository root
 
 bash scripts/run_bev.sh <dataset_name> <n_clusters>
 # Example:
@@ -261,7 +317,7 @@ Output images go to `bev_output/<dataset_name>/<n>clusters/cluster_N/trial_XXXX_
 
 ```bash
 conda activate analyzer
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project
+cd /path/to/gpl-odd-project   # repository root
 
 python3 tests/test_roadid_preservation.py    # 7 tests — roadId bug fix
 python3 tests/test_cluster_medoid.py         # 9 tests — medoid selection
@@ -351,6 +407,19 @@ curl http://localhost:9009/schema
 
 ---
 
+## 10. Documentation layout
+
+Keep **both**:
+
+| Doc | Role |
+|---|---|
+| **`README.md`** (this file) | End-to-end workflow: Payload → Analyzer → Dashboard → optional simulation. Written for someone setting up from scratch. |
+| **`app/*/README.md`** | Deep detail per service (conda env file paths, Payload sampling configuration, dashboard submodule build). |
+
+Do not delete the per-app READMEs — they complement this root overview.
+
+---
+
 ## Related Files
 
 | File | Purpose |
@@ -358,7 +427,7 @@ curl http://localhost:9009/schema
 | `HOW_TO_RUN.md` | Short quick-reference for commands |
 | `CHANGELOG.md` | Record of code changes |
 | `ISSUES.md` | Known problems and open questions |
-| `../cluster_interpreter_integration_plan.md` | Full LLM integration research plan (Phases 0–6) |
+| `cluster_interpreter_integration_plan.md` | Research integration plan (may live next to the repo clone in your LAB folder) |
 | `app/analyzer/README.md` | Analyzer-specific setup details |
 | `app/sampling/README.md` | Sampling server API reference |
 | `app/dashboard/README.md` | Dashboard build steps |

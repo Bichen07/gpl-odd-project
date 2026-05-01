@@ -15,6 +15,7 @@ This file tracks all confusing points, known bugs, and open questions discovered
 - You can also just **open the URL in your browser** — both work the same way.
 - The `/schema` page is the **Swagger UI** (a developer tool that auto-generates interactive API docs). You don't use it during normal workflow — it's only for developers who want to manually test an API endpoint.
 - **Normal users never need `/schema`.** The dashboard (http://localhost:3000) is the interface you actually use.
+- The scary-looking nested fields (`TrajectoryAnalysisRequest`, `ClusteringScores`, `#0 null`) are **OpenAPI type definitions** generated from `@dataclass` in `app/analyzer/src/controller.py` (~1103–1198). See root **README.md → Goal A → "What is `/schema`?"** for a glossary.
 
 **The `/schema` "Try it out" button confusion:** When you clicked "Try it out → Execute" on the `/initialize` endpoint, it correctly showed you a `curl` command as an example. That is what the Swagger UI does — it shows you equivalent commands. The initialize endpoint is meant to be called from the terminal (or by the simulation scripts), not manually from the browser.
 
@@ -163,6 +164,18 @@ And the terminal shows a long stack trace.
 **Reminder:**
 - First time or after code changes: `bun run build` then `bun run start`
 - For development with hot reload: `bun run dev` (no build step needed)
+
+---
+
+## Issue 11 — Parameter Space / Projection Space: all points are black
+
+**Status:** Expected behaviour unless you select a clustering run.
+
+**Cause:** Scatter plots take colours from `selectedClusterInfos[egoName]` in Redux. That is only set when you **click one card/row** in the per-ego clustering result list (after **Analyze** completes or after loading a saved ZIP). Until then `clusterInfo` is `null` and the UI falls back to solid black (`ParameterSpace/Plot/index.tsx`, `Legends/index.tsx`).
+
+**Why:** Auto-selecting the first clustering result was implemented but is **commented out** in `batch.ts` (`selectFirst` block near `setTrajectoryAnalysis`).
+
+**Fix:** After analysis loads → open clustering selection panel → click one result → points become colourful. Ensure colour mode is **interaction-cluster** where applicable.
 
 ---
 

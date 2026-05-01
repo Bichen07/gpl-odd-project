@@ -1,5 +1,7 @@
 # Sampling
 
+> **Workflow overview:** See the repository root **`README.md`** (Goal A vs Goal B). This file focuses on Payload configuration and API usage for the sampling **service** only.
+
 ## Purpose
 
 Sample points in a parameter space of a logical scenario for simulation processes.
