@@ -1,0 +1,66 @@
+<Traffic Safety Principles>
+When analyzing driving behavior clusters, apply these principles:
+
+1. **Right-of-way at intersections:**
+   - Vehicles on the priority road (main road) have right-of-way
+   - Left-turning vehicles must yield to oncoming straight/right-turning traffic
+   - When paths conflict, the vehicle that arrives first typically proceeds first
+   - However, defensive driving may prioritize safety over strict right-of-way
+
+2. **Safe following distance:**
+   - Maintain 2-second time headway as a minimum safe following distance
+   - Greater distances required at higher speeds or in adverse conditions
+   - TTC (Time-To-Collision) < 1.5 seconds indicates critical near-miss
+   - TTC < 1.0 seconds indicates imminent collision risk
+
+3. **Anticipatory driving:**
+   - Experienced drivers anticipate conflicts early and adjust proactively
+   - Reactive strategies (late braking) increase collision risk
+   - Hesitation and uncertainty can create dangerous situations
+
+4. **Speed management:**
+   - Ego should decelerate when approaching potential conflict zones
+   - Rapid deceleration (harsh braking) indicates inadequate anticipation
+   - Smooth deceleration indicates well-calibrated threat assessment
+
+5. **Intersection navigation:**
+   - Ego should scan for conflicting agents before entering intersection
+   - Commitment point: once entering, ego should proceed decisively
+   - Stopping mid-intersection is dangerous (creates new conflicts)
+</Traffic Safety Principles>
+
+<Cluster Analysis Mindset>
+Unlike single-trial interaction detection, cluster analysis focuses on:
+
+- **Pattern recognition:** What behavioral strategy unites these trials?
+- **Variability:** Where do trials within the cluster diverge? (use MFPCA heatmap)
+- **Failure mode identification:** Why do some trials in cluster fail while others succeed?
+- **Parameter sensitivity:** Which scenario parameters most influence safety outcomes?
+
+Key questions to ask:
+- "Is this cluster defined by ego's strategy or by environmental conditions?"
+- "Do failures occur due to poor decision-making or impossible situations?"
+- "What distinguishes this cluster from adjacent clusters in the embedding space?"
+</Cluster Analysis Mindset>
+
+<Behavioral Pattern Taxonomy>
+Common cluster archetypes in intersection scenarios:
+
+**Safe/Defensive Patterns:**
+- **Proactive Yielding:** Early detection → gradual deceleration → long wait
+- **Conservative Gaps:** Only proceed when large time gaps (> 3s) available
+- **Defensive Stop:** Full stop even when legal right-of-way, to ensure safety
+
+**Moderate-Risk Patterns:**
+- **Reactive Yielding:** Late detection → rapid braking → short wait
+- **Threshold-Based:** Proceed if gap exceeds minimum threshold, yield otherwise
+- **Speed-Dependent:** Strategy varies based on oncoming vehicle speed
+
+**High-Risk Patterns:**
+- **Aggressive Proceed:** Minimal or no yielding despite conflict
+- **Hesitation:** Decelerate then accelerate before committing (indecisive)
+- **Misjudged Gap:** Attempt to cross/merge but timing is insufficient
+- **Forced Yield:** Right-of-way violated by oncoming agent, ego forced to brake hard
+
+Use these as inspiration, but create cluster-specific labels based on actual data.
+</Behavioral Pattern Taxonomy>

@@ -47,6 +47,7 @@ curl -s "http://140.113.208.174:3020/api/trials?limit=1" | python3 -c "import js
 8. [Debugging](#8-debugging)
 9. [Payload CMS Reference](#9-payload-cms-reference)
 10. [Documentation layout](#10-documentation-layout)
+11. [Mission Control (Upcoming Feature)](#11-mission-control-upcoming-feature)
 
 ---
 
@@ -451,6 +452,28 @@ Do not delete the per-app READMEs — they complement this root overview.
 
 ---
 
+## 11. Mission Control (Upcoming Feature)
+
+**Status:** Design complete, implementation planned  
+**Goal:** Unify all services (Payload, Sampling, Simulation, Analyzer, Dashboard) into a single "one-click" workflow
+
+**Current problem:**  
+Running simulations requires manually opening 4 terminals (SSH/Xterm), starting Docker containers, launching ROS nodes, and monitoring logs. Dashboard is read-only (no "Run Simulation" button).
+
+**Proposed solution:**  
+A new **Mission Control API** that:
+- ✅ Starts/stops Docker containers programmatically
+- ✅ Orchestrates ROS + esmini simulation loops
+- ✅ Monitors progress and broadcasts real-time status updates
+- ✅ Validates data integrity (CSV + Payload checks)
+- ✅ Adds "Run Simulation" button to Dashboard with live progress bar
+
+**Timeline:** 4-5 weeks (3 phases)  
+**Full design:** See `MISSION_CONTROL.md`  
+**Integration roadmap:** See `cluster_interpreter_integration_plan.md` (Track B)
+
+---
+
 ## Related Files
 
 | File | Purpose |
@@ -459,6 +482,7 @@ Do not delete the per-app READMEs — they complement this root overview.
 | `CHANGELOG.md` | Record of code changes |
 | `ISSUES.md` | **Unresolved** problems and directions to verify (not a changelog of fixes) |
 | `cluster_interpreter_integration_plan.md` | Research integration plan (may live next to the repo clone in your LAB folder) |
+| `MISSION_CONTROL.md` | Unified design for the one-click simulation API (architecture, phases, API spec, dev notes) |
 | `app/analyzer/README.md` | Analyzer-specific setup details |
 | `app/sampling/README.md` | Sampling server API reference |
 | `app/dashboard/README.md` | Dashboard build steps |

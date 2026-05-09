@@ -12,3 +12,11 @@ __pycache__/
 bev_output/**/*.jpg
 bev_output/**/*.png
 # (bev_output/.gitkeep IS committed to preserve the folder)
+
+# LLM artifacts (Phase 4+) — generated locally, not committed
+llm_artifacts/**
+!llm_artifacts/.gitkeep
+!llm_artifacts/README.md
+
+# LLM pipeline run captures — auto-generated, not committed
+app/llm_pipeline/artifacts/
