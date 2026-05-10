@@ -7,6 +7,7 @@ import ProjectionSpace from "./panels/ProjectionSpace";
 import ParameterSpace from "./panels/ParameterSpace";
 import Legends from "./panels/Legends";
 import LlmAnalysis from "./panels/LlmAnalysis";
+import MissionControl from "./panels/MissionControl";
 
 const layout: LayoutData = {
   dockbox: {
@@ -40,6 +41,11 @@ const layout: LayoutData = {
                 id: "llmAnalysis",
                 title: "LLM Analysis",
                 content: <LlmAnalysis />,
+              },
+              {
+                id: "missionControl",
+                title: "🚀 Mission Control",
+                content: <MissionControl />,
               },
             ],
           },

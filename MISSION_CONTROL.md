@@ -101,6 +101,78 @@ User (Manual)
 
 ---
 
+## Payload CMS (`app/payload`) — role, structure, and login
+
+Payload here is **not** just a database UI: it is the **system of record** for scenarios, sampling plans, batches, trials, per-frame observations, saved analyses (`documents`), and uploaded maps/scenarios. Everything else (Sampling, Analyzer, Simulation ROS nodes) reads or writes Payload through **REST** (`/api/...`) or **GraphQL** (`/api/graphql`).
+
+### Tech stack
+
+| Piece | Location / detail |
+|-------|-------------------|
+| Framework | **Next.js 15** App Router + **Payload 3** (`payload`, `@payloadcms/next`, `@payloadcms/db-postgres`) |
+| Database | **PostgreSQL** (`DATABASE_URI` in `.env`; Docker `docker-compose.yml` maps host `3020` → container `3000`) |
+| Config | `app/payload/src/payload.config.ts` — collections, CORS (includes dashboard URLs), `serverURL`, GraphQL |
+| Types | `app/payload/src/payload-types.ts` (generated) |
+
+### Collections (data model)
+
+Registered in `payload.config.ts` — main simulation/analysis entities:
+
+| Collection | Purpose |
+|------------|---------|
+| `sessions` | Groups related **batches** (e.g. “dataset 1 / 2 / 3” style organization). |
+| `scenarios` | Logical scenario: parameters, objectives, links to OpenSCENARIO / OpenDRIVE assets. |
+| `batches` | One **parameter search run** for a scenario: links `scenario`, `session`, `sampling`, optional saved `documents` (analysis zip, images). |
+| `trials` | One simulation run: parameter values, KPIs, link to observations. Custom endpoints (e.g. trajectories) live in `Trials.ts`. |
+| `observations` | Per-frame trajectory + agent state (`egoRoadId`, `egoLaneId`, agents’ `roadId` / `laneId`, etc.). |
+| `samplings` | Sampling strategy/steps for a batch (used by `app/sampling`). |
+| `openScenarios` / `openDrives` | Stored `.xosc` / `.xodr` (and metadata). |
+| `documents` | Uploaded analysis artifacts (`analyze.zip`, plots). |
+| `users` | Admin login + **API keys** (`auth: { useAPIKey: true }` in `Users.ts`). |
+| Others | `egos`, `keyPerformanceIndicators`, `esminiDats`, `media`. |
+
+**Typical selection path for analysis:** choose **Session** → **Batch** → **Trials** / export; the **research dashboard** mirrors this by querying the same IDs via Payload API using `PAYLOAD_API` + API key.
+
+### Routes you actually use
+
+| URL | Who uses it |
+|-----|-------------|
+| **`/admin`** | **Human operators** — Payload’s built-in admin UI: browse/edit collections, upload files, inspect trials/observations. **This is where you log in with a `users` account** (email/password created on first setup; see `app/payload/README.md`). |
+| **`/api/*`** | Sampling service, Analyzer, Dashboard, simulation nodes — REST CRUD + uploads. |
+| **`/api/graphql`** | Dashboard GraphQL client (`graphql-codegen`). |
+| **`/`** (`app/(frontend)/page.tsx`) | Minimal welcome page; optional **SSR auth check** (`payload.auth({ headers })`) — mostly a stub; real “product” UI is **`app/dashboard`**, not this page. |
+| Custom REST | e.g. `heatmapOrdering` endpoint registered in `payload.config.ts`. |
+
+### Access control (why “login to select data”)
+
+- **Browser:** Use **`http://<host>:3020/admin`** (or whatever `PAYLOAD_PUBLIC_SERVER_URL` is). Only authenticated **Users** get write access on many collections (`usersAccess` in `access.ts` for create/update/delete); **read** on batches is often public (`read: () => true` on `Batches`) so APIs can list data, but **editing** scenarios/batches still expects a logged-in admin.
+- **Programs:** Use **`Authorization: users API-Key <key>`** (User API keys from Payload admin). The Analyzer/Dashboard `.env` uses this — no interactive login for services.
+
+So “login to select data” today means: **log into Payload Admin** to pick scenarios/batches/trials or manage uploads; the **scatter/analysis UI** is the separate **Dashboard** app, which authenticates to Payload **via API key**, not your browser session.
+
+---
+
+### How this becomes “one website” (aligned with Mission Control)
+
+Today you effectively have **three faces**: Payload Admin (data/CMS), Dashboard (viz), and terminals (simulation). The plan unifies **control and visibility**, not necessarily a single Next.js bundle on day one:
+
+1. **Same origin via reverse proxy (fastest operational win)**  
+   One hostname, e.g. `https://odd.lab/` with paths:
+   - `/admin` → Payload (port 3020)
+   - `/` or `/app` → Dashboard (port 3000)
+   - `/analyzer` or `/api/analyzer` → Analyzer (8181) if exposed  
+   Cookies stay scoped; CORS headaches shrink. Payload `cors` in `payload.config.ts` already lists dashboard origins — add the unified hostname when you introduce it.
+
+2. **Mission Control API as backend-for-frontend (Phase B)**  
+   The Dashboard **Mission Control** tab calls **your** orchestrator (port 8282). That service calls Sampling + Docker + ROS and **checks Payload health** (`GET /api/batches`, etc.) using the **same API key pattern** — users never paste URLs; they pick **batch/scenario** in UI and click Run.
+
+3. **Optional deep merge (later)**  
+   Embed Dashboard routes inside Payload’s Next app, or vice versa, **or** use iframe/embed only for admin — higher effort; proxy + Mission Control usually suffices.
+
+**Summary:** Payload stays the **authoritative store**; “single website” in the plan means **one browser entry point** (proxy + Dashboard tabs including Mission Control), **one identity story** (SSO later if needed), and **automated** simulation/analysis instead of jumping between Admin, Dashboard, and SSH.
+
+---
+
 ## Implementation Phases
 
 ### Phase B1 — Core API (2 weeks)
