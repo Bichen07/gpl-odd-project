@@ -320,18 +320,24 @@ class SimulationOrchestrator:
 
     async def _trigger_esmini_trial(self, trial_index: int, params: dict) -> bool:
         """
-        Trigger a simulation trial by running the ROS scenario search script
-        inside the sdc-bionic container.
+        Trigger a simulation trial via roslaunch with batch_id override.
 
-        The exact command mirrors what SIMULATION_GUIDE.md Terminal 4 does.
+        roslaunch supports inline arg overrides:
+            roslaunch scenario_search single_parameterized_scenario_search.launch batch_id:=1
+
+        This avoids editing the launch file by hand for every run.
+        Must source both ROS setup files first (melodic + workspace devel).
         """
-        param_str = " ".join(f"--{k} {v}" for k, v in (params or {}).items())
+        setup = (
+            "source /opt/ros/melodic/setup.bash && "
+            "source /project/mmsl_simulation/devel/setup.bash"
+        )
         cmd = (
-            f"bash -c 'source /opt/ros/melodic/setup.bash && "
-            f"source /project/mmsl_simulation/devel/setup.bash && "
-            f"rosrun scenario_search single_parameterized_scenario_search.py "
-            f"--batch_id {self.batch_id} --scenario_id {self.scenario_id} "
-            f"--trial_index {trial_index} {param_str}'"
+            f"bash -c '"
+            f"{setup} && "
+            f"roslaunch scenario_search single_parameterized_scenario_search.launch "
+            f"batch_id:={self.batch_id} "
+            f"sampling_suggestion_api:={self.sampling_api}'"
         )
         ok = await asyncio.get_event_loop().run_in_executor(
             None,

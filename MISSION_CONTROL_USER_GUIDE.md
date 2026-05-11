@@ -43,7 +43,23 @@ Open all required terminals **before** opening the Dashboard.
 
 ## 1. Prerequisites
 
-> **Note — SSH setup:** Since you are SSH-ing from your laptop into the lab PC, all commands below run **on the lab PC** (inside the SSH session). The Dashboard URL you open in your laptop browser is `http://LAB_PC_IP:3000` (e.g. `http://140.113.208.174:3000`). All `localhost` addresses in this guide refer to the **lab PC**, not your laptop.
+> **Note — SSH port forwarding (important!):**  
+> Since you SSH from your laptop to the lab PC, your laptop browser **cannot reach `http://140.113.208.174:3000` directly** — the lab PC firewall blocks it.  
+> Instead, add `-L` port-forward flags when you SSH:
+> ```bash
+> # Run this on your LAPTOP (replace carlos11@140.113.208.174 with your actual SSH target)
+> ssh -L 3000:localhost:3000 \
+>     -L 8282:localhost:8282 \
+>     -L 3020:localhost:3020 \
+>     -L 9009:localhost:9009 \
+>     -L 9010:localhost:9010 \
+>     carlos11@140.113.208.174
+> ```
+> After this, **on your laptop browser** use `http://localhost:3000` (not 140.113.208.174).  
+> All `localhost` addresses in this guide will then work from your laptop browser.  
+> If you already have an SSH session open, open a second terminal on your laptop and add these forwards, or reconnect with the flags above.
+
+All commands below run **on the lab PC** (inside the SSH session).
 
 Before using Mission Control, start the following services. Each one needs its **own terminal** (SSH session).
 
@@ -243,44 +259,98 @@ You should get:
 
 The container (`sdc-bionic`) runs the ROS/esmini simulation stack.
 
-**Check if the container is already running first:**
+#### Step 1 — Check if container is already running
+
 ```bash
 docker ps | grep sdc-bionic
 ```
 
-**Case A — container is NOT listed (not running):**
+**If you see a line like this, the container is ALREADY running — skip to Step 2:**
+```
+53bed4010903   sdc-stage-2:bionic   ...   Up 4 weeks   sdc-bionic
+```
+
+**If you see nothing**, start it:
 ```bash
 sdc-docker-start-container
 ```
-If you see:
+
+**If `sdc-docker-start-container` gives "Conflict" error:**
 ```
 docker: Error response from daemon: Conflict. The container name "/sdc-bionic" is already in use
 ```
-It means the container exists but is stopped. Remove the old one and restart:
+The container exists but in a bad state. Stop and remove it first:
 ```bash
+docker stop sdc-bionic
 docker rm sdc-bionic
 sdc-docker-start-container
 ```
 
-**Case B — container IS already running** (you will see a line in `docker ps`):  
-Skip `sdc-docker-start-container`. Just enter the container:
+#### Step 2 — Enter the container shell
+
 ```bash
 sdc-docker-enter-container-shell
 ```
 
-**Inside the container, start ROS** (this is a separate step inside the Docker shell):
+You will see a different prompt — you are now **inside** the container:
+```
+user @ carlos11-System-Product-Name in /project/mmsl_simulation |15:44:04
+$
+```
+
+#### Step 3 — Source the ROS workspace (REQUIRED — do this every time)
+
+**This is the most common mistake.** Without sourcing, `roslaunch` cannot find any package:
+
+```bash
+source /opt/ros/melodic/setup.bash
+source /project/mmsl_simulation/devel/setup.bash
+```
+
+You can verify it works:
+```bash
+rospack find simulation_adv   # should print: /project/mmsl_simulation/src/simulation_adv
+rospack find scenario_search  # should print: /project/mmsl_simulation/src/scenario_search
+```
+
+#### Step 4 — Start ROS (simulation_adv)
+
 ```bash
 roslaunch simulation_adv run.launch
 ```
 
-**✅ What you should see inside the container:**
+**✅ What you should see:**
 ```
 ... process[rosmaster-1]: started with pid [xxx]
 ... process[rosout-1]: started with pid [xxx]
 ... started core service [/rosmaster]
-... ROS_MASTER_URI=http://localhost:11311
 ```
 ROS is now running. Keep this terminal open.
+
+**❌ What went wrong in your test:**
+```
+RLException: [run.launch] is neither a launch file in package [simulation_adv]
+```
+This means you forgot Step 3 (source the workspace). The fix is always:
+```bash
+source /opt/ros/melodic/setup.bash
+source /project/mmsl_simulation/devel/setup.bash
+roslaunch simulation_adv run.launch
+```
+
+#### Do I still need to edit the launch file by hand?
+
+**No.** The `roslaunch` command supports inline argument overrides:
+
+```bash
+roslaunch scenario_search single_parameterized_scenario_search.launch \
+  batch_id:=1 \
+  sampling_suggestion_api:=http://localhost:9009
+```
+
+`batch_id:=1` overrides the default in the file without editing it. Mission Control API uses exactly this command — it fills in the batch ID from whatever batch you opened in the Dashboard.
+
+> **The launch file default `batch_id` (currently 3) only matters if you run `roslaunch` with no overrides.** As long as you either pass `batch_id:=N` on the command line, or use Mission Control, you never need to edit the file.
 
 After this, Mission Control health check will show:
 ```json
@@ -532,13 +602,18 @@ Set in `app/simulation/src` by reading the system environment or creating an `.e
 
 | Symptom | Likely cause | Fix |
 |---------|-------------|-----|
-| "Run Simulation" button is grey | Docker not available | Run on ITRI lab server |
-| All health chips red | Mission Control API not started | `litestar run --port 8282` |
+| "Run Simulation" button is grey with "Docker not available" tooltip | Mission Control API not running — port 8282 unreachable | Start Terminal 5: `conda activate sampling && cd app/simulation/src && litestar run --port 8282 --host 0.0.0.0` |
+| "Run Simulation" button still grey after starting API | Docker chip ❌ — docker-py not installed | `conda activate sampling && pip install docker` then restart MC API |
+| `curl: (7) Failed to connect to localhost port 8282` | Mission Control API not running | Start Terminal 5 |
+| All health chips red | Mission Control API not started | Start Terminal 5 |
+| `http://140.113.208.174:3000` times out or is refused | SSH firewall blocks direct IP | Use SSH port forwarding: `ssh -L 3000:localhost:3000 -L 8282:localhost:8282 ...` then open `http://localhost:3000` |
+| `roslaunch simulation_adv run.launch` → "is neither a launch file" | ROS workspace not sourced | Inside container: `source /opt/ros/melodic/setup.bash && source /project/mmsl_simulation/devel/setup.bash` |
 | Status stuck at STARTING | Sampling not responding | `conda activate sampling && litestar run --port 9009` |
 | Payload chip red | Payload CMS stopped | `cd app/payload && docker compose up -d` |
 | Trials not appearing in scatter plot | Dashboard cache | Refresh the batch page (F5) |
 | CSV count ≠ Payload count | dat2csv incomplete / Payload POST failed | Check logs; re-run the failed trials |
 | Container status "not_found" | sdc-bionic image not present | Run on the ITRI lab server where image is installed |
+| Need different batch_id without editing launch file | Use CLI override | `roslaunch scenario_search single_parameterized_scenario_search.launch batch_id:=2` |
 
 ---
 
