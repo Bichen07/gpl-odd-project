@@ -59,6 +59,10 @@ Open all required terminals **before** opening the Dashboard.
 >     -L 9010:localhost:9010 \
 >     carlos11@140.113.208.174
 > ```
+
+> ```bash
+> ssh -L 3000:localhost:3000 -L 8282:localhost:8282 -L 3020:localhost:3020 -L 9009:localhost:9009 -L 9010:localhost:9010 carlos11@140.113.208.174
+> ```
 > After connecting, open **`http://localhost:3000`** in your laptop browser — **not** `140.113.208.174:3000`.
 >
 > **If you ran it on the lab PC by mistake and now port 8282 is blocked**, fix it like this (on the lab PC):
@@ -369,6 +373,38 @@ And the "Run Simulation" button becomes enabled (if Docker + Sampling + Payload 
 > **On your laptop (without sdc-bionic image):**  
 > Docker chip shows ❌, "Run Simulation" button is disabled with tooltip "Docker not available on this machine".  
 > This is correct — esmini simulations can only run on the lab PC where the image is installed.
+
+---
+
+### 1g. Quick verification — check all services at once
+
+**Run this single command to verify everything is running:**
+
+```bash
+echo "=== Service Status ===" && \
+echo -n "Dashboard  (3000): " && (ss -tlnp | grep -q ':3000 ' && echo "✅ Running" || echo "❌ NOT running") && \
+echo -n "Payload    (3020): " && (curl -s -o /dev/null -w "%{http_code}" http://localhost:3020/api/batches | grep -q 200 && echo "✅ Running" || echo "❌ NOT running") && \
+echo -n "Sampling   (9009): " && (ss -tlnp | grep -q ':9009 ' && echo "✅ Running" || echo "❌ NOT running") && \
+echo -n "Analyzer   (9010): " && (ss -tlnp | grep -q ':9010 ' && echo "✅ Running" || echo "❌ NOT running") && \
+echo -n "Mission Control (8282): " && (ss -tlnp | grep -q ':8282 ' && echo "✅ Running" || echo "❌ NOT running - START THIS!")
+```
+
+**Expected output when all services are running:**
+```
+=== Service Status ===
+Dashboard  (3000): ✅ Running
+Payload    (3020): ✅ Running
+Sampling   (9009): ✅ Running
+Analyzer   (9010): ✅ Running
+Mission Control (8282): ✅ Running
+```
+
+**If Mission Control shows ❌ NOT running**, you missed step 1e. Go back and start it:
+```bash
+conda activate sampling
+cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/simulation/src
+litestar run --port 8282 --host 0.0.0.0
+```
 
 ---
 
