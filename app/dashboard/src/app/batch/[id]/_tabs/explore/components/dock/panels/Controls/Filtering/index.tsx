@@ -505,7 +505,7 @@ export default function Filtering() {
             indeterminate = true;
           }
           return (
-            <Stack>
+            <Stack key={egoName}>
               <Stack direction="row" alignItems="center">
                 <Checkbox
                   sx={{ p: 0.5 }}

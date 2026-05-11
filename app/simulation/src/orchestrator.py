@@ -337,7 +337,8 @@ class SimulationOrchestrator:
             f"{setup} && "
             f"roslaunch scenario_search single_parameterized_scenario_search.launch "
             f"batch_id:={self.batch_id} "
-            f"sampling_suggestion_api:={self.sampling_api}'"
+            f"sampling_suggestion_api:={self.sampling_api} "
+            f"headless:=true'"   # required — run.launch uses $(arg headless) without a default
         )
         ok = await asyncio.get_event_loop().run_in_executor(
             None,
