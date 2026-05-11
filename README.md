@@ -246,14 +246,16 @@ litestar run --port 9010 --host 0.0.0.0 --debug --reload
 
 ### Terminal 3 — Run the Simulation
 
-The simulation runs the ITRI AV inside Docker. Before running, update the launch file with your batch ID:
+The simulation runs the ITRI AV inside Docker. For the **legacy tmux / `run.sh` workflow**, update the launch file with your batch ID before starting workers:
 
 1. Open:
    ```
-   simulation/ros/scenario_search/launch/single_parameterized_scenario_search.launch
+   simulation/ros/src/scenario_search/launch/single_parameterized_scenario_search.launch
    ```
 2. Set `batch_id` to your batch ID (e.g. `2`).
 3. Set `sampling_suggestion_api` to `http://localhost:9009`.
+
+The ROS node reads these values from **launch parameters** (`rospy.get_param`), not from Dashboard form fields. The Dashboard **Mission Control** tab can start a run with the batch you opened, but until launch parameters are passed programmatically, keep this launch file aligned with the batch you intend to simulate. See `PROJECT_STRUCTURE.md` (manual vs Mission Control).
 
 Then start the simulator:
 ```bash

@@ -4,6 +4,10 @@
 
 ---
 
+## Repository layout
+
+If the `simulation/ros/` tree (many `build/`, `devel/`, and `src/*` packages) is confusing, read **`PROJECT_STRUCTURE.md`** first. It explains Payload vs Sampling vs Analyzer vs Dashboard vs ROS/esmini, which folders are generated, and whether you still edit the launch file manually.
+
 ## Quick summary
 
 | Step | What you do | Where |
