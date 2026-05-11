@@ -17,7 +17,7 @@ import {
   Typography,
 } from "@mui/material";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAppSelector } from "../../redux/hooks";
+import { useAppSelector } from "../../../../redux/hooks";
 
 import {
   getDataQuality,
