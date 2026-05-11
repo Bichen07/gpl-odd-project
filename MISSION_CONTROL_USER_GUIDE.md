@@ -39,92 +39,254 @@ Open all required terminals **before** opening the Dashboard.
 
 ## 1. Prerequisites
 
-Before using Mission Control you need the following services running.
+> **Note — SSH setup:** Since you are SSH-ing from your laptop into the lab PC, all commands below run **on the lab PC** (inside the SSH session). The Dashboard URL you open in your laptop browser is `http://LAB_PC_IP:3000` (e.g. `http://140.113.208.174:3000`). All `localhost` addresses in this guide refer to the **lab PC**, not your laptop.
+
+Before using Mission Control, start the following services. Each one needs its **own terminal** (SSH session).
+
+---
 
 ### 1a. Payload CMS (port 3020)
 
+**Terminal:** any (runs in background with `-d`)
+
 ```bash
-cd app/payload
+cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/payload
 docker compose up -d
 ```
 
-Verify: `curl http://localhost:3020/api/batches` returns JSON.
+**✅ What you should see:**
+```
+[+] Running 2/2
+ ✔ Container payload-postgres-1  Running   0.0s
+ ✔ Container payload-payload-1   Running   0.0s
+```
+The prompt returns immediately. Payload is already running — `Running 0.0s` means the containers were already up.
 
-**Login (for browsing data):**  
-Open `http://localhost:3020/admin` → use your `users` account email/password.  
-First time setup: follow `app/payload/README.md` to create the first admin user.
+**If you see `Starting` instead of `Running`:** wait ~10 seconds then check again with `docker compose ps`.
+
+**Verify it works:**
+```bash
+curl http://localhost:3020/api/batches | head -c 100
+```
+Should print JSON starting with `{"docs":[...`.
+
+**What you do NOT need to do:** You do not need to log into `http://localhost:3020/admin` to run simulations. Admin login is only for manual data browsing.
+
+---
 
 ### 1b. Sampling service (port 9009)
 
+**Terminal:** dedicated (blocks — keep this terminal open)
+
 ```bash
 conda activate sampling
-cd app/sampling/src
+cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/sampling/src
 litestar run --port 9009 --host 0.0.0.0
 ```
 
-### 1c. Analyzer (port 9010 / 8181)
+**✅ What you should see:**
+```
+Using Litestar app from app:app
+┌──────────────────────────────┬──────────────────────┐
+│ Litestar version             │ 2.8.2                │
+│ OpenAPI                      │ Enabled path=/schema │
+└──────────────────────────────┴──────────────────────┘
+INFO:     Uvicorn running on http://0.0.0.0:9009 (Press CTRL+C to quit)
+```
+Then it waits. This terminal stays blocked.
 
+**You will also see 404 lines like:**
+```
+INFO:  127.0.0.1:xxxxx - "GET /health HTTP/1.1" 404 Not Found
+```
+This is the Mission Control API probing for the sampling service health. **This is harmless** — the Sampling service has no `/health` route; Mission Control now uses `/schema` to check (see note below).
+
+**Verify it works:**
+```bash
+curl http://localhost:9009/schema/openapi.json | python3 -m json.tool | head -5
+```
+
+---
+
+### 1c. Analyzer (port 9010)
+
+**Terminal:** dedicated (blocks — keep this terminal open)
+
+**First — check if port 9010 is already in use:**
+```bash
+ss -tlnp | grep 9010
+```
+If something is already listening, kill it:
+```bash
+kill $(lsof -ti :9010)
+```
+
+Then start:
 ```bash
 conda activate analyzer
-cd app/analyzer/src
+cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/analyzer/src
 litestar run --port 9010 --host 0.0.0.0
 ```
 
+**✅ What you should see:**
+```
+Using device: cpu
+Using device: cuda
+Using Litestar app from app:app
+INFO:     Uvicorn running on http://0.0.0.0:9010 (Press CTRL+C to quit)
+```
+(The `h5py not installed` UserWarning is harmless.)
+
+**❌ If you see `[Errno 98] address already in use`:** The port is still occupied.  
+Run `kill $(lsof -ti :9010)` and try again.
+
+---
+
 ### 1d. Dashboard (port 3000)
 
+**Terminal:** dedicated (blocks — keep this terminal open)
+
 ```bash
-cd app/dashboard
+cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/dashboard
 bun run dev
 ```
 
-### 1e. Mission Control API (port 8282) — **new**
+**✅ What you should see:**
+```
+▲ Next.js 15.5.9 (Turbopack)
+   - Local:   http://localhost:3000
+   - Network: http://140.113.208.174:3000
+✓ Ready in 717ms
+```
+Then it waits. Open your **laptop browser** at `http://140.113.208.174:3000`.
 
+When you navigate to `/batch/1` you will see in the terminal:
+```
+GET /batch/1 200 in 10580ms
+```
+`200` means success. You should see the scatter plot page.
+
+---
+
+### 1e. Mission Control API (port 8282) ← new service
+
+**Terminal:** dedicated (blocks — keep this terminal open)
+
+**One-time setup — install the Docker Python library** (only needed once):
 ```bash
-# Use the same conda env as the Sampling service (it already has litestar installed)
 conda activate sampling
-cd app/simulation/src
+pip install docker
+```
+
+Then start the API:
+```bash
+conda activate sampling
+cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/simulation/src
 litestar run --port 8282 --host 0.0.0.0
 ```
 
-Expected startup output:
+**✅ What you should see (with Docker available):**
 ```
 INFO    mission_control.docker: Docker daemon connected.
-INFO:   Started server process [12345]
-INFO:   Waiting for application startup.
-INFO:   Application startup complete.
-INFO:   Uvicorn running on http://0.0.0.0:8282
+Using Litestar app from app:app
+INFO:     Uvicorn running on http://0.0.0.0:8282 (Press CTRL+C to quit)
 ```
 
-If Docker is not installed the first line will instead say:
+**If docker-py was not yet installed (before running `pip install docker`) you would see:**
 ```
 docker-py not installed — Docker manager running in stub mode.
 ```
-This is **not an error** — the API still starts normally and handles all routes.
+After installing docker-py and restarting, this line disappears and the Docker chip in the Dashboard turns green.
 
-**Do NOT open `http://localhost:8282` in a browser** — the API has no homepage (`/`), so the browser will show 404 for `/` and `/favicon.ico`. These 404s are harmless; they just mean you browsed to a path with no route.  
-To confirm the API is healthy, run:
-```bash
-curl http://localhost:8282/simulation/health
+**Do NOT open `http://localhost:8282` in a browser.** The API has no homepage. The browser probes `/` and `/favicon.ico`, both return 404 — this is expected and harmless:
 ```
-You should get a JSON response with `"status": "ok"` and service availability details.
+INFO: "GET / HTTP/1.1" 404 Not Found          ← harmless, just the browser probing
+INFO: "GET /favicon.ico HTTP/1.1" 404 Not Found  ← harmless
+```
 
-### 1f. Simulation container (sdc-bionic) — required for real runs
+**✅ When the Dashboard is also running, you will see real requests:**
+```
+INFO: "OPTIONS /simulation/health HTTP/1.1" 204 No Content    ← CORS preflight (normal)
+INFO: "GET /simulation/health HTTP/1.1" 200 OK                ← ✅ working
+INFO: "GET /simulation/data-quality/1 HTTP/1.1" 200 OK        ← ✅ working
+```
+`200 OK` on `/simulation/health` and `/simulation/data-quality/1` means the Mission Control panel is connected and reading data from the API.
 
-This only works on the **ITRI lab server** which has the `sdc-bionic` Docker image.
-
+**Verify from command line:**
 ```bash
-# Start the container (done automatically by Mission Control, but can be manual)
-sdc-docker-start-container
+curl http://localhost:8282/simulation/health | python3 -m json.tool
+```
+You should get:
+```json
+{
+  "status": "ok",
+  "services": {
+    "payload": { "ok": true },
+    "sampling": { "ok": true },
+    "docker": { "available": true, "container_status": "running" },
+    "ros": { "available": true, "ros_master_alive": false }
+  },
+  "active_runs": 0
+}
+```
 
-# Start ROS inside the container (Terminal inside Docker)
+---
+
+### 1f. Simulation container (sdc-bionic) — required only for running new simulations
+
+> **This is needed only when you want to actually run new simulations.**  
+> For viewing existing data in the Dashboard, analyzing clusters, or seeing Mission Control health — you do NOT need this step.
+
+The container (`sdc-bionic`) runs the ROS/esmini simulation stack.
+
+**Check if the container is already running first:**
+```bash
+docker ps | grep sdc-bionic
+```
+
+**Case A — container is NOT listed (not running):**
+```bash
+sdc-docker-start-container
+```
+If you see:
+```
+docker: Error response from daemon: Conflict. The container name "/sdc-bionic" is already in use
+```
+It means the container exists but is stopped. Remove the old one and restart:
+```bash
+docker rm sdc-bionic
+sdc-docker-start-container
+```
+
+**Case B — container IS already running** (you will see a line in `docker ps`):  
+Skip `sdc-docker-start-container`. Just enter the container:
+```bash
 sdc-docker-enter-container-shell
+```
+
+**Inside the container, start ROS** (this is a separate step inside the Docker shell):
+```bash
 roslaunch simulation_adv run.launch
 ```
 
-> **On your local workstation without sdc-bionic:**  
-> The Mission Control UI still loads. Service health cards will show **Docker: ❌ not available**.  
-> The "Run Simulation" button will be disabled with a tooltip explaining why.  
-> All other features (data quality check, log viewer, status polling) work normally.
+**✅ What you should see inside the container:**
+```
+... process[rosmaster-1]: started with pid [xxx]
+... process[rosout-1]: started with pid [xxx]
+... started core service [/rosmaster]
+... ROS_MASTER_URI=http://localhost:11311
+```
+ROS is now running. Keep this terminal open.
+
+After this, Mission Control health check will show:
+```json
+"ros": { "available": true, "ros_master_alive": true, "node_count": 8 }
+```
+And the "Run Simulation" button becomes enabled (if Docker + Sampling + Payload are also green).
+
+> **On your laptop (without sdc-bionic image):**  
+> Docker chip shows ❌, "Run Simulation" button is disabled with tooltip "Docker not available on this machine".  
+> This is correct — esmini simulations can only run on the lab PC where the image is installed.
 
 ---
 

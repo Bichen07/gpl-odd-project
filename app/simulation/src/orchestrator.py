@@ -261,9 +261,10 @@ class SimulationOrchestrator:
 
     async def _check_sampling(self) -> bool:
         try:
+            # Litestar always exposes /schema — use as health probe
             resp = await asyncio.get_event_loop().run_in_executor(
                 None,
-                lambda: requests.get(f"{self.sampling_api}/health", timeout=3),
+                lambda: requests.get(f"{self.sampling_api}/schema", timeout=3),
             )
             return resp.status_code < 500
         except Exception:

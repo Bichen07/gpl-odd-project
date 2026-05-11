@@ -87,7 +87,9 @@ class SimulationController(Controller):
         sampling_ok = False
         try:
             import requests as _req
-            r = _req.get(os.getenv("SAMPLING_API", "http://localhost:9009") + "/health", timeout=3)
+            # Litestar always exposes /schema — use it as a health probe
+            # (the Sampling service has no /health endpoint)
+            r = _req.get(os.getenv("SAMPLING_API", "http://localhost:9009") + "/schema", timeout=3)
             sampling_ok = r.status_code < 500
         except Exception:
             pass
