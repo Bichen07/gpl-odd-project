@@ -44,10 +44,14 @@ Open all required terminals **before** opening the Dashboard.
 ## 1. Prerequisites
 
 > **Note — SSH port forwarding (important!):**  
-> Since you SSH from your laptop to the lab PC, your laptop browser **cannot reach `http://140.113.208.174:3000` directly** — the lab PC firewall blocks it.  
-> Instead, add `-L` port-forward flags when you SSH:
+> Since you SSH from your laptop to the lab PC, your laptop browser **cannot reach `http://140.113.208.174:3000` directly** — the lab PC firewall blocks it.
+>
+> ### ⚠️ RUN THIS COMMAND ON YOUR LAPTOP — NOT inside the SSH session on the lab PC!
+>
+> If you accidentally run it inside the SSH session, SSH will try to bind lab PC ports that are already in use (`Address already in use`), **and it will squat on port 8282**, breaking the Mission Control API startup (`[Errno 98] address already in use`).
+>
+> **On your laptop** (open a fresh terminal — Windows PowerShell / macOS Terminal / WSL), run:
 > ```bash
-> # Run this on your LAPTOP (replace carlos11@140.113.208.174 with your actual SSH target)
 > ssh -L 3000:localhost:3000 \
 >     -L 8282:localhost:8282 \
 >     -L 3020:localhost:3020 \
@@ -55,9 +59,13 @@ Open all required terminals **before** opening the Dashboard.
 >     -L 9010:localhost:9010 \
 >     carlos11@140.113.208.174
 > ```
-> After this, **on your laptop browser** use `http://localhost:3000` (not 140.113.208.174).  
-> All `localhost` addresses in this guide will then work from your laptop browser.  
-> If you already have an SSH session open, open a second terminal on your laptop and add these forwards, or reconnect with the flags above.
+> After connecting, open **`http://localhost:3000`** in your laptop browser — **not** `140.113.208.174:3000`.
+>
+> **If you ran it on the lab PC by mistake and now port 8282 is blocked**, fix it like this (on the lab PC):
+> ```bash
+> kill $(lsof -ti :8282)   # or:  kill $(ss -tlnp | grep 8282 | awk '{print $NF}' | grep -oP 'pid=\K[0-9]+')
+> ```
+> Then start the Mission Control API again (step 1e).
 
 All commands below run **on the lab PC** (inside the SSH session).
 
