@@ -9,8 +9,6 @@ import {
   Divider,
   Grid,
   LinearProgress,
-  MenuItem,
-  Select,
   Stack,
   TextField,
   Tooltip,
@@ -307,25 +305,25 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
 
       {/* Config */}
       <Grid container spacing={1} alignItems="center">
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             label="Batch ID"
             size="small"
             value={effectiveBatchId || ""}
-            InputProps={{ readOnly: true }}
+            slotProps={{ input: { readOnly: true } }}
             fullWidth
           />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             label="Scenario ID"
             size="small"
             value={scenarioId || ""}
-            InputProps={{ readOnly: true }}
+            slotProps={{ input: { readOnly: true } }}
             fullWidth
           />
         </Grid>
-        <Grid item xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <TextField
             label="Number of trials"
             size="small"
@@ -334,10 +332,10 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
             onChange={(e) => setNTrials(Number(e.target.value))}
             disabled={isActive}
             fullWidth
-            inputProps={{ min: 1, max: 10000 }}
+            slotProps={{ htmlInput: { min: 1, max: 10000 } }}
           />
         </Grid>
-        <Grid item xs={12} sm={6}>
+        <Grid size={{ xs: 12, sm: 6 }}>
           <TextField
             label="Max trial duration (s)"
             size="small"
@@ -346,10 +344,10 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
             onChange={(e) => setMaxDuration(Number(e.target.value))}
             disabled={isActive}
             fullWidth
-            inputProps={{ min: 10, max: 600 }}
+            slotProps={{ htmlInput: { min: 10, max: 600 } }}
           />
         </Grid>
-        <Grid item xs={12} sm={6}>
+        <Grid size={{ xs: 12, sm: 6 }}>
           <Stack direction="row" alignItems="center" spacing={1}>
             <Typography variant="body2">Auto-retry:</Typography>
             <Chip

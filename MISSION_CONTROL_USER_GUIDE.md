@@ -17,6 +17,26 @@
 
 ---
 
+## 0. How many terminals do you need?
+
+Each service runs in its **own terminal** and stays alive the entire time you work.  
+Open all required terminals **before** opening the Dashboard.
+
+| Terminal # | Conda env | Service | Port | When needed |
+|---|---|---|---|---|
+| **1** | _(any)_ | Payload CMS (`docker compose up -d`) | 3020 | Always — start first |
+| **2** | `sampling` | Sampling API | 9009 | When running simulations or clustering |
+| **3** | `analyzer` | Analyzer API | 9010 | When viewing heatmaps / clustering |
+| **4** | _(any)_ | Dashboard (`bun run dev`) | 3000 | Always — keeps website running |
+| **5** | `sampling` | **Mission Control API** ← new | 8282 | When using the Run Simulation button |
+| **6** | _(lab only)_ | sdc-bionic container + roslaunch | — | ITRI lab server only |
+
+> **Terminal 1 returns the prompt immediately** (`docker compose up -d` runs in the background).  
+> **Terminals 2–5 block** — they keep running until you press `Ctrl+C`. Do not close them.  
+> **Terminal 6 is not needed on your local machine.** The Mission Control panel will show Docker as ❌ and the Run Simulation button will be disabled — this is correct and expected.
+
+---
+
 ## 1. Prerequisites
 
 Before using Mission Control you need the following services running.
@@ -60,7 +80,8 @@ bun run dev
 ### 1e. Mission Control API (port 8282) — **new**
 
 ```bash
-conda activate simulation    # or: pip install -r app/simulation/requirements.txt
+# Use the same conda env as the Sampling service (it already has litestar installed)
+conda activate sampling
 cd app/simulation/src
 litestar run --port 8282 --host 0.0.0.0
 ```
@@ -73,6 +94,19 @@ INFO:   Waiting for application startup.
 INFO:   Application startup complete.
 INFO:   Uvicorn running on http://0.0.0.0:8282
 ```
+
+If Docker is not installed the first line will instead say:
+```
+docker-py not installed — Docker manager running in stub mode.
+```
+This is **not an error** — the API still starts normally and handles all routes.
+
+**Do NOT open `http://localhost:8282` in a browser** — the API has no homepage (`/`), so the browser will show 404 for `/` and `/favicon.ico`. These 404s are harmless; they just mean you browsed to a path with no route.  
+To confirm the API is healthy, run:
+```bash
+curl http://localhost:8282/simulation/health
+```
+You should get a JSON response with `"status": "ok"` and service availability details.
 
 ### 1f. Simulation container (sdc-bionic) — required for real runs
 
