@@ -8,6 +8,7 @@ Wraps the Python Docker SDK (docker-py).  Falls back gracefully when:
 """
 from __future__ import annotations
 
+import concurrent.futures
 import logging
 import subprocess
 from typing import Optional
@@ -108,22 +109,32 @@ class DockerManager:
 
     # ── Command execution ──────────────────────────────────────────────────
 
-    def exec(self, cmd: str, workdir: str | None = None) -> tuple[int, str]:
+    def exec(self, cmd: str, workdir: str | None = None, timeout: int = 8) -> tuple[int, str]:
         """
         Run *cmd* inside the container using ``docker exec``.
 
         Returns (exit_code, combined_output).
-        Falls back to subprocess when docker-py exec is unavailable.
+        *timeout* limits how long we block — important for ROS commands like
+        ``rostopic list`` which hang indefinitely when rosmaster is not running.
         """
         if not self._client:
             return -1, "Docker unavailable"
-        try:
+
+        def _run() -> tuple[int, str]:
             container = self._client.containers.get(self.container_name)  # type: ignore
             kwargs: dict = {"workdir": workdir} if workdir else {}
             result = container.exec_run(cmd, **kwargs)
             return result.exit_code, (result.output or b"").decode("utf-8", errors="replace")
-        except Exception as exc:
-            return -1, str(exc)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            future = pool.submit(_run)
+            try:
+                return future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                log.warning("docker exec timed out after %ds: %s", timeout, cmd)
+                return -1, f"(timed out after {timeout}s)"
+            except Exception as exc:
+                return -1, str(exc)
 
     def exec_detached(self, cmd: str, workdir: str | None = None) -> bool:
         """

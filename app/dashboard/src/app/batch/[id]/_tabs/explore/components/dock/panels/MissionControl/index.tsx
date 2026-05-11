@@ -283,8 +283,18 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
     getStatus(runId).then(setSnap).catch(() => {});
   };
 
+  const handleReset = () => {
+    unsub.current?.();
+    unsub.current = null;
+    setRunId(null);
+    setSnap(null);
+    setLogs([]);
+  };
+
   const currentStatus: SimStatus = snap?.status ?? "idle";
-  const isActive = ["starting", "running", "stopping"].includes(currentStatus);
+  // "stopping" is intentionally excluded — once the user clicked Stop they should
+  // be able to start a new run immediately without waiting for cleanup.
+  const isActive = ["starting", "running"].includes(currentStatus);
 
   return (
     <Stack spacing={2} sx={{ p: 2 }}>
@@ -402,6 +412,18 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
         >
           {showLogs ? "Hide Logs" : "📋 Logs"}
         </Button>
+
+        {/* Show reset only when a previous run exists and is no longer starting/running */}
+        {runId && !isActive && (
+          <Button
+            variant="text"
+            size="small"
+            color="inherit"
+            onClick={handleReset}
+          >
+            ↺ New Run
+          </Button>
+        )}
       </Stack>
 
       {/* Status display */}

@@ -168,16 +168,10 @@ class SimulationOrchestrator:
         # Initialize Sampling for this batch
         await self._init_sampling()
 
-        # ROS
-        ros_health = self.ros.health_check()
-        if not ros_health.get("ros_master_alive", False):
-            self._log("WARNING: ROS master not alive — waiting for roslaunch...")
-            # Give ROS a moment to start (it may still be initialising)
-            await asyncio.sleep(5)
-            if not self.ros.is_ros_master_alive():
-                self.errors.append("ROS master did not start in time")
-                return False
-
+        # ROS master — do NOT require it here.
+        # roslaunch (called per trial in _trigger_esmini_trial) starts the ROS master
+        # itself.  Checking before any trial runs will always report "not alive".
+        # We check AFTER the first roslaunch via _wait_for_ros_master() in _run_one_trial.
         self._log("Infrastructure ready.")
         return True
 
@@ -218,6 +212,12 @@ class SimulationOrchestrator:
         ok = await self._trigger_esmini_trial(trial_index, params)
         if not ok:
             return {"trial_index": trial_index, "status": "failed", "reason": "trigger_failed"}
+
+        # 2b. Wait for ROS master to come up (roslaunch just started it)
+        ros_started = await self._wait_for_ros_master(timeout_s=60)
+        if not ros_started:
+            self._log(f"Trial {trial_index}: ROS master did not start — roslaunch may have crashed")
+            return {"trial_index": trial_index, "status": "failed", "reason": "ros_start_timeout"}
 
         # 3. Wait for trial to finish
         finished = await self._wait_for_trial(trial_index)
@@ -345,6 +345,22 @@ class SimulationOrchestrator:
             lambda: self.docker.exec_detached(cmd),
         )
         return ok
+
+    async def _wait_for_ros_master(self, timeout_s: int = 60) -> bool:
+        """
+        Poll until rosmaster responds inside the container or we time out.
+        roslaunch starts rosmaster asynchronously — give it up to *timeout_s* seconds.
+        """
+        deadline = time.monotonic() + timeout_s
+        while time.monotonic() < deadline:
+            alive = await asyncio.get_event_loop().run_in_executor(
+                None, self.ros.is_ros_master_alive
+            )
+            if alive:
+                self._log("ROS master is up.")
+                return True
+            await asyncio.sleep(3)
+        return False
 
     async def _wait_for_trial(self, trial_index: int) -> bool:
         """
