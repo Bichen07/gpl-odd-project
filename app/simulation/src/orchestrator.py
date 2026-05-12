@@ -113,6 +113,7 @@ class SimulationOrchestrator:
                         break
 
                     self.current_trial = i + 1
+                    await self._broadcast_status_update()
                     await self._run_trial_with_retry(i)
                     await self._broadcast_status_update()
 
@@ -188,6 +189,7 @@ class SimulationOrchestrator:
             if not self.retry_failed:
                 break
             self._log(f"Trial {trial_index} failed (attempt {attempt}/{MAX_RETRIES}), retrying...")
+            await self._broadcast_status_update()
             await asyncio.sleep(2)
 
         self.failed_trials += 1
@@ -388,35 +390,10 @@ class SimulationOrchestrator:
                 log.warning("Status callback failed: %s", exc)
 
     async def _broadcast_status_update(self) -> None:
-        elapsed = (time.monotonic() - self.started_at) if self.started_at else 0
-        done = self.completed_trials + self.failed_trials
-        remaining = self.n_trials - done
-        avg = elapsed / done if done > 0 else 0
-        eta = avg * remaining if avg > 0 else None
-
-        await self._broadcast(WsMessageType.STATUS_UPDATE, {
-            "status": self.status.value,
-            "run_id": self.run_id,
-            "current_trial": self.current_trial,
-            "total_trials": self.n_trials,
-            "completed": self.completed_trials,
-            "failed": self.failed_trials,
-            "elapsed_seconds": round(elapsed, 1),
-            "eta_seconds": round(eta, 1) if eta else None,
-            "last_trial": self._last_trial_info,
-        })
+        await self._broadcast(WsMessageType.STATUS_UPDATE, self.snapshot())
 
     async def _broadcast_completion(self) -> None:
-        elapsed = (time.monotonic() - self.started_at) if self.started_at else 0
-        await self._broadcast(WsMessageType.COMPLETED, {
-            "run_id": self.run_id,
-            "status": self.status.value,
-            "total_trials": self.n_trials,
-            "completed": self.completed_trials,
-            "failed": self.failed_trials,
-            "elapsed_seconds": round(elapsed, 1),
-            "errors": self.errors[:10],
-        })
+        await self._broadcast(WsMessageType.COMPLETED, self.snapshot())
 
     # ── Logging helpers ───────────────────────────────────────────────────
 

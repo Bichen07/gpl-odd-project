@@ -190,7 +190,7 @@ bun run dev
    - Network: http://140.113.208.174:3000
 ✓ Ready in 717ms
 ```
-Then it waits. Open your **laptop browser** at `http://140.113.208.174:3000`.
+Then it waits. Open the Dashboard at **`http://localhost:3000`** on the machine where you browse (laptop with SSH port forwarding, or the lab PC directly). Do not rely on `http://140.113.208.174:3000` from outside the lab unless your network and firewall allow it.
 
 When you navigate to `/batch/1` you will see in the terminal:
 ```

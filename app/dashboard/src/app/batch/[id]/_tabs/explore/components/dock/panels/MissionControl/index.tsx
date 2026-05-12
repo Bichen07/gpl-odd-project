@@ -82,8 +82,9 @@ function HealthBadge({ health }: { health: HealthResponse | null }) {
 
 function ProgressPanel({ snap }: { snap: StatusSnapshot }) {
   const { progress, timing } = snap;
+  const finished = progress.completed + progress.failed;
   const pct = progress.total_trials > 0
-    ? Math.round((progress.completed / progress.total_trials) * 100)
+    ? Math.round((finished / progress.total_trials) * 100)
     : 0;
 
   return (
@@ -114,13 +115,24 @@ function ProgressPanel({ snap }: { snap: StatusSnapshot }) {
 }
 
 function LogViewer({ logs }: { logs: string[] }) {
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const stickToBottomRef = useRef(true);
+
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    const el = containerRef.current;
+    if (!el || !stickToBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [logs]);
 
   return (
     <Box
+      ref={containerRef}
+      onScroll={() => {
+        const el = containerRef.current;
+        if (!el) return;
+        stickToBottomRef.current =
+          el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+      }}
       sx={{
         background: "#111",
         borderRadius: 1,
@@ -142,12 +154,17 @@ function LogViewer({ logs }: { logs: string[] }) {
           </Box>
         ))
       )}
-      <div ref={bottomRef} />
     </Box>
   );
 }
 
-function DataQualityPanel({ batchId }: { batchId: number }) {
+function DataQualityPanel({
+  batchId,
+  refreshIntervalMs,
+}: {
+  batchId: number;
+  refreshIntervalMs?: number;
+}) {
   const [q, setQ] = useState<DataQualitySummary | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -167,7 +184,13 @@ function DataQualityPanel({ batchId }: { batchId: number }) {
     fetch();
   }, [fetch]);
 
-  if (loading) return <CircularProgress size={16} />;
+  useEffect(() => {
+    if (!refreshIntervalMs) return;
+    const id = setInterval(fetch, refreshIntervalMs);
+    return () => clearInterval(id);
+  }, [fetch, refreshIntervalMs]);
+
+  if (loading && !q) return <CircularProgress size={16} />;
   if (!q) return <Typography variant="caption">Could not load data quality.</Typography>;
 
   return (
@@ -237,6 +260,31 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
     return () => clearInterval(id);
   }, [runId, showLogs]);
 
+  // Keep status, elapsed time, and logs in sync while a run is active
+  useEffect(() => {
+    if (!runId) return;
+
+    let cancelled = false;
+    const sync = () => {
+      getStatus(runId)
+        .then((status) => {
+          if (cancelled) return;
+          setSnap(status);
+          if (status.logs_tail.length > 0) {
+            setLogs(status.logs_tail);
+          }
+        })
+        .catch(() => {});
+    };
+
+    sync();
+    const id = setInterval(sync, 2_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [runId]);
+
   // WebSocket subscription
   const connectWs = useCallback((id: string) => {
     unsub.current?.();
@@ -244,7 +292,13 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
       id,
       (msg: WsMessage) => {
         if (msg.type === "status_update" || msg.type === "completed") {
-          setSnap(msg.payload as StatusSnapshot);
+          const payload = msg.payload as StatusSnapshot;
+          if (payload.progress && payload.timing) {
+            setSnap(payload);
+            if (payload.logs_tail?.length) {
+              setLogs(payload.logs_tail);
+            }
+          }
         }
       },
     );
@@ -267,6 +321,7 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
         max_trial_duration_seconds: maxDuration,
       });
       setRunId(res.run_id);
+      setShowLogs(true);
       connectWs(res.run_id);
       // Fetch initial snapshot
       getStatus(res.run_id).then(setSnap).catch(() => {});
@@ -454,7 +509,7 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
       )}
 
       {/* Log viewer */}
-      <Collapse in={showLogs && logs.length > 0}>
+      <Collapse in={showLogs}>
         <Divider sx={{ mb: 1 }} />
         <Typography variant="caption" color="text.secondary">
           Live logs (last 50 lines)
@@ -470,7 +525,10 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
           <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: "block" }}>
             Data quality — batch {effectiveBatchId}
           </Typography>
-          <DataQualityPanel batchId={effectiveBatchId} />
+          <DataQualityPanel
+            batchId={effectiveBatchId}
+            refreshIntervalMs={isActive ? 10_000 : undefined}
+          />
         </Box>
       )}
     </Stack>

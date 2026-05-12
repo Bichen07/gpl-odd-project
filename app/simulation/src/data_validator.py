@@ -21,10 +21,14 @@ import requests
 log = logging.getLogger("mission_control.validator")
 
 
-# Default cache path inside the ROS workspace (also used by csv_roadid_loader.py)
-DEFAULT_CACHE_ROOT = Path(
-    "/home/user/ros_catkin_ws/src/scenario_search"
-    "/../../../.cache/scenario_search/records"
+# Host path where esmini CSVs are written (bind-mounted from simulation/ros)
+DEFAULT_CACHE_ROOT = (
+    Path(__file__).resolve().parents[3]
+    / "simulation"
+    / "ros"
+    / ".cache"
+    / "scenario_search"
+    / "records"
 )
 
 REQUIRED_COLUMNS = {"roadId", "laneId", "egoX", "egoY"}

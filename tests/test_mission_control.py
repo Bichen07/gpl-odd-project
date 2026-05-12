@@ -209,6 +209,28 @@ def test_orchestrator_snapshot_keys():
     assert snap["progress"]["total_trials"] == 50
 
 
+@pytest.mark.asyncio
+async def test_orchestrator_status_broadcast_uses_snapshot():
+    messages = []
+
+    async def capture_cb(msg):  # type: ignore[override]
+        messages.append(msg.to_dict())
+
+    orch = SimulationOrchestrator(
+        batch_id=1,
+        scenario_id=1,
+        n_trials=1,
+        status_callback=capture_cb,
+    )
+    orch.current_trial = 1
+    await orch._broadcast_status_update()
+
+    assert messages
+    payload = messages[-1]["payload"]
+    assert payload["progress"]["current_trial"] == 1
+    assert payload["timing"]["elapsed_seconds"] >= 0
+
+
 def test_orchestrator_fails_without_docker():
     """Orchestrator should fail gracefully when Docker isn't available."""
     messages = []

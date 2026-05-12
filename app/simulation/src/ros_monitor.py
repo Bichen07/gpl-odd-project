@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import os
+import shlex
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -24,6 +25,11 @@ TOPIC_RECORD_FILEPATH  = "/esmini_record_filepath"
 # Maximum .dat file size before we consider esmini runaway (bytes → 1 GB)
 MAX_DAT_SIZE_BYTES = 1_073_741_824
 
+ROS_SETUP = (
+    "source /opt/ros/melodic/setup.bash && "
+    "source /project/mmsl_simulation/devel/setup.bash"
+)
+
 
 class RosMonitor:
     """
@@ -36,11 +42,16 @@ class RosMonitor:
     def __init__(self, docker: "DockerManager"):
         self._docker = docker
 
+    def _ros_exec(self, cmd: str) -> tuple[int, str]:
+        """Run a ROS CLI command inside the container with workspace env sourced."""
+        wrapped = f"{ROS_SETUP} && {cmd}"
+        return self._docker.exec(f"bash -lc {shlex.quote(wrapped)}")
+
     # ── ROS Master ────────────────────────────────────────────────────────
 
     def is_ros_master_alive(self) -> bool:
         """Ping rosmaster by running ``rostopic list`` inside the container."""
-        code, out = self._docker.exec("rostopic list")
+        code, out = self._ros_exec("rostopic list")
         if code == 0 and "/" in out:
             return True
         log.warning("ROS master check failed (exit=%d): %s", code, out[:200])
@@ -49,7 +60,7 @@ class RosMonitor:
     # ── Active topics ─────────────────────────────────────────────────────
 
     def list_topics(self) -> list[str]:
-        code, out = self._docker.exec("rostopic list")
+        code, out = self._ros_exec("rostopic list")
         if code != 0:
             return []
         return [line.strip() for line in out.splitlines() if line.strip()]
@@ -60,7 +71,7 @@ class RosMonitor:
     # ── Node health ───────────────────────────────────────────────────────
 
     def list_nodes(self) -> list[str]:
-        code, out = self._docker.exec("rosnode list")
+        code, out = self._ros_exec("rosnode list")
         if code != 0:
             return []
         return [line.strip() for line in out.splitlines() if line.strip()]
@@ -70,7 +81,7 @@ class RosMonitor:
         return node_name in self.list_nodes()
 
     def get_node_info(self, node_name: str) -> str:
-        _, out = self._docker.exec(f"rosnode info {node_name}")
+        _, out = self._ros_exec(f"rosnode info {node_name}")
         return out
 
     # ── esmini watchdog ───────────────────────────────────────────────────
