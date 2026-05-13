@@ -33,7 +33,7 @@ class RunRequest:
     scenario_id: int
     n_trials: int = 100
     retry_failed: bool = True
-    max_trial_duration_seconds: int = 60
+    max_trial_duration_seconds: int = 180
 
 
 @dataclass

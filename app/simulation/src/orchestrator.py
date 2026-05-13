@@ -28,6 +28,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import shlex
 import time
 import uuid
@@ -46,8 +47,8 @@ from ros_monitor import RosMonitor
 log = logging.getLogger("mission_control.orchestrator")
 
 MAX_RETRIES = 3
-# seconds to wait for a trial to finish before timing out
-TRIAL_TIMEOUT_S = 120
+# seconds to wait for a trial to finish before timing out (ROS + esmini + dat2csv)
+TRIAL_TIMEOUT_S = 180
 # seconds between poll loops while waiting for trial completion
 POLL_INTERVAL_S = 3
 
@@ -216,57 +217,62 @@ class SimulationOrchestrator:
         })
 
     async def _run_one_trial(self, trial_index: int) -> dict[str, Any]:
-        """Run a single esmini trial.  Returns dict with status + metadata."""
+        """Run a single esmini trial.  Returns dict with status + metadata.
+
+        **Important:** ``single_parameterized_scenario_search`` calls ``/suggest`` *inside*
+        the container.  Mission Control must **not** call ``/suggest`` here — that would
+        consume the next trial and desynchronise filenames (``esmini_<batch>_<idx>.csv``
+        uses Sampling's ``trial_index``, not this loop index).
+
+        ROS registers outcomes with Sampling when the simulation finishes; do not POST
+        ``/register`` from here with ``outcome: null`` (that marks the trial failed).
+        """
         t_start = time.monotonic()
 
-        # 1. Ask Sampling for parameters
-        params = await self._get_sampling_suggestion()
-        if params is None:
-            return {"trial_index": trial_index, "status": "failed", "reason": "sampling_unavailable"}
+        # Wall-clock anchor: any CSV written/updated *after* this is treated as this trial.
+        trial_started_wall = time.time()
 
-        self._log(f"Trial {trial_index}: params={params}")
-        try:
-            pdir = mc_run_dir_host(self.run_id)
-            pdir.mkdir(parents=True, exist_ok=True)
-            (pdir / f"trial_{trial_index}_params.json").write_text(
-                json.dumps(params, indent=2),
-                encoding="utf-8",
-            )
-        except OSError as exc:
-            self._log("WARNING: could not write trial params JSON:", exc)
+        self._log(
+            f"Trial {trial_index} (run step): awaiting ROS + Sampling — "
+            f"CSV will be esmini_{self.batch_id}_<trial_index>.csv from container",
+        )
 
-        # 2. Trigger esmini scenario search (via ROS inside container)
-        ok = await self._trigger_esmini_trial(trial_index, params)
+        # 1. Trigger esmini scenario search (via ROS inside container; ROS calls /suggest)
+        ok = await self._trigger_esmini_trial(trial_index)
         if not ok:
             return {"trial_index": trial_index, "status": "failed", "reason": "trigger_failed"}
 
-        # 2b. Wait for ROS master to come up (roslaunch just started it)
+        # 2. Wait for ROS master to come up (roslaunch just started it)
         ros_started = await self._wait_for_ros_master(timeout_s=90)
         if not ros_started:
             self._log(f"Trial {trial_index}: ROS master did not start — roslaunch may have crashed")
             self._log_roslaunch_tail(trial_index)
             return {"trial_index": trial_index, "status": "failed", "reason": "ros_start_timeout"}
 
-        # 3. Wait for trial to finish
-        finished = await self._wait_for_trial(trial_index)
-        if not finished:
+        # 3. Wait for the trial CSV (Sampling trial index comes from the filename)
+        sampling_trial_index = await self._wait_for_trial_csv(trial_started_wall)
+        if sampling_trial_index is None:
             return {"trial_index": trial_index, "status": "failed", "reason": "timeout"}
 
-        # 4. Validate CSV + Payload
-        validation = self.validator.validate_trial(self.batch_id, trial_index)
-        if not validation["csv_exists"]:
-            return {"trial_index": trial_index, "status": "failed", "reason": "csv_missing",
-                    "validation": validation}
+        self._log(f"Trial {trial_index}: completed Sampling trial_index={sampling_trial_index}")
 
-        # 5. Register with Sampling (feedback loop)
-        await self._register_sampling_result(trial_index, params)
+        # 4. Validate CSV + Payload (use Sampling index — matches disk + Payload)
+        validation = self.validator.validate_trial(self.batch_id, sampling_trial_index)
+        if not validation["csv_exists"]:
+            return {
+                "trial_index": trial_index,
+                "status": "failed",
+                "reason": "csv_missing",
+                "sampling_trial_index": sampling_trial_index,
+                "validation": validation,
+            }
 
         duration = time.monotonic() - t_start
         return {
             "trial_index": trial_index,
             "status": "success",
             "duration_seconds": round(duration, 1),
-            "params": params,
+            "sampling_trial_index": sampling_trial_index,
             "validation": validation,
         }
 
@@ -311,40 +317,6 @@ class SimulationOrchestrator:
             self._log("Sampling initialized for batch", self.batch_id)
         except Exception as exc:
             self._log("WARNING: Sampling init failed:", exc)
-
-    async def _get_sampling_suggestion(self) -> dict | None:
-        try:
-            resp = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: requests.get(
-                    f"{self.sampling_api}/suggest/{self.batch_id}",
-                    timeout=30,
-                ),
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                return data.get("parameters") or data
-        except Exception as exc:
-            self._log("Sampling suggest failed:", exc)
-        return None
-
-    async def _register_sampling_result(self, trial_index: int, params: dict) -> None:
-        try:
-            await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: requests.post(
-                    f"{self.sampling_api}/register",
-                    json={
-                        "batch_id": str(self.batch_id),
-                        "trial_index": trial_index,
-                        "outcome": None,  # filled by scenario_sampler after sim
-                        "esmini_dat_id": "",
-                    },
-                    timeout=10,
-                ),
-            )
-        except Exception as exc:
-            self._log("WARNING: Sampling register failed:", exc)
 
     def _sampling_api_for_container(self) -> str:
         """
@@ -395,7 +367,7 @@ exec roslaunch scenario_search single_parameterized_scenario_search.launch \\
         tail = "\n".join(lines[-max_lines:])
         self._log("roslaunch log tail:\n" + tail)
 
-    async def _trigger_esmini_trial(self, trial_index: int, params: dict) -> bool:
+    async def _trigger_esmini_trial(self, trial_index: int) -> bool:
         """
         Start ``roslaunch`` inside the container in a **detached** OS process.
 
@@ -441,20 +413,44 @@ exec roslaunch scenario_search single_parameterized_scenario_search.launch \\
             await asyncio.sleep(3)
         return False
 
-    async def _wait_for_trial(self, trial_index: int) -> bool:
+    async def _wait_for_trial_csv(self, trial_started_wall: float) -> int | None:
         """
-        Poll until the CSV file appears (trial finished) or we time out.
+        Poll until an ``esmini_<batch>_<n>.csv`` appears or is updated after *trial_started_wall*.
+
+        The ROS stack names files with Sampling's ``trial_index`` (from ``/suggest`` inside
+        the container), not Mission Control's loop index.
         """
+        name_pat = re.compile(rf"^esmini_{self.batch_id}_(\d+)\.csv$")
         deadline = time.monotonic() + self.max_trial_duration_seconds
-        csv = self.validator.cache_root / f"esmini_{self.batch_id}_{trial_index}.csv"
+        # small slack for mtime vs wall clock on the same host
+        mtime_floor = trial_started_wall - 5.0
 
         while time.monotonic() < deadline:
-            if csv.exists():
-                return True
+            root = self.validator.cache_root
+            best: tuple[float, Path] | None = None
+            if root.is_dir():
+                for p in root.glob(f"esmini_{self.batch_id}_*.csv"):
+                    if not p.is_file():
+                        continue
+                    try:
+                        mt = p.stat().st_mtime
+                    except OSError:
+                        continue
+                    if mt < mtime_floor:
+                        continue
+                    if best is None or mt > best[0]:
+                        best = (mt, p)
+            if best:
+                m = name_pat.match(best[1].name)
+                if m:
+                    return int(m.group(1))
             await asyncio.sleep(POLL_INTERVAL_S)
 
-        self._log(f"Trial {trial_index} timed out after {self.max_trial_duration_seconds}s")
-        return False
+        self._log(
+            f"No new esmini_{self.batch_id}_*.csv within {self.max_trial_duration_seconds}s "
+            "(check roslaunch log and scenario_search records path)",
+        )
+        return None
 
     # ── Broadcasts ────────────────────────────────────────────────────────
 

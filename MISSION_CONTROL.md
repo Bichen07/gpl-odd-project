@@ -242,7 +242,7 @@ WS    /simulation/stream/{id}    — Real-time status updates
   "batch_id": 1,
   "scenario_id": 1,
   "n_trials": 100,
-  "options": { "retry_failed": true, "max_trial_duration_seconds": 60 }
+  "options": { "retry_failed": true, "max_trial_duration_seconds": 180 }
 }
 ```
 

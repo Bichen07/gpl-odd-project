@@ -231,7 +231,7 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
   // Form state
   const [nTrials, setNTrials] = useState(100);
   const [retryFailed, setRetryFailed] = useState(true);
-  const [maxDuration, setMaxDuration] = useState(60);
+  const [maxDuration, setMaxDuration] = useState(120);
 
   // Run state
   const [runId, setRunId] = useState<string | null>(null);
@@ -409,7 +409,8 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
             onChange={(e) => setMaxDuration(Number(e.target.value))}
             disabled={isActive}
             fullWidth
-            slotProps={{ htmlInput: { min: 10, max: 600 } }}
+            helperText="Deadline for a new/updated CSV (ROS uses Sampling’s trial index in the filename, not 0…N−1)."
+            slotProps={{ htmlInput: { min: 30, max: 600 } }}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>

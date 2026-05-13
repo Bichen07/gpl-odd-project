@@ -30,6 +30,7 @@ def test_run_request_defaults():
     req = RunRequest(batch_id=1, scenario_id=2)
     assert req.n_trials == 100
     assert req.retry_failed is True
+    assert req.max_trial_duration_seconds == 180
 
 
 def test_ws_message_serialization():
@@ -131,6 +132,17 @@ def test_data_validator_count_csvs(tmp_path):
     assert validator.count_local_csvs(3) == 5
     assert validator.count_local_csvs(4) == 1
     assert validator.count_local_csvs(99) == 0
+
+
+def test_esmini_csv_filename_matches_sampling_trial_index():
+    """ROS writes esmini_<batch>_<sampling_trial_index>.csv — not Mission Control loop index."""
+    import re
+
+    batch_id = 1
+    pat = re.compile(rf"^esmini_{batch_id}_(\d+)\.csv$")
+    m = pat.match("esmini_1_1144.csv")
+    assert m is not None
+    assert int(m.group(1)) == 1144
 
 
 def test_data_validator_summary(tmp_path):

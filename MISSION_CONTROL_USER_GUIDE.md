@@ -524,7 +524,7 @@ Health is refreshed every 15 seconds automatically.
 | **Batch ID** | Auto-filled from the current batch page (read-only) |
 | **Scenario ID** | Auto-filled from the batch's linked scenario (read-only) |
 | **Number of trials** | How many simulations to run (default: 100) |
-| **Max trial duration (s)** | Timeout per trial (default: 60 s) |
+| **Max trial duration (s)** | Deadline waiting for a **new or updated** `esmini_<batch>_<trial_index>.csv` under `scenario_search/records/` (default API: 180 s; Dashboard field default: 120 s). The number in the filename is **Sampling’s** `trial_index`, not “trial 1 of 100”. |
 | **Auto-retry** | Toggle — retries failed trials up to 3 times (default: on) |
 
 ### 3e. Run the simulation
@@ -675,7 +675,7 @@ curl -X POST http://localhost:8282/simulation/run \
     "scenario_id": 1,
     "n_trials": 50,
     "retry_failed": true,
-    "max_trial_duration_seconds": 60
+    "max_trial_duration_seconds": 180
   }'
 ```
 
