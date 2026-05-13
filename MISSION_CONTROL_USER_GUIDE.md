@@ -27,25 +27,61 @@ If the `simulation/ros/` tree (many `build/`, `devel/`, and `src/*` packages) is
 
 ### Option A — one terminal (recommended on the lab PC)
 
-From the **repository root**, start Payload plus Sampling, Analyzer, Mission Control, and Dashboard in the background:
+This path starts **Payload (Docker)** plus **Sampling, Analyzer, Mission Control, and Dashboard** as background processes. PIDs and logs live under **`logs/dev_stack/`**.
+
+#### Before you run the script
+
+1. **Working directory:** clone path may differ; always `cd` to the **repository root** (the folder that contains `scripts/start_dev_stack.sh`).
+2. **Clean restart:** if you started the stack earlier and want a fresh run, stop the app processes first (Payload keeps running):
+   ```bash
+   ./scripts/stop_dev_stack.sh
+   ```
+3. **Ports must be free** on the lab PC: **3000** (Dashboard), **8282** (Mission Control), **9009** (Sampling), **9010** (Analyzer). If the script exits with `port 8282 in use` (or another port), either run **`./scripts/stop_dev_stack.sh`** or free the port (see **§1 Prerequisites** if **SSH `-L 8282:...` was run on the lab PC by mistake** — that also blocks 8282).
+
+#### Start the stack
 
 ```bash
 cd /path/to/gpl-odd-project
 ./scripts/start_dev_stack.sh
 ```
 
-Logs: `logs/dev_stack/*.log` — e.g. `tail -f logs/dev_stack/dashboard.log`
-
-Stop Litestar + Dashboard (Payload Docker left running):
-
-```bash
-./scripts/stop_dev_stack.sh
-```
+Optional: **`./scripts/start_dev_stack.sh --skip-payload`** if Payload containers are already up.
 
 **Requirements:** `docker`, `conda` (envs `sampling` and `analyzer`), `bun`.  
 **Not started by this script:** the `sdc-bionic` simulation container — start it separately on the lab server when you need **▶ Run Simulation** (`sdc-docker-start-container` / your usual flow).
 
-After the stack is up: open **`http://localhost:3000`** (or use SSH port forwarding from your laptop), use Payload admin if you want, and use the Dashboard Mission Control tab to run simulations.
+#### When it succeeds
+
+The script prints local URLs, for example:
+
+- **Dashboard:** `http://localhost:3000`
+- **Mission Control health:** `http://localhost:8282/simulation/health`
+- **Payload API:** `http://localhost:3020/api`
+
+Quick check on the lab PC (optional):
+
+```bash
+curl -sS http://localhost:8282/simulation/health
+tail -n 20 logs/dev_stack/mission_control.log
+```
+
+Logs for each service: **`logs/dev_stack/*.log`** — e.g. `tail -f logs/dev_stack/dashboard.log` if a page fails to load.
+
+#### Next steps after the script finishes
+
+1. **Browser:** open the **Dashboard** at **`http://localhost:3000`** on the lab PC.  
+   If you work from a **laptop over SSH**, do **not** open the lab’s public IP for these ports; instead open an SSH session **from the laptop** with **local port forwarding** (full command is in **§1 Prerequisites**). Then on the laptop use **`http://localhost:3000`** the same way.
+2. **Payload:** log in through the Dashboard / Payload admin as you usually do (create or open a **Batch**).
+3. **Mission Control:** in the Dashboard, select your batch → open the **🚀 Mission Control** tab → set trial count → **▶ Run Simulation** (see **Quick summary** and later sections for Docker/ros expectations).
+4. **Lab only:** before **Run Simulation** works end-to-end, ensure **`sdc-bionic`** (ROS/esmini) is running on the lab server per your usual procedure.
+
+#### Stop the background apps
+
+Stops Sampling, Analyzer, Mission Control, and Dashboard; **does not** run `docker compose down` for Payload:
+
+```bash
+./scripts/stop_dev_stack.sh
+```
 
 ### Option B — manual (one terminal per service)
 
