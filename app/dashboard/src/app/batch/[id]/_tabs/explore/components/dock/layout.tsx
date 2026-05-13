@@ -46,6 +46,8 @@ const layout: LayoutData = {
                 id: "missionControl",
                 title: "🚀 Mission Control",
                 content: <MissionControl />,
+                // Keep WebSocket + run state when maximizing another panel (rc-dock otherwise unmounts).
+                cached: true,
               },
             ],
           },

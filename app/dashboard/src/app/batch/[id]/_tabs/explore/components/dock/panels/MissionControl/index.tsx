@@ -94,9 +94,15 @@ function ProgressPanel({ snap }: { snap: StatusSnapshot }) {
           Trial {progress.current_trial} / {progress.total_trials}
           &nbsp;({pct}%)
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          ETA: {fmtSeconds(timing.eta_seconds)}
-        </Typography>
+        <Tooltip
+          title="Rough estimate: (elapsed ÷ finished trials) × trials left. Resets as success/fail mix changes; not wall-clock guaranteed."
+          placement="top"
+          arrow
+        >
+          <Typography variant="body2" color="text.secondary" component="span" sx={{ cursor: "help" }}>
+            ETA: {fmtSeconds(timing.eta_seconds)}
+          </Typography>
+        </Tooltip>
       </Box>
       <LinearProgress variant="determinate" value={pct} />
       <Stack direction="row" spacing={2}>
@@ -409,8 +415,8 @@ export default function MissionControl({ batchId }: { batchId?: string }) {
             onChange={(e) => setMaxDuration(Number(e.target.value))}
             disabled={isActive}
             fullWidth
-            helperText="Deadline for a new/updated CSV (ROS uses Sampling’s trial index in the filename, not 0…N−1)."
-            slotProps={{ htmlInput: { min: 30, max: 600 } }}
+            helperText="Clock starts after ROS is up. Ego + esmini often need 60–120s; reference-model CSVs use a longer name (supported server-side)."
+            slotProps={{ htmlInput: { min: 60, max: 600 } }}
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6 }}>

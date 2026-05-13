@@ -124,6 +124,15 @@ def test_data_validator_zero_roadid_warning(tmp_path):
     assert len(roadid_issues) > 0
 
 
+def test_data_validator_reference_csv(tmp_path):
+    csv = tmp_path / "esmini_rss_reference_model_2_42.csv"
+    csv.write_text("roadId,laneId,egoX,egoY,egoZ\n51,1,1.0,2.0,0.0\n")
+    validator = DataValidator(cache_root=tmp_path, payload_api="http://invalid:9999/api")
+    result = validator.validate_trial(batch_id=2, trial_index=42)
+    assert result["csv_exists"] is True
+    assert result["csv_has_required_columns"] is True
+
+
 def test_data_validator_count_csvs(tmp_path):
     for i in range(5):
         (tmp_path / f"esmini_3_{i}.csv").write_text("roadId\n1\n")
@@ -132,6 +141,13 @@ def test_data_validator_count_csvs(tmp_path):
     assert validator.count_local_csvs(3) == 5
     assert validator.count_local_csvs(4) == 1
     assert validator.count_local_csvs(99) == 0
+
+
+def test_data_validator_count_includes_reference_csvs(tmp_path):
+    (tmp_path / "esmini_3_0.csv").write_text("roadId\n1\n")
+    (tmp_path / "esmini_rss_reference_model_3_1.csv").write_text("roadId\n1\n")
+    validator = DataValidator(cache_root=tmp_path)
+    assert validator.count_local_csvs(3) == 2
 
 
 def test_esmini_csv_filename_matches_sampling_trial_index():

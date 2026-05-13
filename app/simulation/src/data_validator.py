@@ -38,6 +38,19 @@ def _csv_path(cache_root: Path, batch_id: int, trial_index: int) -> Path:
     return cache_root / f"esmini_{batch_id}_{trial_index}.csv"
 
 
+def _csv_path_reference(cache_root: Path, batch_id: int, trial_index: int) -> Path:
+    """When ``enable_reference_preventable_judgement`` uses the RSS reference model turn."""
+    return cache_root / f"esmini_rss_reference_model_{batch_id}_{trial_index}.csv"
+
+
+def resolve_trial_csv(cache_root: Path, batch_id: int, trial_index: int) -> Path | None:
+    """Return the CSV path if either standard or reference-model file exists."""
+    for p in (_csv_path(cache_root, batch_id, trial_index), _csv_path_reference(cache_root, batch_id, trial_index)):
+        if p.is_file():
+            return p
+    return None
+
+
 class DataValidator:
     """
     Checks CSV files and Payload records for data integrity.
@@ -84,11 +97,14 @@ class DataValidator:
             "issues": issues,
         }
 
-        csv = _csv_path(self.cache_root, batch_id, trial_index)
+        csv = resolve_trial_csv(self.cache_root, batch_id, trial_index)
 
         # 1. CSV exists
-        if not csv.exists():
-            issues.append(f"CSV not found: {csv}")
+        if csv is None:
+            issues.append(
+                f"CSV not found: {_csv_path(self.cache_root, batch_id, trial_index)} "
+                f"(or reference {_csv_path_reference(self.cache_root, batch_id, trial_index)})"
+            )
             result["checks_passed"] = False
             result["issues"] = issues
             return result
@@ -139,8 +155,9 @@ class DataValidator:
 
     def count_local_csvs(self, batch_id: int) -> int:
         """Count CSV files locally present for *batch_id*."""
-        pattern = f"esmini_{batch_id}_*.csv"
-        return len(list(self.cache_root.glob(pattern)))
+        n = len(list(self.cache_root.glob(f"esmini_{batch_id}_*.csv")))
+        n += len(list(self.cache_root.glob(f"esmini_rss_reference_model_{batch_id}_*.csv")))
+        return n
 
     def count_payload_trials(self, batch_id: int) -> int:
         """Return total trial count from Payload for *batch_id*."""

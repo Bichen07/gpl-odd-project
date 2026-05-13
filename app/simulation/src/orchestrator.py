@@ -33,6 +33,7 @@ import shlex
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Awaitable, Callable, Optional
 
 import requests
@@ -415,40 +416,50 @@ exec roslaunch scenario_search single_parameterized_scenario_search.launch \\
 
     async def _wait_for_trial_csv(self, trial_started_wall: float) -> int | None:
         """
-        Poll until an ``esmini_<batch>_<n>.csv`` appears or is updated after *trial_started_wall*.
+        Poll until an esmini CSV for this batch appears or is updated after *trial_started_wall*.
 
-        The ROS stack names files with Sampling's ``trial_index`` (from ``/suggest`` inside
-        the container), not Mission Control's loop index.
+        Filenames (see ``single_parameterized_scenario_search``):
+          - ``esmini_<batch>_<trial_index>.csv``
+          - ``esmini_rss_reference_model_<batch>_<trial_index>.csv`` (reference / preventable flow)
+
+        The numeric index is Sampling's ``trial_index``, not Mission Control's loop index.
         """
-        name_pat = re.compile(rf"^esmini_{self.batch_id}_(\d+)\.csv$")
+        pat_standard = re.compile(rf"^esmini_{self.batch_id}_(\d+)\.csv$")
+        pat_ref = re.compile(rf"^esmini_rss_reference_model_{self.batch_id}_(\d+)\.csv$")
         deadline = time.monotonic() + self.max_trial_duration_seconds
-        # small slack for mtime vs wall clock on the same host
         mtime_floor = trial_started_wall - 5.0
 
-        while time.monotonic() < deadline:
+        def _candidate_paths() -> list[Path]:
             root = self.validator.cache_root
+            if not root.is_dir():
+                return []
+            paths: list[Path] = []
+            paths.extend(root.glob(f"esmini_{self.batch_id}_*.csv"))
+            paths.extend(root.glob(f"esmini_rss_reference_model_{self.batch_id}_*.csv"))
+            return paths
+
+        while time.monotonic() < deadline:
             best: tuple[float, Path] | None = None
-            if root.is_dir():
-                for p in root.glob(f"esmini_{self.batch_id}_*.csv"):
-                    if not p.is_file():
-                        continue
-                    try:
-                        mt = p.stat().st_mtime
-                    except OSError:
-                        continue
-                    if mt < mtime_floor:
-                        continue
-                    if best is None or mt > best[0]:
-                        best = (mt, p)
+            for p in _candidate_paths():
+                if not p.is_file():
+                    continue
+                try:
+                    mt = p.stat().st_mtime
+                except OSError:
+                    continue
+                if mt < mtime_floor:
+                    continue
+                if best is None or mt > best[0]:
+                    best = (mt, p)
             if best:
-                m = name_pat.match(best[1].name)
+                m = pat_standard.match(best[1].name) or pat_ref.match(best[1].name)
                 if m:
                     return int(m.group(1))
             await asyncio.sleep(POLL_INTERVAL_S)
 
         self._log(
-            f"No new esmini_{self.batch_id}_*.csv within {self.max_trial_duration_seconds}s "
-            "(check roslaunch log and scenario_search records path)",
+            f"No new esmini CSV for batch {self.batch_id} within {self.max_trial_duration_seconds}s "
+            "(see roslaunch log; increase Max trial duration if ego/esmini needs more time)",
         )
         return None
 
