@@ -12,7 +12,7 @@ If the `simulation/ros/` tree (many `build/`, `devel/`, and `src/*` packages) is
 
 | Step | What you do | Where |
 |------|------------|-------|
-| 1 | Start the Mission Control API | Lab server terminal |
+| 1 | Start stack: `./scripts/start_dev_stack.sh` (or start services manually) | Lab server |
 | 2 | Open the Dashboard | Browser |
 | 3 | Pick a Batch, click **🚀 Mission Control** tab | Dashboard |
 | 4 | Set trial count, click **▶ Run Simulation** | Dashboard |
@@ -23,7 +23,33 @@ If the `simulation/ros/` tree (many `build/`, `devel/`, and `src/*` packages) is
 
 ## 0. How many terminals do you need?
 
-Each service runs in its **own terminal** and stays alive the entire time you work.  
+**Easiest:** use **Option A** (`./scripts/start_dev_stack.sh`) — **one** terminal on the lab PC starts Payload + four app processes in the background.
+
+### Option A — one terminal (recommended on the lab PC)
+
+From the **repository root**, start Payload plus Sampling, Analyzer, Mission Control, and Dashboard in the background:
+
+```bash
+cd /path/to/gpl-odd-project
+./scripts/start_dev_stack.sh
+```
+
+Logs: `logs/dev_stack/*.log` — e.g. `tail -f logs/dev_stack/dashboard.log`
+
+Stop Litestar + Dashboard (Payload Docker left running):
+
+```bash
+./scripts/stop_dev_stack.sh
+```
+
+**Requirements:** `docker`, `conda` (envs `sampling` and `analyzer`), `bun`.  
+**Not started by this script:** the `sdc-bionic` simulation container — start it separately on the lab server when you need **▶ Run Simulation** (`sdc-docker-start-container` / your usual flow).
+
+After the stack is up: open **`http://localhost:3000`** (or use SSH port forwarding from your laptop), use Payload admin if you want, and use the Dashboard Mission Control tab to run simulations.
+
+### Option B — manual (one terminal per service)
+
+If you prefer not to use the script, each service runs in its **own terminal** and stays alive the entire time you work.  
 Open all required terminals **before** opening the Dashboard.
 
 | Terminal # | Conda env | Service | Port | When needed |
@@ -73,7 +99,7 @@ Open all required terminals **before** opening the Dashboard.
 
 All commands below run **on the lab PC** (inside the SSH session).
 
-Before using Mission Control, start the following services. Each one needs its **own terminal** (SSH session).
+Before using Mission Control, start the stack (**Option A:** `./scripts/start_dev_stack.sh`) or follow steps **1a–1e** below (**Option B**, one terminal per blocking service).
 
 ---
 
@@ -667,6 +693,8 @@ Set in `app/simulation/src` by reading the system environment or creating an `.e
 
 | File | Role |
 |------|------|
+| `scripts/start_dev_stack.sh` | One command: Payload + Sampling + Analyzer + Mission Control + Dashboard |
+| `scripts/stop_dev_stack.sh` | Stops the four app processes (not Payload Docker) |
 | `app/simulation/docs/mission_control_artifacts.md` | On-disk layout for `runs/`, logs, scripts |
 | `app/simulation/src/mission_control_paths.py` | Host/container paths + run `manifest.json` |
 | `app/simulation/src/models.py` | Shared dataclasses (request/response/status) |
