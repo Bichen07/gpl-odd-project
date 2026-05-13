@@ -20,3 +20,6 @@ llm_artifacts/**
 
 # LLM pipeline run captures — auto-generated, not committed
 app/llm_pipeline/artifacts/
+
+# Mission Control per-run logs and generated launch scripts
+simulation/ros/.cache/mission_control/runs/

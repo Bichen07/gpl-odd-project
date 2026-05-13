@@ -635,6 +635,7 @@ Response:
 | `PAYLOAD_API` | `http://localhost:3020/api` | Payload REST API base URL |
 | `PAYLOAD_API_KEY` | _(empty)_ | Payload user API key |
 | `SAMPLING_API` | `http://localhost:9009` | Sampling Litestar service URL |
+| `SAMPLING_API_FOR_CONTAINER` | same as `SAMPLING_API` | URL passed to `roslaunch` **inside** Docker. If the container does **not** use `--network host`, set this to a host-reachable address (e.g. `http://172.17.0.1:9009`). |
 | `DASHBOARD_URL` | `http://localhost:3000` | Added to CORS allow-list |
 | `NEXT_PUBLIC_MISSION_CONTROL_API` | `http://localhost:8282` | Set in Dashboard `.env` |
 
@@ -656,6 +657,7 @@ Set in `app/simulation/src` by reading the system environment or creating an `.e
 | Payload chip red | Payload CMS stopped | `cd app/payload && docker compose up -d` |
 | Trials not appearing in scatter plot | Dashboard cache | Refresh the batch page (F5) |
 | CSV count ≠ Payload count | dat2csv incomplete / Payload POST failed | Check logs; re-run the failed trials |
+| Every trial: "ROS master did not start" | `roslaunch` never stayed alive (fixed: use nohup script) **or** Sampling unreachable from container | Inspect `simulation/ros/.cache/mission_control/runs/<run_id>/trial_<N>_roslaunch.log` on the lab PC. If needed: `export SAMPLING_API_FOR_CONTAINER=http://<host-ip>:9009` before starting Mission Control. |
 | Container status "not_found" | sdc-bionic image not present | Run on the ITRI lab server where image is installed |
 | Need different batch_id without editing launch file | Use CLI override | `roslaunch scenario_search single_parameterized_scenario_search.launch batch_id:=2` |
 
@@ -665,6 +667,8 @@ Set in `app/simulation/src` by reading the system environment or creating an `.e
 
 | File | Role |
 |------|------|
+| `app/simulation/docs/mission_control_artifacts.md` | On-disk layout for `runs/`, logs, scripts |
+| `app/simulation/src/mission_control_paths.py` | Host/container paths + run `manifest.json` |
 | `app/simulation/src/models.py` | Shared dataclasses (request/response/status) |
 | `app/simulation/src/docker_manager.py` | Docker SDK wrapper |
 | `app/simulation/src/ros_monitor.py` | ROS health monitor via docker exec |
@@ -675,4 +679,4 @@ Set in `app/simulation/src` by reading the system environment or creating an `.e
 | `app/simulation/requirements.txt` | Python dependencies |
 | `app/dashboard/src/app/_shared/api/missionControl.ts` | TypeScript API client |
 | `app/dashboard/src/app/batch/[id]/_tabs/explore/components/dock/panels/MissionControl/index.tsx` | Dashboard UI panel |
-| `tests/test_mission_control.py` | 18 unit tests (all pass) |
+| `tests/test_mission_control.py` | Unit tests (Mission Control) |

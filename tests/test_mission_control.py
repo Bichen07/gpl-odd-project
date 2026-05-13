@@ -45,6 +45,14 @@ def test_sim_status_values():
     assert SimStatus.FAILED.value == "failed"
 
 
+def test_mission_control_cache_paths():
+    from mission_control_paths import CONTAINER_MISSION_CONTROL, MISSION_CONTROL_CACHE, run_dir_host
+
+    assert "mission_control" in str(MISSION_CONTROL_CACHE)
+    assert CONTAINER_MISSION_CONTROL.endswith("/mission_control")
+    assert "mc_test" in str(run_dir_host("mc_test"))
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  docker_manager (stub mode — no Docker daemon needed)
 # ─────────────────────────────────────────────────────────────────────────────

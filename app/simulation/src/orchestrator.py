@@ -25,8 +25,10 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
+import shlex
 import time
 import uuid
 from datetime import datetime, timezone
@@ -36,6 +38,8 @@ import requests
 
 from data_validator import DataValidator
 from docker_manager import DockerManager
+from mission_control_paths import CONTAINER_MISSION_CONTROL, write_run_manifest
+from mission_control_paths import run_dir_host as mc_run_dir_host
 from models import SimStatus, WsMessage, WsMessageType
 from ros_monitor import RosMonitor
 
@@ -107,6 +111,18 @@ class SimulationOrchestrator:
             else:
                 # Phase 2: trial loop
                 self.status = SimStatus.RUNNING
+                write_run_manifest(
+                    self.run_id,
+                    batch_id=self.batch_id,
+                    scenario_id=self.scenario_id,
+                    n_trials=self.n_trials,
+                    sampling_api_host=self.sampling_api,
+                    sampling_api_container=self._sampling_api_for_container(),
+                )
+                self._log(
+                    "Run artifact directory (host)",
+                    str(mc_run_dir_host(self.run_id)),
+                )
                 for i in range(self.n_trials):
                     if self._stop_requested:
                         self._log("Stop requested — halting after trial", i)
@@ -209,6 +225,15 @@ class SimulationOrchestrator:
             return {"trial_index": trial_index, "status": "failed", "reason": "sampling_unavailable"}
 
         self._log(f"Trial {trial_index}: params={params}")
+        try:
+            pdir = mc_run_dir_host(self.run_id)
+            pdir.mkdir(parents=True, exist_ok=True)
+            (pdir / f"trial_{trial_index}_params.json").write_text(
+                json.dumps(params, indent=2),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            self._log("WARNING: could not write trial params JSON:", exc)
 
         # 2. Trigger esmini scenario search (via ROS inside container)
         ok = await self._trigger_esmini_trial(trial_index, params)
@@ -216,9 +241,10 @@ class SimulationOrchestrator:
             return {"trial_index": trial_index, "status": "failed", "reason": "trigger_failed"}
 
         # 2b. Wait for ROS master to come up (roslaunch just started it)
-        ros_started = await self._wait_for_ros_master(timeout_s=60)
+        ros_started = await self._wait_for_ros_master(timeout_s=90)
         if not ros_started:
             self._log(f"Trial {trial_index}: ROS master did not start — roslaunch may have crashed")
+            self._log_roslaunch_tail(trial_index)
             return {"trial_index": trial_index, "status": "failed", "reason": "ros_start_timeout"}
 
         # 3. Wait for trial to finish
@@ -320,32 +346,83 @@ class SimulationOrchestrator:
         except Exception as exc:
             self._log("WARNING: Sampling register failed:", exc)
 
+    def _sampling_api_for_container(self) -> str:
+        """
+        URL passed to ``roslaunch`` inside Docker.
+
+        With ``--network host``, ``http://localhost:9009`` matches the host.
+        On bridge networks, set ``SAMPLING_API_FOR_CONTAINER`` (e.g. host gateway IP).
+        """
+        return os.getenv("SAMPLING_API_FOR_CONTAINER", self.sampling_api).strip()
+
+    def _write_trial_launch_script(self, trial_index: int) -> tuple[str, str]:
+        """
+        Write ``trial_<N>_launch.sh`` on the host (visible in container via mount).
+
+        Returns (container_script_path, container_log_path).
+        """
+        host_dir = mc_run_dir_host(self.run_id)
+        host_dir.mkdir(parents=True, exist_ok=True)
+        sampling = self._sampling_api_for_container()
+        export_sampling = f"export MC_SAMPLING_URL={shlex.quote(sampling)}\n"
+
+        script = f"""#!/usr/bin/env bash
+set -euo pipefail
+{export_sampling}source /opt/ros/melodic/setup.bash
+source /project/mmsl_simulation/devel/setup.bash
+export ROS_MASTER_URI="${{ROS_MASTER_URI:-http://localhost:11311}}"
+export ROS_HOSTNAME="${{ROS_HOSTNAME:-localhost}}"
+exec roslaunch scenario_search single_parameterized_scenario_search.launch \\
+  batch_id:={self.batch_id} \\
+  sampling_suggestion_api:=${{MC_SAMPLING_URL}} \\
+  headless:=true
+"""
+        host_script = host_dir / f"trial_{trial_index}_launch.sh"
+        host_script.write_text(script, encoding="utf-8")
+        host_script.chmod(0o755)
+
+        rel = f"runs/{self.run_id}/trial_{trial_index}_launch.sh"
+        c_script = f"{CONTAINER_MISSION_CONTROL}/{rel}"
+        c_log = f"{CONTAINER_MISSION_CONTROL}/runs/{self.run_id}/trial_{trial_index}_roslaunch.log"
+        return c_script, c_log
+
+    def _log_roslaunch_tail(self, trial_index: int, max_lines: int = 35) -> None:
+        host_log = mc_run_dir_host(self.run_id) / f"trial_{trial_index}_roslaunch.log"
+        if not host_log.is_file():
+            self._log("No roslaunch log at", str(host_log))
+            return
+        lines = host_log.read_text(encoding="utf-8", errors="replace").splitlines()
+        tail = "\n".join(lines[-max_lines:])
+        self._log("roslaunch log tail:\n" + tail)
+
     async def _trigger_esmini_trial(self, trial_index: int, params: dict) -> bool:
         """
-        Trigger a simulation trial via roslaunch with batch_id override.
+        Start ``roslaunch`` inside the container in a **detached** OS process.
 
-        roslaunch supports inline arg overrides:
-            roslaunch scenario_search single_parameterized_scenario_search.launch batch_id:=1
-
-        This avoids editing the launch file by hand for every run.
-        Must source both ROS setup files first (melodic + workspace devel).
+        ``docker exec_run(..., detach=True)`` often tears down the exec session and
+        kills the child before ``roslaunch`` can start roscore.  We instead write a
+        small script on the bind-mounted volume and run ``nohup bash script >> log &``
+        via a short synchronous ``docker exec``.
         """
-        setup = (
-            "source /opt/ros/melodic/setup.bash && "
-            "source /project/mmsl_simulation/devel/setup.bash"
+        c_script, c_log = self._write_trial_launch_script(trial_index)
+
+        inner = (
+            f"chmod +x {shlex.quote(c_script)} && "
+            f"nohup bash {shlex.quote(c_script)} >> {shlex.quote(c_log)} 2>&1 & "
+            f"sleep 2 && echo MC_DISPATCH_OK"
         )
-        cmd = (
-            f"bash -c '"
-            f"{setup} && "
-            f"roslaunch scenario_search single_parameterized_scenario_search.launch "
-            f"batch_id:={self.batch_id} "
-            f"sampling_suggestion_api:={self.sampling_api} "
-            f"headless:=true'"   # required — run.launch uses $(arg headless) without a default
-        )
-        ok = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: self.docker.exec_detached(cmd),
-        )
+        dispatch = f"bash -lc {shlex.quote(inner)}"
+
+        def _dispatch() -> tuple[int, str]:
+            return self.docker.exec(dispatch, timeout=30)
+
+        code, out = await asyncio.get_event_loop().run_in_executor(None, _dispatch)
+        ok = code == 0 and "MC_DISPATCH_OK" in out
+        if not ok:
+            self._log(
+                "ERROR: roslaunch dispatch failed",
+                f"exit={code} out={out[:500]}",
+            )
         return ok
 
     async def _wait_for_ros_master(self, timeout_s: int = 60) -> bool:

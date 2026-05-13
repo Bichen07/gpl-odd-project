@@ -450,6 +450,14 @@ async with websockets.connect(f"ws://localhost:8282/stream/{run_id}") as ws:
         print(json.loads(msg)["current_trial"])
 ```
 
+### Per-run artifacts and `roslaunch`
+
+Mission Control writes each trial’s launch script, `roslaunch` stdout/stderr, sampling params JSON, and a run `manifest.json` under `simulation/ros/.cache/mission_control/runs/<run_id>/` (bind-mounted at `/project/mmsl_simulation/.cache/mission_control/...` in `sdc-bionic`). See **`app/simulation/docs/mission_control_artifacts.md`** for the full layout.
+
+**Do not rely on `docker exec_run(..., detach=True)` alone to keep `roslaunch` alive** — the exec session can tear down and kill the child before roscore starts. The orchestrator uses a bind-mounted shell script plus `nohup bash <script> >> log &` via a short synchronous exec.
+
+If every trial logs “ROS master did not start”, inspect `trial_<N>_roslaunch.log` under that run folder and verify `SAMPLING_API_FOR_CONTAINER` when the container is not on host network.
+
 ---
 
 ## Next Steps
