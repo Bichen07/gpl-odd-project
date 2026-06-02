@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { Roboto } from "next/font/google";
-import { ThemeProvider } from "@mui/material/styles";
-import theme from "@/theme";
+import { ThemeModeProvider } from "@/components/ThemeModeProvider";
 import "./global.scss";
 import { ToastContainer } from "react-toastify";
 
@@ -25,10 +24,10 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${roboto.variable}`}>
         <AppRouterCacheProvider>
-          <ThemeProvider theme={theme}>
+          <ThemeModeProvider>
             <ToastContainer theme="colored" style={{ transition: "Bounce" }} />
             {children}
-          </ThemeProvider>
+          </ThemeModeProvider>
         </AppRouterCacheProvider>
       </body>
     </html>

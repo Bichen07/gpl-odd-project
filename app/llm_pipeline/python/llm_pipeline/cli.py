@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 
 from .context_builder import build_context
+from .cluster_interpret import cluster_interpret
 from .evaluate import evaluate_run
 from .llm_runner import run_llm
 from .prompt_builder import build_prompt
@@ -16,9 +17,18 @@ def _source_path() -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description="GPL-ODD LLM pipeline CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name in ("context", "prompt", "llm", "eval"):
+    for name in ("context", "prompt", "llm", "eval", "cluster-interpret"):
         p = sub.add_parser(name)
         p.add_argument("--run-id", required=True)
+
+    ci = sub.choices["cluster-interpret"]
+    ci.add_argument("--dataset", help="dataset1|dataset2|dataset3 (else manifest)")
+    ci.add_argument("--model", default="gpt-4o")
+    ci.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Write stub YAML without calling OpenAI",
+    )
 
     args = parser.parse_args()
     source = _source_path()
@@ -28,6 +38,14 @@ def main() -> None:
         out = build_prompt(source, args.run_id)
     elif args.cmd == "llm":
         out = run_llm(source, args.run_id)
+    elif args.cmd == "cluster-interpret":
+        out = cluster_interpret(
+            source,
+            args.run_id,
+            dataset=getattr(args, "dataset", None),
+            model=getattr(args, "model", "gpt-4o"),
+            dry_run=getattr(args, "dry_run", False),
+        )
     else:
         out = evaluate_run(source, args.run_id)
     print(out)

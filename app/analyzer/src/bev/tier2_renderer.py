@@ -1,0 +1,652 @@
+"""
+bev_tier2_renderer.py — Phase 3b: xosc_gen-style BEV using esmini odrplot map + MapPlotter.
+
+Map:   ``hct_6_tracks.csv`` from ``scripts/generate_map_tracks.py`` (esmini odrplot).
+Agents: local ``esmini_<batch>_<trial>.csv`` (authoritative sim ground truth).
+"""
+from __future__ import annotations
+
+import csv
+import json
+import math
+import os
+import tempfile
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+import yaml
+
+from bev.renderer import BevSnapshot
+from bev.map_plotter import MapPlotter
+from data.csv_roadid_loader import csv_exists, get_csv_road_data
+from data.dataset_config import (
+    csv_indices_to_trial_id,
+    get_dataset_config,
+    map_tracks_path_for_dataset,
+    trial_id_to_csv_indices,
+    xodr_path_for_dataset,
+)
+
+# Default vehicle dimensions when esmini CSV has no width/length
+_AGENT_DEFAULTS = {
+    "Ego": ("car", 2.2, 5.17),
+    "Oncoming": ("car", 2.0, 4.5),
+}
+
+_MIN_VALID_WIDTH = 1.0
+_MIN_VALID_LENGTH = 2.0
+
+
+def infer_agent_role(name: str) -> str:
+    """Human-readable role for legend (ID → role)."""
+    n = name.strip().lower()
+    if n == "ego":
+        return "Ego"
+    if "park" in n:
+        return "Parking"
+    if "oncom" in n:
+        return "Oncoming car"
+    if "static" in n or "obstacle" in n:
+        return "Static obstacle"
+    if "bicycle" in n or "bike" in n:
+        return "Bicycle"
+    if "pedestrian" in n or "person" in n:
+        return "Pedestrian"
+    return name.strip()
+
+
+def _dims_for_agent(df: pd.DataFrame, name: str) -> Tuple[str, float, float]:
+    """Return (class, width, length) from CSV dimensions or defaults."""
+    cls, w_def, ln_def = _AGENT_DEFAULTS.get(name, ("car", 2.0, 4.5))
+    sub = df[df["name"].astype(str).str.strip() == name]
+    if sub.empty:
+        return cls, w_def, ln_def
+    w = ln = None
+    if "width" in sub.columns:
+        w = sub["width"].dropna().median()
+    if "length" in sub.columns:
+        ln = sub["length"].dropna().median()
+    try:
+        w = float(w) if w is not None and not pd.isna(w) else w_def
+    except (TypeError, ValueError):
+        w = w_def
+    try:
+        ln = float(ln) if ln is not None and not pd.isna(ln) else ln_def
+    except (TypeError, ValueError):
+        ln = ln_def
+    if w < _MIN_VALID_WIDTH:
+        w = w_def
+    if ln < _MIN_VALID_LENGTH:
+        ln = ln_def
+    return cls, w, ln
+
+
+def build_agent_registry(df: pd.DataFrame) -> List[dict]:
+    """Build agent list with track_id, display_id (1-based), role, width, length."""
+    names = sorted({str(n).strip() for n in df["name"].unique() if str(n).strip()})
+    if "Ego" in names:
+        names = ["Ego"] + sorted(n for n in names if n != "Ego")
+    registry = []
+    display_id = 1
+    for track_id, name in enumerate(names):
+        cls, w, ln = _dims_for_agent(df, name)
+        registry.append(
+            {
+                "track_id": track_id,
+                "display_id": display_id,
+                "name": name,
+                "role": infer_agent_role(name),
+                "class": cls,
+                "width": w,
+                "length": ln,
+            }
+        )
+        display_id += 1
+    return registry
+
+DEFAULT_N_SNAPSHOTS = 12
+DEFAULT_MIN_FRAME_GAP_S = 0.35
+
+
+def tier2_output_dir(
+    base: str | Path,
+    dataset: str,
+    n_clusters: Optional[int] = None,
+    cluster_label: Optional[int] = None,
+) -> Path:
+    """
+    ``bev_output_tier2/{dataset}/cluster_num{N}/cluster_{label}/`` layout.
+    """
+    root = Path(base) / dataset
+    if n_clusters is not None:
+        root = root / f"cluster_num{n_clusters}"
+    if cluster_label is not None:
+        root = root / f"cluster_{cluster_label}"
+    return root
+
+
+def _slug_label(label: str) -> str:
+    return "".join(c if c.isalnum() or c in "-_" else "_" for c in label).strip("_")
+
+
+def pick_critical_timestamps(
+    df: pd.DataFrame,
+    time_steps: List[float],
+    max_frames: int = DEFAULT_N_SNAPSHOTS,
+    min_gap: float = DEFAULT_MIN_FRAME_GAP_S,
+    collision_timestep: Optional[float] = None,
+) -> List[Tuple[int, str]]:
+    """
+    Select action-like key times from esmini CSV (xosc_gen-style density).
+
+    Events: start/end, closest approach, proximity, braking, road changes,
+    optional collision, plus uniform mid-scenario fill.
+    """
+    n = len(time_steps)
+    if n == 0:
+        return []
+    t_arr = np.asarray(time_steps, dtype=float)
+
+    def idx_near(t: float) -> int:
+        return int(np.argmin(np.abs(t_arr - t)))
+
+    # (priority, index, label) — lower priority number = more important
+    raw: List[Tuple[int, int, str]] = []
+
+    def add(priority: int, idx: int, label: str) -> None:
+        idx = max(0, min(n - 1, int(idx)))
+        raw.append((priority, idx, label))
+
+    add(0, 0, "start")
+    add(100, n - 1, "end")
+
+    names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
+    ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
+    others = sorted(nm for nm in names if nm != ego_name)
+
+    if ego_name:
+        ego = df[df["name"].astype(str).str.strip() == ego_name].sort_values("time")
+        ego_t = ego["time"].to_numpy(dtype=float)
+        speed_col = "speed" if "speed" in ego.columns else None
+        ego_speed = (
+            ego[speed_col].astype(float).to_numpy()
+            if speed_col
+            else np.zeros(len(ego))
+        )
+
+        if len(ego_speed) > 1:
+            imin = int(np.argmin(ego_speed))
+            add(22, idx_near(float(ego_t[imin])), "ego_min_speed")
+
+        if len(ego_t) > 2:
+            dt = np.diff(ego_t)
+            ds = np.diff(ego_speed)
+            valid = dt > 1e-6
+            if np.any(valid):
+                decel = ds[valid] / dt[valid]
+                worst = int(np.argmin(decel))
+                t_evt = float(ego_t[np.where(valid)[0][worst] + 1])
+                add(24, idx_near(t_evt), "ego_max_deceleration")
+
+        if "roadId" in ego.columns and len(ego) > 1:
+            rid = ego["roadId"].fillna(0).astype(int).to_numpy()
+            changes = np.where(np.diff(rid) != 0)[0]
+            for j, ci in enumerate(changes[:3]):
+                add(28 + j, idx_near(float(ego_t[ci + 1])), f"ego_road_change_{j + 1}")
+
+        if others:
+            other_name = others[0]
+            oth = (
+                df[df["name"].astype(str).str.strip() == other_name]
+                .sort_values("time")
+                .rename(
+                    columns={
+                        "x": "x_o",
+                        "y": "y_o",
+                        "speed": "speed_o",
+                    }
+                )
+            )
+            merged = pd.merge_asof(
+                ego.sort_values("time"),
+                oth.sort_values("time"),
+                on="time",
+                direction="nearest",
+                tolerance=0.06,
+            )
+            if not merged.empty and "x" in merged.columns and "x_o" in merged.columns:
+                dist = np.hypot(
+                    merged["x"].astype(float) - merged["x_o"].astype(float),
+                    merged["y"].astype(float) - merged["y_o"].astype(float),
+                )
+                imin_d = int(np.argmin(dist))
+                t_ca = float(merged["time"].iloc[imin_d])
+                add(8, idx_near(t_ca), "closest_approach")
+                close = np.where(dist < 20.0)[0]
+                if len(close):
+                    add(14, idx_near(float(merged["time"].iloc[int(close[0])])), "within_20m")
+
+    if collision_timestep is not None:
+        add(5, idx_near(float(collision_timestep)), "collision")
+
+    # Best label per index (lowest priority wins)
+    by_idx: Dict[int, Tuple[int, str]] = {}
+    for prio, idx, label in raw:
+        if idx not in by_idx or prio < by_idx[idx][0]:
+            by_idx[idx] = (prio, label)
+
+    ordered = sorted(by_idx.items(), key=lambda kv: time_steps[kv[0]])
+    picked: List[Tuple[int, str]] = []
+    last_t = -1e9
+    for idx, (_prio, label) in ordered:
+        t = time_steps[idx]
+        if picked and (t - last_t) < min_gap:
+            continue
+        if len(picked) >= max_frames:
+            break
+        picked.append((idx, label))
+        last_t = t
+
+    # Uniform fill (xosc_gen-style coverage) if still under budget
+    used = {idx for idx, _ in picked}
+    if len(picked) < max_frames and n > 2:
+        need = max_frames - len(picked)
+        for k in range(1, need + 1):
+            t = t_arr[0] + (t_arr[-1] - t_arr[0]) * k / (need + 1)
+            idx = idx_near(float(t))
+            if idx in used:
+                continue
+            if picked and abs(t - time_steps[picked[-1][0]]) < min_gap:
+                continue
+            picked.append((idx, f"mid_{k}"))
+            used.add(idx)
+            if len(picked) >= max_frames:
+                break
+
+    picked.sort(key=lambda x: time_steps[x[0]])
+
+    picked = [(i, lb) for i, lb in picked if i not in (0, n - 1)]
+    picked.insert(0, (0, "start"))
+    if n > 1:
+        picked.append((n - 1, "end"))
+    picked.sort(key=lambda x: time_steps[x[0]])
+    # Trim to max while keeping endpoints
+    if len(picked) > max_frames:
+        start = picked[0]
+        end = picked[-1]
+        mid = [p for p in picked[1:-1]]
+        if max_frames <= 1:
+            picked = [start]
+        elif max_frames == 2:
+            picked = [start, end]
+        else:
+            keep_mid = max_frames - 2
+            picked = [start] + mid[:keep_mid] + [end]
+
+    return picked
+
+
+def _heading_to_degrees(h: float) -> float:
+    """esmini ``h`` is radians; MapPlotter expects degrees."""
+    if abs(h) > 2 * math.pi + 0.5:
+        return h
+    return math.degrees(h)
+
+
+def esmini_df_to_trajectory_csv(df: pd.DataFrame, out_path: Path) -> List[dict]:
+    """Write xosc_gen-format trajectory CSV; return agent registry for meta.yaml."""
+    registry = build_agent_registry(df)
+    name_to_id = {a["name"]: a["track_id"] for a in registry}
+
+    fieldnames = [
+        "trackId",
+        "time",
+        "x",
+        "y",
+        "velocity",
+        "heading",
+        "road_id",
+        "lane_id",
+        "lane_offset",
+        "s",
+    ]
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer.writeheader()
+        for _, row in df.iterrows():
+            name = str(row["name"]).strip()
+            if name not in name_to_id:
+                continue
+            writer.writerow(
+                {
+                    "trackId": name_to_id[name],
+                    "time": round(float(row["time"]), 3),
+                    "x": float(row["x"]),
+                    "y": float(row["y"]),
+                    "velocity": float(row.get("speed", 0) or 0),
+                    "heading": round(_heading_to_degrees(float(row["h"])), 3),
+                    "road_id": int(row.get("roadId", 0) or 0),
+                    "lane_id": int(row.get("laneId", 0) or 0),
+                    "lane_offset": float(row.get("offset", 0) or 0),
+                    "s": float(row.get("s", 0) or 0),
+                }
+            )
+    return registry
+
+
+def write_meta_yaml(
+    registry: List[dict],
+    df: pd.DataFrame,
+    out_path: Path,
+    dataset: str = "gplodd",
+    location: str = "hct_6",
+) -> None:
+    t0 = float(df["time"].min())
+    t1 = float(df["time"].max())
+    payload = {
+        "dataset": dataset,
+        "location": location,
+        "x_offset": 0.0,
+        "y_offset": 0.0,
+        "duration": round(t1 - t0, 3),
+        "agents": [
+            {
+                "track_id": a["track_id"],
+                "display_id": a["display_id"],
+                "role": a["role"],
+                "class": a["class"],
+                "name": a["name"],
+                "width": a["width"],
+                "length": a["length"],
+            }
+            for a in registry
+        ],
+    }
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    with out_path.open("w") as fh:
+        yaml.safe_dump(payload, fh, sort_keys=False)
+
+
+def view_bounds_from_df(df: pd.DataFrame, pad: float = 45.0) -> Tuple[float, float, float, float]:
+    """Crop window around all agents (metres)."""
+    xs = df["x"].astype(float)
+    ys = df["y"].astype(float)
+    return (
+        float(xs.min()) - pad,
+        float(xs.max()) + pad,
+        float(ys.min()) - pad,
+        float(ys.max()) + pad,
+    )
+
+
+def highlight_road_ids_from_df(df: pd.DataFrame) -> List[str]:
+    """Road IDs used during the trial (for gray lane fill in MapPlotter)."""
+    ids = set()
+    if "roadId" in df.columns:
+        for v in df["roadId"].dropna().unique():
+            try:
+                iv = int(v)
+                if iv > 0:
+                    ids.add(str(iv))
+            except (TypeError, ValueError):
+                pass
+    return sorted(ids, key=int)
+
+
+def df_to_trajectory_dict(df: pd.DataFrame) -> Tuple[Dict[str, List[dict]], List[float]]:
+    """Build BevRenderer-style trajectory dict for key-frame selection."""
+    times = sorted(df["time"].unique().tolist())
+    traj: Dict[str, List[dict]] = {}
+    for name in df["name"].unique():
+        name = str(name).strip()
+        sub = df[df["name"].astype(str).str.strip() == name].sort_values("time")
+        frames = []
+        for t in times:
+            rows = sub[sub["time"] == t]
+            if rows.empty:
+                continue
+            r = rows.iloc[0]
+            _, w, ln = _dims_for_agent(df, name)
+            frames.append(
+                {
+                    "x": float(r["x"]),
+                    "y": float(r["y"]),
+                    "yaw": float(r["h"]),
+                    "width": w,
+                    "length": ln,
+                    "speed": float(r.get("speed", 0) or 0),
+                }
+            )
+        if frames:
+            traj[name] = frames
+    return traj, times
+
+
+class Tier2BevRenderer:
+    """Render BEV snapshots via xosc_gen MapPlotter + odrplot tracks CSV."""
+
+    def __init__(
+        self,
+        map_tracks_csv: str,
+        xodr_path: str,
+        location: str = "hct_6",
+        dataset_name: str = "gplodd",
+    ):
+        self.map_tracks_csv = map_tracks_csv
+        self.xodr_path = xodr_path
+        self.location = location
+        self.dataset_name = dataset_name
+        if not Path(map_tracks_csv).is_file():
+            raise FileNotFoundError(
+                f"Map tracks CSV not found: {map_tracks_csv}\n"
+                "Run: python3 scripts/generate_map_tracks.py"
+            )
+        self._plotter = MapPlotter()
+
+    def render_trial_from_esmini_csv(
+        self,
+        batch_id: int,
+        trial_index: int,
+        output_dir: str,
+        n_snapshots: int = DEFAULT_N_SNAPSHOTS,
+        collision_timestep: Optional[float] = None,
+        file_prefix: Optional[str] = None,
+        min_frame_gap_s: float = DEFAULT_MIN_FRAME_GAP_S,
+    ) -> List[BevSnapshot]:
+        if not csv_exists(batch_id, trial_index):
+            raise FileNotFoundError(
+                f"No esmini CSV for batch {batch_id} trial {trial_index}"
+            )
+        df = get_csv_road_data(batch_id, trial_index)
+        if df is None or df.empty:
+            raise RuntimeError(f"Empty esmini CSV for batch {batch_id} trial {trial_index}")
+
+        prefix = file_prefix or f"trial_{trial_index}"
+        os.makedirs(output_dir, exist_ok=True)
+        work = Path(tempfile.mkdtemp(prefix="bev_tier2_"))
+        try:
+            traj_csv = work / "trajectory.csv"
+            meta_yaml = work / "meta.yaml"
+            registry = esmini_df_to_trajectory_csv(df, traj_csv)
+            write_meta_yaml(
+                registry,
+                df,
+                meta_yaml,
+                dataset=self.dataset_name,
+                location=self.location,
+            )
+
+            _, time_steps = df_to_trajectory_dict(df)
+            key_indices = pick_critical_timestamps(
+                df,
+                time_steps,
+                max_frames=n_snapshots,
+                min_gap=min_frame_gap_s,
+                collision_timestep=collision_timestep,
+            )
+            highlight = highlight_road_ids_from_df(df)
+            vbounds = view_bounds_from_df(df)
+            snapshots: List[BevSnapshot] = []
+
+            for rank, (idx, label) in enumerate(key_indices):
+                t = time_steps[idx]
+                slug = _slug_label(label)
+                out_path = os.path.join(
+                    output_dir,
+                    f"{prefix}_t_{t:05.2f}_{slug}.jpg",
+                )
+                self._plotter.plot_map_with_agents(
+                    self.map_tracks_csv,
+                    out_path,
+                    str(traj_csv),
+                    str(meta_yaml),
+                    float(t),
+                    highlight_road_ids_list=highlight,
+                    ego_id=0,
+                    heading_in_degrees=True,
+                    view_bounds=vbounds,
+                    draw_trajectory_trails=True,
+                    figure_title=f"t = {t:.2f}s — {label}",
+                )
+                snapshots.append(BevSnapshot(timestep=t, label=label, path=out_path))
+                print(f"[Tier2BevRenderer] Saved {out_path}")
+            return snapshots
+        finally:
+            import shutil
+
+            shutil.rmtree(work, ignore_errors=True)
+
+    def render_cluster_medoids(
+        self,
+        medoids: Dict[int, Tuple[int, int]],
+        output_dir: str,
+        n_snapshots: int = DEFAULT_N_SNAPSHOTS,
+        dataset: Optional[str] = None,
+        n_clusters: Optional[int] = None,
+    ) -> Dict[int, List[BevSnapshot]]:
+        results: Dict[int, List[BevSnapshot]] = {}
+        for label, (batch_id, trial_index) in medoids.items():
+            if dataset and n_clusters is not None:
+                # output_dir = bev_output_tier2 root
+                cluster_out = str(
+                    tier2_output_dir(output_dir, dataset, n_clusters, label)
+                )
+            else:
+                cluster_out = os.path.join(output_dir, f"cluster_{label}")
+            try:
+                if dataset:
+                    trial_label = csv_indices_to_trial_id(dataset, batch_id, trial_index)
+                else:
+                    trial_label = str(trial_index)
+                snaps = self.render_trial_from_esmini_csv(
+                    batch_id,
+                    trial_index,
+                    cluster_out,
+                    n_snapshots=n_snapshots,
+                    file_prefix=f"trial_{trial_label}",
+                )
+                results[label] = snaps
+            except FileNotFoundError as e:
+                print(f"[Tier2BevRenderer] SKIP cluster {label}: {e}")
+        return results
+
+
+def _pick_cluster_representative_trial_id(
+    trial_ids: List[str],
+    trajectories: Optional[dict],
+) -> Optional[str]:
+    """Geometric medoid on Ego mean (x,y), matching Phase 3a bev_renderer."""
+    if trajectories:
+        trial_means = []
+        for tid in trial_ids:
+            if tid not in trajectories:
+                continue
+            frames = trajectories[tid].get("trajectory", {}).get("Ego", [])
+            if not frames:
+                continue
+            mx = sum(f["x"] for f in frames) / len(frames)
+            my = sum(f["y"] for f in frames) / len(frames)
+            trial_means.append((tid, mx, my))
+        if trial_means:
+            ctr_x = sum(m[1] for m in trial_means) / len(trial_means)
+            ctr_y = sum(m[2] for m in trial_means) / len(trial_means)
+            return min(
+                trial_means,
+                key=lambda m: (m[1] - ctr_x) ** 2 + (m[2] - ctr_y) ** 2,
+            )[0]
+    return trial_ids[0] if trial_ids else None
+
+
+def load_medoids_from_clustering(
+    clustering_path: str,
+    dataset: str,
+    trajectories_path: Optional[str] = None,
+) -> Dict[int, Tuple[int, int]]:
+    """
+    Map cluster label -> (batch_id, trial_index) for the given dataset.
+
+    Clustering keys are Payload trial IDs (e.g. 8135 for dataset2).
+    CSV files use ``esmini_{batch}_{trial_index}.csv`` with
+    ``trial_index = trial_id - trial_id_base`` (see DATA_INVENTORY.md).
+    """
+    cfg = get_dataset_config(dataset)
+    batch_id = int(cfg["batch_id"])
+
+    trajectories: Optional[dict] = None
+    if trajectories_path and Path(trajectories_path).is_file():
+        with open(trajectories_path) as f:
+            trajectories = json.load(f)
+
+    with open(clustering_path) as f:
+        clustering = json.load(f)
+
+    medoids: Dict[int, Tuple[int, int]] = {}
+    label_to_trials: Dict[str, List[str]] = {}
+    for trial_id, label in clustering["data"].items():
+        label_to_trials.setdefault(label, []).append(trial_id)
+
+    for label_str, trial_ids in label_to_trials.items():
+        label = int(label_str)
+        if label == -1:
+            continue
+
+        rep_id = _pick_cluster_representative_trial_id(trial_ids, trajectories)
+        if rep_id is None:
+            continue
+
+        # Prefer geometric medoid if its CSV exists; else first cluster member with CSV.
+        candidates = [rep_id] + [
+            tid for tid in sorted(trial_ids, key=int) if tid != rep_id
+        ]
+        chosen: Optional[Tuple[int, int]] = None
+        for tid in candidates:
+            try:
+                b, tidx = trial_id_to_csv_indices(dataset, tid)
+            except (ValueError, KeyError):
+                continue
+            if b != batch_id:
+                continue
+            if csv_exists(b, tidx):
+                chosen = (b, tidx)
+                break
+
+        if chosen:
+            medoids[label] = chosen
+        else:
+            print(
+                f"[Tier2BevRenderer] SKIP cluster {label}: no local CSV for "
+                f"dataset {dataset} (batch {batch_id}, tried {len(trial_ids)} trials)"
+            )
+
+    return medoids
+
+
+def resolve_tier2_paths(dataset: str) -> Tuple[Path, Path, str]:
+    """Return (xodr_path, map_tracks_csv, location) for a dataset."""
+    cfg = get_dataset_config(dataset)
+    xodr = xodr_path_for_dataset(dataset)
+    tracks = map_tracks_path_for_dataset(dataset)
+    return xodr, tracks, str(cfg["location"])

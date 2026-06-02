@@ -30,7 +30,7 @@
                 "motion_configs": [
                     {
                         "begin_lateral_offset": [-0.8, -6.0],
-                        "begin_lateral_speed_kph": [1.0, .0],
+                        "begin_lateral_speed_kph": [1.0, 0.0],
                         "move_trigger_distance": [6.0, 20.0]
                     }
                 ]

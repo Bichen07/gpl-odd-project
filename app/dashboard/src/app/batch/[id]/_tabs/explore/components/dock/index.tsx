@@ -4,6 +4,7 @@ import "./rc-dock.css";
 import DockLayout, { PanelData, TabData } from "rc-dock";
 import { useRef, useState, createContext, useEffect } from "react";
 import { Box } from "@mui/material";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 import layout from "./layout";
 import Saves from "./panels/Saves";
 import {
@@ -17,6 +18,7 @@ import { A } from "ts-toolbelt";
 import { getTrials, Trial } from "@/app/_shared/graphql/queries/trials";
 import { useAppDispatch } from "../../redux/hooks";
 import { batchSlice, CriticalityMetric } from "../../redux/slices/batch";
+import BehaviorOverlay from "./panels/BehaviorOverlay";
 
 export const DockLayoutContext = createContext<DockLayout | null>(null);
 
@@ -70,6 +72,16 @@ export default function Dock({ batchId, saves, trials, batch }: Props) {
     >
       <Provider store={store}>
         <DockLayoutContext.Provider value={dockLayoutRefState}>
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 12,
+              zIndex: 1000,
+            }}
+          >
+            <ThemeToggleButton />
+          </Box>
           <DataLoader trials={trials} batch={batch} />
           <DockLayout
             ref={dockLayoutRef}
@@ -83,6 +95,7 @@ export default function Dock({ batchId, saves, trials, batch }: Props) {
               fontFamily: "var(--font-roboto)",
             }}
           />
+          <BehaviorOverlay />
         </DockLayoutContext.Provider>
         {/* <InteractionCount batchId={batchId} /> */}
       </Provider>

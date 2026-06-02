@@ -19,7 +19,7 @@ from unittest.mock import MagicMock, patch
 # Allow importing from app/analyzer/src
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app", "analyzer", "src"))
 
-from bev_renderer import (
+from bev.renderer import (
     BevRenderer,
     BevSnapshot,
     _sample_arc,

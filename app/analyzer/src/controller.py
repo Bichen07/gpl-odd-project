@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 import time
@@ -1243,6 +1244,7 @@ class TrajectoryAnalysisController(Controller):
         # Collect s ranges per road
         road_s_ranges = defaultdict(list)
         road_id_order = []
+        phase6_context = None
 
         for egoId in egoIds:
             trajectories, rawTrajectories, trial_mappings, batch_mappings, columns = (
@@ -1418,6 +1420,13 @@ class TrajectoryAnalysisController(Controller):
                 )
 
                 mfpca_dict[key] = mfpcaResult
+                if key == "full":
+                    phase6_context = {
+                        "mfpca_value": value,
+                        "clustering_results": results,
+                        "trial_mappings": trial_mappings,
+                        "batch_mappings": batch_mappings,
+                    }
 
             batch = list(batch_mappings.values())[0]
             parameters = batch["scenario"]["parameters"]
@@ -1875,6 +1884,47 @@ class TrajectoryAnalysisController(Controller):
                 "analyzer_response",
                 {"egos": list(returned.keys()), "response_keys": list(docsave.keys())},
             )
+
+        if (
+            os.getenv("GPL_ODD_CLUSTER_INTERPRETATION", "").lower()
+            in ("1", "true", "yes")
+            and phase6_context is not None
+        ):
+            try:
+                from llm.cluster_interpretation_pipeline import (
+                    run_post_analyzer_cluster_interpretation,
+                    zip_interpretations,
+                )
+
+                run_dir = run_post_analyzer_cluster_interpretation(
+                    analyzer_run_id=run_id,
+                    batch_mappings=phase6_context["batch_mappings"],
+                    trial_mappings=phase6_context["trial_mappings"],
+                    mfpca_value=phase6_context["mfpca_value"],
+                    clustering_results=phase6_context["clustering_results"],
+                    capture=_capture,
+                )
+                if run_dir is not None:
+                    zip_buffer = zip_interpretations(run_dir)
+                    response = requests.post(
+                        f"{PAYLOAD_API}/api/documents",
+                        files={
+                            "file": (
+                                "cluster_interpretations.zip",
+                                zip_buffer,
+                                "application/zip",
+                            )
+                        },
+                        headers=headers,
+                    )
+                    response.raise_for_status()
+                    print(
+                        "[Phase6] Uploaded cluster_interpretations.zip:",
+                        response.json().get("doc", {}).get("id"),
+                    )
+            except Exception as exc:
+                print(f"[Phase6] Cluster interpretation failed: {exc}", file=sys.stderr)
+
         return returned
 
     def get_trajectories(self, data: TrajectoryAnalysisRequest, egoId: int):

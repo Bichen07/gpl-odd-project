@@ -56,7 +56,11 @@ start_bg() {
     return 0
   fi
   echo "[$name] starting → $logfile"
-  nohup "$@" >>"$logfile" 2>&1 &
+  if command -v setsid >/dev/null 2>&1; then
+    setsid "$@" >>"$logfile" 2>&1 </dev/null &
+  else
+    nohup "$@" >>"$logfile" 2>&1 &
+  fi
   echo $! >"$pidfile"
   sleep 1
   if ! kill -0 "$(cat "$pidfile")" 2>/dev/null; then
