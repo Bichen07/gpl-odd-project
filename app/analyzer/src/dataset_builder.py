@@ -26,18 +26,18 @@ import yaml
 import requests
 
 # Add analyzer src to path for package imports (bev/, data/, llm/)
-from repo_paths import ANALYZER_SRC, REPO_ROOT
+from repo_paths import ANALYZER_SRC, REPO_ROOT, CLUSTERS_DIR
 
 if str(ANALYZER_SRC) not in sys.path:
     sys.path.insert(0, str(ANALYZER_SRC))
 
-from bev.renderer import XodrParser
-from data.csv_roadid_loader import csv_exists, get_csv_road_data
-from llm.sim_labeller import assign_agent_road_id, build_meta_yaml, build_trajectory_csv
+from renderer import XodrParser
+from csv_roadid_loader import csv_exists, get_csv_road_data
+from sim_labeller import assign_agent_road_id, build_meta_yaml, build_trajectory_csv
 
 # Project root
 PROJECT_ROOT = REPO_ROOT
-LLM_ARTIFACTS_DIR = PROJECT_ROOT / "llm_artifacts"
+LLM_ARTIFACTS_DIR = CLUSTERS_DIR  # results/clusters/
 
 # Payload API endpoint (Note: docker-compose maps container port 3000 to host port 3020)
 PAYLOAD_API = os.getenv("PAYLOAD_API_URL", "http://localhost:3020")
@@ -200,7 +200,7 @@ def compute_medoids(
         batch_id, trial_index = None, None
         if dataset:
             try:
-                from data.dataset_config import trial_id_to_csv_indices
+                from dataset_config import trial_id_to_csv_indices
                 batch_id, trial_index = trial_id_to_csv_indices(dataset, medoid_trial_id)
             except Exception:
                 pass
@@ -380,7 +380,7 @@ def process_medoid(
     bev_dir = cluster_dir / "bev"
     bev_dir.mkdir(exist_ok=True)
     try:
-        from bev.tier2_renderer import Tier2BevRenderer, resolve_tier2_paths
+        from tier2_renderer import Tier2BevRenderer, resolve_tier2_paths
 
         _xodr, map_tracks, location = resolve_tier2_paths(dataset_name)
         if map_tracks.is_file():
@@ -523,7 +523,7 @@ def main():
     run_dir.mkdir(parents=True, exist_ok=True)
     
     # Copy map file (dataset-specific: hct_6 vs hct_6_no_930)
-    from data.dataset_config import xodr_path_for_dataset
+    from dataset_config import xodr_path_for_dataset
 
     map_dir = run_dir / "map"
     map_dir.mkdir(exist_ok=True)

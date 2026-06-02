@@ -88,8 +88,8 @@ export async function POST(req: NextRequest) {
 import sys, json, os
 sys.path.insert(0, "${analyzerSrc}")
 
-from data.dataset_config import trial_id_to_csv_indices, xodr_path_for_dataset, get_dataset_config
-from data.csv_roadid_loader import csv_exists
+from dataset_config import trial_id_to_csv_indices, xodr_path_for_dataset, get_dataset_config
+from csv_roadid_loader import csv_exists
 import numpy as np
 
 with open("${clusterDataFile}") as _f:
@@ -152,10 +152,10 @@ update_status("generating_bev", 0, total, f"Found {len(medoids)} medoids, genera
 
 # generate BEV
 from pathlib import Path
-output_root = Path(project_root) / "llm_artifacts" / run_id
+output_root = Path(project_root) / "results" / "clusters" / run_id
 (output_root / "clusters").mkdir(parents=True, exist_ok=True)
 
-from bev.tier2_renderer import Tier2BevRenderer, resolve_tier2_paths
+from tier2_renderer import Tier2BevRenderer, resolve_tier2_paths
 xodr_resolved, map_tracks, location = resolve_tier2_paths(dataset)
 xodr_path = xodr_path_for_dataset(dataset)
 

@@ -361,11 +361,11 @@ def main():
     parser.add_argument("--n-clusters", type=int, default=None,
                         help="Cluster count (inferred from --cluster filename if omitted)")
     parser.add_argument("--out", default=None,
-                        help="Override output root (default: llm_artifacts/bev_<dataset>_<N>cl)")
+                        help="Override output root (default: results/bev/bev_<dataset>_<N>cl)")
     args = parser.parse_args()
 
-    from data.dataset_config import get_dataset_config, trial_id_to_csv_indices
-    from bev.tier2_renderer import (
+    from dataset_config import get_dataset_config, trial_id_to_csv_indices
+    from tier2_renderer import (
         Tier2BevRenderer,
         load_medoids_from_clustering,
         resolve_tier2_paths,
@@ -393,7 +393,7 @@ def main():
     if args.out:
         bev_root = Path(args.out)
     else:
-        bev_root = REPO_ROOT / "llm_artifacts" / f"bev_{args.dataset}_{n_cl}cl"
+        bev_root = REPO_ROOT / "results" / "bev" / f"bev_{args.dataset}_{n_cl}cl"
 
     ds_cfg = get_dataset_config(args.dataset)
     batch_id = int(ds_cfg["batch_id"]) if args.batch is None else args.batch

@@ -22,7 +22,7 @@ EXTRA_ARGS="${@:3}"
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 CLUSTER="${REPO_ROOT}/alldatasets/${DATASET}/selectedClusteringResult_${N_CLUSTERS}Clusters.json"
 TRAJ="${REPO_ROOT}/alldatasets/${DATASET}/trajectories.json"
-OUT="${REPO_ROOT}/llm_artifacts/bev_${DATASET}_${N_CLUSTERS}cl"
+OUT="${REPO_ROOT}/results/bev/bev_${DATASET}_${N_CLUSTERS}cl"
 
 if [[ ! -f "$CLUSTER" ]]; then
   echo "ERROR: clustering file not found: $CLUSTER"
@@ -38,7 +38,7 @@ echo "Clusters: $N_CLUSTERS"
 echo "Output:   ${OUT}/${DATASET}/cluster_num${N_CLUSTERS}/cluster_*/"
 echo ""
 
-conda run -n analyzer python3 "${REPO_ROOT}/app/analyzer/src/bev_renderer.py" \
+conda run -n analyzer python3 "${REPO_ROOT}/app/analyzer/src/renderer.py" \
   --cluster "$CLUSTER" \
   --traj "$TRAJ" \
   --out "$OUT" \

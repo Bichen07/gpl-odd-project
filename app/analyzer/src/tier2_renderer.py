@@ -18,10 +18,10 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from bev.renderer import BevSnapshot
-from bev.map_plotter import MapPlotter
-from data.csv_roadid_loader import csv_exists, get_csv_road_data
-from data.dataset_config import (
+from renderer import BevSnapshot
+from map_plotter import MapPlotter
+from csv_roadid_loader import csv_exists, get_csv_road_data
+from dataset_config import (
     csv_indices_to_trial_id,
     get_dataset_config,
     map_tracks_path_for_dataset,

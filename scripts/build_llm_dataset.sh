@@ -41,7 +41,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$PROJECT_ROOT"
 
 # Build Python command with all args
-CMD=("python3" "app/analyzer/src/llm_dataset_builder.py" "--dataset" "$DATASET" "--n-clusters" "$N_CLUSTERS")
+CMD=("python3" "app/analyzer/src/dataset_builder.py" "--dataset" "$DATASET" "--n-clusters" "$N_CLUSTERS")
 
 if [[ -n "$RUN_ID" ]]; then
     CMD+=("--run-id" "$RUN_ID")

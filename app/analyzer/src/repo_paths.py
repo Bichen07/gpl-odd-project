@@ -1,4 +1,4 @@
-"""Repository and analyzer paths (stable regardless of subpackage depth)."""
+"""Repository and analyzer paths (stable regardless of invocation directory)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -14,3 +14,9 @@ def repo_root() -> Path:
 
 REPO_ROOT = repo_root()
 ANALYZER_SRC = REPO_ROOT / "app" / "analyzer" / "src"
+
+# All generated outputs live under results/
+RESULTS_DIR     = REPO_ROOT / "results"
+CLUSTERS_DIR    = RESULTS_DIR / "clusters"   # per-run cluster + LLM artifacts
+BEV_DIR         = RESULTS_DIR / "bev"        # standalone BEV test outputs
+PIPELINE_DIR    = RESULTS_DIR / "pipeline"   # stage 1-5 LLM pipeline captures

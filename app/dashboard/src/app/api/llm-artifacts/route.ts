@@ -64,7 +64,7 @@ function loadStage2bInterpretations(
       "stage2b_cluster_interpretation",
       runId,
     ),
-    path.join(projectRoot, "llm_artifacts", runId, "clusters"),
+    path.join(projectRoot, "results", "clusters", runId, "clusters"),
   ];
 
   const out: ClusterInterp[] = [];
@@ -117,7 +117,7 @@ function loadStage2bInterpretations(
 }
 
 function isClusterDatasetRun(projectRoot: string, runId: string): boolean {
-  const llmRun = path.join(projectRoot, "llm_artifacts", runId);
+  const llmRun = path.join(projectRoot, "results", "clusters", runId);
   if (!fs.existsSync(llmRun)) return false;
   return (
     fs.existsSync(path.join(llmRun, "manifest.json")) ||
@@ -126,7 +126,7 @@ function isClusterDatasetRun(projectRoot: string, runId: string): boolean {
 }
 
 function runHasBevImages(projectRoot: string, runId: string): boolean {
-  const clustersDir = path.join(projectRoot, "llm_artifacts", runId, "clusters");
+  const clustersDir = path.join(projectRoot, "results", "clusters", runId, "clusters");
   if (!fs.existsSync(clustersDir)) return false;
   for (const entry of fs.readdirSync(clustersDir, { withFileTypes: true })) {
     if (!entry.isDirectory() || !entry.name.startsWith("cluster_")) continue;
@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
     "llm_pipeline",
     "artifacts",
   );
-  const llmArtifactsRoot = path.join(projectRoot, "llm_artifacts");
+  const llmArtifactsRoot = path.join(projectRoot, "results", "clusters");
 
   const runSet = new Set<string>();
 

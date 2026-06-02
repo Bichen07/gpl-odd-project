@@ -19,14 +19,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import yaml
 
-from repo_paths import ANALYZER_SRC, REPO_ROOT
+from repo_paths import ANALYZER_SRC, REPO_ROOT, CLUSTERS_DIR
 
 if str(ANALYZER_SRC) not in sys.path:
     sys.path.insert(0, str(ANALYZER_SRC))
 
-from data.dataset_config import DATASETS, trial_id_to_csv_indices, xodr_path_for_dataset
+from dataset_config import DATASETS, trial_id_to_csv_indices, xodr_path_for_dataset
 
-LLM_ARTIFACTS_DIR = REPO_ROOT / "llm_artifacts"
+LLM_ARTIFACTS_DIR = CLUSTERS_DIR  # results/clusters/
 LLM_PIPELINE_SRC = REPO_ROOT / "app" / "llm_pipeline" / "src"
 if str(LLM_PIPELINE_SRC) not in sys.path:
     sys.path.insert(0, str(LLM_PIPELINE_SRC))
@@ -451,8 +451,8 @@ def build_llm_run_from_analyzer(
     n_clusters: int,
 ) -> Path:
     """Phase 4 dataset build for analyzer-derived medoids."""
-    from bev.renderer import XodrParser
-    from llm.dataset_builder import build_run_manifest, process_medoid
+    from renderer import XodrParser
+    from dataset_builder import build_run_manifest, process_medoid
 
     run_dir = LLM_ARTIFACTS_DIR / run_id
     run_dir.mkdir(parents=True, exist_ok=True)

@@ -1891,7 +1891,7 @@ class TrajectoryAnalysisController(Controller):
             and phase6_context is not None
         ):
             try:
-                from llm.cluster_interpretation_pipeline import (
+                from cluster_interpretation_pipeline import (
                     run_post_analyzer_cluster_interpretation,
                     zip_interpretations,
                 )

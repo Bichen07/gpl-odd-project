@@ -23,7 +23,8 @@ export async function GET(req: NextRequest) {
   if (runId && cluster && file) {
     const imgPath = path.join(
       projectRoot,
-      "llm_artifacts",
+      "results",
+      "clusters",
       runId,
       "clusters",
       `cluster_${cluster}`,
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "runId required" }, { status: 400 });
   }
 
-  const clustersDir = path.join(projectRoot, "llm_artifacts", runId, "clusters");
+  const clustersDir = path.join(projectRoot, "results", "clusters", runId, "clusters");
   if (!fs.existsSync(clustersDir)) {
     return NextResponse.json({ clusters: [] });
   }
