@@ -362,7 +362,37 @@ def main():
                         help="Cluster count (inferred from --cluster filename if omitted)")
     parser.add_argument("--out", default=None,
                         help="Override output root (default: results/bev/bev_<dataset>_<N>cl)")
+    parser.add_argument(
+        "--snapshot-size",
+        type=int,
+        default=1024,
+        help="Square BEV snapshot output size in pixels (default: 1024)",
+    )
+    parser.add_argument(
+        "--snapshot-border-frac",
+        type=float,
+        default=0.10,
+        help="White border as fraction of map content per side (default: 0.10)",
+    )
+    parser.add_argument("--road-label-size", type=float, default=5.6)
+    parser.add_argument("--lane-label-size", type=float, default=5.6)
+    parser.add_argument("--road-label-plain-size", type=float, default=4.8)
+    parser.add_argument("--agent-id-size", type=float, default=4.0)
+    parser.add_argument("--info-font-size", type=float, default=8.0)
+    parser.add_argument("--scope-font-size", type=float, default=7.0)
+    parser.add_argument("--title-font-size", type=float, default=7.0)
     args = parser.parse_args()
+
+    from map_plotter import BevTypography
+    bev_typography = BevTypography(
+        road_label_size=args.road_label_size,
+        lane_label_size=args.lane_label_size,
+        road_label_plain_size=args.road_label_plain_size,
+        agent_id_fontsize=args.agent_id_size,
+        info_fontsize=args.info_font_size,
+        scope_fontsize=args.scope_font_size,
+        title_fontsize=args.title_font_size,
+    )
 
     from dataset_config import get_dataset_config, trial_id_to_csv_indices
     from tier2_renderer import (
@@ -403,6 +433,9 @@ def main():
         xodr_path=str(xodr_p),
         location=location,
         dataset_name=args.dataset,
+        snapshot_output_px=args.snapshot_size,
+        snapshot_border_frac=args.snapshot_border_frac,
+        typography=bev_typography,
     )
 
     if args.trial:

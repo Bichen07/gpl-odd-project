@@ -40,7 +40,13 @@ from typing import Dict, List, Optional
 
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_openai import ChatOpenAI
+
+from llm_factory import (
+    DEFAULT_MODEL,
+    create_interpretation_llm,
+    is_gemini_model,
+    normalize_model_name,
+)
 
 
 @dataclass
@@ -62,32 +68,41 @@ class ClusterInterpreter:
     LLM-based pipeline for characterizing driving behavior clusters.
     
     Args:
-        model: OpenAI model ID (default "gpt-4o")
+        model: LLM id — gemini-* (GOOGLE_API_KEY) or gpt-* (OPENAI_API_KEY);
+               default ``gemini-2.5-flash``
         xodr_path: Path to OpenDRIVE map file (for map description)
         temperature: LLM temperature (default 0.1 for consistency)
         prompt_dir: Directory containing prompt templates
+        api_key: Optional API key (else GOOGLE_API_KEY / OPENAI_API_KEY from env)
     """
     
     def __init__(
         self,
-        model: str = "gpt-4o",
+        model: str = DEFAULT_MODEL,
         xodr_path: Optional[str] = None,
         temperature: float = 0.1,
         prompt_dir: str = "app/llm_pipeline/prompt_templates",
+        api_key: Optional[str] = None,
     ):
-        self.model = model
+        self.model = normalize_model_name(model)
         self.temperature = temperature
         self.prompt_dir = Path(prompt_dir)
         self.xodr_path = xodr_path
         
-        # Initialize LLM
-        self.llm = ChatOpenAI(
-            model=model,
+        self.llm = create_interpretation_llm(
+            self.model,
+            api_key=api_key,
             temperature=temperature,
-            max_tokens=4096,
         )
-        
-        print(f"[ClusterInterpreter] Initialized with model={model}, temp={temperature}")
+        # Reuse one event loop per interpreter — Gemini gRPC breaks if
+        # asyncio.run() is called twice (Pass 1 then Pass 2).
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+        provider = "Gemini" if is_gemini_model(self.model) else "OpenAI"
+        print(
+            f"[ClusterInterpreter] Initialized ({provider}) "
+            f"model={self.model}, temp={temperature}"
+        )
     
     def analyze_cluster(
         self,
@@ -191,11 +206,9 @@ class ClusterInterpreter:
         else:
             print(f"✅ Reviewer pass complete: {review_tokens['Total']} tokens")
         
-        # Parse YAML
-        try:
-            parsed = yaml.safe_load(final_yaml)
-        except yaml.YAMLError as e:
-            print(f"❌ ERROR: Failed to parse final YAML: {e}")
+        # Parse YAML (tolerate prose wrapper or missing ```yaml fence)
+        parsed = self._parse_interpretation_yaml(final_yaml)
+        if parsed is None:
             return None
         
         # Total token usage
@@ -237,28 +250,44 @@ class ClusterInterpreter:
             print(f"❌ ERROR: Prompt file not found: {path}")
             return None
     
+    @staticmethod
+    def _fmt_metric(value, fmt: str, unit: str) -> str:
+        """Format a numeric metric; use ``n/a`` when value is None or missing."""
+        if value is None:
+            return f"n/a {unit}".strip()
+        try:
+            return f"{fmt.format(float(value))} {unit}".strip()
+        except (TypeError, ValueError):
+            return f"n/a {unit}".strip()
+
     def _format_cluster_stats(self, stats: Dict) -> str:
         """Format cluster statistics for prompt."""
         n = stats.get("n_trials", 0)
-        collision_rate = stats.get("collision_rate", 0.0)
-        mean_ttc = stats.get("mean_ttc", 0.0)
-        min_ttc = stats.get("min_ttc", 0.0)
-        mean_spret = stats.get("mean_spret", 0.0)
-        param_ranges = stats.get("parameter_ranges", {})
-        
+        collision_rate = stats.get("collision_rate", 0.0) or 0.0
+        param_ranges = stats.get("parameter_ranges", {}) or {}
+
         lines = [
             f"Number of trials: {n}",
-            f"Collision rate: {collision_rate:.1f}%",
-            f"Mean TTC: {mean_ttc:.2f} seconds",
-            f"Minimum TTC: {min_ttc:.2f} seconds",
-            f"Mean SPrET: {mean_spret:.2f} meters",
+            f"Collision rate: {float(collision_rate):.1f}%",
+            f"Mean TTC: {self._fmt_metric(stats.get('mean_ttc'), '{:.2f}', 'seconds')}",
+            f"Minimum TTC: {self._fmt_metric(stats.get('min_ttc'), '{:.2f}', 'seconds')}",
+            f"Mean SPrET: {self._fmt_metric(stats.get('mean_spret'), '{:.2f}', 'meters')}",
             "",
             "Parameter ranges:",
         ]
-        
-        for param, (min_val, max_val) in param_ranges.items():
-            lines.append(f"  - {param}: {min_val:.1f} to {max_val:.1f}")
-        
+
+        if not param_ranges:
+            lines.append("  (not available for this cluster)")
+        for param, bounds in param_ranges.items():
+            if not bounds or len(bounds) < 2:
+                lines.append(f"  - {param}: n/a")
+                continue
+            min_val, max_val = bounds[0], bounds[1]
+            lines.append(
+                f"  - {param}: {self._fmt_metric(min_val, '{:.1f}', '')} to "
+                f"{self._fmt_metric(max_val, '{:.1f}', '')}"
+            )
+
         return "\n".join(lines)
     
     def _get_map_description(self) -> str:
@@ -322,17 +351,8 @@ Intersection geometry:
         
         # Call LLM
         try:
-            with get_openai_callback() as cb:
-                response = asyncio.run(asyncio.wait_for(
-                    self._async_invoke_llm(self.llm, messages),
-                    timeout=180
-                ))
-                analysis_result = response.content
-                tokens = {
-                    "Prompt": cb.prompt_tokens,
-                    "Completion": cb.completion_tokens,
-                    "Total": cb.total_tokens,
-                }
+            response, tokens = self._invoke_messages(messages, timeout=180)
+            analysis_result = self._response_to_text(response.content)
         except asyncio.TimeoutError:
             print("❌ ERROR: LLM response timed out after 180 seconds")
             return None, {}
@@ -340,13 +360,10 @@ Intersection geometry:
             print(f"❌ ERROR: LLM call failed: {e}")
             return None, {}
         
-        # Extract YAML from markdown code block
-        yaml_match = re.search(r"```yaml\s*([\s\S]*?)\s*```", analysis_result)
-        if yaml_match:
-            return yaml_match.group(1).strip(), tokens
-        else:
-            print("⚠️  WARNING: No YAML block found in response, using raw output")
-            return analysis_result.strip(), tokens
+        extracted = self._extract_yaml_block(analysis_result)
+        if not re.search(r"```(?:yaml|YAML)", analysis_result, re.I):
+            print("⚠️  WARNING: No ```yaml fence in response; extracted best-effort YAML")
+        return extracted, tokens
     
     def _run_reviewer_pass(
         self,
@@ -369,17 +386,8 @@ Intersection geometry:
         ]
         
         try:
-            with get_openai_callback() as cb:
-                response = asyncio.run(asyncio.wait_for(
-                    self._async_invoke_llm(self.llm, messages),
-                    timeout=120
-                ))
-                review_result = response.content
-                tokens = {
-                    "Prompt": cb.prompt_tokens,
-                    "Completion": cb.completion_tokens,
-                    "Total": cb.total_tokens,
-                }
+            response, tokens = self._invoke_messages(messages, timeout=120)
+            review_result = self._response_to_text(response.content)
         except asyncio.TimeoutError:
             print("❌ ERROR: Reviewer LLM response timed out")
             return None, {}
@@ -387,13 +395,88 @@ Intersection geometry:
             print(f"❌ ERROR: Reviewer LLM call failed: {e}")
             return None, {}
         
-        # Extract YAML
-        yaml_match = re.search(r"```yaml\s*([\s\S]*?)\s*```", review_result)
-        if yaml_match:
-            return yaml_match.group(1).strip(), tokens
-        else:
-            return review_result.strip(), tokens
-    
+        return self._extract_yaml_block(review_result), tokens
+
+    @staticmethod
+    def _extract_yaml_block(text: str) -> str:
+        """Pull YAML from a fenced block or from bare cluster_* keys."""
+        text = (text or "").strip()
+        if not text:
+            return ""
+        fenced = re.search(
+            r"```(?:yaml|YAML)\s*([\s\S]*?)\s*```", text, re.IGNORECASE
+        )
+        if fenced:
+            return fenced.group(1).strip()
+        for marker in ("cluster_id:", "cluster_label:"):
+            if marker in text:
+                return text[text.index(marker) :].strip()
+        return text
+
+    def _parse_interpretation_yaml(self, raw: str) -> Optional[Dict]:
+        """Parse cluster interpretation YAML with a second-chance extractor."""
+        for candidate in (raw, self._extract_yaml_block(raw)):
+            if not candidate:
+                continue
+            try:
+                parsed = yaml.safe_load(candidate)
+                if isinstance(parsed, dict):
+                    return parsed
+            except yaml.YAMLError:
+                continue
+        print(f"❌ ERROR: Failed to parse final YAML (first 120 chars): {raw[:120]!r}")
+        return None
+
+    def _ensure_loop(self) -> asyncio.AbstractEventLoop:
+        if self._loop is None or self._loop.is_closed():
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+        return self._loop
+
+    def _run_async(self, coro):
+        return self._ensure_loop().run_until_complete(coro)
+
+    @staticmethod
+    def _response_to_text(content) -> str:
+        if content is None:
+            return ""
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            parts = []
+            for block in content:
+                if isinstance(block, str):
+                    parts.append(block)
+                elif isinstance(block, dict):
+                    parts.append(block.get("text") or block.get("content") or "")
+                else:
+                    parts.append(getattr(block, "text", None) or str(block))
+            return "".join(str(p) for p in parts if p)
+        return str(content)
+
+    def _invoke_messages(self, messages, timeout: int = 180):
+        """Invoke LLM with timeout; return (response, token_usage dict)."""
+        async def _run():
+            return await self.llm.ainvoke(messages)
+
+        if is_gemini_model(self.model):
+            response = self._run_async(asyncio.wait_for(_run(), timeout=timeout))
+            meta = getattr(response, "usage_metadata", None) or {}
+            tokens = {
+                "Prompt": int(meta.get("input_tokens", 0) or 0),
+                "Completion": int(meta.get("output_tokens", 0) or 0),
+                "Total": int(meta.get("total_tokens", 0) or 0),
+            }
+            return response, tokens
+
+        with get_openai_callback() as cb:
+            response = self._run_async(asyncio.wait_for(_run(), timeout=timeout))
+            return response, {
+                "Prompt": cb.prompt_tokens,
+                "Completion": cb.completion_tokens,
+                "Total": cb.total_tokens,
+            }
+
     async def _async_invoke_llm(self, llm, messages):
         """Async wrapper for LLM invocation."""
         return await llm.ainvoke(messages)

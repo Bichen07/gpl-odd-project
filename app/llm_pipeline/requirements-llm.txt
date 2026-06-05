@@ -1,0 +1,5 @@
+# Optional deps for Step 5 cluster interpretation (install in analyzer env)
+langchain-core>=0.3
+langchain-community>=0.3
+langchain-openai>=0.2
+langchain-google-genai>=2.0

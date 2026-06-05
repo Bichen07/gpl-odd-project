@@ -12,8 +12,14 @@ set -euo pipefail
 
 DATASET="${1:-}"
 N_CLUSTERS="${2:-}"
-RUN_ID="${3:-}"
-shift 3 2>/dev/null || true  # Shift past required args
+shift 2  # consume <dataset> <n_clusters>
+
+# Optional run_id only when the next token is not a flag (e.g. --trials)
+RUN_ID=""
+if [[ $# -gt 0 && "${1:-}" != --* ]]; then
+    RUN_ID="$1"
+    shift
+fi
 
 if [[ -z "$DATASET" ]] || [[ -z "$N_CLUSTERS" ]]; then
     echo "Usage: $0 <dataset> <n_clusters> [run_id] [--trials 'batch:index,...']"
@@ -53,6 +59,11 @@ CMD+=("$@")
 "${CMD[@]}"
 
 echo ""
-echo "🎉 Done! You can now use the output with xosc_gen:"
-echo "   1. For each cluster, feed trajectory.csv + meta.yaml to xosc_gen's Labeller"
-echo "   2. Use BEV images for visual context in LLM prompts"
+echo "🎉 Done! Output: results/${DATASET}/${N_CLUSTERS}/cluster<i>/"
+echo "   Each cluster dir has: trajectory.csv, meta.yaml, action.yaml,"
+echo "   description.txt, snapshots/, stats.json, medoid.json, observations.json"
+echo ""
+echo "Next steps:"
+echo "  • Map metadata (one-time):  python3 scripts/map_preprocess.py --dataset ${DATASET}"
+echo "  • Step 5 (LLM interpret):   python3 app/analyzer/src/cluster_interpretation_pipeline.py \\"
+echo "                                  --dataset ${DATASET} --n-clusters ${N_CLUSTERS} [--dry-run]"

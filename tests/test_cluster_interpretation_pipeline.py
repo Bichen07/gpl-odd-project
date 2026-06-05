@@ -13,7 +13,7 @@ ANALYZER_SRC = REPO / "app" / "analyzer" / "src"
 if str(ANALYZER_SRC) not in sys.path:
     sys.path.insert(0, str(ANALYZER_SRC))
 
-from llm.cluster_interpretation_pipeline import (  # noqa: E402
+from cluster_interpretation_pipeline import (  # noqa: E402
     action_log_from_observations,
     build_cluster_stats,
     compute_cluster_medoids,

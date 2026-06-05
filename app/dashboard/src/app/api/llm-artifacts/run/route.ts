@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   const {
     runId,
     dataset,
-    model = "gpt-4o",
+    model = "gemini-2.5-flash",
     apiKey,
     dryRun = false,
   } = body as {
@@ -62,7 +62,12 @@ export async function POST(req: NextRequest) {
     PYTHONPATH: `${pipelinePython}:${analyzerSrc}:${process.env.PYTHONPATH || ""}`,
   };
   if (apiKey) {
-    env.OPENAI_API_KEY = apiKey;
+    const m = String(model).toLowerCase();
+    if (m.startsWith("gemini")) {
+      env.GOOGLE_API_KEY = apiKey;
+    } else {
+      env.OPENAI_API_KEY = apiKey;
+    }
   }
 
   const args = [

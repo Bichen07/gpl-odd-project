@@ -23,11 +23,16 @@ def main() -> None:
 
     ci = sub.choices["cluster-interpret"]
     ci.add_argument("--dataset", help="dataset1|dataset2|dataset3 (else manifest)")
-    ci.add_argument("--model", default="gpt-4o")
+    ci.add_argument(
+        "--model",
+        nargs="+",
+        default=["gemini-2.5-flash"],
+        help="LLM model (default gemini-2.5-flash; GOOGLE_API_KEY for gemini-*)",
+    )
     ci.add_argument(
         "--dry-run",
         action="store_true",
-        help="Write stub YAML without calling OpenAI",
+        help="Write stub YAML without calling the LLM",
     )
 
     args = parser.parse_args()
@@ -39,11 +44,12 @@ def main() -> None:
     elif args.cmd == "llm":
         out = run_llm(source, args.run_id)
     elif args.cmd == "cluster-interpret":
+        model = " ".join(getattr(args, "model", ["gemini-2.5-flash"]))
         out = cluster_interpret(
             source,
             args.run_id,
             dataset=getattr(args, "dataset", None),
-            model=getattr(args, "model", "gpt-4o"),
+            model=model,
             dry_run=getattr(args, "dry_run", False),
         )
     else:

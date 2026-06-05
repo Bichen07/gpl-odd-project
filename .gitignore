@@ -12,13 +12,8 @@ __pycache__/
 bev_output/**/*.jpg
 bev_output/**/*.png
 
-# results/ — generated outputs (clusters, BEV, pipeline captures)
-results/clusters/**
-results/bev/**
-results/pipeline/**
-!results/clusters/.gitkeep
-!results/bev/.gitkeep
-!results/pipeline/.gitkeep
+# results/ — generated outputs (local only)
+results/
 !results/README.md
 
 # Legacy name kept for backwards compat during transition

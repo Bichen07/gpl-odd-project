@@ -8,6 +8,9 @@
 #   bash scripts/build_llm_dataset.sh dataset1 3 my_run_001
 #   ./scripts/run_cluster_interpretation.sh my_run_001 dataset1
 #   ./scripts/run_cluster_interpretation.sh my_run_001 dataset1 --dry-run
+#
+# Gemini (default): export GOOGLE_API_KEY=...
+# OpenAI gpt-*:     export OPENAI_API_KEY=...
 
 set -euo pipefail
 

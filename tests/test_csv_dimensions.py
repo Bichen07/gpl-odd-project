@@ -10,7 +10,7 @@ REPO = Path(__file__).resolve().parents[1]
 SRC = REPO / "app" / "analyzer" / "src"
 sys.path.insert(0, str(SRC))
 
-from data.csv_roadid_loader import get_csv_road_data
+from csv_roadid_loader import get_csv_road_data
 
 
 @pytest.mark.skipif(

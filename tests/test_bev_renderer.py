@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Unit tests for Phase 3 — BEV Renderer.
+Unit tests for renderer.py — XODR geometry sampling helpers.
 
-Tests XodrParser geometry sampling and BevRenderer key-timestep selection
-without needing a display or writing real files (matplotlib is mocked).
+Note (June 2026 refactor): the old ``BevRenderer`` class and
+``_load_medoids_from_clustering`` were removed; BEV rendering + medoid loading
+now live in ``tier2_renderer.py`` (covered by test_bev_tier2.py). This file
+keeps only the surviving geometry-sampling unit tests.
 
 How to run:
     conda activate analyzer
@@ -14,19 +16,15 @@ import math
 import os
 import sys
 import unittest
-from unittest.mock import MagicMock, patch
 
 # Allow importing from app/analyzer/src
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "app", "analyzer", "src"))
 
-from bev.renderer import (
-    BevRenderer,
-    BevSnapshot,
+from renderer import (
     _sample_arc,
     _sample_line,
     _sample_param_poly3,
     _sample_spiral,
-    _load_medoids_from_clustering,
 )
 
 
@@ -99,145 +97,6 @@ class TestSampleParamPoly3(unittest.TestCase):
         self.assertGreaterEqual(len(pts), 2)
         # All y close to 0
         self.assertTrue(all(abs(p[1]) < 1e-9 for p in pts))
-
-
-# ---------------------------------------------------------------------------
-# BevRenderer key-timestep selection (no real rendering needed)
-# ---------------------------------------------------------------------------
-
-def _make_straight_traj(n=100, speed=10.0):
-    """Simple straight trajectory along x-axis."""
-    frames = [{"x": float(i), "y": 0.0, "yaw": 0.0,
-               "width": 2.0, "length": 4.5, "speed": speed}
-              for i in range(n)]
-    time_steps = [i * 0.1 for i in range(n)]
-    return frames, time_steps
-
-
-class TestBevRendererKeyTimesteps(unittest.TestCase):
-    """Tests the _pick_key_indices logic without rendering."""
-
-    def setUp(self):
-        # Patch XodrParser so no real file is needed
-        with patch("bev_renderer.XodrParser") as mock_parser_cls:
-            mock_parser = MagicMock()
-            mock_parser.roads = []
-            mock_parser_cls.return_value = mock_parser
-            self.renderer = BevRenderer.__new__(BevRenderer)
-            self.renderer.dpi = 120
-            self.renderer._map_bounds = None
-            self.renderer._parser = mock_parser
-
-    def test_always_includes_start_and_end(self):
-        ego, ts = _make_straight_traj(50)
-        oncoming = [{"x": float(50 - i), "y": 0.0, "yaw": math.pi,
-                     "width": 2.0, "length": 4.5, "speed": 10.0}
-                    for i in range(50)]
-        traj = {"Ego": ego, "Oncoming": oncoming}
-        indices = self.renderer._pick_key_indices(traj, ts, n=5, collision_t=None)
-        idx_list = [i for i, _ in indices]
-        self.assertIn(0, idx_list, "Start frame (0) must be in key indices")
-        self.assertIn(49, idx_list, "End frame must be in key indices")
-        print(f"✓ Key indices always include start/end: {idx_list}")
-
-    def test_detects_closest_approach(self):
-        """Ego and Oncoming converge at frame 25 then diverge."""
-        ego = [{"x": float(i), "y": 0.0, "yaw": 0.0,
-                "width": 2.0, "length": 4.5, "speed": 10.0}
-               for i in range(50)]
-        oncoming = [{"x": float(50 - i), "y": 0.0, "yaw": math.pi,
-                     "width": 2.0, "length": 4.5, "speed": 10.0}
-                    for i in range(50)]
-        traj = {"Ego": ego, "Oncoming": oncoming}
-        ts = [i * 0.1 for i in range(50)]
-        indices = self.renderer._pick_key_indices(traj, ts, n=5, collision_t=None)
-        idx_list = [i for i, _ in indices]
-        # Frame 25 is where they meet (x=25 both) → distance = 0
-        self.assertIn(25, idx_list,
-                      f"Closest approach (frame 25) must be detected, got {idx_list}")
-        print(f"✓ Closest approach at frame 25 detected: {idx_list}")
-
-    def test_no_duplicate_frames(self):
-        ego, ts = _make_straight_traj(30)
-        oncoming = [{"x": float(30 - i), "y": 0.0, "yaw": math.pi,
-                     "width": 2.0, "length": 4.5, "speed": 5.0}
-                    for i in range(30)]
-        traj = {"Ego": ego, "Oncoming": oncoming}
-        indices = self.renderer._pick_key_indices(traj, ts, n=5, collision_t=None)
-        idx_list = [i for i, _ in indices]
-        self.assertEqual(len(idx_list), len(set(idx_list)),
-                         f"Duplicate frame indices found: {idx_list}")
-
-    def test_n_snapshots_not_exceeded(self):
-        ego, ts = _make_straight_traj(100)
-        oncoming = [{"x": float(100 - i), "y": 0.0, "yaw": math.pi,
-                     "width": 2.0, "length": 4.5, "speed": 10.0}
-                    for i in range(100)]
-        traj = {"Ego": ego, "Oncoming": oncoming}
-        for n in [3, 5, 7]:
-            indices = self.renderer._pick_key_indices(traj, ts, n=n, collision_t=None)
-            self.assertLessEqual(len(indices), n,
-                                 f"Expected ≤{n} snapshots but got {len(indices)}")
-        print("✓ n_snapshots limit respected")
-
-
-# ---------------------------------------------------------------------------
-# Medoid loading from clustering JSON
-# ---------------------------------------------------------------------------
-
-class TestLoadMedoids(unittest.TestCase):
-    def test_three_clusters(self):
-        """
-        Simulate a trajectories dict and a clustering dict with 3 clusters.
-        Verify that _load_medoids_from_clustering returns one medoid per cluster.
-        """
-        # Build simple trajectories: 3 groups spatially separated
-        traj = {}
-        for i in range(30):
-            cluster = i // 10
-            base_x = cluster * 100.0
-            frames = [{"x": base_x + j * 0.1, "y": 0.0, "yaw": 0.0,
-                       "width": 2.0, "length": 4.5, "speed": 5.0}
-                      for j in range(20)]
-            traj[str(i)] = {"time": [j * 0.1 for j in range(20)],
-                            "trajectory": {"Ego": frames}}
-
-        clustering = {"data": {str(i): str(i // 10) for i in range(30)},
-                      "task": {}, "scores": {}}
-
-        import tempfile, json as json_mod
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-            json_mod.dump(clustering, f)
-            tmp_path = f.name
-
-        medoids = _load_medoids_from_clustering(tmp_path, traj)
-        os.unlink(tmp_path)
-
-        self.assertEqual(set(medoids.keys()), {0, 1, 2},
-                         f"Expected clusters 0,1,2 but got {set(medoids.keys())}")
-        for label, trial_id in medoids.items():
-            self.assertIn(trial_id, traj,
-                          f"Medoid {trial_id} not in trajectory dict")
-        print(f"✓ Three cluster medoids: {medoids}")
-
-    def test_noise_cluster_excluded(self):
-        """Cluster label -1 (HDBSCAN noise) must not appear in result."""
-        traj = {str(i): {"time": [0.0], "trajectory": {"Ego": [
-            {"x": float(i), "y": 0.0, "yaw": 0.0, "width": 2.0, "length": 4.5}
-        ]}} for i in range(5)}
-        clustering = {"data": {"0": "-1", "1": "0", "2": "0", "3": "1", "4": "1"},
-                      "task": {}, "scores": {}}
-
-        import tempfile, json as json_mod
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as f:
-            json_mod.dump(clustering, f)
-            tmp_path = f.name
-
-        medoids = _load_medoids_from_clustering(tmp_path, traj)
-        os.unlink(tmp_path)
-
-        self.assertNotIn(-1, medoids, "Noise cluster -1 must be excluded")
-        print(f"✓ Noise excluded. Medoids: {medoids}")
 
 
 if __name__ == "__main__":

@@ -19,7 +19,7 @@ import pandas as pd
 import yaml
 
 from renderer import BevSnapshot
-from map_plotter import MapPlotter
+from map_plotter import BevTypography, DEFAULT_BEV_TYPOGRAPHY, MapPlotter
 from csv_roadid_loader import csv_exists, get_csv_road_data
 from dataset_config import (
     csv_indices_to_trial_id,
@@ -370,15 +370,25 @@ def write_meta_yaml(
         yaml.safe_dump(payload, fh, sort_keys=False)
 
 
-def view_bounds_from_df(df: pd.DataFrame, pad: float = 45.0) -> Tuple[float, float, float, float]:
-    """Crop window around all agents (metres)."""
+def view_bounds_from_df(
+    df: pd.DataFrame,
+    pad_frac: float = 0.20,
+) -> Tuple[float, float, float, float]:
+    """Crop window around all agents (metres).
+
+    Padding is proportional to agent span per axis (default 10% each side).
+    Example: x span 100 m, y span 80 m → padded window 120 m × 96 m.
+    """
     xs = df["x"].astype(float)
     ys = df["y"].astype(float)
+    x_min, x_max = float(xs.min()), float(xs.max())
+    y_min, y_max = float(ys.min()), float(ys.max())
+    pad = max(x_max - x_min, y_max - y_min) * pad_frac
     return (
-        float(xs.min()) - pad,
-        float(xs.max()) + pad,
-        float(ys.min()) - pad,
-        float(ys.max()) + pad,
+        x_min - pad,
+        x_max + pad,
+        y_min - pad,
+        y_max + pad,
     )
 
 
@@ -425,6 +435,9 @@ def df_to_trajectory_dict(df: pd.DataFrame) -> Tuple[Dict[str, List[dict]], List
     return traj, times
 
 
+MAP_OVERVIEW_FILENAME = "map_overview.jpg"
+
+
 class Tier2BevRenderer:
     """Render BEV snapshots via xosc_gen MapPlotter + odrplot tracks CSV."""
 
@@ -434,17 +447,47 @@ class Tier2BevRenderer:
         xodr_path: str,
         location: str = "hct_6",
         dataset_name: str = "gplodd",
+        snapshot_output_px: int = 1024,
+        snapshot_border_frac: float = 0.10,
+        typography: BevTypography = DEFAULT_BEV_TYPOGRAPHY,
     ):
         self.map_tracks_csv = map_tracks_csv
         self.xodr_path = xodr_path
         self.location = location
         self.dataset_name = dataset_name
+        self.snapshot_output_px = snapshot_output_px
+        self.snapshot_border_frac = snapshot_border_frac
+        self.typography = typography
         if not Path(map_tracks_csv).is_file():
             raise FileNotFoundError(
                 f"Map tracks CSV not found: {map_tracks_csv}\n"
                 "Run: python3 scripts/generate_map_tracks.py"
             )
         self._plotter = MapPlotter()
+
+    def render_map_overview(
+        self,
+        highlight_road_ids: List[str],
+        view_bounds: Tuple[float, float, float, float],
+        output_path: str,
+        title: Optional[str] = None,
+    ) -> str:
+        """Local map without agents — red road IDs, black lane IDs (xosc_gen style)."""
+        os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+        self._plotter.render_scene(
+            self.map_tracks_csv,
+            output_path,
+            highlight_road_ids_list=highlight_road_ids,
+            view_bounds=view_bounds,
+            draw_labels=True,
+            typography=self.typography,
+            figure_title=title or "Map overview (cluster roads)",
+            scope_bounds=view_bounds,
+            output_px=self.snapshot_output_px,
+            white_border_frac=self.snapshot_border_frac,
+        )
+        print(f"[Tier2BevRenderer] Saved map overview {output_path}")
+        return output_path
 
     def render_trial_from_esmini_csv(
         self,
@@ -455,6 +498,7 @@ class Tier2BevRenderer:
         collision_timestep: Optional[float] = None,
         file_prefix: Optional[str] = None,
         min_frame_gap_s: float = DEFAULT_MIN_FRAME_GAP_S,
+        overview_dir: Optional[str] = None,
     ) -> List[BevSnapshot]:
         if not csv_exists(batch_id, trial_index):
             raise FileNotFoundError(
@@ -491,6 +535,15 @@ class Tier2BevRenderer:
             vbounds = view_bounds_from_df(df)
             snapshots: List[BevSnapshot] = []
 
+            overview_root = overview_dir if overview_dir is not None else output_dir
+            overview_path = os.path.join(overview_root, MAP_OVERVIEW_FILENAME)
+            self.render_map_overview(
+                highlight,
+                vbounds,
+                overview_path,
+                title="Map overview — cluster medoid roads",
+            )
+
             for rank, (idx, label) in enumerate(key_indices):
                 t = time_steps[idx]
                 slug = _slug_label(label)
@@ -498,18 +551,23 @@ class Tier2BevRenderer:
                     output_dir,
                     f"{prefix}_t_{t:05.2f}_{slug}.jpg",
                 )
-                self._plotter.plot_map_with_agents(
+                self._plotter.render_scene(
                     self.map_tracks_csv,
                     out_path,
-                    str(traj_csv),
-                    str(meta_yaml),
-                    float(t),
                     highlight_road_ids_list=highlight,
+                    view_bounds=vbounds,
+                    draw_labels=False,
+                    typography=self.typography,
+                    tracks_csv_path=str(traj_csv),
+                    metadata_yaml_path=str(meta_yaml),
+                    timestamp=float(t),
                     ego_id=0,
                     heading_in_degrees=True,
-                    view_bounds=vbounds,
                     draw_trajectory_trails=True,
-                    figure_title=f"t = {t:.2f}s — {label}",
+                    time_label=f"t = {t:.2f}s — {label}",
+                    scope_bounds=vbounds,
+                    output_px=self.snapshot_output_px,
+                    white_border_frac=self.snapshot_border_frac,
                 )
                 snapshots.append(BevSnapshot(timestep=t, label=label, path=out_path))
                 print(f"[Tier2BevRenderer] Saved {out_path}")

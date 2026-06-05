@@ -8,7 +8,7 @@ This script orchestrates Phase 4: for each cluster's medoid trial, it generates:
 - observations.json (raw Payload data)
 - stats.json (cluster statistics)
 
-Output structure: llm_artifacts/<run_id>/clusters/cluster_<label>/
+Output structure: results/<dataset>/<n_clusters>/cluster<label>/
 """
 
 import argparse
@@ -25,8 +25,8 @@ import numpy as np
 import yaml
 import requests
 
-# Add analyzer src to path for package imports (bev/, data/, llm/)
-from repo_paths import ANALYZER_SRC, REPO_ROOT, CLUSTERS_DIR
+# Add analyzer src to path for flat-module imports
+from repo_paths import ANALYZER_SRC, REPO_ROOT, RESULTS_DIR
 
 if str(ANALYZER_SRC) not in sys.path:
     sys.path.insert(0, str(ANALYZER_SRC))
@@ -37,7 +37,6 @@ from sim_labeller import assign_agent_road_id, build_meta_yaml, build_trajectory
 
 # Project root
 PROJECT_ROOT = REPO_ROOT
-LLM_ARTIFACTS_DIR = CLUSTERS_DIR  # results/clusters/
 
 # Payload API endpoint (Note: docker-compose maps container port 3000 to host port 3020)
 PAYLOAD_API = os.getenv("PAYLOAD_API_URL", "http://localhost:3020")
@@ -188,43 +187,61 @@ def compute_medoids(
 
     csv_mapping = _build_csv_trial_mapping()
     
+    def _resolve_indices(tid: str):
+        b, ti = None, None
+        if dataset:
+            try:
+                from dataset_config import trial_id_to_csv_indices
+                b, ti = trial_id_to_csv_indices(dataset, tid)
+            except Exception:
+                pass
+        if b is None:
+            b, ti = _get_trial_metadata(tid, csv_mapping)
+        return b, ti
+
     for label in unique_labels:
         mask = labels_arr == label
         X_cluster = X[mask]
         ids_cluster = np.array(trial_ids)[mask]
-        
-        centroid = X_cluster.mean(axis=0, keepdims=True)
-        idx = pairwise_distances_argmin(centroid, X_cluster, metric="euclidean")[0]
-        medoid_trial_id = str(ids_cluster[idx])
-        
-        batch_id, trial_index = None, None
-        if dataset:
-            try:
-                from dataset_config import trial_id_to_csv_indices
-                batch_id, trial_index = trial_id_to_csv_indices(dataset, medoid_trial_id)
-            except Exception:
-                pass
-        if batch_id is None:
-            batch_id, trial_index = _get_trial_metadata(medoid_trial_id, csv_mapping)
-        
-        if batch_id is None or trial_index is None:
-            print(f"⚠️  WARNING: Could not fetch metadata for trial {medoid_trial_id}")
-            continue
-        
-        # Verify CSV exists
-        if not csv_exists(batch_id, trial_index):
-            print(f"⚠️  WARNING: CSV not found for batch {batch_id} trial {trial_index}")
-            continue
-        
         cluster_size = int(mask.sum())
-        medoids.append({
-            "cluster_label": str(label),
-            "trial_id": medoid_trial_id,
-            "batch_id": batch_id,
-            "trial_index": trial_index,
-            "size": cluster_size,
-        })
-    
+
+        # Rank cluster trials by distance to the centroid. The true medoid is
+        # the closest, but its esmini CSV may not be cached locally, so we fall
+        # back to the nearest trial that DOES have a CSV (keeps dataset1 fully
+        # analysable with local data).
+        centroid = X_cluster.mean(axis=0)
+        dists = np.linalg.norm(X_cluster - centroid, axis=1)
+        order = np.argsort(dists)
+
+        chosen = None
+        for rank, idx in enumerate(order):
+            cand_id = str(ids_cluster[idx])
+            b, ti = _resolve_indices(cand_id)
+            if b is None or ti is None:
+                continue
+            if not csv_exists(b, ti):
+                continue
+            chosen = {
+                "cluster_label": str(label),
+                "trial_id": cand_id,
+                "batch_id": b,
+                "trial_index": ti,
+                "size": cluster_size,
+                "medoid_rank": int(rank),  # 0 = exact medoid
+                "is_exact_medoid": rank == 0,
+            }
+            break
+
+        if chosen is None:
+            print(f"⚠️  WARNING: cluster {label}: no trial with a local CSV "
+                  f"(checked {len(order)} candidates) — skipped")
+            continue
+        if chosen["medoid_rank"] > 0:
+            print(f"  ↪ cluster {label}: exact medoid CSV missing, using "
+                  f"nearest available (rank {chosen['medoid_rank']}, "
+                  f"trial {chosen['trial_id']})")
+        medoids.append(chosen)
+
     return medoids
 
 
@@ -308,25 +325,63 @@ def _df_to_observations(df: "pd.DataFrame") -> List[Dict[str, Any]]:
     return observations
 
 
+def build_bev_typography(args: argparse.Namespace):
+    """Build ``BevTypography`` from dataset_builder CLI args."""
+    from map_plotter import BevTypography
+
+    return BevTypography(
+        road_label_size=args.road_label_size,
+        lane_label_size=args.lane_label_size,
+        road_label_plain_size=args.road_label_plain_size,
+        agent_id_fontsize=args.agent_id_size,
+        info_fontsize=args.info_font_size,
+        scope_fontsize=args.scope_font_size,
+        title_fontsize=args.title_font_size,
+    )
+
+
 def process_medoid(
     medoid: Dict[str, Any],
     run_dir: Path,
     xodr_path: Path,
     parser: XodrParser,
     dataset_name: str = "dataset1",
+    snapshot_output_px: int = 1024,
+    snapshot_border_frac: float = 0.10,
+    typography=None,
 ) -> bool:
     """Process a single medoid trial: generate all required files.
     
     Returns True on success, False on failure.
     """
+    from map_plotter import DEFAULT_BEV_TYPOGRAPHY
+
+    if typography is None:
+        typography = DEFAULT_BEV_TYPOGRAPHY
+
     label = medoid["cluster_label"]
     batch_id = medoid["batch_id"]
     trial_index = medoid["trial_index"]
     
     print(f"\n🔹 Processing cluster {label} (batch {batch_id}, trial {trial_index})")
     
-    cluster_dir = run_dir / "clusters" / f"cluster_{label}"
+    cluster_dir = run_dir / f"cluster{label}"
     cluster_dir.mkdir(parents=True, exist_ok=True)
+
+    # medoid.json — provenance for this cluster representative
+    try:
+        with (cluster_dir / "medoid.json").open("w") as f:
+            json.dump({
+                "cluster_label": label,
+                "trial_id": medoid.get("trial_id"),
+                "batch_id": batch_id,
+                "trial_index": trial_index,
+                "size": medoid.get("size"),
+                "medoid_rank": medoid.get("medoid_rank", 0),
+                "is_exact_medoid": medoid.get("is_exact_medoid", True),
+            }, f, indent=2)
+    except Exception as e:
+        print(f"  ⚠️  Failed to write medoid.json: {e}")
     
     # 1. Check if CSV exists
     if not csv_exists(batch_id, trial_index):
@@ -376,9 +431,30 @@ def process_medoid(
         del df
         return False
     
-    # 6. Generate BEV images (Phase 3b — MapPlotter + odrplot tracks)
-    bev_dir = cluster_dir / "bev"
-    bev_dir.mkdir(exist_ok=True)
+    # 6. Action labelling (Step 2) + scenario description (Step 3)
+    #    Rule-based, map-agnostic (taxonomy.py / labeller.py / description.py).
+    try:
+        from labeller import label_trajectory, save_action_yaml
+        from description import build_description, save_description_txt
+
+        map_yaml = REPO_ROOT / "alldatasets" / "map" / f"{Path(xodr_path).stem}.yaml"
+        action_data = label_trajectory(
+            trajectory_path, meta_path,
+            map_yaml if map_yaml.is_file() else None,
+        )
+        save_action_yaml(action_data, cluster_dir / "action.yaml")
+        save_description_txt(build_description(action_data),
+                            cluster_dir / "description.txt")
+        if not map_yaml.is_file():
+            print("  ⚠️  action/description built WITHOUT junction info — run "
+                  "scripts/map_preprocess.py first")
+        print(f"  ✓ Generated action.yaml + description.txt")
+    except Exception as e:
+        print(f"  ⚠️  Action/description generation failed: {e}")
+
+    # 7. Generate BEV snapshots (Step 4 — MapPlotter + odrplot tracks)
+    snapshots_dir = cluster_dir / "snapshots"
+    snapshots_dir.mkdir(exist_ok=True)
     try:
         from tier2_renderer import Tier2BevRenderer, resolve_tier2_paths
 
@@ -389,21 +465,25 @@ def process_medoid(
                 str(xodr_path if xodr_path.is_file() else _xodr),
                 location=location,
                 dataset_name=dataset_name,
+                snapshot_output_px=snapshot_output_px,
+                snapshot_border_frac=snapshot_border_frac,
+                typography=typography,
             )
             snaps = tier2.render_trial_from_esmini_csv(
                 batch_id,
                 trial_index,
-                str(bev_dir),
+                str(snapshots_dir),
                 n_snapshots=12,
                 file_prefix=f"trial_{trial_index}",
+                overview_dir=str(cluster_dir),
             )
-            print(f"  ✓ Generated {len(snaps)} Tier2 BEV images")
+            print(f"  ✓ Generated {len(snaps)} BEV snapshots + map_overview.jpg")
         else:
             print(f"  ⚠️  BEV skipped — run: python3 scripts/generate_map_tracks.py")
     except Exception as e:
         print(f"  ⚠️  BEV generation failed: {e}")
     
-    # 7. Save raw observations (for reference/debugging)
+    # 8. Save raw observations (for reference/debugging)
     obs_path = cluster_dir / "observations.json"
     try:
         with obs_path.open("w") as f:
@@ -470,8 +550,63 @@ def main():
         "--trials",
         help="Manual trial list: batch:index,batch:index,... (e.g., '1:100,1:200,1:300')",
     )
+    parser.add_argument(
+        "--snapshot-size",
+        type=int,
+        default=1024,
+        help="Square BEV snapshot output size in pixels (default: 1024)",
+    )
+    parser.add_argument(
+        "--snapshot-border-frac",
+        type=float,
+        default=0.10,
+        help="White border as fraction of map content per side (default: 0.10 → 100 m → 120 m frame)",
+    )
+    parser.add_argument(
+        "--road-label-size",
+        type=float,
+        default=10,
+        help="Font size (pt) for red road ID boxes on map_overview.jpg (default: 5.6)",
+    )
+    parser.add_argument(
+        "--lane-label-size",
+        type=float,
+        default=12,
+        help="Font size (pt) for black lane ID boxes on map_overview.jpg (default: 5.6)",
+    )
+    parser.add_argument(
+        "--road-label-plain-size",
+        type=float,
+        default=10,
+        help="Font size (pt) for unhighlighted road IDs on full-network hct_6.jpg (default: 4.8)",
+    )
+    parser.add_argument(
+        "--agent-id-size",
+        type=float,
+        default=10,
+        help="Font size (pt) for on-car agent ID circles in snapshots (default: 4.0)",
+    )
+    parser.add_argument(
+        "--info-font-size",
+        type=float,
+        default=15.0,
+        help="Font size (pt) for top-left agent list and top-right time label (default: 8.0)",
+    )
+    parser.add_argument(
+        "--scope-font-size",
+        type=float,
+        default=15.0,
+        help="Font size (pt) for bottom-left scope text in snapshots (default: 7.0)",
+    )
+    parser.add_argument(
+        "--title-font-size",
+        type=float,
+        default=15.0,
+        help="Font size (pt) for map_overview title (default: 7.0)",
+    )
     
     args = parser.parse_args()
+    bev_typography = build_bev_typography(args)
     
     # Generate run ID if not provided
     run_id = args.run_id or datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -518,11 +653,11 @@ def main():
     
     print(f"\n📊 Found {len(medoids)} medoid clusters")
     
-    # 3. Create output directory structure
-    run_dir = LLM_ARTIFACTS_DIR / run_id
+    # 3. Create output directory structure: results/<dataset>/<n_clusters>/
+    run_dir = RESULTS_DIR / args.dataset / str(args.n_clusters)
     run_dir.mkdir(parents=True, exist_ok=True)
     
-    # Copy map file (dataset-specific: hct_6 vs hct_6_no_930)
+    # Copy map assets used for this run (dataset-specific: hct_6 vs hct_6_no_930)
     from dataset_config import xodr_path_for_dataset
 
     map_dir = run_dir / "map"
@@ -537,7 +672,13 @@ def main():
         sys.exit(1)
     map_dest = map_dir / xodr_src.name
     shutil.copy(xodr_src, map_dest)
-    print(f"✓ Copied map to {map_dest}")
+    # Also copy preprocessed map metadata (yaml / jpg / description) if present.
+    preproc_dir = PROJECT_ROOT / "alldatasets" / "map"
+    for suffix in (".yaml", ".jpg", "_description.txt"):
+        asset = preproc_dir / f"{xodr_src.stem}{suffix}"
+        if asset.is_file():
+            shutil.copy(asset, map_dir / asset.name)
+    print(f"✓ Copied map assets to {map_dir}")
     
     # 4. Initialize map parser (XodrParser for road-ID assignment)
     xodr_path = map_dest
@@ -548,13 +689,11 @@ def main():
         print(f"❌ ERROR: Failed to initialize map parser: {e}")
         sys.exit(1)
     
-    # 5. Copy clustering files
+    # 5. Copy clustering result (the small selected-result file only; the full
+    #    57MB embeddings.json is left in alldatasets/ to avoid duplicating it
+    #    per run — reference it there if needed).
     clustering_dir = run_dir / "clustering"
     clustering_dir.mkdir(exist_ok=True)
-    
-    # Copy embeddings
-    embeddings_src = PROJECT_ROOT / "alldatasets" / args.dataset / "clustering.json"
-    shutil.copy(embeddings_src, clustering_dir / "embeddings.json")
     
     # Copy selected result
     result_src = (
@@ -570,7 +709,14 @@ def main():
     success_count = 0
     for medoid in medoids:
         if process_medoid(
-            medoid, run_dir, xodr_path, parser, dataset_name=args.dataset
+            medoid,
+            run_dir,
+            xodr_path,
+            parser,
+            dataset_name=args.dataset,
+            snapshot_output_px=args.snapshot_size,
+            snapshot_border_frac=args.snapshot_border_frac,
+            typography=bev_typography,
         ):
             success_count += 1
     

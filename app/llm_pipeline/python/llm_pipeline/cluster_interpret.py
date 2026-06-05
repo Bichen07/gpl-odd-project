@@ -39,13 +39,16 @@ def cluster_interpret(
     source_file: Path,
     run_id: str,
     dataset: Optional[str] = None,
-    model: str = "gpt-4o",
+    model: str = "gemini-2.5-flash",
     dry_run: bool = False,
 ) -> Path:
     repo_root = find_repo_root(source_file)
     _ensure_analyzer_imports(repo_root)
+    llm_src = repo_root / "app" / "llm_pipeline" / "src"
+    if str(llm_src) not in sys.path:
+        sys.path.insert(0, str(llm_src))
 
-    from llm.cluster_interpretation_pipeline import run_stage2b_for_run_dir
+    from cluster_interpretation_pipeline import run_stage2b_for_run_dir
 
     run_dir = resolve_run_dir(repo_root, run_id)
     manifest = _load_manifest(run_dir)

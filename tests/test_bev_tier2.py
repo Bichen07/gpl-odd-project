@@ -11,8 +11,8 @@ SRC = REPO / "app" / "analyzer" / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from bev.map_plotter import MapPlotter
-from bev.tier2_renderer import (
+from map_plotter import MapPlotter, _coerce_highlight_road_ids
+from tier2_renderer import (
     _heading_to_degrees,
     build_agent_registry,
     highlight_road_ids_from_df,
@@ -20,13 +20,30 @@ from bev.tier2_renderer import (
     load_medoids_from_clustering,
     pick_critical_timestamps,
     tier2_output_dir,
+    view_bounds_from_df,
 )
-from data.dataset_config import get_dataset_config, trial_id_to_csv_indices
+from dataset_config import get_dataset_config, trial_id_to_csv_indices
 
 
 def test_tier2_output_dir_layout():
     p = tier2_output_dir("/tmp/bev", "dataset1", 3, 2)
     assert p == Path("/tmp/bev/dataset1/cluster_num3/cluster_2")
+
+
+def test_view_bounds_proportional_padding():
+    import pandas as pd
+
+    df = pd.DataFrame(
+        {
+            "x": [0.0, 100.0, 50.0],
+            "y": [0.0, 0.0, 80.0],
+        }
+    )
+    xmin, xmax, ymin, ymax = view_bounds_from_df(df, pad_frac=0.10)
+    assert xmin == pytest.approx(-10.0)
+    assert xmax == pytest.approx(110.0)
+    assert ymin == pytest.approx(-8.0)
+    assert ymax == pytest.approx(88.0)
 
 
 def test_pick_critical_timestamps_min_count():
@@ -103,6 +120,22 @@ def test_heading_to_degrees():
     assert _heading_to_degrees(45.0) == 45.0
 
 
+def test_coerce_highlight_road_ids():
+    assert _coerce_highlight_road_ids("51,152,206") == {"51", "152", "206"}
+    assert _coerce_highlight_road_ids([51, 152]) == {"51", "152"}
+    assert _coerce_highlight_road_ids(None) == set()
+
+
+def test_map_tracks_csv_border_lanes_parsed():
+    tracks = REPO / "alldatasets/resources/xodr/hct_6_tracks.csv"
+    if not tracks.is_file():
+        pytest.skip("hct_6_tracks.csv not generated")
+    plotter = MapPlotter()
+    lanes, *_ = plotter._parse_and_process_map_data(str(tracks))
+    borders = [l for l in lanes if l["type"] == "border"]
+    assert len(borders) >= 300
+
+
 def test_map_tracks_csv_parses():
     tracks = REPO / "alldatasets/resources/xodr/hct_6_tracks.csv"
     if not tracks.is_file():
@@ -119,7 +152,7 @@ def test_map_tracks_csv_parses():
     reason="esmini CSV for trial 1000 not on disk",
 )
 def test_tier2_render_one_frame(tmp_path):
-    from bev.tier2_renderer import Tier2BevRenderer
+    from tier2_renderer import Tier2BevRenderer
 
     tracks = REPO / "alldatasets/resources/xodr/hct_6_tracks.csv"
     xodr = REPO / "alldatasets/resources/xodr/hct_6.xodr"

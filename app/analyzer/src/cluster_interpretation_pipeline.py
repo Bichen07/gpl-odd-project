@@ -31,6 +31,14 @@ LLM_PIPELINE_SRC = REPO_ROOT / "app" / "llm_pipeline" / "src"
 if str(LLM_PIPELINE_SRC) not in sys.path:
     sys.path.insert(0, str(LLM_PIPELINE_SRC))
 
+from llm_factory import (  # noqa: E402
+    DEFAULT_MODEL,
+    api_key_env_hint,
+    has_llm_credentials,
+    llm_api_key_for_model,
+    normalize_model_name,
+)
+
 
 def dataset_from_batch_id(batch_id: int) -> Optional[str]:
     for name, cfg in DATASETS.items():
@@ -198,11 +206,18 @@ def resolve_mfpca_heatmap(
 
 
 def collect_bev_snapshot_paths(cluster_dir: Path) -> List[str]:
-    bev_dir = cluster_dir / "bev"
-    if not bev_dir.is_dir():
-        return []
-    paths = sorted(bev_dir.glob("*.jpg")) + sorted(bev_dir.glob("*.png"))
-    return [str(p) for p in paths]
+    """Collect BEV image paths from a cluster dir.
+
+    Supports both the V1 layout (``snapshots/``) and the legacy layout
+    (``bev/``).
+    """
+    for sub in ("snapshots", "bev"):
+        d = cluster_dir / sub
+        if d.is_dir():
+            paths = sorted(d.glob("*.jpg")) + sorted(d.glob("*.png"))
+            if paths:
+                return [str(p) for p in paths]
+    return []
 
 
 def compute_cluster_medoids(
@@ -298,9 +313,10 @@ def interpret_cluster_dir(
     cluster_dir: Path,
     cluster_id: int,
     dataset: str,
-    model: str = "gpt-4o",
+    model: str = DEFAULT_MODEL,
     dry_run: bool = False,
     heatmap_search_dirs: Optional[List[Path]] = None,
+    api_key: Optional[str] = None,
     trial_mappings: Optional[Dict[str, Any]] = None,
     scenario_parameters: Optional[List[Dict]] = None,
     clustering_result: Any = None,
@@ -349,9 +365,12 @@ def interpret_cluster_dir(
     if heatmap is None and bev_paths:
         heatmap = Path(bev_paths[0])
 
-    api_key = os.getenv("OPENAI_API_KEY", "").strip()
-    if dry_run or not api_key:
-        reason = "dry_run" if dry_run else "OPENAI_API_KEY not set"
+    model = normalize_model_name(model)
+    if dry_run or not has_llm_credentials(model, api_key):
+        if dry_run:
+            reason = "dry_run"
+        else:
+            reason = f"{api_key_env_hint(model)} not set"
         return write_stub_interpretation(
             cluster_dir, cluster_id, medoid_trial_id, cluster_stats, reason
         )
@@ -373,6 +392,7 @@ def interpret_cluster_dir(
         model=model,
         xodr_path=str(xodr) if xodr.is_file() else None,
         prompt_dir=str(prompt_dir),
+        api_key=llm_api_key_for_model(model, api_key),
     )
 
     result = interpreter.analyze_cluster(
@@ -405,7 +425,7 @@ def interpret_cluster_dir(
 def run_stage2b_for_run_dir(
     run_dir: Path,
     dataset: str,
-    model: str = "gpt-4o",
+    model: str = DEFAULT_MODEL,
     dry_run: bool = False,
     trial_mappings: Optional[Dict[str, Any]] = None,
     scenario_parameters: Optional[List[Dict]] = None,
@@ -598,3 +618,100 @@ def run_post_analyzer_cluster_interpretation(
 
     print(f"[Phase6] Wrote {len(outputs)} interpretations → {stage2b_root}")
     return run_dir
+
+
+# ---------------------------------------------------------------------------
+# V1 layout runner + CLI:  results/<dataset>/<n_clusters>/cluster<N>/
+# ---------------------------------------------------------------------------
+
+def run_stage2b_for_dataset_k(
+    dataset: str,
+    n_clusters: int,
+    model: str = DEFAULT_MODEL,
+    dry_run: bool = False,
+    api_key: Optional[str] = None,
+) -> Dict[str, str]:
+    """Interpret every ``cluster<N>`` folder under results/<dataset>/<k>/.
+
+    Without an API key (or with ``dry_run``) a stub interpretation is written
+    so the structure and downstream wiring can be validated offline. With
+    ``GOOGLE_API_KEY`` (Gemini, default) or ``OPENAI_API_KEY`` (gpt-*) set,
+    the real ClusterInterpreter runs.
+    """
+    model = normalize_model_name(model)
+    from repo_paths import RESULTS_DIR
+
+    run_dir = RESULTS_DIR / dataset / str(n_clusters)
+    if not run_dir.is_dir():
+        raise FileNotFoundError(
+            f"No results dir: {run_dir}\n"
+            f"Run: bash scripts/build_llm_dataset.sh {dataset} {n_clusters}"
+        )
+
+    outputs: Dict[str, str] = {}
+    search_dirs = [run_dir, REPO_ROOT, Path.cwd()]
+    cluster_dirs = sorted(
+        d for d in run_dir.glob("cluster*")
+        if d.is_dir() and d.name[len("cluster"):].isdigit()
+    )
+    if not cluster_dirs:
+        raise FileNotFoundError(f"No cluster<N> folders under {run_dir}")
+
+    for cluster_dir in cluster_dirs:
+        cluster_id = int(cluster_dir.name[len("cluster"):])
+        out = interpret_cluster_dir(
+            cluster_dir, cluster_id, dataset,
+            model=model, dry_run=dry_run, heatmap_search_dirs=search_dirs,
+        )
+        if out:
+            outputs[str(cluster_id)] = str(out)
+            print(f"  ✓ cluster{cluster_id} → {out.name}")
+    return outputs
+
+
+def main() -> int:
+    import argparse
+
+    ap = argparse.ArgumentParser(
+        description="Step 5 — cluster interpretation on results/<dataset>/<k>/"
+    )
+    ap.add_argument("--dataset", required=True, help="dataset1 / dataset2 / dataset3")
+    ap.add_argument("--n-clusters", type=int, required=True)
+    ap.add_argument(
+        "--model",
+        nargs="+",
+        default=[DEFAULT_MODEL],
+        metavar="MODEL",
+        help=(
+            f"LLM model id (default: {DEFAULT_MODEL}). "
+            "Multiple words allowed, e.g. --model gemini flash 2.5"
+        ),
+    )
+    ap.add_argument("--api-key", default=None, help="API key (overrides env)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="force stub output even if an API key is set")
+    args = ap.parse_args()
+
+    model = normalize_model_name(" ".join(args.model))
+    has_key = has_llm_credentials(model, args.api_key)
+    mode = "DRY-RUN (stub)" if (args.dry_run or not has_key) else f"LIVE ({model})"
+    print(f"🔹 Cluster interpretation — {args.dataset} k={args.n_clusters} — {mode}")
+    if not has_key and not args.dry_run:
+        print(
+            f"   ℹ️  {api_key_env_hint(model)} not set → writing stub interpretations. "
+            f"Export your key and re-run for real LLM output."
+        )
+
+    outputs = run_stage2b_for_dataset_k(
+        args.dataset,
+        args.n_clusters,
+        model=model,
+        dry_run=args.dry_run,
+        api_key=args.api_key,
+    )
+    print(f"✅ Wrote {len(outputs)} cluster_interpretation.yaml files")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
