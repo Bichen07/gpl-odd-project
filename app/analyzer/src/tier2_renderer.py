@@ -57,10 +57,17 @@ def infer_agent_role(name: str) -> str:
     return name.strip()
 
 
+def _normalized_name_series(df: pd.DataFrame) -> pd.Series:
+    """Strip agent names once; reuse across hot paths on large esmini CSVs."""
+    if "_name_norm" in df.columns:
+        return df["_name_norm"]
+    return df["name"].astype(str).str.strip()
+
+
 def _dims_for_agent(df: pd.DataFrame, name: str) -> Tuple[str, float, float]:
     """Return (class, width, length) from CSV dimensions or defaults."""
     cls, w_def, ln_def = _AGENT_DEFAULTS.get(name, ("car", 2.0, 4.5))
-    sub = df[df["name"].astype(str).str.strip() == name]
+    sub = df[_normalized_name_series(df) == name]
     if sub.empty:
         return cls, w_def, ln_def
     w = ln = None
@@ -108,6 +115,23 @@ def build_agent_registry(df: pd.DataFrame) -> List[dict]:
 
 DEFAULT_N_SNAPSHOTS = 12
 DEFAULT_MIN_FRAME_GAP_S = 0.35
+DEFAULT_ACTION_MIN_GAP_S = 0.1
+_UNCAPPED_MAX_FRAMES = 99999
+
+# Semantic maneuver events (skip MAINTAIN_SPEED / DECELERATE when semantic_only=True).
+SEMANTIC_ACTION_TYPES = frozenset({
+    "LANE_CHANGE_LEFT",
+    "LANE_CHANGE_RIGHT",
+    "ENTER_JUNCTION",
+    "EXIT_JUNCTION",
+    "EMERGENCY_BRAKE",
+    "STOPPED",
+    "CUTTING_IN",
+    "ONCOMING",
+    "YIELD_TO_EGO",
+    "CROSSING",
+    "PARKED",
+})
 
 
 def tier2_output_dir(
@@ -131,12 +155,232 @@ def _slug_label(label: str) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in label).strip("_")
 
 
+def _action_entry_times(action: dict) -> List[float]:
+    """Collect start/end boundaries from gpl-odd or xosc_gen action dict."""
+    times: List[float] = []
+    attrs = action.get("attributes") or {}
+    st = action.get("start_time", attrs.get("start_time"))
+    et = action.get("end_time", attrs.get("end_time"))
+    dur = action.get("duration", attrs.get("duration"))
+    if st is not None:
+        times.append(float(st))
+    if dur is not None and st is not None:
+        times.append(float(st) + float(dur))
+    if et is not None:
+        times.append(float(et))
+    return times
+
+
+def extract_action_timestamps_gpl(
+    action_yaml_path: str | Path,
+    min_gap: float = DEFAULT_ACTION_MIN_GAP_S,
+    semantic_only: bool = False,
+) -> List[Tuple[float, str]]:
+    """
+    Extract key times from ``action.yaml`` (gpl-odd top-level schema + xosc_gen
+    ``attributes`` nesting). Returns ``(timestamp, action_label)`` pairs.
+    """
+    path = Path(action_yaml_path)
+    if not path.is_file():
+        return []
+
+    try:
+        with path.open() as fh:
+            data = yaml.safe_load(fh) or {}
+    except Exception as exc:
+        print(f"[tier2] Warning: failed to read action YAML {path}: {exc}")
+        return []
+
+    raw: List[Tuple[float, str]] = []
+    for agent in data.get("agents") or []:
+        for action in agent.get("actions") or []:
+            name = str(action.get("action", "action"))
+            if semantic_only and name not in SEMANTIC_ACTION_TYPES:
+                continue
+            for t in _action_entry_times(action):
+                raw.append((float(t), name))
+
+    if not raw:
+        return []
+
+    raw.sort(key=lambda x: x[0])
+    merged: List[Tuple[float, str]] = []
+    for t, label in raw:
+        if merged and (t - merged[-1][0]) < min_gap:
+            prev_t, prev_label = merged[-1]
+            if prev_label != label:
+                merged[-1] = (prev_t, f"{prev_label}+{label}")
+            continue
+        merged.append((t, label))
+    return merged
+
+
+def _times_to_indices(
+    frames: List[Tuple[float, str]],
+    time_steps: List[float],
+    min_gap: float,
+) -> List[Tuple[int, str]]:
+    """Map ``(time, label)`` to nearest simulation indices with min-gap dedupe."""
+    if not time_steps or not frames:
+        return []
+    t_arr = np.asarray(time_steps, dtype=float)
+    out: List[Tuple[int, str]] = []
+    last_t = -1e9
+    for t, label in sorted(frames, key=lambda x: x[0]):
+        idx = int(np.argmin(np.abs(t_arr - t)))
+        t_snap = float(time_steps[idx])
+        if out and (t_snap - last_t) < min_gap:
+            prev_idx, prev_label = out[-1]
+            if prev_label != label:
+                out[-1] = (prev_idx, f"{prev_label}+{label}")
+            continue
+        out.append((idx, label))
+        last_t = t_snap
+    return out
+
+
+def merge_key_frame_times(
+    df: pd.DataFrame,
+    time_steps: List[float],
+    action_frames: List[Tuple[float, str]],
+    *,
+    min_gap: float = DEFAULT_ACTION_MIN_GAP_S,
+    collision_timestep: Optional[float] = None,
+    heuristic_max_frames: Optional[int] = None,
+    include_proximity_heuristics: bool = True,
+) -> List[Tuple[int, str]]:
+    """
+    Combine action.yaml event times with kinematic heuristics (hybrid mode).
+    Action events are kept; heuristics fill gaps (closest approach, collision, etc.).
+    """
+    action_picks = _times_to_indices(action_frames, time_steps, min_gap)
+    action_indices = {idx for idx, _ in action_picks}
+
+    heur_cap = heuristic_max_frames if heuristic_max_frames is not None else _UNCAPPED_MAX_FRAMES
+    heur_picks = pick_critical_timestamps(
+        df,
+        time_steps,
+        max_frames=heur_cap,
+        min_gap=min_gap,
+        collision_timestep=collision_timestep,
+        fill_uniform=False,
+        include_proximity_heuristics=include_proximity_heuristics,
+    )
+
+    merged: List[Tuple[int, str]] = list(action_picks)
+    picked_times = [float(time_steps[i]) for i, _ in merged]
+    proximity_labels = {"closest_approach", "within_20m", "collision"}
+
+    for idx, label in heur_picks:
+        if not include_proximity_heuristics and label in proximity_labels:
+            continue
+        if idx in action_indices:
+            continue
+        t = float(time_steps[idx])
+        if picked_times and min(abs(t - pt) for pt in picked_times) < min_gap:
+            continue
+        merged.append((idx, label))
+        picked_times.append(t)
+
+    merged.sort(key=lambda x: time_steps[x[0]])
+    return merged
+
+
+def resolve_key_frames(
+    df: pd.DataFrame,
+    time_steps: List[float],
+    *,
+    action_yaml_path: Optional[str] = None,
+    key_frame_mode: str = "hybrid",
+    min_gap: float = DEFAULT_ACTION_MIN_GAP_S,
+    n_snapshots: Optional[int] = None,
+    collision_timestep: Optional[float] = None,
+    semantic_only: bool = False,
+    collision_trial: bool = False,
+) -> List[Tuple[int, str]]:
+    """
+    Select BEV key-frame indices.
+
+    Modes: ``action`` (YAML only), ``hybrid`` (YAML + heuristics), ``heuristic``.
+    ``n_snapshots=None`` renders all selected frames; set a cap for quick dev only.
+    """
+    mode = (key_frame_mode or "hybrid").lower()
+    yaml_path = Path(action_yaml_path) if action_yaml_path else None
+    has_yaml = yaml_path is not None and yaml_path.is_file()
+
+    if mode == "action":
+        if not has_yaml:
+            print("[tier2] action mode: no action.yaml — falling back to heuristic")
+            mode = "heuristic"
+        else:
+            frames = extract_action_timestamps_gpl(
+                yaml_path, min_gap=min_gap, semantic_only=semantic_only
+            )
+            picks = _times_to_indices(frames, time_steps, min_gap)
+    elif mode == "hybrid":
+        action_frames = (
+            extract_action_timestamps_gpl(
+                yaml_path, min_gap=min_gap, semantic_only=semantic_only
+            )
+            if has_yaml
+            else []
+        )
+        if action_frames:
+            picks = merge_key_frame_times(
+                df,
+                time_steps,
+                action_frames,
+                min_gap=min_gap,
+                collision_timestep=collision_timestep,
+                include_proximity_heuristics=collision_trial,
+            )
+        else:
+            print("[tier2] hybrid mode: no action frames — using heuristics only")
+            picks = pick_critical_timestamps(
+                df,
+                time_steps,
+                max_frames=n_snapshots or _UNCAPPED_MAX_FRAMES,
+                min_gap=min_gap,
+                collision_timestep=collision_timestep,
+                fill_uniform=n_snapshots is not None,
+                include_proximity_heuristics=collision_trial,
+            )
+    else:
+        picks = pick_critical_timestamps(
+            df,
+            time_steps,
+            max_frames=n_snapshots or _UNCAPPED_MAX_FRAMES,
+            min_gap=min_gap,
+            collision_timestep=collision_timestep,
+            fill_uniform=n_snapshots is not None,
+            include_proximity_heuristics=collision_trial,
+        )
+
+    if not picks:
+        return picks
+
+    if n_snapshots is not None and len(picks) > n_snapshots:
+        start = picks[0]
+        end = picks[-1]
+        mid = [p for p in picks[1:-1]]
+        if n_snapshots <= 1:
+            return [start]
+        if n_snapshots == 2:
+            return [start, end]
+        keep_mid = n_snapshots - 2
+        picks = [start] + mid[:keep_mid] + [end]
+
+    return picks
+
+
 def pick_critical_timestamps(
     df: pd.DataFrame,
     time_steps: List[float],
-    max_frames: int = DEFAULT_N_SNAPSHOTS,
+    max_frames: Optional[int] = DEFAULT_N_SNAPSHOTS,
     min_gap: float = DEFAULT_MIN_FRAME_GAP_S,
     collision_timestep: Optional[float] = None,
+    fill_uniform: Optional[bool] = None,
+    include_proximity_heuristics: bool = True,
 ) -> List[Tuple[int, str]]:
     """
     Select action-like key times from esmini CSV (xosc_gen-style density).
@@ -221,12 +465,17 @@ def pick_critical_timestamps(
                     merged["x"].astype(float) - merged["x_o"].astype(float),
                     merged["y"].astype(float) - merged["y_o"].astype(float),
                 )
-                imin_d = int(np.argmin(dist))
-                t_ca = float(merged["time"].iloc[imin_d])
-                add(8, idx_near(t_ca), "closest_approach")
-                close = np.where(dist < 20.0)[0]
-                if len(close):
-                    add(14, idx_near(float(merged["time"].iloc[int(close[0])])), "within_20m")
+                if include_proximity_heuristics:
+                    imin_d = int(np.argmin(dist))
+                    t_ca = float(merged["time"].iloc[imin_d])
+                    add(8, idx_near(t_ca), "closest_approach")
+                    close = np.where(dist < 20.0)[0]
+                    if len(close):
+                        add(
+                            14,
+                            idx_near(float(merged["time"].iloc[int(close[0])])),
+                            "within_20m",
+                        )
 
     if collision_timestep is not None:
         add(5, idx_near(float(collision_timestep)), "collision")
@@ -237,6 +486,11 @@ def pick_critical_timestamps(
         if idx not in by_idx or prio < by_idx[idx][0]:
             by_idx[idx] = (prio, label)
 
+    cap = max_frames if max_frames is not None else _UNCAPPED_MAX_FRAMES
+    do_fill = fill_uniform if fill_uniform is not None else (
+        max_frames is not None and max_frames < _UNCAPPED_MAX_FRAMES
+    )
+
     ordered = sorted(by_idx.items(), key=lambda kv: time_steps[kv[0]])
     picked: List[Tuple[int, str]] = []
     last_t = -1e9
@@ -244,15 +498,15 @@ def pick_critical_timestamps(
         t = time_steps[idx]
         if picked and (t - last_t) < min_gap:
             continue
-        if len(picked) >= max_frames:
+        if len(picked) >= cap:
             break
         picked.append((idx, label))
         last_t = t
 
-    # Uniform fill (xosc_gen-style coverage) if still under budget
+    # Uniform fill if still under budget (capped mode only)
     used = {idx for idx, _ in picked}
-    if len(picked) < max_frames and n > 2:
-        need = max_frames - len(picked)
+    if do_fill and len(picked) < cap and n > 2:
+        need = cap - len(picked)
         for k in range(1, need + 1):
             t = t_arr[0] + (t_arr[-1] - t_arr[0]) * k / (need + 1)
             idx = idx_near(float(t))
@@ -262,7 +516,7 @@ def pick_critical_timestamps(
                 continue
             picked.append((idx, f"mid_{k}"))
             used.add(idx)
-            if len(picked) >= max_frames:
+            if len(picked) >= cap:
                 break
 
     picked.sort(key=lambda x: time_steps[x[0]])
@@ -272,17 +526,17 @@ def pick_critical_timestamps(
     if n > 1:
         picked.append((n - 1, "end"))
     picked.sort(key=lambda x: time_steps[x[0]])
-    # Trim to max while keeping endpoints
-    if len(picked) > max_frames:
+    # Trim to cap while keeping endpoints (capped mode only)
+    if do_fill and len(picked) > cap:
         start = picked[0]
         end = picked[-1]
         mid = [p for p in picked[1:-1]]
-        if max_frames <= 1:
+        if cap <= 1:
             picked = [start]
-        elif max_frames == 2:
+        elif cap == 2:
             picked = [start, end]
         else:
-            keep_mid = max_frames - 2
+            keep_mid = cap - 2
             picked = [start] + mid[:keep_mid] + [end]
 
     return picked
@@ -406,33 +660,71 @@ def highlight_road_ids_from_df(df: pd.DataFrame) -> List[str]:
     return sorted(ids, key=int)
 
 
+def unique_time_steps(df: pd.DataFrame) -> List[float]:
+    """Sorted simulation timestamps from an esmini CSV."""
+    return sorted(df["time"].unique().tolist())
+
+
+def infer_collision_timestep(df: pd.DataFrame, threshold_m: float = 2.5) -> Optional[float]:
+    """Approximate collision time as ego–NPC minimum distance below *threshold_m*."""
+    names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
+    ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
+    others = sorted(nm for nm in names if nm != ego_name)
+    if not ego_name or not others:
+        return None
+
+    ego = df[df["name"].astype(str).str.strip() == ego_name].sort_values("time")
+    oth = (
+        df[df["name"].astype(str).str.strip() == others[0]]
+        .sort_values("time")
+        .rename(columns={"x": "x_o", "y": "y_o"})
+    )
+    merged = pd.merge_asof(
+        ego.sort_values("time"),
+        oth.sort_values("time"),
+        on="time",
+        direction="nearest",
+        tolerance=0.06,
+    )
+    if merged.empty or "x_o" not in merged.columns:
+        return None
+    dist = np.hypot(
+        merged["x"].astype(float) - merged["x_o"].astype(float),
+        merged["y"].astype(float) - merged["y_o"].astype(float),
+    )
+    imin = int(np.argmin(dist))
+    if float(dist.iloc[imin]) > threshold_m:
+        return None
+    return float(merged["time"].iloc[imin])
+
+
 def df_to_trajectory_dict(df: pd.DataFrame) -> Tuple[Dict[str, List[dict]], List[float]]:
     """Build BevRenderer-style trajectory dict for key-frame selection."""
-    times = sorted(df["time"].unique().tolist())
+    names = sorted({str(n).strip() for n in df["name"].unique() if str(n).strip()})
+    if "Ego" in names:
+        names = ["Ego"] + sorted(n for n in names if n != "Ego")
+    agent_dims = {name: _dims_for_agent(df, name)[1:] for name in names}
+
+    name_col = _normalized_name_series(df)
+    sub = df.assign(_name_norm=name_col)
     traj: Dict[str, List[dict]] = {}
-    for name in df["name"].unique():
-        name = str(name).strip()
-        sub = df[df["name"].astype(str).str.strip() == name].sort_values("time")
-        frames = []
-        for t in times:
-            rows = sub[sub["time"] == t]
-            if rows.empty:
-                continue
-            r = rows.iloc[0]
-            _, w, ln = _dims_for_agent(df, name)
-            frames.append(
-                {
-                    "x": float(r["x"]),
-                    "y": float(r["y"]),
-                    "yaw": float(r["h"]),
-                    "width": w,
-                    "length": ln,
-                    "speed": float(r.get("speed", 0) or 0),
-                }
-            )
-        if frames:
-            traj[name] = frames
-    return traj, times
+    for name in names:
+        w, ln = agent_dims[name]
+        rows = sub.loc[sub["_name_norm"] == name].sort_values("time")
+        if rows.empty:
+            continue
+        traj[name] = [
+            {
+                "x": float(r["x"]),
+                "y": float(r["y"]),
+                "yaw": float(r["h"]),
+                "width": w,
+                "length": ln,
+                "speed": float(r.get("speed", 0) or 0),
+            }
+            for _, r in rows.iterrows()
+        ]
+    return traj, unique_time_steps(df)
 
 
 MAP_OVERVIEW_FILENAME = "map_overview.jpg"
@@ -494,11 +786,15 @@ class Tier2BevRenderer:
         batch_id: int,
         trial_index: int,
         output_dir: str,
-        n_snapshots: int = DEFAULT_N_SNAPSHOTS,
+        n_snapshots: Optional[int] = None,
         collision_timestep: Optional[float] = None,
         file_prefix: Optional[str] = None,
-        min_frame_gap_s: float = DEFAULT_MIN_FRAME_GAP_S,
+        min_frame_gap_s: float = DEFAULT_ACTION_MIN_GAP_S,
         overview_dir: Optional[str] = None,
+        action_yaml_path: Optional[str] = None,
+        key_frame_mode: str = "hybrid",
+        semantic_only: bool = False,
+        collision_trial: bool = False,
     ) -> List[BevSnapshot]:
         if not csv_exists(batch_id, trial_index):
             raise FileNotFoundError(
@@ -523,13 +819,17 @@ class Tier2BevRenderer:
                 location=self.location,
             )
 
-            _, time_steps = df_to_trajectory_dict(df)
-            key_indices = pick_critical_timestamps(
+            time_steps = unique_time_steps(df)
+            key_indices = resolve_key_frames(
                 df,
                 time_steps,
-                max_frames=n_snapshots,
+                action_yaml_path=action_yaml_path,
+                key_frame_mode=key_frame_mode,
                 min_gap=min_frame_gap_s,
+                n_snapshots=n_snapshots,
                 collision_timestep=collision_timestep,
+                semantic_only=semantic_only,
+                collision_trial=collision_trial,
             )
             highlight = highlight_road_ids_from_df(df)
             vbounds = view_bounds_from_df(df)
@@ -581,9 +881,11 @@ class Tier2BevRenderer:
         self,
         medoids: Dict[int, Tuple[int, int]],
         output_dir: str,
-        n_snapshots: int = DEFAULT_N_SNAPSHOTS,
+        n_snapshots: Optional[int] = None,
         dataset: Optional[str] = None,
         n_clusters: Optional[int] = None,
+        key_frame_mode: str = "hybrid",
+        action_yaml_dir: Optional[str] = None,
     ) -> Dict[int, List[BevSnapshot]]:
         results: Dict[int, List[BevSnapshot]] = {}
         for label, (batch_id, trial_index) in medoids.items():
@@ -599,12 +901,19 @@ class Tier2BevRenderer:
                     trial_label = csv_indices_to_trial_id(dataset, batch_id, trial_index)
                 else:
                     trial_label = str(trial_index)
+                action_yaml = None
+                if action_yaml_dir:
+                    candidate = Path(action_yaml_dir) / f"cluster{label}" / "action.yaml"
+                    if candidate.is_file():
+                        action_yaml = str(candidate)
                 snaps = self.render_trial_from_esmini_csv(
                     batch_id,
                     trial_index,
                     cluster_out,
                     n_snapshots=n_snapshots,
                     file_prefix=f"trial_{trial_label}",
+                    action_yaml_path=action_yaml,
+                    key_frame_mode=key_frame_mode,
                 )
                 results[label] = snaps
             except FileNotFoundError as e:

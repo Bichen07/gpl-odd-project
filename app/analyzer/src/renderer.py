@@ -354,8 +354,18 @@ def main():
     parser.add_argument("--traj", default=None, help="Path to trajectories.json (for medoid lookup)")
     parser.add_argument("--trial", default=None, help="Optional single Payload trial id")
     parser.add_argument("--batch", type=int, default=None, help="Override esmini batch id")
-    parser.add_argument("--n-snapshots", type=int, default=12,
-                        help="Number of critical frames per trial (default 12)")
+    parser.add_argument(
+        "--n-snapshots",
+        type=int,
+        default=None,
+        help="Optional cap on BEV frames (default: uncapped, all key times)",
+    )
+    parser.add_argument(
+        "--key-frame-mode",
+        choices=("action", "hybrid", "heuristic"),
+        default="hybrid",
+        help="Key-frame source: action.yaml, hybrid, or heuristic only",
+    )
     parser.add_argument("--dataset", default="dataset1",
                         help="Dataset name (determines default xodr + tracks + output path)")
     parser.add_argument("--n-clusters", type=int, default=None,
@@ -446,6 +456,7 @@ def main():
             batch_id, tidx, str(trial_out),
             n_snapshots=args.n_snapshots,
             file_prefix=f"trial_{args.trial}",
+            key_frame_mode=args.key_frame_mode,
         )
     elif args.cluster:
         medoids = load_medoids_from_clustering(
@@ -461,6 +472,7 @@ def main():
             n_snapshots=args.n_snapshots,
             dataset=args.dataset,
             n_clusters=n_cl,
+            key_frame_mode=args.key_frame_mode,
         )
         snaps = [s for lst in results.values() for s in lst]
     else:

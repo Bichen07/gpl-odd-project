@@ -61,7 +61,7 @@ def main() -> int:
 
     repo = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(repo / "app/analyzer/src"))
-    from data.dataset_config import DATASETS, XODR_DIR
+    from dataset_config import DATASETS, XODR_DIR
 
     odrplot = find_odrplot(repo)
     if odrplot is None:

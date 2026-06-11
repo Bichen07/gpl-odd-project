@@ -47,7 +47,7 @@ curl -s "http://140.113.208.174:3020/api/trials?limit=1" | python3 -c "import js
 8. [Debugging](#8-debugging)
 9. [Payload CMS Reference](#9-payload-cms-reference)
 10. [Documentation layout](#10-documentation-layout)
-11. [Mission Control (Upcoming Feature)](#11-mission-control-upcoming-feature)
+11. [Mission Control](#11-mission-control)
 
 ---
 
@@ -199,7 +199,12 @@ So:
 
 > **Warning:** This requires the ITRI AV Docker image (`sdc-docker`) which is only available on the lab machines. You cannot do this on a regular laptop.
 
-You need **three terminals** running at the same time.
+**Documentation:**
+- **Recommended (lab PC):** [readMD/MISSION_CONTROL_USER_GUIDE.md](readMD/MISSION_CONTROL_USER_GUIDE.md) — start dev stack, Dashboard **Mission Control** tab, or API on port 8282
+- **Architecture & data flow:** [readMD/MISSION_CONTROL.md](readMD/MISSION_CONTROL.md) — call graph, Payload role, `vehicle_parameters.json`, troubleshooting
+- **Legacy tmux workflow (upstream / senior):** steps below + [simulation/README.md](simulation/README.md)
+
+You need **three terminals** running at the same time for the **legacy** path. Mission Control can reduce this to `./scripts/start_dev_stack.sh` plus the `sdc-bionic` container — see the user guide.
 
 ### Terminal 1 — Sampling Server
 
@@ -454,25 +459,25 @@ Do not delete the per-app READMEs — they complement this root overview.
 
 ---
 
-## 11. Mission Control (Upcoming Feature)
+## 11. Mission Control
 
-**Status:** Design complete, implementation planned  
-**Goal:** Unify all services (Payload, Sampling, Simulation, Analyzer, Dashboard) into a single "one-click" workflow
+**Status:** Implemented — Mission Control API (port 8282) + Dashboard **Mission Control** tab on batch Explore dock.
 
-**Current problem:**  
-Running simulations requires manually opening 4 terminals (SSH/Xterm), starting Docker containers, launching ROS nodes, and monitoring logs. Dashboard is read-only (no "Run Simulation" button).
+**What it does:**
+- Starts simulation runs from the Dashboard or `POST /simulation/run`
+- Orchestrates per-trial `roslaunch` inside `sdc-bionic` via `app/simulation/src/orchestrator.py`
+- Shows real-time progress (WebSocket), health chips, and data-quality summary
+- Validates CSV output after each trial
 
-**Proposed solution:**  
-A new **Mission Control API** that:
-- ✅ Starts/stops Docker containers programmatically
-- ✅ Orchestrates ROS + esmini simulation loops
-- ✅ Monitors progress and broadcasts real-time status updates
-- ✅ Validates data integrity (CSV + Payload checks)
-- ✅ Adds "Run Simulation" button to Dashboard with live progress bar
+**Docs:**
+| Doc | Use when |
+|-----|----------|
+| [readMD/MISSION_CONTROL_USER_GUIDE.md](readMD/MISSION_CONTROL_USER_GUIDE.md) | You want step-by-step commands (ports, SSH, container) |
+| [readMD/MISSION_CONTROL.md](readMD/MISSION_CONTROL.md) | You need architecture, file call graph, Payload/simulation data flow |
 
-**Timeline:** 4-5 weeks (3 phases)  
-**Full design:** See `MISSION_CONTROL.md`  
-**Integration roadmap:** See `cluster_interpreter_integration_plan.md` (Track B)
+**Legacy alternative:** README §4 Goal B tmux `run.sh` (same ROS stack, no Mission Control API).
+
+**Research integration:** See `cluster_interpreter_integration_plan.md` (Track B) for post-simulation clustering / BEV automation.
 
 ---
 
@@ -484,7 +489,8 @@ A new **Mission Control API** that:
 | `CHANGELOG.md` | Record of code changes |
 | `ISSUES.md` | **Unresolved** problems and directions to verify (not a changelog of fixes) |
 | `cluster_interpreter_integration_plan.md` | Research integration plan (may live next to the repo clone in your LAB folder) |
-| `MISSION_CONTROL.md` | Unified design for the one-click simulation API (architecture, phases, API spec, dev notes) |
+| `readMD/MISSION_CONTROL.md` | Simulation pipeline reference (call graph, Payload, vehicle_parameters, how to run) |
+| `readMD/MISSION_CONTROL_USER_GUIDE.md` | Operator runbook for Mission Control on the lab PC |
 | `app/analyzer/README.md` | Analyzer-specific setup details |
 | `app/sampling/README.md` | Sampling server API reference |
 | `app/dashboard/README.md` | Dashboard build steps |

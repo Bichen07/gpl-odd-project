@@ -349,6 +349,12 @@ def process_medoid(
     snapshot_output_px: int = 1024,
     snapshot_border_frac: float = 0.10,
     typography=None,
+    key_frame_mode: str = "hybrid",
+    max_snapshots: Optional[int] = None,
+    semantic_only: bool = False,
+    collision_flags: Optional[Dict[str, bool]] = None,
+    cluster_collision_stats: Optional[Dict[str, Any]] = None,
+    n_clusters: Optional[int] = None,
 ) -> bool:
     """Process a single medoid trial: generate all required files.
     
@@ -452,14 +458,32 @@ def process_medoid(
     except Exception as e:
         print(f"  ⚠️  Action/description generation failed: {e}")
 
+    from cluster_stats import trial_collision_flag
+
+    trial_id = str(medoid.get("trial_id") or "")
+    medoid_collided = trial_collision_flag(collision_flags or {}, trial_id)
+
     # 7. Generate BEV snapshots (Step 4 — MapPlotter + odrplot tracks)
     snapshots_dir = cluster_dir / "snapshots"
     snapshots_dir.mkdir(exist_ok=True)
+    for stale in list(snapshots_dir.glob("*.jpg")) + list(snapshots_dir.glob("*.png")):
+        stale.unlink(missing_ok=True)
     try:
-        from tier2_renderer import Tier2BevRenderer, resolve_tier2_paths
+        from tier2_renderer import (
+            Tier2BevRenderer,
+            infer_collision_timestep,
+            resolve_tier2_paths,
+        )
 
         _xodr, map_tracks, location = resolve_tier2_paths(dataset_name)
         if map_tracks.is_file():
+            action_yaml = cluster_dir / "action.yaml"
+            collision_ts = None
+            if medoid_collided:
+                collision_ts = infer_collision_timestep(df)
+                if collision_ts is not None:
+                    print(f"  ✓ Inferred collision timestep {collision_ts:.2f}s")
+
             tier2 = Tier2BevRenderer(
                 str(map_tracks),
                 str(xodr_path if xodr_path.is_file() else _xodr),
@@ -473,9 +497,14 @@ def process_medoid(
                 batch_id,
                 trial_index,
                 str(snapshots_dir),
-                n_snapshots=12,
+                n_snapshots=max_snapshots,
                 file_prefix=f"trial_{trial_index}",
                 overview_dir=str(cluster_dir),
+                action_yaml_path=str(action_yaml) if action_yaml.is_file() else None,
+                key_frame_mode=key_frame_mode,
+                semantic_only=semantic_only,
+                collision_timestep=collision_ts,
+                collision_trial=medoid_collided,
             )
             print(f"  ✓ Generated {len(snaps)} BEV snapshots + map_overview.jpg")
         else:
@@ -498,16 +527,22 @@ def process_medoid(
         duration = observations[-1]["time"] - observations[0]["time"] if observations else 0
         agent_names = [ag.name for ag in registry if ag.name != "Ego"]
         
+        cc = cluster_collision_stats or {}
         stats = {
             "cluster_label": label,
             "cluster_size": medoid["size"],
+            "n_trials": cc.get("n_trials", medoid["size"]),
+            "collision_count": cc.get("collision_count"),
+            "collision_rate": cc.get("collision_rate"),
             "medoid_trial_id": medoid.get("trial_id"),
+            "medoid_collided": medoid_collided if collision_flags else None,
             "batch_id": batch_id,
             "trial_index": trial_index,
             "frame_count": len(observations),
             "duration_seconds": duration,
             "agent_count": len(agent_names),
             "agents": agent_names,
+            "n_clusters": n_clusters,
         }
         with stats_path.open("w") as f:
             json.dump(stats, f, indent=2)
@@ -604,7 +639,25 @@ def main():
         default=15.0,
         help="Font size (pt) for map_overview title (default: 7.0)",
     )
-    
+    parser.add_argument(
+        "--key-frame-mode",
+        choices=("action", "hybrid", "heuristic"),
+        default="hybrid",
+        help="BEV key frames: action.yaml events, hybrid (+ heuristics), or heuristic only",
+    )
+    parser.add_argument(
+        "--max-snapshots",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Optional cap on BEV frames rendered (default: uncapped, all key times)",
+    )
+    parser.add_argument(
+        "--semantic-only",
+        action="store_true",
+        help="Only use semantic maneuver events from action.yaml (skip speed segments)",
+    )
+
     args = parser.parse_args()
     bev_typography = build_bev_typography(args)
     
@@ -614,6 +667,8 @@ def main():
     print(f"🚀 Building LLM dataset for {args.dataset} (k={args.n_clusters})")
     print(f"   Run ID: {run_id}")
     
+    result_data: Optional[Dict[str, Any]] = None
+
     # Check if manual trials specified
     if args.trials:
         print(f"\n📝 Using manually specified trials: {args.trials}")
@@ -704,6 +759,35 @@ def main():
     )
     shutil.copy(result_src, clustering_dir / "selectedClusteringResult.json")
     print(f"✓ Copied clustering data")
+
+    collision_flags: Optional[Dict[str, bool]] = None
+    collision_path = PROJECT_ROOT / "alldatasets" / args.dataset / "collision.json"
+    if collision_path.is_file():
+        try:
+            collision_flags = json.loads(collision_path.read_text(encoding="utf-8"))
+            print(f"✓ Loaded collision flags from {collision_path.name}")
+        except Exception as e:
+            print(f"⚠️  Could not load collision.json: {e}")
+
+    from cluster_stats import build_collision_cluster_stats
+
+    if result_data is None:
+        clustering_data = load_clustering_data(args.dataset, args.n_clusters)
+        if clustering_data:
+            _, result_data = clustering_data
+
+    per_cluster_collision: Dict[str, Dict[str, Any]] = {}
+    if collision_flags and result_data:
+        for medoid in medoids:
+            lb = medoid["cluster_label"]
+            per_cluster_collision[lb] = build_collision_cluster_stats(
+                int(lb), result_data, collision_flags
+            )
+            cs = per_cluster_collision[lb]
+            print(
+                f"  ℹ cluster {lb}: collision_rate={cs['collision_rate']}% "
+                f"({cs['collision_count']}/{cs['n_trials']} trials)"
+            )
     
     # 6. Process each medoid
     success_count = 0
@@ -717,6 +801,12 @@ def main():
             snapshot_output_px=args.snapshot_size,
             snapshot_border_frac=args.snapshot_border_frac,
             typography=bev_typography,
+            key_frame_mode=args.key_frame_mode,
+            max_snapshots=args.max_snapshots,
+            semantic_only=args.semantic_only,
+            collision_flags=collision_flags,
+            cluster_collision_stats=per_cluster_collision.get(medoid["cluster_label"]),
+            n_clusters=args.n_clusters,
         ):
             success_count += 1
     

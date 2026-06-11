@@ -47,8 +47,10 @@ def unique_list(sequence):
     return [x for x in sequence if not (x in seen or seen.add(x))]
 
 
-def _safe_dump_json(path: Path, payload):
-    path.parent.mkdir(parents=True, exist_ok=True)
+def _safe_dump_json(path, payload):
+    parent = path.parent if hasattr(path, "parent") else os.path.dirname(str(path))
+    if parent and not os.path.isdir(str(parent)):
+        os.makedirs(str(parent))
     with open(str(path), "w") as f:
         json.dump(payload, f, indent=2, default=str)
 

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import zipfile
 from collections import defaultdict
@@ -24,6 +25,12 @@ from repo_paths import ANALYZER_SRC, REPO_ROOT, CLUSTERS_DIR
 if str(ANALYZER_SRC) not in sys.path:
     sys.path.insert(0, str(ANALYZER_SRC))
 
+from cluster_stats import (
+    build_collision_cluster_stats,
+    cluster_label_value,
+    trials_in_cluster_data,
+    trial_collision_flag,
+)
 from dataset_config import DATASETS, trial_id_to_csv_indices, xodr_path_for_dataset
 
 LLM_ARTIFACTS_DIR = CLUSTERS_DIR  # results/clusters/
@@ -65,17 +72,27 @@ def pick_clustering_result(
     return valid[0]
 
 
+def _clustering_assignments(clustering_result: Any) -> Dict[str, Any]:
+    if clustering_result is None:
+        return {}
+    if isinstance(clustering_result, dict):
+        return clustering_result.get("data", clustering_result)
+    data = getattr(clustering_result, "data", None)
+    return data if isinstance(data, dict) else {}
+
+
 def cluster_labels_for_trials(
     clustering_result: Any,
     trial_ids: List[str],
 ) -> np.ndarray:
+    assignments = _clustering_assignments(clustering_result)
     labels = []
     for tid in trial_ids:
-        item = clustering_result.data.get(tid)
+        item = assignments.get(tid)
         if item is None:
             labels.append(-1)
         else:
-            labels.append(int(item.label))
+            labels.append(cluster_label_value(item))
     return np.asarray(labels, dtype=int)
 
 
@@ -83,11 +100,32 @@ def trials_in_cluster(
     clustering_result: Any,
     cluster_label: int,
 ) -> List[str]:
-    out = []
-    for tid, item in clustering_result.data.items():
-        if int(item.label) == int(cluster_label):
-            out.append(str(tid))
-    return out
+    return trials_in_cluster_data(
+        _clustering_assignments(clustering_result),
+        cluster_label,
+    )
+
+
+def load_collision_flags(dataset: str) -> Dict[str, Any]:
+    path = REPO_ROOT / "alldatasets" / dataset / "collision.json"
+    if not path.is_file():
+        return {}
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_clustering_result_json(dataset: str, n_clusters: int) -> Optional[Dict[str, Any]]:
+    candidates = [
+        REPO_ROOT / "alldatasets" / dataset / f"selectedClusteringResult_{n_clusters}Clusters.json",
+    ]
+    from repo_paths import RESULTS_DIR
+
+    candidates.append(
+        RESULTS_DIR / dataset / str(n_clusters) / "clustering" / "selectedClusteringResult.json"
+    )
+    for path in candidates:
+        if path.is_file():
+            return json.loads(path.read_text(encoding="utf-8"))
+    return None
 
 
 def build_cluster_stats(
@@ -205,19 +243,77 @@ def resolve_mfpca_heatmap(
     return None
 
 
-def collect_bev_snapshot_paths(cluster_dir: Path) -> List[str]:
+_SNAPSHOT_TS_RE = re.compile(r"_t_(\d+(?:\.\d+)?)(?:_|\.jpg|\.png)", re.I)
+
+
+def extract_snapshot_timestamp(path_or_name: str) -> float:
+    """Parse time from snapshot filename, e.g. trial_2951_t_13.13_ENTER_JUNCTION.jpg."""
+    name = Path(path_or_name).name
+    m = _SNAPSHOT_TS_RE.search(name)
+    if m:
+        return float(m.group(1))
+    m2 = re.search(r"t[_=](\d+(?:\.\d+)?)", name, re.I)
+    return float(m2.group(1)) if m2 else 0.0
+
+
+def select_evenly_spaced_snapshots(
+    paths: List[str],
+    max_count: int,
+) -> List[str]:
+    """
+    Pick up to *max_count* snapshots spread across the timeline (xosc_gen style).
+    Each target time uses the closest unused real snapshot.
+    """
+    if not paths or max_count <= 0:
+        return []
+    sorted_paths = sorted(paths, key=extract_snapshot_timestamp)
+    if len(sorted_paths) <= max_count:
+        return sorted_paths
+
+    times = [extract_snapshot_timestamp(p) for p in sorted_paths]
+    t_min, t_max = times[0], times[-1]
+    if max_count == 1:
+        return [sorted_paths[0]]
+
+    targets = [
+        t_min + i * (t_max - t_min) / (max_count - 1)
+        for i in range(max_count)
+    ]
+    chosen_indices: List[int] = []
+    available = set(range(len(sorted_paths)))
+    for tgt in targets:
+        best_i = min(available, key=lambda i: abs(times[i] - tgt))
+        chosen_indices.append(best_i)
+        available.discard(best_i)
+
+    chosen_indices.sort()
+    return [sorted_paths[i] for i in chosen_indices]
+
+
+def collect_bev_snapshot_paths(
+    cluster_dir: Path,
+    max_llm_snapshots: Optional[int] = None,
+) -> List[str]:
     """Collect BEV image paths from a cluster dir.
 
     Supports both the V1 layout (``snapshots/``) and the legacy layout
-    (``bev/``).
+    (``bev/``). When *max_llm_snapshots* is set, evenly subsample for LLM.
     """
+    paths: List[str] = []
     for sub in ("snapshots", "bev"):
         d = cluster_dir / sub
         if d.is_dir():
-            paths = sorted(d.glob("*.jpg")) + sorted(d.glob("*.png"))
-            if paths:
-                return [str(p) for p in paths]
-    return []
+            found = sorted(d.glob("*.jpg")) + sorted(d.glob("*.png"))
+            if found:
+                paths = [str(p) for p in found]
+                break
+    if not paths:
+        return []
+
+    paths.sort(key=extract_snapshot_timestamp)
+    if max_llm_snapshots is not None and len(paths) > max_llm_snapshots:
+        return select_evenly_spaced_snapshots(paths, max_llm_snapshots)
+    return paths
 
 
 def compute_cluster_medoids(
@@ -320,6 +416,7 @@ def interpret_cluster_dir(
     trial_mappings: Optional[Dict[str, Any]] = None,
     scenario_parameters: Optional[List[Dict]] = None,
     clustering_result: Any = None,
+    max_llm_snapshots: Optional[int] = None,
 ) -> Optional[Path]:
     """Run interpretation for one ``llm_artifacts/.../clusters/cluster_*`` directory."""
     stats_path = cluster_dir / "stats.json"
@@ -336,22 +433,43 @@ def interpret_cluster_dir(
     label = int(stats.get("cluster_label", cluster_id))
     trial_ids = (
         trials_in_cluster(clustering_result, label)
-        if clustering_result is not None and trial_mappings
+        if clustering_result is not None
         else []
     )
     if trial_mappings and trial_ids:
         cluster_stats = build_cluster_stats(
             label, trial_ids, trial_mappings, scenario_parameters
         )
-    else:
+    elif stats.get("collision_rate") is not None:
         cluster_stats = {
-            "n_trials": stats.get("cluster_size", 1),
-            "collision_rate": 0.0,
+            "cluster_label": label,
+            "n_trials": stats.get("n_trials", stats.get("cluster_size", 1)),
+            "collision_rate": float(stats.get("collision_rate", 0.0)),
             "mean_ttc": None,
             "min_ttc": None,
             "mean_spret": None,
             "parameter_ranges": {},
         }
+    else:
+        collision_flags = load_collision_flags(dataset)
+        clustering_json = clustering_result
+        if clustering_json is None:
+            n_k = int(stats.get("n_clusters") or 0)
+            if n_k:
+                clustering_json = load_clustering_result_json(dataset, n_k)
+        if clustering_json and collision_flags:
+            cluster_stats = build_collision_cluster_stats(
+                label, clustering_json, collision_flags
+            )
+        else:
+            cluster_stats = {
+                "n_trials": stats.get("cluster_size", 1),
+                "collision_rate": 0.0,
+                "mean_ttc": None,
+                "min_ttc": None,
+                "mean_spret": None,
+                "parameter_ranges": {},
+            }
 
     obs_path = cluster_dir / "observations.json"
     if obs_path.is_file():
@@ -360,7 +478,12 @@ def interpret_cluster_dir(
         observations = []
     action_log = action_log_from_observations(observations)
 
-    bev_paths = collect_bev_snapshot_paths(cluster_dir)
+    bev_paths = collect_bev_snapshot_paths(cluster_dir, max_llm_snapshots=max_llm_snapshots)
+    if max_llm_snapshots is not None and bev_paths:
+        print(
+            f"[interpret] Using {len(bev_paths)} evenly spaced BEV snapshots "
+            f"(max_llm_snapshots={max_llm_snapshots})"
+        )
     heatmap = resolve_mfpca_heatmap(dataset, cluster_id, heatmap_search_dirs)
     if heatmap is None and bev_paths:
         heatmap = Path(bev_paths[0])
@@ -630,6 +753,7 @@ def run_stage2b_for_dataset_k(
     model: str = DEFAULT_MODEL,
     dry_run: bool = False,
     api_key: Optional[str] = None,
+    max_llm_snapshots: Optional[int] = None,
 ) -> Dict[str, str]:
     """Interpret every ``cluster<N>`` folder under results/<dataset>/<k>/.
 
@@ -657,12 +781,25 @@ def run_stage2b_for_dataset_k(
     if not cluster_dirs:
         raise FileNotFoundError(f"No cluster<N> folders under {run_dir}")
 
+    clustering_result = load_clustering_result_json(dataset, n_clusters)
+    collision_flags = load_collision_flags(dataset)
+
     for cluster_dir in cluster_dirs:
         cluster_id = int(cluster_dir.name[len("cluster"):])
         out = interpret_cluster_dir(
             cluster_dir, cluster_id, dataset,
             model=model, dry_run=dry_run, heatmap_search_dirs=search_dirs,
+            max_llm_snapshots=max_llm_snapshots,
+            clustering_result=clustering_result,
         )
+        if out and clustering_result and collision_flags:
+            cs = build_collision_cluster_stats(
+                cluster_id, clustering_result, collision_flags
+            )
+            print(
+                f"  ℹ cluster{cluster_id}: collision_rate={cs['collision_rate']}% "
+                f"({cs['collision_count']}/{cs['n_trials']} trials)"
+            )
         if out:
             outputs[str(cluster_id)] = str(out)
             print(f"  ✓ cluster{cluster_id} → {out.name}")
@@ -690,6 +827,13 @@ def main() -> int:
     ap.add_argument("--api-key", default=None, help="API key (overrides env)")
     ap.add_argument("--dry-run", action="store_true",
                     help="force stub output even if an API key is set")
+    ap.add_argument(
+        "--max-llm-snapshots",
+        type=int,
+        default=10,
+        metavar="N",
+        help="Evenly subsample BEV images sent to LLM (default: 10; 0 = all on disk)",
+    )
     args = ap.parse_args()
 
     model = normalize_model_name(" ".join(args.model))
@@ -702,12 +846,14 @@ def main() -> int:
             f"Export your key and re-run for real LLM output."
         )
 
+    max_llm = args.max_llm_snapshots if args.max_llm_snapshots > 0 else None
     outputs = run_stage2b_for_dataset_k(
         args.dataset,
         args.n_clusters,
         model=model,
         dry_run=args.dry_run,
         api_key=args.api_key,
+        max_llm_snapshots=max_llm,
     )
     print(f"✅ Wrote {len(outputs)} cluster_interpretation.yaml files")
     return 0

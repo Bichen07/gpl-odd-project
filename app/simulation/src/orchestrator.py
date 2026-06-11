@@ -340,8 +340,9 @@ class SimulationOrchestrator:
         export_sampling = f"export MC_SAMPLING_URL={shlex.quote(sampling)}\n"
 
         script = f"""#!/usr/bin/env bash
-set -euo pipefail
-{export_sampling}source /opt/ros/melodic/setup.bash
+set -eo pipefail
+{export_sampling}export ROS_DISTRO="${{ROS_DISTRO:-melodic}}"
+source /opt/ros/melodic/setup.bash
 source /project/mmsl_simulation/devel/setup.bash
 export ROS_MASTER_URI="${{ROS_MASTER_URI:-http://localhost:11311}}"
 export ROS_HOSTNAME="${{ROS_HOSTNAME:-localhost}}"
