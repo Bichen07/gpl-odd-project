@@ -262,15 +262,18 @@ const Replayer = () => {
     if (trajectoryAnalysis != null) {
       return;
     }
+    const trialIds = selectedTrialIds.value.map((v) => Number(v)).filter((id) => id > 0);
+    if (trialIds.length === 0) {
+      return;
+    }
     const fetchData = async () => {
       dispatch(batchSlice.actions.setClipTimeManualOverride(0));
       try {
         const updated: typeof trajectories = {};
         updated["main"] = {};
 
-        // const egoTrialIds = new Set(trials.map(t => t?.id ?? -1));
         const trajData = await getTrajectories({
-          trialIds: selectedTrialIds.value.map((v) => Number(v)),
+          trialIds,
           framePeriod: 0.25,
         }).then((response) => response.data);
 
@@ -280,14 +283,11 @@ const Replayer = () => {
 
         setTrajectories(updated);
       } catch (error) {
-        console.error("Failed to fetch trajectory data.");
+        console.error("Failed to fetch trajectory data.", error);
       }
     };
     fetchData();
-    if (selectedTrialId == null) {
-      return;
-    }
-  }, [selectedTrialIds]);
+  }, [selectedTrialIds, trajectoryAnalysis]);
 
   useEffect(() => {
     async function fetchAndUnzip() {
@@ -1175,6 +1175,7 @@ const Replayer = () => {
 
       return (
         <Stack
+          key={egoName}
           sx={{
             // height: "100%",
             flex: windowsCount,

@@ -9,7 +9,7 @@ export default function ClusteringSelection() {
     <Stack sx={{ height: "100%" }}>
       {batch?.egos?.map((ego) => {
         return (
-          <Stack sx={{ flex: 1, height: "100%" }}>
+          <Stack key={ego.id ?? ego.name} sx={{ flex: 1, height: "100%" }}>
             {/* <Typography>{ego.name}</Typography> */}
             <PerEgoSelection egoName={ego.name} />
           </Stack>

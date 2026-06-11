@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 from urllib.parse import urlencode, parse_qs, urlparse, quote
 from dataclasses import dataclass, asdict
 import itertools
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import torch
 from torch import nn, optim
 
@@ -74,6 +74,7 @@ from shapely.ops import nearest_points, split
 from graphql import batch_query, trials_query
 from timer import Timer
 from env import PAYLOAD_API, PAYLOAD_GRAPHQL_API, PAYLOAD_API_KEY
+import analysis_progress
 from predict import calculate_gradients, train_surrogate_model, predict
 from TwoDimTTC import getpoints, getpoints_np
 from gradient import train_surrogate_nn_model
@@ -231,51 +232,57 @@ def draw_full_heatmap(
     output_path="heatmap.png",
 ):
     """
-    Draws a full heatmap PNG similar to PixiJS implementation
+    Draws a full heatmap PNG similar to PixiJS implementation.
+    Trials with shorter time series are padded on the right (gray) so rows align.
     """
+    hex_color = "#555555"
+    bg_rgb = np.array(
+        tuple(int(hex_color[i : i + 2], 16) for i in (1, 3, 5)), dtype=np.uint8
+    )
 
-    num_trials = len(trial_order)
+    ordered_trials = []
+    for trial_id in trial_order:
+        key = str(trial_id)
+        if key not in trajectory_data:
+            continue
+        series = trajectory_data[key].get(attribute)
+        if not series:
+            continue
+        ordered_trials.append(key)
 
-    # Determine max time length
-    max_frames = max(len(trajectory_data[trial_id]["time"]) for trial_id in trial_order)
+    if not ordered_trials:
+        print(f"Skipping heatmap {output_path}: no trials with attribute {attribute}")
+        return
 
+    max_frames = max(len(trajectory_data[tid][attribute]) for tid in ordered_trials)
+    max_frames = max(max_frames, 1)
+    num_trials = len(ordered_trials)
     width = int(max_frames * resolution)
     height = int(num_trials * resolution)
-
-    width = max_frames * resolution
-    height = num_trials * resolution
-
-    # img = np.zeros((height, width, 3), dtype=np.uint8)
-    hex_color = "#555555"
-    rgb = tuple(int(hex_color[i:i+2], 16) for i in (1, 3, 5))
-    img = np.full((height, width, 3), rgb, dtype=np.uint8)
+    img = np.tile(bg_rgb, (height, width, 1))
 
     vmin, vmax = value_range
-    norm = mcolors.Normalize(vmin=vmin, vmax=vmax, clip=True)
-    # colormap = cm.get_cmap("viridis")  # replace with OrRd etc.
     colormap, norm_ = get_chroma_like_colormap(attribute, value_range)
-    # colormap, norm = get_chroma_like_colormap(attribute, value_range)
-    if "RelativeDistance" in attribute:
-        norm = norm_
+    norm = norm_ if "RelativeDistance" in attribute else mcolors.Normalize(
+        vmin=vmin, vmax=vmax, clip=True
+    )
 
-    for y_idx, trial_id in enumerate(trial_order):
-        values = trajectory_data[trial_id][attribute]
-        for i, val in enumerate(values):
-            if val is None or np.isnan(val):
-                val = vmin
-                print("val is none damn")
-            rgba = colormap(norm(val))
-            color = (np.array(rgba[:3]) * 255).astype(np.uint8)
+    for y_idx, trial_id in enumerate(ordered_trials):
+        values = list(trajectory_data[trial_id][attribute])
+        if len(values) < max_frames:
+            values.extend([np.nan] * (max_frames - len(values)))
+        y = y_idx * resolution
+        for i, val in enumerate(values[:max_frames]):
+            if val is None or (isinstance(val, float) and np.isnan(val)):
+                color = bg_rgb
+            else:
+                rgba = colormap(norm(val))
+                color = (np.array(rgba[:3]) * 255).astype(np.uint8)
             x = i * resolution
-            y = y_idx * resolution
-            img[
-                y : y + resolution,
-                x : x + resolution,
-            ] = color
+            img[y : y + resolution, x : x + resolution] = color
 
-    image = Image.fromarray(img, mode="RGB")
-    image.save(output_path)
-    print(f"Saved {output_path}")
+    Image.fromarray(img, mode="RGB").save(output_path)
+    print(f"Saved {output_path} ({num_trials} trials x {max_frames} frames)")
 
 def draw_full_heatmap_s(
     trajectory_data,
@@ -1222,10 +1229,15 @@ def heading_vector_from_yaw(yaw):
 class TrajectoryAnalysisController(Controller):
     path = "/trajectory_analysis"
 
+    @get("/progress")
+    async def analysis_progress_status(self) -> Dict[str, Any]:
+        return analysis_progress.snapshot()
+
     @post("/")
     async def clustering(
         self, data: TrajectoryAnalysisRequest
     ) -> Dict[str, TrajectoryAnalysisResponse]:
+        analysis_progress.begin_run(data.batchIds, len(data.tasks))
         run_id = f"analyzer_{int(time.time())}"
         if _capture is not None:
             _capture.record(
@@ -1247,6 +1259,12 @@ class TrajectoryAnalysisController(Controller):
         phase6_context = None
 
         for egoId in egoIds:
+            analysis_progress.update(
+                "loading_trajectories",
+                0,
+                1,
+                "Loading trials and trajectories from Payload…",
+            )
             trajectories, rawTrajectories, trial_mappings, batch_mappings, columns = (
                 self.get_trajectories(data, egoId)
             )
@@ -1377,6 +1395,7 @@ class TrajectoryAnalysisController(Controller):
             batch = list(batch_mappings.values())[0]
             parameters = batch["scenario"]["parameters"]
 
+            analysis_progress.update("mfpca", 0, 1, "Running MFPCA on ego trajectories…")
             t = Timer("MFPCA")
             clustering_duration = 5
             t.start()
@@ -1392,6 +1411,7 @@ class TrajectoryAnalysisController(Controller):
 
             mfpca_dict = {}
             for key, value in analysis_data.items():
+                analysis_progress.update("umap", 0, 1, "Computing UMAP embeddings…")
                 t = Timer("2D umap projection")
                 t.start()
                 umapProjections, X_umap = self.get_2d_umap_projections(
@@ -1399,6 +1419,12 @@ class TrajectoryAnalysisController(Controller):
                 )
                 t.stop()
 
+                analysis_progress.update(
+                    "clustering",
+                    0,
+                    len(data.tasks),
+                    f"Running HDBSCAN grid (0/{len(data.tasks)} tasks)…",
+                )
                 t = Timer("Clustering")
                 t.start()
                 results = self.cluster(
@@ -1473,7 +1499,13 @@ class TrajectoryAnalysisController(Controller):
             metric_grid_predictions = {}
             metric_grid_gradients = {}
             metric_gradients = {}
-            for used_metric in metric_names:
+            for metric_index, used_metric in enumerate(metric_names):
+                analysis_progress.update(
+                    "surrogate",
+                    metric_index,
+                    len(metric_names),
+                    f"Training metric surrogate ({metric_index + 1}/{len(metric_names)})…",
+                )
                 used_metric_name = used_metric
                 metric = [
                     m
@@ -1925,6 +1957,8 @@ class TrajectoryAnalysisController(Controller):
             except Exception as exc:
                 print(f"[Phase6] Cluster interpretation failed: {exc}", file=sys.stderr)
 
+        analysis_progress.update("packaging", 1, 1, "Packaging results…")
+        analysis_progress.finish()
         return returned
 
     def get_trajectories(self, data: TrajectoryAnalysisRequest, egoId: int):
@@ -1936,7 +1970,10 @@ class TrajectoryAnalysisController(Controller):
         for batchId in data.batchIds:
             variables = {"id": batchId}
 
-            response = requests.get(f"{PAYLOAD_API}/api/batches/{batchId}?depth=3")
+            response = requests.get(
+                f"{PAYLOAD_API}/api/batches/{batchId}?depth=3",
+                headers=headers,
+            )
             response.raise_for_status()
             response_data = response.json()
             batch = response_data
@@ -1962,10 +1999,13 @@ class TrajectoryAnalysisController(Controller):
                 "where": {"batch": {"equals": batchId}, "ego": {"equals": egoId}},
             }
             qs = qs_stringify(params)
-            response = requests.get(f"{PAYLOAD_API}/api/trials?{qs}")
+            response = requests.get(
+                f"{PAYLOAD_API}/api/trials?{qs}",
+                headers=headers,
+            )
             pprint(f"{PAYLOAD_API}/api/trials?{qs}")
-            trials_response_data = response.json()
             response.raise_for_status()
+            trials_response_data = response.json()
 
             for trial in trials_response_data["docs"]:
                 if trial is None or trial["testObjectives"] is None:
@@ -1982,12 +2022,20 @@ class TrajectoryAnalysisController(Controller):
         trajectory_queries_chunks = split_into_chunks(
             [trial["id"] for trial in batch_trials], 100
         )
+        total_chunks = len(trajectory_queries_chunks)
         for index, chunk in enumerate(trajectory_queries_chunks):
+            analysis_progress.update(
+                "loading_trajectories",
+                index,
+                total_chunks,
+                f"Loading trajectories ({index + 1}/{total_chunks} chunks)…",
+            )
             t = Timer("Get Trajectories" + f", chunk: {index}")
             t.start()
             response = requests.post(
                 f"{PAYLOAD_API}/api/trials/trajectories",
                 json={"trialIds": [int(v) for v in chunk], "framePeriod": 0.1},
+                headers=headers,
             )
             response.raise_for_status()
             trajectories_data += response.json()
@@ -2842,8 +2890,24 @@ class TrajectoryAnalysisController(Controller):
             )
 
         def execute_tasks_in_parallel(tasks):
+            total_tasks = len(tasks)
+            completed_tasks = 0
+            taskOutputs: List[Optional[tuple]] = [None] * total_tasks
             with ThreadPoolExecutor() as executor:
-                taskOutputs = list(executor.map(execute_task, tasks))
+                future_to_index = {
+                    executor.submit(execute_task, task): i
+                    for i, task in enumerate(tasks)
+                }
+                for future in as_completed(future_to_index):
+                    index = future_to_index[future]
+                    taskOutputs[index] = future.result()
+                    completed_tasks += 1
+                    analysis_progress.update(
+                        "clustering",
+                        completed_tasks,
+                        total_tasks,
+                        f"HDBSCAN task {completed_tasks}/{total_tasks}",
+                    )
             for i, output in enumerate(taskOutputs):
                 if output is None:
                     results.append(None)

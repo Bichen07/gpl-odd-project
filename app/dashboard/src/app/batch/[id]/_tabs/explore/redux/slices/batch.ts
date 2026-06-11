@@ -366,6 +366,13 @@ export const batchSlice = createSlice({
       state.filteredTrialIds = [];
       state.trajectoryAnalysis = action.payload;
       if (state.trajectoryAnalysis == null) {
+        state.selectedClusteringResults = null;
+        state.selectedClusteringResult = null;
+        state.selectedClusteringResult2 = null;
+        state.selectedClusterInfos = null;
+        state.selectedClusterInfo = null;
+        state.selectedClusterInfo2 = null;
+        state.clusterInfos = {};
         return;
       }
 
