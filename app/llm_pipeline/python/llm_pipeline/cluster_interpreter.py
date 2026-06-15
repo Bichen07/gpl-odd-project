@@ -10,7 +10,7 @@ Orchestrates the LLM pipeline for characterizing behavioral clusters:
 Adapted from xosc_gen/models/scenario_interpretation.py for cluster analysis.
 
 Usage:
-    from cluster_interpreter import ClusterInterpreter
+    from llm_pipeline.cluster_interpreter import ClusterInterpreter
     
     interpreter = ClusterInterpreter(
         model="gpt-4o",
@@ -38,10 +38,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from .paths import PROMPT_TEMPLATES_DIR
 from langchain_community.callbacks.manager import get_openai_callback
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from llm_factory import (
+from .llm_factory import (
     DEFAULT_MODEL,
     create_interpretation_llm,
     is_gemini_model,
@@ -81,12 +82,14 @@ class ClusterInterpreter:
         model: str = DEFAULT_MODEL,
         xodr_path: Optional[str] = None,
         temperature: float = 0.1,
-        prompt_dir: str = "app/llm_pipeline/prompt_templates",
+        prompt_dir: Optional[str] = None,
         api_key: Optional[str] = None,
     ):
         self.model = normalize_model_name(model)
         self.temperature = temperature
-        self.prompt_dir = Path(prompt_dir)
+        self.prompt_dir = (
+            Path(prompt_dir) if prompt_dir else PROMPT_TEMPLATES_DIR
+        )
         self.xodr_path = xodr_path
         
         self.llm = create_interpretation_llm(

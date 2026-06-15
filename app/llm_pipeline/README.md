@@ -9,7 +9,7 @@ running LLM analysis from the GPL-ODD workflow.
 - `artifacts/`: materialized run artifacts grouped by stage.
 - `runs/`: optional run-level logs.
 - `prompt_templates/`: versioned prompt templates.
-- `python/llm_pipeline/`: reusable Python package used by services/scripts.
+- `python/llm_pipeline/`: reusable Python package (stages 1–6, cluster interpretation, LLM factory)
 
 ## Stage Summary
 

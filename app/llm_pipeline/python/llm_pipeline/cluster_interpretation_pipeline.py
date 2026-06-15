@@ -20,31 +20,26 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import yaml
 
-from repo_paths import ANALYZER_SRC, REPO_ROOT, CLUSTERS_DIR
-
-if str(ANALYZER_SRC) not in sys.path:
-    sys.path.insert(0, str(ANALYZER_SRC))
-
-from cluster_stats import (
+from .analyzer_bridge import ensure_analyzer_src
+from .cluster_stats import (
     build_collision_cluster_stats,
     cluster_label_value,
     trials_in_cluster_data,
     trial_collision_flag,
 )
-from dataset_config import DATASETS, trial_id_to_csv_indices, xodr_path_for_dataset
-
-LLM_ARTIFACTS_DIR = CLUSTERS_DIR  # results/clusters/
-LLM_PIPELINE_SRC = REPO_ROOT / "app" / "llm_pipeline" / "src"
-if str(LLM_PIPELINE_SRC) not in sys.path:
-    sys.path.insert(0, str(LLM_PIPELINE_SRC))
-
-from llm_factory import (  # noqa: E402
+from .llm_factory import (
     DEFAULT_MODEL,
     api_key_env_hint,
     has_llm_credentials,
     llm_api_key_for_model,
     normalize_model_name,
 )
+from .paths import CLUSTERS_DIR, REPO_ROOT, RESULTS_DIR
+
+ensure_analyzer_src()
+from dataset_config import DATASETS, trial_id_to_csv_indices, xodr_path_for_dataset  # noqa: E402
+
+LLM_ARTIFACTS_DIR = CLUSTERS_DIR
 
 
 def dataset_from_batch_id(batch_id: int) -> Optional[str]:
@@ -117,7 +112,7 @@ def load_clustering_result_json(dataset: str, n_clusters: int) -> Optional[Dict[
     candidates = [
         REPO_ROOT / "alldatasets" / dataset / f"selectedClusteringResult_{n_clusters}Clusters.json",
     ]
-    from repo_paths import RESULTS_DIR
+    from .paths import RESULTS_DIR
 
     candidates.append(
         RESULTS_DIR / dataset / str(n_clusters) / "clustering" / "selectedClusteringResult.json"
@@ -507,10 +502,12 @@ def interpret_cluster_dir(
             "missing BEV snapshots or MFPCA heatmap",
         )
 
-    from cluster_interpreter import ClusterInterpreter
+    from .cluster_interpreter import ClusterInterpreter
 
     xodr = xodr_path_for_dataset(dataset)
-    prompt_dir = REPO_ROOT / "app" / "llm_pipeline" / "prompt_templates"
+    from .paths import PROMPT_TEMPLATES_DIR
+
+    prompt_dir = PROMPT_TEMPLATES_DIR
     interpreter = ClusterInterpreter(
         model=model,
         xodr_path=str(xodr) if xodr.is_file() else None,
@@ -763,7 +760,7 @@ def run_stage2b_for_dataset_k(
     the real ClusterInterpreter runs.
     """
     model = normalize_model_name(model)
-    from repo_paths import RESULTS_DIR
+    from .paths import RESULTS_DIR
 
     run_dir = RESULTS_DIR / dataset / str(n_clusters)
     if not run_dir.is_dir():

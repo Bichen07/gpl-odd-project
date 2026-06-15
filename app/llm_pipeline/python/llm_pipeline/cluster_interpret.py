@@ -3,18 +3,12 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from typing import Any, Optional
 
 from .capture import PipelineCapture
+from .cluster_interpretation_pipeline import run_stage2b_for_run_dir
 from .paths import find_repo_root
-
-
-def _ensure_analyzer_imports(repo_root: Path) -> None:
-    analyzer_src = repo_root / "app" / "analyzer" / "src"
-    if str(analyzer_src) not in sys.path:
-        sys.path.insert(0, str(analyzer_src))
 
 
 def _load_manifest(run_dir: Path) -> dict[str, Any]:
@@ -43,13 +37,6 @@ def cluster_interpret(
     dry_run: bool = False,
 ) -> Path:
     repo_root = find_repo_root(source_file)
-    _ensure_analyzer_imports(repo_root)
-    llm_src = repo_root / "app" / "llm_pipeline" / "src"
-    if str(llm_src) not in sys.path:
-        sys.path.insert(0, str(llm_src))
-
-    from cluster_interpretation_pipeline import run_stage2b_for_run_dir
-
     run_dir = resolve_run_dir(repo_root, run_id)
     manifest = _load_manifest(run_dir)
     ds = dataset or manifest.get("dataset")

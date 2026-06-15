@@ -46,6 +46,8 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 cd "$PROJECT_ROOT"
 
+export PYTHONPATH="${PROJECT_ROOT}/app/llm_pipeline/python:${PROJECT_ROOT}/app/analyzer/src:${PYTHONPATH:-}"
+
 # Build Python command with all args
 CMD=("python3" "app/analyzer/src/dataset_builder.py" "--dataset" "$DATASET" "--n-clusters" "$N_CLUSTERS")
 
@@ -65,5 +67,5 @@ echo "   description.txt, snapshots/, stats.json, medoid.json, observations.json
 echo ""
 echo "Next steps:"
 echo "  • Map metadata (one-time):  python3 scripts/map_preprocess.py --dataset ${DATASET}"
-echo "  • Step 5 (LLM interpret):   python3 app/analyzer/src/cluster_interpretation_pipeline.py \\"
+echo "  • Step 5 (LLM interpret):   python3 -m llm_pipeline.cluster_interpretation_pipeline \\"
 echo "                                  --dataset ${DATASET} --n-clusters ${N_CLUSTERS} [--dry-run]"

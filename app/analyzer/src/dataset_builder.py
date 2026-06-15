@@ -458,7 +458,10 @@ def process_medoid(
     except Exception as e:
         print(f"  ⚠️  Action/description generation failed: {e}")
 
-    from cluster_stats import trial_collision_flag
+    from pipeline_imports import ensure_llm_pipeline
+
+    ensure_llm_pipeline()
+    from llm_pipeline.cluster_stats import trial_collision_flag
 
     trial_id = str(medoid.get("trial_id") or "")
     medoid_collided = trial_collision_flag(collision_flags or {}, trial_id)
@@ -769,7 +772,10 @@ def main():
         except Exception as e:
             print(f"⚠️  Could not load collision.json: {e}")
 
-    from cluster_stats import build_collision_cluster_stats
+    from pipeline_imports import ensure_llm_pipeline
+
+    ensure_llm_pipeline()
+    from llm_pipeline.cluster_stats import build_collision_cluster_stats
 
     if result_data is None:
         clustering_data = load_clustering_data(args.dataset, args.n_clusters)

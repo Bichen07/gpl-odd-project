@@ -8,8 +8,11 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SRC = REPO / "app" / "analyzer" / "src"
+LLM_PKG = REPO / "app" / "llm_pipeline" / "python"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
+if str(LLM_PKG) not in sys.path:
+    sys.path.insert(0, str(LLM_PKG))
 
 from map_plotter import MapPlotter, _coerce_highlight_road_ids
 from tier2_renderer import (
@@ -25,7 +28,7 @@ from tier2_renderer import (
     tier2_output_dir,
     view_bounds_from_df,
 )
-from cluster_interpretation_pipeline import (
+from llm_pipeline.cluster_interpretation_pipeline import (
     extract_snapshot_timestamp,
     select_evenly_spaced_snapshots,
 )

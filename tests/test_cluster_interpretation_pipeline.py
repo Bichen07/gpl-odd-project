@@ -9,11 +9,11 @@ from pathlib import Path
 import numpy as np
 
 REPO = Path(__file__).resolve().parents[1]
-ANALYZER_SRC = REPO / "app" / "analyzer" / "src"
-if str(ANALYZER_SRC) not in sys.path:
-    sys.path.insert(0, str(ANALYZER_SRC))
+LLM_PKG = REPO / "app" / "llm_pipeline" / "python"
+if str(LLM_PKG) not in sys.path:
+    sys.path.insert(0, str(LLM_PKG))
 
-from cluster_interpretation_pipeline import (  # noqa: E402
+from llm_pipeline.cluster_interpretation_pipeline import (  # noqa: E402
     action_log_from_observations,
     build_cluster_stats,
     compute_cluster_medoids,

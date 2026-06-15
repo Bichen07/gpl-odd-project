@@ -229,11 +229,12 @@ def draw_full_heatmap(
     value_range,  # (min, max)
     frame_period=0.1,
     resolution=4,
-    output_path="heatmap.png",
-):
+    output_path=None,
+) -> Optional[bytes]:
     """
     Draws a full heatmap PNG similar to PixiJS implementation.
     Trials with shorter time series are padded on the right (gray) so rows align.
+    Returns PNG bytes for upload; optionally writes output_path (debug only).
     """
     hex_color = "#555555"
     bg_rgb = np.array(
@@ -251,8 +252,8 @@ def draw_full_heatmap(
         ordered_trials.append(key)
 
     if not ordered_trials:
-        print(f"Skipping heatmap {output_path}: no trials with attribute {attribute}")
-        return
+        print(f"Skipping heatmap for {attribute}: no trials with data")
+        return None
 
     max_frames = max(len(trajectory_data[tid][attribute]) for tid in ordered_trials)
     max_frames = max(max_frames, 1)
@@ -281,8 +282,18 @@ def draw_full_heatmap(
             x = i * resolution
             img[y : y + resolution, x : x + resolution] = color
 
-    Image.fromarray(img, mode="RGB").save(output_path)
-    print(f"Saved {output_path} ({num_trials} trials x {max_frames} frames)")
+    img_pil = Image.fromarray(img, mode="RGB")
+    buf = io.BytesIO()
+    img_pil.save(buf, format="PNG")
+    png_bytes = buf.getvalue()
+    if output_path is not None:
+        Path(output_path).write_bytes(png_bytes)
+        print(f"Saved {output_path} ({num_trials} trials x {max_frames} frames)")
+    else:
+        print(
+            f"Generated {attribute} heatmap ({num_trials} trials x {max_frames} frames)"
+        )
+    return png_bytes
 
 def draw_full_heatmap_s(
     trajectory_data,
@@ -1837,26 +1848,25 @@ class TrajectoryAnalysisController(Controller):
         for egoName in returned.keys():
             trialOrder = returned[egoName].mfpca["full"].trialOrder
             for attribute in visualization_columns:
-                output_path = f"{egoName}_{attribute}_time_fullheatmap.png"
-                draw_full_heatmap(
-                    trajectory_data=heatmapData[egoName],  # your parsed data
+                filename = f"{egoName}_{attribute}_time_fullheatmap.png"
+                png_bytes = draw_full_heatmap(
+                    trajectory_data=heatmapData[egoName],
                     trial_order=trialOrder,
                     attribute=attribute,
                     value_range=bound[attribute]["range"],
                     frame_period=0.1,
                     resolution=3,
-                    output_path=output_path,
                 )
-                # Open the PNG file in binary mode
-                with open(output_path, "rb") as f:
-                    files = {
-                        "file": (output_path, f, "image/png")
-                    }
-                    response = requests.post(
-                        f"{PAYLOAD_API}/api/documents",
-                        files=files,
-                        headers=headers
-                    )
+                if png_bytes is None:
+                    continue
+                files = {
+                    "file": (filename, io.BytesIO(png_bytes), "image/png")
+                }
+                response = requests.post(
+                    f"{PAYLOAD_API}/api/documents",
+                    files=files,
+                    headers=headers
+                )
                 response.raise_for_status()
                 imageDoc = response.json()["doc"]
                 print("Uploaded file info:", imageDoc)
@@ -1923,7 +1933,10 @@ class TrajectoryAnalysisController(Controller):
             and phase6_context is not None
         ):
             try:
-                from cluster_interpretation_pipeline import (
+                from pipeline_imports import ensure_llm_pipeline
+
+                ensure_llm_pipeline()
+                from llm_pipeline.cluster_interpretation_pipeline import (
                     run_post_analyzer_cluster_interpretation,
                     zip_interpretations,
                 )

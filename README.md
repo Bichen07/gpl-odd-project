@@ -41,7 +41,7 @@ curl -s "http://140.113.208.174:3020/api/trials?limit=1" | python3 -c "import js
 2. [Prerequisites](#2-prerequisites)
 3. [Goal A — View Existing Data (Start Here)](#3-goal-a--view-existing-data-start-here)
 4. [Goal B — Run New Simulations](#4-goal-b--run-new-simulations)
-5. [BEV Renderer (Research Add-on)](#5-bev-renderer-research-add-on)
+5. [BEV & LLM Pipeline (Research)](#5-bev--llm-pipeline-research)
 6. [Unit Tests](#6-unit-tests)
 7. [Branch & Git Strategy](#7-branch--git-strategy)
 8. [Debugging](#8-debugging)
@@ -109,6 +109,20 @@ You should see:
 ✓ Application startup complete.
 ```
 
+**Required for Dashboard → Explore → Analyze.** If Analyzer is not running, the UI shows `Analyzer error (network): Network Error`.
+
+Verify: `curl -s -o /dev/null -w '%{http_code}\n' http://localhost:9010/schema` should return `200`.
+
+If you open the Dashboard at `http://<lab-ip>:3000` from another machine, set in `app/dashboard/.env`:
+
+```bash
+NEXT_PUBLIC_ANALYZER_API_ADDRESS=http://<lab-ip>:9010
+```
+
+(`localhost:9010` in `.env` only works when the browser runs on the same machine as Analyzer.)
+
+Restart `bun run dev` after changing `.env`.
+
 #### What is `http://localhost:9010/schema`?
 
 That URL is the **OpenAPI / Swagger** documentation page Litestar generates automatically from Python types in the analyzer code.
@@ -133,25 +147,55 @@ So when the schema UI shows `#0 null` / `#1 number` under nested fields, it mean
 
 ### Terminal 2 — Start the Dashboard
 
+The Dashboard can run in **development** or **production** mode. Both use port **3000** — only one can run at a time.
+
+| | Development (`bun run dev`) | Production (`bun run build` + `bun run start`) |
+|---|---|---|
+| **When to use** | Daily lab work, editing UI code | Deploy-like run, no hot reload |
+| **Needs `build`?** | No — compiles on the fly | Yes — `bun run start` reads `.next/` from a prior build |
+| **Command** | `bun run dev` | `bun run build` then `bun run start` |
+| **Hot reload** | Yes | No |
+
+**Why `localhost:3000` sometimes opens without you running anything:** `./scripts/start_dev_stack.sh` (or an old `bun run dev`) may already be listening on 3000. Check with `ss -tlnp \| grep 3000`. If something is there, use that URL or stop the old process before starting again.
+
+**Why `bun run start` fails with “Could not find a production build”:** `start` is production mode. Run `bun run build` first (once per code change), or switch to dev mode below.
+
+#### Option A — Development mode (recommended for lab use)
+
 ```bash
 cd app/dashboard
+bun run dev --hostname 0.0.0.0
+```
 
-# First time only: build the project
-bun run build
+`--hostname 0.0.0.0` lets you open the Dashboard from another machine (e.g. `http://140.113.208.174:3000`).
 
-# Start the website
-bun run start
+You should see something like:
+```
+▲ Next.js …
+- Local:   http://localhost:3000
+- Network: http://<your-lab-ip>:3000
+✓ Ready
+```
+
+#### Option B — Production mode
+
+```bash
+cd app/dashboard
+bun run build    # required before start; re-run after dashboard code changes
+bun run start --hostname 0.0.0.0
 ```
 
 You should see:
 ```
-✓ Ready in 359ms
+✓ Ready in …ms
 - Local: http://localhost:3000
 ```
 
 Open **http://localhost:3000** in your browser. This is the main dashboard.
 
 > **If `bun run build` fails**, see [ISSUES.md](./ISSUES.md) for the fix.
+
+> **Port already in use (`EADDRINUSE`):** Another Dashboard is already running. Use the existing tab, or stop it (`kill $(lsof -ti :3000)` or close the terminal running `dev`/`start`), then start again.
 
 ---
 
@@ -294,9 +338,31 @@ Start the dashboard (Goal A steps) and navigate to your batch. Click **Analyze**
 
 ---
 
-## 5. BEV Renderer (Research Add-on)
+## 5. BEV & LLM Pipeline (Research)
 
-Generates top-down Bird's Eye View images of the most representative trial per cluster. Used as visual input for LLM-based scenario interpretation (future work).
+Research tooling for bird's-eye views and LLM-based cluster interpretation. Code layout:
+
+| Path | Role |
+|---|---|
+| `app/analyzer/src/` | Senior clustering stack + BEV (`map_plotter`, `renderer`, `dataset_builder`, …) |
+| `app/llm_pipeline/python/llm_pipeline/` | LLM package: stages 1–5 CLI, `cluster_interpreter`, `cluster_interpretation_pipeline` |
+| `app/llm_pipeline/prompt_templates/` | Prompt files for cluster interpretation |
+| `app/llm_pipeline/artifacts/` | Captured stage outputs |
+
+Set `PYTHONPATH` once per shell (from the **repository root**):
+
+```bash
+conda activate analyzer
+cd /path/to/gpl-odd-project
+
+export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
+```
+
+Scripts such as `scripts/build_llm_dataset.sh` and `scripts/run_cluster_interpretation.sh` set this automatically.
+
+### BEV renderer
+
+Generates top-down Bird's Eye View images of the most representative trial per cluster. Used as visual input for LLM cluster interpretation.
 
 ```bash
 conda activate analyzer
@@ -318,6 +384,54 @@ alldatasets/dataset1/
 Output images go to `bev_output/<dataset_name>/<n>clusters/cluster_N/trial_XXXX_frame_NNN.jpg`.
 
 > `alldatasets/` is in `.gitignore` — these are large data files not tracked by git.
+
+### LLM pipeline — cluster interpretation
+
+After BEV snapshots and cluster stats exist under `results/<dataset>/<k>/` or `llm_artifacts/<run_id>/`:
+
+**Build dataset artifacts (Phase 4):**
+
+```bash
+bash scripts/build_llm_dataset.sh dataset1 3
+# Optional run id and trial override:
+# bash scripts/build_llm_dataset.sh dataset1 3 my_run_001 --trials "1:100,1:200"
+```
+
+**Step 5 — offline interpretation on `results/<dataset>/<k>/`:**
+
+```bash
+python3 -m llm_pipeline.cluster_interpretation_pipeline \
+  --dataset dataset1 --n-clusters 3 --dry-run
+```
+
+Remove `--dry-run` and set `GOOGLE_API_KEY` (Gemini, default) or `OPENAI_API_KEY` (gpt-*) for live LLM output.
+
+**Stage 2b CLI — interpret an existing `llm_artifacts/<run_id>/` tree:**
+
+```bash
+python3 -m llm_pipeline.cli cluster-interpret --run-id <run_id> --dataset dataset1
+# Stub only (no API call):
+python3 -m llm_pipeline.cli cluster-interpret --run-id <run_id> --dataset dataset1 --dry-run
+```
+
+Or use the wrapper script:
+
+```bash
+bash scripts/run_cluster_interpretation.sh <run_id> dataset1
+bash scripts/run_cluster_interpretation.sh <run_id> dataset1 --dry-run
+```
+
+**Optional — run interpretation automatically after Dashboard Analyze:**
+
+```bash
+export GPL_ODD_CLUSTER_INTERPRETATION=1
+# optional: export GPL_ODD_DATASET=dataset1
+# optional: export GPL_ODD_CLUSTER_INTERPRET_DRY_RUN=1
+```
+
+Then restart the Analyzer (`litestar run …`) and click **Analyze** in the Dashboard.
+
+More detail: `app/llm_pipeline/README.md` and `cluster_interpreter_integration_plan.md`.
 
 ---
 
@@ -492,6 +606,7 @@ Do not delete the per-app READMEs — they complement this root overview.
 | `readMD/MISSION_CONTROL.md` | Simulation pipeline reference (call graph, Payload, vehicle_parameters, how to run) |
 | `readMD/MISSION_CONTROL_USER_GUIDE.md` | Operator runbook for Mission Control on the lab PC |
 | `app/analyzer/README.md` | Analyzer-specific setup details |
+| `app/llm_pipeline/README.md` | LLM pipeline stages, CLI, cluster interpretation |
 | `app/sampling/README.md` | Sampling server API reference |
 | `app/dashboard/README.md` | Dashboard build steps |
 | `app/payload/README.md` | Payload CMS local setup |
