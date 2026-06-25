@@ -7,7 +7,7 @@
     <arg name="sim_with_external" default="false" />
 
     <arg name="sampling_suggestion_api" default="http://localhost:9009" />
-    <arg name="batch_id" default="3" />
+    <arg name="batch_id" default="1" />
     <arg name="ego_id" default="1" />
 
     <!-- <arg name="map_name" default="alks_road_straight" /> -->
@@ -18,13 +18,15 @@
     <arg name="route_name" default="operation" />
     <!-- <arg name="route_name" default="hsc-hsp-hsc-loop-demo" /> -->
 
-    <!-- drive in hct -->
-    <!-- <arg name="ego_position_seq" default="21" /> -->
+    <!-- drive in hct --> 
+    <!-- CASE 1: 21 -->
+    <arg name="ego_position_seq" default="21" />
 
     <!-- drive out hct -->
     <!-- <arg name="ego_position_seq" default="22" /> -->
 
-    <!-- opposite overtake -->
+    <!-- opposite overtake --> 
+    <!-- CASE 2: 4 -->
     <!-- <arg name="ego_position_seq" default="4" /> -->
     <!-- <arg name="ego_position_seq" default="30" /> -->
 
@@ -34,13 +36,16 @@
     <!-- Bus BIke -->
     <!-- <arg name="ego_position_seq" default="28" /> -->
 
-    <!-- Bridge Cut In -->
+    <!-- Bridge Cut In --> 
+    <!-- CASE 3: 29 -->
     <!-- <arg name="ego_position_seq" default="29" /> -->
-    <arg name="ego_position_seq" default="26" />
+    <!-- <arg name="ego_position_seq" default="26" /> -->
 
 
     <!-- <arg name="route_name" default="hsc-hsp-hsc-loop" /> -->
     <!-- <arg name="route_name" default="loop1" /> -->
+
+
     <!-- <arg name="ego_position_seq" default="1" /> -->
     <!-- <arg name="ego_position_seq" default="3" /> -->
 

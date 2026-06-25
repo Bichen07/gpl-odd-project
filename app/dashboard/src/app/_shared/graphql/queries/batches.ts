@@ -109,6 +109,15 @@ export const appendBatchTrajectoryAnalysisSave = async (
     savedTrajectoryAnalysis: [...existingDocumentIds, documentId],
   });
 };
+
+export const setBatchTrajectoryAnalysisSaves = async (
+  batchId: number,
+  documentIds: number[],
+) => {
+  return api.patch(`/batches/${batchId}`, {
+    savedTrajectoryAnalysis: documentIds,
+  });
+};
 export type SavedTrajectoryAnalysis = Object.Path<
   GetBatchTrajectoryAnalysisQuery,
   ["Batch", "savedTrajectoryAnalysis"]

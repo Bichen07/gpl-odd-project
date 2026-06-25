@@ -14,21 +14,29 @@ import {
   Button,
   TextField,
   LinearProgress,
+  Checkbox,
+  IconButton,
 } from "@mui/material";
+import DeleteOutline from "@mui/icons-material/DeleteOutline";
 import axios from "axios";
 import {
   appendBatchTrajectoryAnalysisSave,
   SavedTrajectoryAnalysis,
+  setBatchTrajectoryAnalysisSaves,
 } from "@/app/_shared/graphql/queries/batches";
+import {
+  deleteDocument,
+  postDocument,
+} from "@/app/_shared/graphql/queries/documents";
 import {
   AnalysisProgress,
   ClusteringTask,
+  ClusteringResult,
   getAnalysisProgress,
   getTrajectoryAnalysis,
 } from "@/app/_shared/graphql/queries/clustering";
 // import { IDockviewPanelProps } from "dockview";
 import { useEffect, useState } from "react";
-import { postDocument } from "@/app/_shared/graphql/queries/documents";
 import { useAppDispatch, useAppSelector } from "../../../../redux/hooks";
 import { batchSlice } from "../../../../redux/slices/batch";
 import JSZip from "jszip";
@@ -41,6 +49,9 @@ type Props = {
 export default function Saves(props: Props) {
   const trajectoryAnalysis = useAppSelector(
     (state) => state.batch.trajectoryAnalysis,
+  );
+  const selectedClusteringResults = useAppSelector(
+    (state) => state.batch.selectedClusteringResults,
   );
   const dispatch = useAppDispatch();
 
@@ -63,6 +74,10 @@ export default function Saves(props: Props) {
     useState<AnalysisProgress | null>(null);
   const [progressPollFailed, setProgressPollFailed] = useState(false);
   const [activeSaveId, setActiveSaveId] = useState<string | null>(null);
+  const [selectedSaveIds, setSelectedSaveIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [deletingSaves, setDeletingSaves] = useState(false);
 
   useEffect(() => {
     setSaveItems(saves);
@@ -241,7 +256,8 @@ export default function Saves(props: Props) {
                   {Object.values(trajectoryAnalysis)[0]?.trials
                     ? Object.keys(Object.values(trajectoryAnalysis)[0].trials).length
                     : "?"}{" "}
-                  trials. Run Analysis again for latest Payload data, or Clear below.
+                  trials. Run Analysis again for latest Payload data, or unload
+                  below (saved files are not deleted).
                 </Typography>
                 <Button
                   size="small"
@@ -251,105 +267,203 @@ export default function Saves(props: Props) {
                     dispatch(batchSlice.actions.setTrajectoryAnalysis(null));
                     setActiveSaveId(null);
                     toast.info(
-                      "Cleared loaded analysis. Click Analysis to cluster all current trials.",
+                      "Unloaded analysis from memory. Saved files in Payload are unchanged. Click Analysis to cluster current trials.",
                     );
                   }}
                 >
-                  Clear analysis
+                  Unload analysis
                 </Button>
               </Stack>
             )}
           </Stack>
-          <Stack
-            sx={{ mb: 2 }}
-            direction="row"
-            flexWrap="wrap"
-            rowGap={1}
-            columnGap={1}
-          >
-            {saveItems?.map((item, index) => (
-              <Paper
-                key={item.id ?? index}
-                component={Button}
-                sx={{
-                  ...(activeSaveId === String(item.id)
-                    ? { bgcolor: "primary.main", color: "primary.contrastText" }
-                    : {}),
-                }}
-                loading={loadingFilename === item.filename}
-                disabled={loadingFilename != null}
-                onClick={() => {
-                  setLoadingFilename(item.filename);
-                  const loadSave = async () => {
-                    try {
-                      // axios
-                      //   .get(
-                      //     `${process.env.NEXT_PUBLIC_PAYLOAD_API_ADDRESS}/Documents/${item.filename}`
-                      //   )
-                      //   .then((response) => {
-                      //     // console.log(response.data);
-                      //     setLoadingFilename(null);
-                      //     dispatch(
-                      //       batchSlice.actions.setTrajectoryAnalysis(
-                      //         response.data
-                      //       )
-                      //     );
-                      //   });
-
-                      console.log(item.filename);
-                      const response = await axios.get(
-                        item?.url ?? "",
-                        { responseType: "arraybuffer" },
-                      );
-                      const fileBlob = response.data;
-                      let jsonObject: any;
-
-                      const isZip =
-                        item.filename?.toLowerCase().endsWith(".zip") ||
-                        (fileBlob.byteLength >= 2 &&
-                          new Uint8Array(fileBlob)[0] === 0x50 &&
-                          new Uint8Array(fileBlob)[1] === 0x4b);
-
-                      if (isZip) {
-                        const zip = await JSZip.loadAsync(fileBlob);
-                        const jsonFileName = Object.keys(zip.files).find(
-                          (name) => name.endsWith(".json"),
-                        );
-                        if (jsonFileName == null) {
-                          throw new Error("No JSON file found in ZIP");
-                        }
-                        const jsonText = await zip
-                          .file(jsonFileName)
-                          ?.async("text");
-                        jsonObject = JSON.parse(jsonText ?? "");
-                      } else {
-                        const jsonText = new TextDecoder().decode(fileBlob);
-                        jsonObject = JSON.parse(jsonText);
-                      }
-
-                      console.log("UNZIPPED Save");
-                      console.log(jsonObject);
-                      for (const key of Object.keys(jsonObject)) {
-                        jsonObject[key]["id"] = item.id;
-                      }
-                      dispatch(
-                        batchSlice.actions.setTrajectoryAnalysis(jsonObject),
-                      );
-                      setActiveSaveId(String(item.id));
-                      setLoadingFilename(null);
-                    } catch (err) {
-                      setLoadingFilename(null);
-                      dispatch(batchSlice.actions.setTrajectoryAnalysis(null));
-                      toast.error("Fail to load selectd saved file!");
-                      console.error(err);
+          {saveItems != null && saveItems.length > 0 && (
+            <Stack direction="row" gap={1} sx={{ mb: 1, width: "100%" }}>
+              <LoadingButton
+                size="small"
+                variant="outlined"
+                color="error"
+                loading={deletingSaves}
+                disabled={selectedSaveIds.size === 0 || loadingFilename != null}
+                onClick={async () => {
+                  if (selectedSaveIds.size === 0) return;
+                  const confirmed = window.confirm(
+                    `Delete ${selectedSaveIds.size} saved analysis file(s) from Payload? This cannot be undone.`,
+                  );
+                  if (!confirmed) return;
+                  setDeletingSaves(true);
+                  try {
+                    const remaining = (saveItems ?? []).filter((item) => {
+                      const id = String(item.id);
+                      return !selectedSaveIds.has(id);
+                    });
+                    for (const id of selectedSaveIds) {
+                      await deleteDocument(id);
                     }
-                  };
-                  loadSave();
+                    await setBatchTrajectoryAnalysisSaves(
+                      Number(batchId),
+                      remaining
+                        .map((item) => Number(item.id))
+                        .filter((id) => Number.isFinite(id)),
+                    );
+                    if (
+                      activeSaveId != null &&
+                      selectedSaveIds.has(activeSaveId)
+                    ) {
+                      dispatch(batchSlice.actions.setTrajectoryAnalysis(null));
+                      setActiveSaveId(null);
+                    }
+                    setSaveItems(remaining);
+                    setSelectedSaveIds(new Set());
+                    toast.success("Deleted selected saves.");
+                  } catch (error) {
+                    console.error(error);
+                    toast.error("Failed to delete one or more saves.");
+                  } finally {
+                    setDeletingSaves(false);
+                  }
                 }}
               >
-                {item.filename}
-              </Paper>
-            ))}
+                Delete selected ({selectedSaveIds.size})
+              </LoadingButton>
+            </Stack>
+          )}
+          <Stack sx={{ mb: 2, width: "100%" }} rowGap={1}>
+            {saveItems?.map((item, index) => {
+              const saveId = String(item.id ?? index);
+              const loadSave = async () => {
+                setLoadingFilename(item.filename);
+                try {
+                  const response = await axios.get(item?.url ?? "", {
+                    responseType: "arraybuffer",
+                  });
+                  const fileBlob = response.data;
+                  let jsonObject: any;
+
+                  const isZip =
+                    item.filename?.toLowerCase().endsWith(".zip") ||
+                    (fileBlob.byteLength >= 2 &&
+                      new Uint8Array(fileBlob)[0] === 0x50 &&
+                      new Uint8Array(fileBlob)[1] === 0x4b);
+
+                  if (isZip) {
+                    const zip = await JSZip.loadAsync(fileBlob);
+                    const jsonFileName = Object.keys(zip.files).find((name) =>
+                      name.endsWith(".json"),
+                    );
+                    if (jsonFileName == null) {
+                      throw new Error("No JSON file found in ZIP");
+                    }
+                    const jsonText = await zip
+                      .file(jsonFileName)
+                      ?.async("text");
+                    jsonObject = JSON.parse(jsonText ?? "");
+                  } else {
+                    const jsonText = new TextDecoder().decode(fileBlob);
+                    jsonObject = JSON.parse(jsonText);
+                  }
+
+                  for (const key of Object.keys(jsonObject)) {
+                    jsonObject[key]["id"] = item.id;
+                  }
+                  dispatch(
+                    batchSlice.actions.setTrajectoryAnalysis(jsonObject),
+                  );
+                  setActiveSaveId(saveId);
+                  setLoadingFilename(null);
+                } catch (err) {
+                  setLoadingFilename(null);
+                  dispatch(batchSlice.actions.setTrajectoryAnalysis(null));
+                  toast.error("Failed to load selected saved file.");
+                  console.error(err);
+                }
+              };
+
+              return (
+                <Stack
+                  key={saveId}
+                  direction="row"
+                  alignItems="center"
+                  spacing={1}
+                  component={Paper}
+                  variant="outlined"
+                  sx={{
+                    px: 1,
+                    py: 0.5,
+                    ...(activeSaveId === saveId
+                      ? { borderColor: "primary.main", bgcolor: "action.hover" }
+                      : {}),
+                  }}
+                >
+                  <Checkbox
+                    size="small"
+                    checked={selectedSaveIds.has(saveId)}
+                    onChange={(_, checked) => {
+                      setSelectedSaveIds((prev) => {
+                        const next = new Set(prev);
+                        if (checked) next.add(saveId);
+                        else next.delete(saveId);
+                        return next;
+                      });
+                    }}
+                  />
+                  <Button
+                    size="small"
+                    sx={{ flex: 1, justifyContent: "flex-start", textTransform: "none" }}
+                    disabled={loadingFilename != null}
+                    onClick={() => void loadSave()}
+                  >
+                    {loadingFilename === item.filename
+                      ? "Loading…"
+                      : item.filename}
+                  </Button>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    disabled={deletingSaves || loadingFilename != null}
+                    aria-label={`Delete ${item.filename}`}
+                    onClick={async () => {
+                      const confirmed = window.confirm(
+                        `Delete "${item.filename}" from Payload?`,
+                      );
+                      if (!confirmed) return;
+                      setDeletingSaves(true);
+                      try {
+                        await deleteDocument(saveId);
+                        const remaining = (saveItems ?? []).filter(
+                          (s) => String(s.id) !== saveId,
+                        );
+                        await setBatchTrajectoryAnalysisSaves(
+                          Number(batchId),
+                          remaining
+                            .map((s) => Number(s.id))
+                            .filter((id) => Number.isFinite(id)),
+                        );
+                        if (activeSaveId === saveId) {
+                          dispatch(
+                            batchSlice.actions.setTrajectoryAnalysis(null),
+                          );
+                          setActiveSaveId(null);
+                        }
+                        setSaveItems(remaining);
+                        setSelectedSaveIds((prev) => {
+                          const next = new Set(prev);
+                          next.delete(saveId);
+                          return next;
+                        });
+                        toast.success(`Deleted ${item.filename}`);
+                      } catch (error) {
+                        console.error(error);
+                        toast.error("Failed to delete save.");
+                      } finally {
+                        setDeletingSaves(false);
+                      }
+                    }}
+                  >
+                    <DeleteOutline fontSize="small" />
+                  </IconButton>
+                </Stack>
+              );
+            })}
           </Stack>
         </AccordionDetails>
       </Accordion>
@@ -416,14 +530,14 @@ export default function Saves(props: Props) {
                   </Typography>
                   {showLiveProgress ? (
                     <Typography variant="body2" color="text.secondary">
-                      {analysisProgress.current}/{analysisProgress.total} (
-                      {analysisProgress.percent}%)
+                      HDBSCAN run {analysisProgress.current}/
+                      {analysisProgress.total} ({analysisProgress.percent}%)
                     </Typography>
                   ) : (
                     <Typography variant="body2" color="text.secondary">
                       {estimatedTasks > 0
-                        ? `~${estimatedTasks}/${tasks.length} HDBSCAN tasks (estimated, ${estimatedPercent}%)`
-                        : `Preparing trajectories / MFPCA… (${estimatedPercent}% estimated)`}
+                        ? `~${estimatedTasks}/${tasks.length} HDBSCAN parameter runs (estimated, ${estimatedPercent}%) — trials come from Payload, not CSV count`
+                        : `Loading trials from Payload / MFPCA… (${estimatedPercent}% estimated)`}
                     </Typography>
                   )}
                   {progressPollFailed && !showLiveProgress && (
@@ -447,7 +561,7 @@ export default function Saves(props: Props) {
               onClick={() => {
                 const fetchData = async () => {
                   setAnalysisStatus(
-                    `Contacting Analyzer (batch ${batchId}, ${tasks.length} tasks)…`,
+                    `Contacting Analyzer (batch ${batchId}, ${tasks.length} HDBSCAN parameter runs — not trial count)…`,
                   );
                   try {
                     const response = await getTrajectoryAnalysis({
@@ -533,6 +647,35 @@ export default function Saves(props: Props) {
                             "trajectories.json",
                             JSON.stringify(trajectoryAnalysis),
                           );
+
+                          // Persist the user's current cluster selection so that
+                          // dataset_builder.py can reproduce it without heuristics.
+                          if (selectedClusteringResults != null) {
+                            const selectedEntries: Record<string, {
+                              egoName: string;
+                              durationMode: string;
+                              clusteringIndex: number | null;
+                              task: ClusteringResult["task"] | null;
+                            }> = {};
+                            for (const [egoName, result] of Object.entries(selectedClusteringResults)) {
+                              if (result == null) continue;
+                              const egoData = (trajectoryAnalysis as Record<string, any>)?.[egoName];
+                              const clusteringList: ClusteringResult[] =
+                                egoData?.mfpca?.full?.clustering ?? [];
+                              const idx = clusteringList.findIndex(
+                                (c) => JSON.stringify(c?.task) === JSON.stringify(result.task),
+                              );
+                              selectedEntries[egoName] = {
+                                egoName,
+                                durationMode: "full",
+                                clusteringIndex: idx >= 0 ? idx : null,
+                                task: result.task ?? null,
+                              };
+                            }
+                            if (Object.keys(selectedEntries).length > 0) {
+                              zip.file("selected.json", JSON.stringify(selectedEntries, null, 2));
+                            }
+                          }
                           const zipBlob = await zip.generateAsync({
                             type: "blob",
                             compression: "DEFLATE",

@@ -957,7 +957,7 @@ def load_medoids_from_clustering(
 
     Clustering keys are Payload trial IDs (e.g. 8135 for dataset2).
     CSV files use ``esmini_{batch}_{trial_index}.csv`` with
-    ``trial_index = trial_id - trial_id_base`` (see DATA_INVENTORY.md).
+    ``trial_index = trial_id - trial_id_base`` (see readMD/DATA_INVENTORY_AND_ANALYSIS.md).
     """
     cfg = get_dataset_config(dataset)
     batch_id = int(cfg["batch_id"])

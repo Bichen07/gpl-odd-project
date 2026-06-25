@@ -1,33 +1,117 @@
 #!/usr/bin/env bash
 # Build LLM dataset from medoid trials
 #
-# Usage:
+# --- Legacy positional usage (alldatasets mode) ---
 #   ./scripts/build_llm_dataset.sh <dataset> <n_clusters> [run_id] [--trials 'batch:index,...']
 #
-# Example:
+# --- New payload-save mode ---
+#   ./scripts/build_llm_dataset.sh \
+#     --source payload-save \
+#     --batch-id 1 \
+#     --k 4 \
+#     [--save-doc-id 46] \
+#     [--dataset dataset1] \
+#     [--ego-name ITRI] \
+#     [--duration-mode full]
+#
+# Examples:
 #   ./scripts/build_llm_dataset.sh dataset1 8
 #   ./scripts/build_llm_dataset.sh dataset1 3 "" --trials "1:100,1:200,1:300"
+#   ./scripts/build_llm_dataset.sh --source payload-save --batch-id 1 --k 4 --dataset dataset1
 
 set -euo pipefail
 
-DATASET="${1:-}"
-N_CLUSTERS="${2:-}"
-shift 2  # consume <dataset> <n_clusters>
-
-# Optional run_id only when the next token is not a flag (e.g. --trials)
+# ---------------------------------------------------------------
+# Detect mode: if first arg starts with '--' it is flag-style;
+# otherwise fall back to legacy positional <dataset> <n_clusters>
+# ---------------------------------------------------------------
+SOURCE_MODE="alldatasets"
+DATASET=""
+DATASET_PROVIDED=0      # 1 only when the user explicitly passes --dataset / positional
+N_CLUSTERS=""
+BATCH_ID=""
 RUN_ID=""
-if [[ $# -gt 0 && "${1:-}" != --* ]]; then
-    RUN_ID="$1"
-    shift
-fi
+EXTRA_FLAGS=()
 
-if [[ -z "$DATASET" ]] || [[ -z "$N_CLUSTERS" ]]; then
-    echo "Usage: $0 <dataset> <n_clusters> [run_id] [--trials 'batch:index,...']"
-    echo ""
-    echo "Example:"
-    echo "  $0 dataset1 8"
-    echo "  $0 dataset1 3 \"\" --trials \"1:100,1:200,1:300\""
-    exit 1
+if [[ $# -gt 0 && "${1:-}" != --* ]]; then
+    # Legacy positional mode
+    DATASET="${1:-}"
+    DATASET_PROVIDED=1
+    N_CLUSTERS="${2:-}"
+    shift 2
+
+    if [[ $# -gt 0 && "${1:-}" != --* ]]; then
+        RUN_ID="$1"
+        shift
+    fi
+
+    if [[ -z "$DATASET" ]] || [[ -z "$N_CLUSTERS" ]]; then
+        echo "Usage:"
+        echo "  $0 <dataset> <n_clusters> [run_id] [--trials 'batch:index,...']"
+        echo "  $0 --source payload-save --batch-id 1 --k 4 [--dataset dataset1] [--save-doc-id 46]"
+        exit 1
+    fi
+else
+    # Flag-based mode — parse just the flags we need to determine SOURCE, DATASET,
+    # N_CLUSTERS, and RUN_ID; all other flags are forwarded as-is.
+    REMAINING=("$@")
+    IDX=0
+    while [[ $IDX -lt ${#REMAINING[@]} ]]; do
+        arg="${REMAINING[$IDX]}"
+        next_idx=$(( IDX + 1 ))
+        case "$arg" in
+            --source)
+                SOURCE_MODE="${REMAINING[$next_idx]}"
+                IDX=$(( IDX + 2 ))
+                ;;
+            --dataset)
+                DATASET="${REMAINING[$next_idx]}"
+                DATASET_PROVIDED=1
+                IDX=$(( IDX + 2 ))
+                ;;
+            --n-clusters)
+                N_CLUSTERS="${REMAINING[$next_idx]}"
+                IDX=$(( IDX + 2 ))
+                ;;
+            --k)
+                # --k also determines n_clusters for output path labelling
+                if [[ -z "$N_CLUSTERS" ]]; then
+                    N_CLUSTERS="${REMAINING[$next_idx]}"
+                fi
+                EXTRA_FLAGS+=("$arg" "${REMAINING[$next_idx]}")
+                IDX=$(( IDX + 2 ))
+                ;;
+            --batch-id)
+                BATCH_ID="${REMAINING[$next_idx]}"
+                EXTRA_FLAGS+=("$arg" "${REMAINING[$next_idx]}")
+                IDX=$(( IDX + 2 ))
+                ;;
+            --run-id)
+                RUN_ID="${REMAINING[$next_idx]}"
+                IDX=$(( IDX + 2 ))
+                ;;
+            *)
+                EXTRA_FLAGS+=("$arg")
+                IDX=$(( IDX + 1 ))
+                ;;
+        esac
+    done
+
+    if [[ "$SOURCE_MODE" == "payload-save" ]]; then
+        # --dataset is optional: when omitted, dataset_builder.py resolves the
+        # canonical dataset (dataset1/2/3) from --batch-id. N_CLUSTERS is only
+        # used for the cosmetic echo below; Python derives the real k.
+        if [[ -z "$N_CLUSTERS" ]]; then
+            N_CLUSTERS="0"  # placeholder; actual k resolved by Python
+        fi
+    else
+        if [[ -z "$DATASET" ]] || [[ -z "$N_CLUSTERS" ]]; then
+            echo "Usage:"
+            echo "  $0 <dataset> <n_clusters> [run_id] [--trials 'batch:index,...']"
+            echo "  $0 --source payload-save --batch-id 1 --k 4 [--dataset dataset1] [--save-doc-id 46]"
+            exit 1
+        fi
+    fi
 fi
 
 # Activate conda environment
@@ -40,7 +124,6 @@ conda activate analyzer 2>/dev/null || {
     exit 1
 }
 
-# Run the Python script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
@@ -48,24 +131,53 @@ cd "$PROJECT_ROOT"
 
 export PYTHONPATH="${PROJECT_ROOT}/app/llm_pipeline/python:${PROJECT_ROOT}/app/analyzer/src:${PYTHONPATH:-}"
 
-# Build Python command with all args
-CMD=("python3" "app/analyzer/src/dataset_builder.py" "--dataset" "$DATASET" "--n-clusters" "$N_CLUSTERS")
+# Build Python command
+CMD=(
+    "python3" "app/analyzer/src/dataset_builder.py"
+    "--source" "$SOURCE_MODE"
+)
+
+# Only forward --dataset when the user explicitly provided it; otherwise let
+# dataset_builder.py resolve it from --batch-id (payload-save mode).
+if [[ "$DATASET_PROVIDED" == "1" ]]; then
+    CMD+=("--dataset" "$DATASET")
+fi
+
+# Only pass --n-clusters when it's a real value (not the placeholder "0")
+if [[ -n "$N_CLUSTERS" && "$N_CLUSTERS" != "0" ]]; then
+    CMD+=("--n-clusters" "$N_CLUSTERS")
+fi
 
 if [[ -n "$RUN_ID" ]]; then
     CMD+=("--run-id" "$RUN_ID")
 fi
 
-# Pass through any remaining args (like --trials)
-CMD+=("$@")
+# Append any remaining flags (--trials, --batch-id, --k, --save-doc-id, etc.)
+if [[ ${#EXTRA_FLAGS[@]} -gt 0 ]]; then
+    CMD+=("${EXTRA_FLAGS[@]}")
+fi
+
+# In legacy positional mode, also pass through remaining "$@"
+if [[ "$SOURCE_MODE" == "alldatasets" && ${#EXTRA_FLAGS[@]} -eq 0 ]]; then
+    CMD+=("$@")
+fi
 
 "${CMD[@]}"
 
+# --- Cosmetic summary ---
+# When --dataset was omitted in payload-save mode, the real folder name is
+# resolved by Python (see the "Output:" line it prints above).
+DISPLAY_DATASET="$DATASET"
+if [[ "$DATASET_PROVIDED" != "1" ]]; then
+    DISPLAY_DATASET="<resolved-from-batch-${BATCH_ID:-?}>"
+fi
+
 echo ""
-echo "🎉 Done! Output: results/${DATASET}/${N_CLUSTERS}/cluster<i>/"
+echo "🎉 Done! See the 'Output:' path printed above (results/<dataset>/${N_CLUSTERS}/cluster<i>/)"
 echo "   Each cluster dir has: trajectory.csv, meta.yaml, action.yaml,"
 echo "   description.txt, snapshots/, stats.json, medoid.json, observations.json"
 echo ""
-echo "Next steps:"
-echo "  • Map metadata (one-time):  python3 scripts/map_preprocess.py --dataset ${DATASET}"
+echo "Next steps (replace <dataset> with the resolved name above, e.g. dataset1):"
+echo "  • Map metadata (one-time):  python3 scripts/map_preprocess.py --dataset ${DISPLAY_DATASET}"
 echo "  • Step 5 (LLM interpret):   python3 -m llm_pipeline.cluster_interpretation_pipeline \\"
-echo "                                  --dataset ${DATASET} --n-clusters ${N_CLUSTERS} [--dry-run]"
+echo "                                  --dataset ${DISPLAY_DATASET} --n-clusters ${N_CLUSTERS} [--dry-run]"

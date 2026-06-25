@@ -9,7 +9,7 @@
 | Need | Read |
 |------|------|
 | **Step-by-step run commands** (ports, SSH tunnel, container) | [MISSION_CONTROL_USER_GUIDE.md](MISSION_CONTROL_USER_GUIDE.md) |
-| **Per-trial CSV paths, alldatasets provenance** | [DATA_INVENTORY.md](DATA_INVENTORY.md) §2 |
+| **Per-trial CSV paths, data flow & analysis** | [DATA_INVENTORY_AND_ANALYSIS.md](DATA_INVENTORY_AND_ANALYSIS.md) |
 | **Legacy tmux workflow** (upstream / senior style) | [README.md](../README.md) §4 Goal B; [Legacy upstream workflow](#legacy-upstream-workflow--can-you-still-follow-it) below |
 | **Payload Admin → code parameter flow** | [Payload CMS configuration → code](#payload-cms-configuration--code-parameter-flow) below |
 | **Architecture, call graph, launch file, vehicle_parameters** | **This file** |
@@ -109,7 +109,7 @@ flowchart TB
 
 ## Per-trial data flow
 
-Full data catalog: [DATA_INVENTORY.md](DATA_INVENTORY.md) §2 Q1–Q2.
+Full data flow: [DATA_INVENTORY_AND_ANALYSIS.md](DATA_INVENTORY_AND_ANALYSIS.md).
 
 ```text
 1. SPSS __init__       GET Payload /batches/{id}, /scenarios/{id}
@@ -132,7 +132,7 @@ Full data catalog: [DATA_INVENTORY.md](DATA_INVENTORY.md) §2 Q1–Q2.
 | MC run logs | `simulation/ros/.cache/mission_control/runs/<run_id>/trial_*_roslaunch.log` |
 | Analysis export | `alldatasets/datasetN/` (Analyzer + Dashboard — **not** written by esmini directly) |
 
-**Trial ID warning:** The numeric index in the CSV filename is Sampling's `trial_index`, **not** Payload `trial.id`. Mapping `trial_id ≈ trial_id_base + trial_index` only holds when clustering and CSVs come from the **same** simulation campaign. Do not pair senior `alldatasets/` exports with new local `records/` without re-running clustering. See [DATA_INVENTORY.md](DATA_INVENTORY.md).
+**Trial ID warning:** The numeric index in the CSV filename is Sampling's `trial_index`, **not** Payload `trial.id`. Mapping `trial_id ≈ trial_id_base + trial_index` only holds when clustering and CSVs come from the **same** simulation campaign. Do not pair senior `alldatasets/` exports with new local `records/` without re-running clustering. See [DATA_INVENTORY_AND_ANALYSIS.md](DATA_INVENTORY_AND_ANALYSIS.md).
 
 ---
 
@@ -635,7 +635,7 @@ Implemented: `MissionControl/index.tsx`, `missionControl.ts`, Explore dock tab.
 | Document | Purpose |
 |----------|---------|
 | [MISSION_CONTROL_USER_GUIDE.md](MISSION_CONTROL_USER_GUIDE.md) | Operator runbook |
-| [DATA_INVENTORY.md](DATA_INVENTORY.md) | Data paths and alldatasets provenance |
+| [DATA_INVENTORY_AND_ANALYSIS.md](DATA_INVENTORY_AND_ANALYSIS.md) | Data flow, clustering, interpretation |
 | [README.md](../README.md) | Project overview, Goal A / Goal B |
 | [simulation/README.md](../simulation/README.md) | ITRI Docker / catkin setup |
 | `app/simulation/docs/mission_control_artifacts.md` | Per-run artifact layout |

@@ -1,7 +1,9 @@
 "use client";
+import dynamic from "next/dynamic";
 import { useAppSelector } from "../../../../redux/hooks";
-import { Stack, Typography } from "@mui/material";
-import Plot from "./Plot";
+import { Stack } from "@mui/material";
+
+const Plot = dynamic(() => import("./Plot"), { ssr: false });
 
 export default function ParameterSpace() {
   const egos = useAppSelector((state) => state.batch.egos);

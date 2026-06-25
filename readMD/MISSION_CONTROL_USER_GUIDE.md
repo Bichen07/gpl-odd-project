@@ -144,7 +144,7 @@ Before using Mission Control, start the stack (**Option A:** `./scripts/start_de
 **Terminal:** any (runs in background with `-d`)
 
 ```bash
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/payload
+cd /home/carlos11/Downloads/code/LAB/gpl-odd-project/app/payload
 docker compose up -d
 ```
 
@@ -174,7 +174,7 @@ Should print JSON starting with `{"docs":[...`.
 
 ```bash
 conda activate sampling
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/sampling/src
+cd /home/carlos11/Downloads/code/LAB/gpl-odd-project/app/sampling/src
 litestar run --port 9009 --host 0.0.0.0
 ```
 
@@ -218,7 +218,7 @@ kill $(lsof -ti :9010)
 Then start:
 ```bash
 conda activate analyzer
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/analyzer/src
+cd /home/carlos11/Downloads/code/LAB/gpl-odd-project/app/analyzer/src
 litestar run --port 9010 --host 0.0.0.0
 ```
 
@@ -241,7 +241,7 @@ Run `kill $(lsof -ti :9010)` and try again.
 **Terminal:** dedicated (blocks — keep this terminal open)
 
 ```bash
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/dashboard
+cd /home/carlos11/Downloads/code/LAB/gpl-odd-project/app/dashboard
 bun run dev
 ```
 
@@ -275,7 +275,7 @@ pip install docker
 Then start the API:
 ```bash
 conda activate sampling
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/simulation/src
+cd /home/carlos11/Downloads/code/LAB/gpl-odd-project/app/simulation/src
 litestar run --port 8282 --host 0.0.0.0
 ```
 
@@ -464,7 +464,7 @@ Mission Control (8282): ✅ Running
 **If Mission Control shows ❌ NOT running**, you missed step 1e. Go back and start it:
 ```bash
 conda activate sampling
-cd /home/carlos11/Downloads/code/LAB/41_Git/gpl-odd-project/app/simulation/src
+cd /home/carlos11/Downloads/code/LAB/gpl-odd-project/app/simulation/src
 litestar run --port 8282 --host 0.0.0.0
 ```
 

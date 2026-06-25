@@ -1,4 +1,4 @@
-"""Per-dataset map, batch, and Payload trial ID conventions (see DATA_INVENTORY.md)."""
+"""Per-dataset map, batch, and Payload trial ID conventions (see readMD/DATA_INVENTORY_AND_ANALYSIS.md)."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -42,6 +42,19 @@ def get_dataset_config(dataset: str) -> Dict:
             f"Unknown dataset {dataset!r}. Expected one of: {list(DATASETS)}"
         )
     return DATASETS[dataset]
+
+
+def dataset_for_batch_id(batch_id: int) -> Optional[str]:
+    """Reverse-lookup the canonical dataset name for a Payload batch id.
+
+    Used by payload-save mode so `--dataset` can be omitted: the batch id from
+    the saved analysis determines which map/track assets to use.
+    Returns None if no dataset maps to this batch id.
+    """
+    for name, cfg in DATASETS.items():
+        if int(cfg.get("batch_id", -1)) == int(batch_id):
+            return name
+    return None
 
 
 def xodr_path_for_dataset(dataset: str) -> Path:

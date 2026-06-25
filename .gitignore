@@ -29,3 +29,6 @@ simulation/ros/.cache/mission_control/runs/
 
 # start_dev_stack.sh / stop_dev_stack.sh logs and pid files
 logs/dev_stack/
+
+# PDF files
+*.pdf
