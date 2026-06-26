@@ -3,8 +3,8 @@
 Generate odrplot tracks CSV from OpenDRIVE using esmini odrplot.
 
 Usage:
-    python3 scripts/generate_map_tracks.py
-    python3 scripts/generate_map_tracks.py --dataset dataset2
+    python3 scripts/generate_map_tracks.py --batch-id 1
+    python3 scripts/generate_map_tracks.py --batch-id 2
     python3 scripts/generate_map_tracks.py --all
 """
 from __future__ import annotations
@@ -49,20 +49,26 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Generate odrplot tracks CSV for HCT map(s)")
     parser.add_argument("--step", type=float, default=2.0, help="odrplot sampling step (m)")
     parser.add_argument(
+        "--batch-id",
+        type=int,
+        default=None,
+        help="Payload batch id (resolves the map via dataset_config). Preferred.",
+    )
+    parser.add_argument(
         "--dataset",
-        default="dataset1",
-        help="dataset1|dataset2|dataset3 (selects xodr + output tracks name)",
+        default=None,
+        help="Internal alias: dataset1|dataset2|dataset3 (prefer --batch-id)",
     )
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Generate tracks for every dataset map variant",
+        help="Generate tracks for every map variant",
     )
     args = parser.parse_args()
 
     repo = Path(__file__).resolve().parents[1]
     sys.path.insert(0, str(repo / "app/analyzer/src"))
-    from dataset_config import DATASETS, XODR_DIR
+    from dataset_config import DATASETS, XODR_DIR, dataset_for_batch_id
 
     odrplot = find_odrplot(repo)
     if odrplot is None:
@@ -72,7 +78,23 @@ def main() -> int:
         )
         return 1
 
-    datasets = list(DATASETS) if args.all else [args.dataset]
+    if args.all:
+        datasets = list(DATASETS)
+    elif args.batch_id is not None:
+        ds = dataset_for_batch_id(args.batch_id)
+        if ds is None:
+            print(
+                f"ERROR: no map config maps to batch id {args.batch_id}. "
+                f"Known batches: {[c['batch_id'] for c in DATASETS.values()]}",
+                file=sys.stderr,
+            )
+            return 1
+        datasets = [ds]
+    elif args.dataset:
+        datasets = [args.dataset]
+    else:
+        parser.error("provide --batch-id <n> (or --dataset / --all)")
+        return 2
     XODR_DIR.mkdir(parents=True, exist_ok=True)
     try:
         for ds in datasets:

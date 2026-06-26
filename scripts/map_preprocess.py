@@ -24,7 +24,7 @@ Outputs (into results/map/):
   * <map_id>.jpg               — top-down map image (MapPlotter, no agents)
 
 Usage:
-  python3 scripts/map_preprocess.py --dataset dataset1
+  python3 scripts/map_preprocess.py --batch-id 1
   python3 scripts/map_preprocess.py --map-id hct_6   # explicit map id
 """
 from __future__ import annotations
@@ -138,8 +138,9 @@ def build_description(map_data: Dict) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Map-agnostic XODR preprocessor")
-    ap.add_argument("--dataset", default=None, help="Dataset name (dataset1/2/3)")
-    ap.add_argument("--map-id", default=None, help="Map id (e.g. hct_6); overrides --dataset")
+    ap.add_argument("--batch-id", type=int, default=None, help="Payload batch id (resolves the map via dataset_config). Preferred.")
+    ap.add_argument("--dataset", default=None, help="Internal alias: dataset1/2/3 (prefer --batch-id)")
+    ap.add_argument("--map-id", default=None, help="Map id (e.g. hct_6); overrides --batch-id/--dataset")
     ap.add_argument("--no-image", action="store_true", help="Skip .jpg map render")
     ap.add_argument(
         "--image-size",
@@ -170,14 +171,20 @@ def main() -> int:
     if args.map_id:
         map_id = args.map_id
         tracks_name = f"{map_id}_tracks.csv"
-    elif args.dataset:
-        from dataset_config import get_dataset_config
+    elif args.batch_id is not None or args.dataset:
+        from dataset_config import get_dataset_config, dataset_for_batch_id
 
-        cfg = get_dataset_config(args.dataset)
+        dataset = args.dataset
+        if args.batch_id is not None:
+            dataset = dataset_for_batch_id(args.batch_id)
+            if dataset is None:
+                ap.error(f"no map config maps to batch id {args.batch_id}")
+                return 2
+        cfg = get_dataset_config(dataset)
         map_id = Path(cfg["xodr"]).stem
         tracks_name = cfg["tracks"]
     else:
-        ap.error("provide --dataset or --map-id")
+        ap.error("provide --batch-id, --dataset, or --map-id")
         return 2
 
     xodr_path = XODR_DIR / f"{map_id}.xodr"

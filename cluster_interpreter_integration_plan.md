@@ -624,15 +624,21 @@ BEV rendering needs the map track + metadata assets in `results/map/`. If that f
 empty (fresh checkout), run once per map before the build:
 
 ```bash
-python3 scripts/generate_map_tracks.py --dataset dataset1   # writes results/map/hct_6.xodr + hct_6_tracks.csv
-python3 scripts/map_preprocess.py     --dataset dataset1    # writes results/map/hct_6.{yaml,jpg,_description.txt}
-# dataset2 uses a different map (hct_6_no_930): repeat with --dataset dataset2
+python3 scripts/generate_map_tracks.py --batch-id 1   # writes results/map/hct_6.xodr + hct_6_tracks.csv
+python3 scripts/map_preprocess.py     --batch-id 1    # writes results/map/hct_6.{yaml,jpg,_description.txt}
+# batch 2 uses a different map (hct_6_no_930): repeat with --batch-id 2
 ```
 
-Note: `--dataset` is still the correct flag **for these two map scripts** (it selects the
-xodr + output map name via `dataset_config`). Only `build_llm_dataset.sh` dropped `--dataset`.
-`map_preprocess.py` also accepts `--map-id hct_6` directly; `generate_map_tracks.py` takes
-`--dataset` (or `--all` for every map variant).
+Both map scripts are now **batch-centric** (`--batch-id <n>`), matching `build_llm_dataset.sh`.
+The batch id resolves to a map through `dataset_config.DATASETS` (see below). Alternatives:
+`--map-id hct_6` (map_preprocess, explicit), `--dataset dataset1` (internal alias, still
+accepted), `--all` (generate_map_tracks, every map variant).
+
+How the `dataset1/2/3` labels relate to batches: `dataset_config.DATASETS` is just an internal
+table keyed by canonical name, each row carrying `batch_id`, `xodr`, `tracks`, and `location`.
+`--batch-id` is reverse-looked-up to that row via `dataset_for_batch_id()`. Today: batch 1 →
+`hct_6`, batch 2 → `hct_6_no_930`, batch 3 → `hct_6`. The label is never required from the CLI;
+it only namespaces the config. (A future cleanup could re-key `DATASETS` by `batch_id` directly.)
 
 `generate_map_tracks.py` now copies the source xodr into `results/map/` automatically, so
 no manual `cp` is needed. Without these assets the build still completes but logs
@@ -647,8 +653,8 @@ cd gpl-odd-project
 conda activate analyzer
 
 # One-time map assets per map (skip if results/map already populated)
-python3 scripts/generate_map_tracks.py --dataset <dataset>
-python3 scripts/map_preprocess.py     --dataset <dataset>
+python3 scripts/generate_map_tracks.py --batch-id <batch>
+python3 scripts/map_preprocess.py     --batch-id <batch>
 
 # payload-save build — the supported path. --dataset is NOT needed (resolved from --batch-id).
 # Pick the result with --k (best silhouette), --clustering-index <i>, or a saved selected.json:
@@ -772,24 +778,21 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000
 cd /home/carlos11/Downloads/code/LAB/gpl-odd-project
 
 # A) Ensure shared map assets in results/map/ (one-time per map)
-python3 scripts/generate_map_tracks.py --dataset dataset1
-python3 scripts/map_preprocess.py     --dataset dataset1
+python3 scripts/generate_map_tracks.py --batch-id 1
+python3 scripts/map_preprocess.py     --batch-id 1
 
-# B-legacy) Build medoid artifacts from alldatasets/ (requires exported clustering files)
-#   → output: results/batch1/4_cluster/
-bash scripts/build_llm_dataset.sh dataset1 4
-
-# B-new) Build medoid artifacts directly from Payload saved analysis (no alldatasets/ needed)
-#   --dataset is optional; when omitted it is resolved from --batch-id (batch 1 → dataset1)
-#   → output: results/batch1/4_cluster/
+# B) Build medoid artifacts directly from Payload saved analysis (no alldatasets/ needed)
+#   --dataset not needed; the map is resolved from --batch-id.
+#   → output: results/batch1/<k>_cluster_s=<silhouette>/
 bash scripts/build_llm_dataset.sh \
   --source payload-save \
   --batch-id 1 \
   --k 4
-# Options: --save-doc-id 46   (specific save, default: latest)
-#          --clustering-index 445   (exact index instead of --k)
-#          --ego-name ITRI          (default: ITRI)
-#          --duration-mode full     (default: full)
+# Options: --save-doc-id 46       (specific save, default: latest)
+#          --clustering-index 445 (exact index instead of --k)
+#          --list-clusterings     (print candidates for --k, then pick an index)
+#          --ego-name ITRI        (default: ITRI)
+#          --duration-mode full   (default: full)
 
 # C) Run interpretation
 bash scripts/run_cluster_interpretation.sh dataset1 4
