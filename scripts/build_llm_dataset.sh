@@ -31,6 +31,7 @@ DATASET_PROVIDED=0      # 1 only when the user explicitly passes --dataset / pos
 N_CLUSTERS=""
 BATCH_ID=""
 RUN_ID=""
+LIST_ONLY=0            # 1 when --list-clusterings is requested (no build, no summary)
 EXTRA_FLAGS=()
 
 if [[ $# -gt 0 && "${1:-}" != --* ]]; then
@@ -89,6 +90,11 @@ else
             --run-id)
                 RUN_ID="${REMAINING[$next_idx]}"
                 IDX=$(( IDX + 2 ))
+                ;;
+            --list-clusterings)
+                LIST_ONLY=1
+                EXTRA_FLAGS+=("$arg")
+                IDX=$(( IDX + 1 ))
                 ;;
             *)
                 EXTRA_FLAGS+=("$arg")
@@ -164,20 +170,20 @@ fi
 
 "${CMD[@]}"
 
-# --- Cosmetic summary ---
-# When --dataset was omitted in payload-save mode, the real folder name is
-# resolved by Python (see the "Output:" line it prints above).
-DISPLAY_DATASET="$DATASET"
-if [[ "$DATASET_PROVIDED" != "1" ]]; then
-    DISPLAY_DATASET="<resolved-from-batch-${BATCH_ID:-?}>"
+# --- List-only mode: nothing was built, skip the output summary ---
+if [[ "$LIST_ONLY" == "1" ]]; then
+    exit 0
 fi
 
+# --- Cosmetic summary ---
+# Output layout: results/batch<id>/<k>_cluster_s=<silhouette>/cluster<N>/...
 echo ""
-echo "🎉 Done! See the 'Output:' path printed above (results/<dataset>/${N_CLUSTERS}/cluster<i>/)"
-echo "   Each cluster dir has: trajectory.csv, meta.yaml, action.yaml,"
-echo "   description.txt, snapshots/, stats.json, medoid.json, observations.json"
+echo "🎉 Done! See the 'Output dir:' path printed above:"
+echo "   results/batch<id>/<k>_cluster_s=<silhouette>/cluster<i>/"
+echo "   Each cluster dir has: context.md, cluster.json, action.yaml,"
+echo "   description.txt, trajectory.csv, map_overview.jpg, snapshots/"
+echo "   Shared map assets: results/map/"
 echo ""
-echo "Next steps (replace <dataset> with the resolved name above, e.g. dataset1):"
-echo "  • Map metadata (one-time):  python3 scripts/map_preprocess.py --dataset ${DISPLAY_DATASET}"
-echo "  • Step 5 (LLM interpret):   python3 -m llm_pipeline.cluster_interpretation_pipeline \\"
-echo "                                  --dataset ${DISPLAY_DATASET} --n-clusters ${N_CLUSTERS} [--dry-run]"
+echo "One-time map assets (if results/map/ is empty):"
+echo "  python3 scripts/generate_map_tracks.py --dataset <dataset>"
+echo "  python3 scripts/map_preprocess.py     --dataset <dataset>"

@@ -14,7 +14,7 @@ Usage:
     
     interpreter = ClusterInterpreter(
         model="gpt-4o",
-        xodr_path="alldatasets/resources/xodr/hct_6.xodr"
+        xodr_path="results/map/hct_6.xodr"
     )
     
     result = interpreter.analyze_cluster(

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -72,12 +73,22 @@ def main() -> int:
         return 1
 
     datasets = list(DATASETS) if args.all else [args.dataset]
+    XODR_DIR.mkdir(parents=True, exist_ok=True)
     try:
         for ds in datasets:
             cfg = DATASETS[ds]
             xodr = XODR_DIR / cfg["xodr"]
             out = XODR_DIR / cfg["tracks"]
             print(f"=== {ds}: {cfg['description']} ===")
+
+            # Ensure the source xodr is present in results/map so the whole map
+            # layout is self-contained (map_preprocess + BEV read from here).
+            if not xodr.is_file():
+                src = repo / "simulation/ros/.cache/scenario_search" / cfg["xodr"]
+                if src.is_file():
+                    shutil.copy(src, xodr)
+                    print(f"✓ Copied source map → {xodr}")
+
             generate_one(repo, xodr, out, args.step, odrplot)
     except FileNotFoundError as e:
         print(f"ERROR: {e}", file=sys.stderr)

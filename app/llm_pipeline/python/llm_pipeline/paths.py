@@ -5,7 +5,7 @@ from pathlib import Path
 
 def find_repo_root(start: Path) -> Path:
     for p in [start, *start.parents]:
-        if (p / "alldatasets").is_dir() and (p / "app" / "analyzer").is_dir():
+        if (p / "results").is_dir() and (p / "app" / "analyzer").is_dir():
             return p
         if p.name == "gpl-odd-project":
             return p

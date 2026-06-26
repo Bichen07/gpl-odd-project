@@ -18,7 +18,7 @@ rule-based labeller actually needs:
   * Junctions     — {junction_id: [connecting road ids]}
   * RoadLanes     — per-road driving lane ids (for description context)
 
-Outputs (into alldatasets/map/):
+Outputs (into results/map/):
   * <map_id>.yaml              — the structured map metadata above
   * <map_id>_description.txt   — human-readable lane/junction summary
   * <map_id>.jpg               — top-down map image (MapPlotter, no agents)
@@ -43,8 +43,9 @@ ANALYZER_SRC = REPO_ROOT / "app" / "analyzer" / "src"
 if str(ANALYZER_SRC) not in sys.path:
     sys.path.insert(0, str(ANALYZER_SRC))
 
-XODR_DIR = REPO_ROOT / "alldatasets" / "resources" / "xodr"
-MAP_DIR = REPO_ROOT / "alldatasets" / "map"
+# Shared map assets (xodr input + generated yaml/jpg/description) live in results/map.
+XODR_DIR = REPO_ROOT / "results" / "map"
+MAP_DIR = REPO_ROOT / "results" / "map"
 
 
 def parse_map(xodr_path: Path) -> Dict:

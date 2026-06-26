@@ -2,13 +2,13 @@
 """Build structured LLM dataset from medoid trials.
 
 This script orchestrates Phase 4: for each cluster's medoid trial, it generates:
-- trajectory.csv (xosc_gen format with roadId/laneId)
-- meta.yaml (scenario metadata)
-- BEV images (key timesteps)
-- observations.json (raw Payload data)
-- stats.json (cluster statistics)
+- trajectory.csv (xosc_gen format with roadId/laneId; raw timeline for BEV)
+- action.yaml (structured semantic events) + description.txt (prose)
+- BEV images (key timesteps) + map_overview.jpg
+- cluster.json (merged cluster + medoid + scene metadata)
+- context.md (consolidated LLM card: header + description + actions + snapshot index)
 
-Output structure: results/<dataset>/<n_clusters>/cluster<label>/
+Output structure: results/batch<id>/<k>_cluster_s=<silhouette>/cluster<label>/
 """
 
 import argparse
@@ -149,30 +149,22 @@ def load_clustering_data(dataset: str, n_clusters: int) -> Optional[Tuple[Dict, 
     return embeddings_data, result_data
 
 
-def load_clustering_from_payload_save(
+def _real_cluster_count(result: Dict) -> int:
+    """Number of real clusters in a ClusteringResult (excludes noise label -1)."""
+    return len({v["label"] for v in result.get("data", {}).values()} - {"-1"})
+
+
+def _fetch_payload_analysis(
     batch_id: int,
     save_doc_id: Optional[int] = None,
-    k: Optional[int] = None,
-    clustering_index: Optional[int] = None,
     duration_mode: str = "full",
     ego_name: str = "ITRI",
-) -> Optional[Tuple[Dict, Dict, Dict]]:
-    """Fetch a saved Dashboard analysis zip from Payload and extract clustering data.
+) -> Optional[Tuple[Dict, List, Dict, Optional[Dict]]]:
+    """Fetch + parse a saved Dashboard analysis zip from Payload.
 
-    Returns (embeddings_data, result_data, trial_index_map) or None on error.
-
-    embeddings_data: { "embeddings": { trialId: [float, ...] } }
-    result_data:     { "data": { trialId: { "trialId": ..., "label": ... } } }
-    trial_index_map: { trialId_str: (batch_id_int, trial_index_int) }
-
-    Either k or clustering_index must be provided (not both).
+    Returns (scores, clustering_list, ego_data, selected_meta_raw) or None on error.
+    Shared by load_clustering_from_payload_save() and list_clusterings_from_payload_save().
     """
-    if k is not None and clustering_index is not None:
-        print("❌ ERROR: --k and --clustering-index are mutually exclusive")
-        return None
-    # k and clustering_index may both be None if selected.json is present in the zip;
-    # we re-check after parsing.
-
     # 1. Fetch batch to get saved analysis document list
     try:
         resp = requests.get(
@@ -228,17 +220,14 @@ def load_clustering_from_payload_save(
     try:
         with zipfile.ZipFile(io.BytesIO(dl.content)) as zf:
             zf_namelist = zf.namelist()
-            # Main analysis file
             json_name = next((n for n in zf_namelist if n.endswith(".json") and "selected" not in n), None)
             if json_name is None:
-                # Fallback: any json
                 json_name = next((n for n in zf_namelist if n.endswith(".json")), None)
             if json_name is None:
                 print(f"❌ ERROR: No JSON file found in {doc_filename}")
                 return None
             with zf.open(json_name) as jf:
                 analysis = json.load(jf)
-            # selected.json — persisted Dashboard cluster choice
             selected_meta_raw: Optional[Dict] = None
             if "selected.json" in zf_namelist:
                 try:
@@ -250,26 +239,10 @@ def load_clustering_from_payload_save(
         print(f"❌ ERROR: Failed to parse zip from {doc_filename}: {exc}")
         return None
 
-    # 4b. Apply selected.json if available and no CLI override
-    selected_meta: Optional[Dict] = None
-    if selected_meta_raw is not None:
-        ego_sel = selected_meta_raw.get(ego_name)
-        if ego_sel:
-            selected_meta = ego_sel
-            print(f"  Found selected.json: ego={ego_name}, "
-                  f"index={selected_meta.get('clusteringIndex')}, "
-                  f"task={selected_meta.get('task')}")
-            if k is None and clustering_index is None:
-                ci = selected_meta.get("clusteringIndex")
-                if ci is not None:
-                    clustering_index = int(ci)
-                    print(f"  Using clusteringIndex={clustering_index} from selected.json")
-
     # 5. Navigate to ego → mfpca → duration_mode
     ego_data = analysis.get(ego_name)
     if ego_data is None:
-        available = list(analysis.keys())
-        print(f"❌ ERROR: ego '{ego_name}' not in saved analysis. Available: {available}")
+        print(f"❌ ERROR: ego '{ego_name}' not in saved analysis. Available: {list(analysis.keys())}")
         return None
 
     mfpca_all = ego_data.get("mfpca", {})
@@ -278,8 +251,8 @@ def load_clustering_from_payload_save(
         return None
 
     mfpca = mfpca_all[duration_mode]
-    scores = mfpca.get("scores", {})          # {trialId: [float, ...]}
-    clustering_list = mfpca.get("clustering", [])
+    scores = mfpca.get("scores", {})
+    clustering_list = [c for c in mfpca.get("clustering", []) if c is not None]
 
     if not scores:
         print("❌ ERROR: mfpca.scores is empty — no embeddings found.")
@@ -288,9 +261,104 @@ def load_clustering_from_payload_save(
         print("❌ ERROR: mfpca.clustering is empty — no clustering results found.")
         return None
 
-    # Remove None entries
-    clustering_list = [c for c in clustering_list if c is not None]
+    return scores, clustering_list, ego_data, selected_meta_raw
+
+
+def list_clusterings_from_payload_save(
+    batch_id: int,
+    save_doc_id: Optional[int] = None,
+    k: Optional[int] = None,
+    duration_mode: str = "full",
+    ego_name: str = "ITRI",
+) -> bool:
+    """Print every clustering candidate (index, k, silhouette, task params).
+
+    If k is given, only candidates with that real cluster count are shown.
+    Returns True on success. Used by `--list-clusterings`.
+    """
+    fetched = _fetch_payload_analysis(batch_id, save_doc_id, duration_mode, ego_name)
+    if fetched is None:
+        return False
+    scores, clustering_list, _ego_data, _sel = fetched
+    print(f"  Loaded {len(scores)} trial embeddings, {len(clustering_list)} clustering candidates.\n")
+
+    rows = []
+    for idx, result in enumerate(clustering_list):
+        rk = _real_cluster_count(result)
+        if k is not None and rk != k:
+            continue
+        sc = result.get("scores", {}) or {}
+        task = result.get("task", {}) or {}
+        rows.append({
+            "idx": idx,
+            "k": rk,
+            "silhouette": sc.get("silhouetteScore"),
+            "minClusterSize": task.get("minClusterSize"),
+            "minSamples": task.get("minSamples"),
+            "epsilon": task.get("clusterSelectionEpsilon"),
+            "method": task.get("clusterSelectionMethod"),
+        })
+
+    if not rows:
+        print(f"  No clustering candidates{f' with k={k}' if k is not None else ''}.")
+        return True
+
+    # Sort by k, then silhouette desc — so the default --k pick is the top row per k
+    rows.sort(key=lambda r: (r["k"], -(r["silhouette"] if r["silhouette"] is not None else -1.0)))
+
+    hdr = f"{'index':>6}  {'k':>3}  {'silhouette':>11}  {'minClSize':>9}  {'minSamp':>7}  {'epsilon':>7}  method"
+    print(hdr)
+    print("  " + "-" * (len(hdr) + 2))
+    for r in rows:
+        sil = f"{r['silhouette']:.4f}" if isinstance(r["silhouette"], (int, float)) else "?"
+        print(f"{r['idx']:>6}  {r['k']:>3}  {sil:>11}  "
+              f"{str(r['minClusterSize']):>9}  {str(r['minSamples']):>7}  "
+              f"{str(r['epsilon']):>7}  {r['method']}")
+    print(f"\n  → Pick one with: --clustering-index <index>   "
+          f"(or --k <k> to auto-pick the highest-silhouette row for that k)")
+    return True
+
+
+def load_clustering_from_payload_save(
+    batch_id: int,
+    save_doc_id: Optional[int] = None,
+    k: Optional[int] = None,
+    clustering_index: Optional[int] = None,
+    duration_mode: str = "full",
+    ego_name: str = "ITRI",
+) -> Optional[Tuple[Dict, Dict, Dict]]:
+    """Fetch a saved Dashboard analysis zip from Payload and extract clustering data.
+
+    Returns (embeddings_data, result_data, trial_index_map) or None on error.
+
+    embeddings_data: { "embeddings": { trialId: [float, ...] } }
+    result_data:     { "data": { trialId: { "trialId": ..., "label": ... } } }
+    trial_index_map: { trialId_str: (batch_id_int, trial_index_int) }
+
+    Either k or clustering_index must be provided (not both), unless the zip
+    carries a selected.json with the user's choice.
+    """
+    if k is not None and clustering_index is not None:
+        print("❌ ERROR: --k and --clustering-index are mutually exclusive")
+        return None
+
+    fetched = _fetch_payload_analysis(batch_id, save_doc_id, duration_mode, ego_name)
+    if fetched is None:
+        return None
+    scores, clustering_list, ego_data, selected_meta_raw = fetched
     print(f"  Loaded {len(scores)} trial embeddings, {len(clustering_list)} clustering candidates.")
+
+    # Apply selected.json if available and no CLI override
+    if selected_meta_raw is not None:
+        ego_sel = selected_meta_raw.get(ego_name)
+        if ego_sel:
+            print(f"  Found selected.json: ego={ego_name}, "
+                  f"index={ego_sel.get('clusteringIndex')}, task={ego_sel.get('task')}")
+            if k is None and clustering_index is None:
+                ci = ego_sel.get("clusteringIndex")
+                if ci is not None:
+                    clustering_index = int(ci)
+                    print(f"  Using clusteringIndex={clustering_index} from selected.json")
 
     # 6. Select one ClusteringResult
     if k is None and clustering_index is None:
@@ -470,12 +538,14 @@ def build_run_manifest(
     n_clusters: int,
     medoids: List[Dict[str, Any]],
     run_id: str,
+    batch_id: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Create the top-level manifest.json for this run."""
     return {
         "run_id": run_id,
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "dataset": dataset,
+        "batch_id": batch_id,
         "n_clusters": n_clusters,
         "medoid_count": len(medoids),
         "clusters": [
@@ -560,6 +630,100 @@ def build_bev_typography(args: argparse.Namespace):
     )
 
 
+def write_context_md(
+    cluster_dir: Path,
+    cluster_doc: Optional[Dict[str, Any]],
+    action_data: Optional[Dict[str, Any]],
+) -> None:
+    """Write a single self-contained LLM context card for one cluster.
+
+    Combines the cluster/medoid header, the prose description, the structured
+    agent action timeline, and an ordered index of BEV snapshots so the model
+    can read one file (plus the images) instead of stitching several artifacts.
+    """
+    cd = cluster_doc or {}
+    c = cd.get("cluster", {})
+    m = cd.get("medoid", {})
+    s = cd.get("scene", {})
+
+    lines: List[str] = []
+    label = c.get("label", cluster_dir.name.replace("cluster", ""))
+    sil = c.get("silhouette")
+    sil_str = f"{sil:.4f}" if isinstance(sil, (int, float)) else "n/a"
+    lines.append(f"# Cluster {label}")
+    lines.append("")
+    lines.append(
+        f"- **Representativeness**: medoid of {c.get('size', '?')} similar trials "
+        f"(k={c.get('n_clusters', '?')}, silhouette={sil_str})"
+    )
+    lines.append(
+        f"- **Medoid trial**: id={m.get('trial_id', '?')}, batch={m.get('batch_id', '?')}, "
+        f"esmini index={m.get('trial_index', '?')}"
+        + ("" if m.get("is_exact_medoid", True) else f" (nearest available, rank {m.get('medoid_rank')})")
+    )
+    if c.get("collision_rate") is not None:
+        lines.append(
+            f"- **Collisions**: {c.get('collision_count')}/{c.get('n_trials')} trials "
+            f"({c.get('collision_rate')}%)"
+        )
+    lines.append(
+        f"- **Map**: {s.get('location', '?')}, duration {s.get('duration_seconds', '?')}s, "
+        f"{s.get('frame_count', '?')} frames"
+    )
+    agents = s.get("agents", [])
+    if agents:
+        ag_str = ", ".join(
+            f"{a.get('name')} ({a.get('class')})" for a in agents
+        )
+        lines.append(f"- **Agents**: {ag_str}")
+    lines.append("")
+
+    # Scenario description (prose)
+    desc_path = cluster_dir / "description.txt"
+    if desc_path.is_file():
+        lines.append("## Scenario description")
+        lines.append("")
+        lines.append(desc_path.read_text(encoding="utf-8").strip())
+        lines.append("")
+
+    # Structured agent action timeline
+    if action_data and action_data.get("agents"):
+        lines.append("## Agent actions")
+        lines.append("")
+        for ag in action_data["agents"]:
+            role = ag.get("role", "npc")
+            header = f"### {ag.get('name', '?')} ({ag.get('type', 'car')}, {role})"
+            rel = ag.get("relation_to_ego")
+            if rel:
+                header += f" — {rel}"
+            lines.append(header)
+            lines.append("")
+            lines.append("| time | action | road | lane |")
+            lines.append("|------|--------|------|------|")
+            for ev in ag.get("actions", []):
+                st = ev.get("start_time")
+                et = ev.get("end_time")
+                tspan = f"{st:.1f}s" if st == et else f"{st:.1f}–{et:.1f}s"
+                lines.append(
+                    f"| {tspan} | {ev.get('action')} | {ev.get('road_id')} | {ev.get('lane_id')} |"
+                )
+            lines.append("")
+
+    # BEV snapshot index
+    snap_dir = cluster_dir / "snapshots"
+    snaps = sorted(p.name for p in snap_dir.glob("*.jpg")) if snap_dir.is_dir() else []
+    if snaps or (cluster_dir / "map_overview.jpg").is_file():
+        lines.append("## BEV snapshots (chronological)")
+        lines.append("")
+        if (cluster_dir / "map_overview.jpg").is_file():
+            lines.append("- `map_overview.jpg` — whole-map view with the medoid trajectory")
+        for name in snaps:
+            lines.append(f"- `snapshots/{name}`")
+        lines.append("")
+
+    (cluster_dir / "context.md").write_text("\n".join(lines), encoding="utf-8")
+
+
 def process_medoid(
     medoid: Dict[str, Any],
     run_dir: Path,
@@ -575,6 +739,7 @@ def process_medoid(
     collision_flags: Optional[Dict[str, bool]] = None,
     cluster_collision_stats: Optional[Dict[str, Any]] = None,
     n_clusters: Optional[int] = None,
+    silhouette: Optional[float] = None,
 ) -> bool:
     """Process a single medoid trial: generate all required files.
     
@@ -594,21 +759,6 @@ def process_medoid(
     cluster_dir = run_dir / f"cluster{label}"
     cluster_dir.mkdir(parents=True, exist_ok=True)
 
-    # medoid.json — provenance for this cluster representative
-    try:
-        with (cluster_dir / "medoid.json").open("w") as f:
-            json.dump({
-                "cluster_label": label,
-                "trial_id": medoid.get("trial_id"),
-                "batch_id": batch_id,
-                "trial_index": trial_index,
-                "size": medoid.get("size"),
-                "medoid_rank": medoid.get("medoid_rank", 0),
-                "is_exact_medoid": medoid.get("is_exact_medoid", True),
-            }, f, indent=2)
-    except Exception as e:
-        print(f"  ⚠️  Failed to write medoid.json: {e}")
-    
     # 1. Check if CSV exists
     if not csv_exists(batch_id, trial_index):
         print(f"  ❌ CSV not found for batch {batch_id} trial {trial_index}")
@@ -641,7 +791,8 @@ def process_medoid(
         del df
         return False
     
-    # 5. Build meta.yaml
+    # 5. Build meta.yaml (intermediate input for the labeller; removed from output later)
+    location_for_meta = Path(xodr_path).stem
     meta_path = cluster_dir / "meta.yaml"
     try:
         build_meta_yaml(
@@ -649,9 +800,9 @@ def process_medoid(
             observations,
             meta_path,
             dataset="gpl-odd-simulated",
-            location="hct_6",
+            location=location_for_meta,
         )
-        print(f"  ✓ Generated meta.yaml")
+        print(f"  ✓ Generated meta.yaml (intermediate)")
     except Exception as e:
         print(f"  ❌ Failed to build meta.yaml: {e}")
         del df
@@ -659,15 +810,17 @@ def process_medoid(
     
     # 6. Action labelling (Step 2) + scenario description (Step 3)
     #    Rule-based, map-agnostic (taxonomy.py / labeller.py / description.py).
+    action_data_for_ctx: Optional[Dict[str, Any]] = None
     try:
         from labeller import label_trajectory, save_action_yaml
         from description import build_description, save_description_txt
 
-        map_yaml = REPO_ROOT / "alldatasets" / "map" / f"{Path(xodr_path).stem}.yaml"
+        map_yaml = RESULTS_DIR / "map" / f"{Path(xodr_path).stem}.yaml"
         action_data = label_trajectory(
             trajectory_path, meta_path,
             map_yaml if map_yaml.is_file() else None,
         )
+        action_data_for_ctx = action_data
         save_action_yaml(action_data, cluster_dir / "action.yaml")
         save_description_txt(build_description(action_data),
                             cluster_dir / "description.txt")
@@ -735,44 +888,67 @@ def process_medoid(
     except Exception as e:
         print(f"  ⚠️  BEV generation failed: {e}")
     
-    # 8. Save raw observations (for reference/debugging)
-    obs_path = cluster_dir / "observations.json"
+    # 8. Consolidated cluster.json (merges old meta.yaml + medoid.json + stats.json).
+    #    observations.json is no longer written — trajectory.csv is the single raw timeline.
     try:
-        with obs_path.open("w") as f:
-            json.dump(observations, f, indent=2)
-        print(f"  ✓ Saved observations.json")
-    except Exception as e:
-        print(f"  ⚠️  Failed to save observations.json: {e}")
-    
-    # 8. Save cluster statistics
-    stats_path = cluster_dir / "stats.json"
-    try:
-        duration = observations[-1]["time"] - observations[0]["time"] if observations else 0
+        duration = (observations[-1]["time"] - observations[0]["time"]) if observations else 0
         agent_names = [ag.name for ag in registry if ag.name != "Ego"]
-        
         cc = cluster_collision_stats or {}
-        stats = {
-            "cluster_label": label,
-            "cluster_size": medoid["size"],
-            "n_trials": cc.get("n_trials", medoid["size"]),
-            "collision_count": cc.get("collision_count"),
-            "collision_rate": cc.get("collision_rate"),
-            "medoid_trial_id": medoid.get("trial_id"),
-            "medoid_collided": medoid_collided if collision_flags else None,
-            "batch_id": batch_id,
-            "trial_index": trial_index,
-            "frame_count": len(observations),
-            "duration_seconds": duration,
-            "agent_count": len(agent_names),
-            "agents": agent_names,
-            "n_clusters": n_clusters,
+        cluster_doc = {
+            "cluster": {
+                "label": label,
+                "size": medoid["size"],
+                "n_trials": cc.get("n_trials", medoid["size"]),
+                "n_clusters": n_clusters,
+                "silhouette": round(float(silhouette), 4) if silhouette is not None else None,
+                "collision_count": cc.get("collision_count"),
+                "collision_rate": cc.get("collision_rate"),
+            },
+            "medoid": {
+                "trial_id": medoid.get("trial_id"),
+                "batch_id": batch_id,
+                "trial_index": trial_index,
+                "medoid_rank": medoid.get("medoid_rank", 0),
+                "is_exact_medoid": medoid.get("is_exact_medoid", True),
+                "collided": medoid_collided if collision_flags else None,
+            },
+            "scene": {
+                "dataset": "gpl-odd-simulated",
+                "location": location_for_meta,
+                "duration_seconds": round(float(duration), 3),
+                "frame_count": len(observations),
+                "agents": [
+                    {
+                        "track_id": a.track_id,
+                        "name": a.name,
+                        "class": a.obj_class,
+                        "width": a.width,
+                        "length": a.length,
+                    }
+                    for a in registry
+                ],
+            },
         }
-        with stats_path.open("w") as f:
-            json.dump(stats, f, indent=2)
-        print(f"  ✓ Saved stats.json")
+        with (cluster_dir / "cluster.json").open("w") as f:
+            json.dump(cluster_doc, f, indent=2)
+        print(f"  ✓ Saved cluster.json")
     except Exception as e:
-        print(f"  ⚠️  Failed to save stats.json: {e}")
-    
+        cluster_doc = None
+        print(f"  ⚠️  Failed to write cluster.json: {e}")
+
+    # 9. Consolidated LLM context card (description + actions + snapshot index)
+    try:
+        write_context_md(cluster_dir, cluster_doc, action_data_for_ctx)
+        print(f"  ✓ Saved context.md")
+    except Exception as e:
+        print(f"  ⚠️  Failed to write context.md: {e}")
+
+    # meta.yaml is an intermediate input to the labeller only — drop it from output.
+    try:
+        (cluster_dir / "meta.yaml").unlink(missing_ok=True)
+    except Exception:
+        pass
+
     # Clean up dataframe
     del df
     
@@ -834,6 +1010,12 @@ def main():
         type=int,
         default=None,
         help="Directly select by 0-based index into clustering[] array (mutually exclusive with --k)",
+    )
+    parser.add_argument(
+        "--list-clusterings",
+        action="store_true",
+        help="payload-save only: print all clustering candidates (index, k, silhouette, "
+             "task params) and exit without building. Filter with --k.",
     )
     parser.add_argument(
         "--duration-mode",
@@ -937,6 +1119,23 @@ def main():
 
     # --- Validate arg combinations ---
     is_payload_save = args.source == "payload-save"
+
+    # --- List-only mode: print clustering candidates and exit (no build) ---
+    if args.list_clusterings:
+        if not is_payload_save:
+            parser.error("--list-clusterings requires --source payload-save")
+        if args.batch_id is None:
+            parser.error("--list-clusterings requires --batch-id")
+        print(f"📋 Clustering candidates for batch {args.batch_id}"
+              f"{f' (k={args.k_clusters})' if args.k_clusters is not None else ''}:")
+        ok = list_clusterings_from_payload_save(
+            batch_id=args.batch_id,
+            save_doc_id=args.save_doc_id,
+            k=args.k_clusters,
+            duration_mode=args.duration_mode,
+            ego_name=args.ego_name,
+        )
+        sys.exit(0 if ok else 1)
 
     if not args.trials:
         if is_payload_save:
@@ -1051,41 +1250,72 @@ def main():
 
     print(f"\n📊 Found {len(medoids)} medoid clusters")
 
-    # --- Step 3: Output directory ---
-    run_dir = RESULTS_DIR / dataset_name / str(n_clusters)
-    run_dir.mkdir(parents=True, exist_ok=True)
+    # --- Resolve batch id for the output path (results/batch<id>/<k>_cluster/) ---
+    batch_id_out: Optional[int] = args.batch_id
+    if batch_id_out is None:
+        try:
+            from dataset_config import get_dataset_config
+            batch_id_out = int(get_dataset_config(dataset_name)["batch_id"])
+        except Exception:
+            batch_id_out = None
+    if batch_id_out is None and medoids:
+        batch_id_out = medoids[0].get("batch_id")
+    # If dataset is still unknown but we now know the batch, recover the dataset
+    # name so map/track assets resolve correctly.
+    if dataset_name in ("", "unknown") and batch_id_out is not None:
+        try:
+            from dataset_config import dataset_for_batch_id
+            recovered = dataset_for_batch_id(batch_id_out)
+            if recovered:
+                dataset_name = recovered
+        except Exception:
+            pass
 
-    # Copy map assets
+    batch_label = f"batch{batch_id_out}" if batch_id_out is not None else dataset_name
+
+    # --- Step 3: Output directory (batch-based layout) ---
+    #   results/batch<id>/<k>_cluster_s=<silhouette>/cluster<N>/...
+    # The silhouette suffix keeps multiple results with the same k (but different
+    # clustering params) in separate folders.
+    silhouette: Optional[float] = None
+    if result_data is not None:
+        sv = (result_data.get("scores", {}) or {}).get("silhouetteScore")
+        if isinstance(sv, (int, float)):
+            silhouette = float(sv)
+    cluster_dirname = f"{n_clusters}_cluster"
+    if silhouette is not None:
+        cluster_dirname += f"_s={silhouette:.4f}"
+    run_dir = RESULTS_DIR / batch_label / cluster_dirname
+    run_dir.mkdir(parents=True, exist_ok=True)
+    print(f"📁 Output dir: {run_dir.relative_to(RESULTS_DIR.parent)}")
+
+    # --- Shared map assets (results/map/), generated once by
+    #     generate_map_tracks.py + map_preprocess.py. No per-run copy. ---
+    shared_map_dir = RESULTS_DIR / "map"
     try:
         from dataset_config import xodr_path_for_dataset
         xodr_src = xodr_path_for_dataset(dataset_name)
     except Exception:
-        xodr_src = PROJECT_ROOT / "simulation/ros/.cache/scenario_search/hct_6.xodr"
+        xodr_src = shared_map_dir / "hct_6.xodr"
 
-    if args.xodr:
+    if not xodr_src.is_file() and args.xodr:
         alt = PROJECT_ROOT / args.xodr
         if alt.is_file():
             xodr_src = alt
     if not xodr_src.is_file():
-        print(f"❌ ERROR: Map file not found: {xodr_src}")
+        cache_xodr = PROJECT_ROOT / "simulation/ros/.cache/scenario_search/hct_6.xodr"
+        if cache_xodr.is_file():
+            xodr_src = cache_xodr
+    if not xodr_src.is_file():
+        print(f"❌ ERROR: Map xodr not found in {shared_map_dir}.")
+        print(f"   Run: python3 scripts/generate_map_tracks.py --dataset {dataset_name}")
         sys.exit(1)
 
-    map_dir = run_dir / "map"
-    map_dir.mkdir(exist_ok=True)
-    map_dest = map_dir / xodr_src.name
-    shutil.copy(xodr_src, map_dest)
-    preproc_dir = PROJECT_ROOT / "alldatasets" / "map"
-    for suffix in (".yaml", ".jpg", "_description.txt"):
-        asset = preproc_dir / f"{xodr_src.stem}{suffix}"
-        if asset.is_file():
-            shutil.copy(asset, map_dir / asset.name)
-    print(f"✓ Copied map assets to {map_dir}")
-
-    # --- Step 4: Initialize map parser ---
-    xodr_path = map_dest
+    # --- Step 4: Initialize map parser (reads shared map xodr directly) ---
+    xodr_path = xodr_src
     try:
         parser_xodr = XodrParser(str(xodr_path))
-        print("✓ Initialized XODR map parser")
+        print(f"✓ Initialized XODR map parser from {xodr_path}")
     except Exception as e:
         print(f"❌ ERROR: Failed to initialize map parser: {e}")
         sys.exit(1)
@@ -1165,11 +1395,12 @@ def main():
             collision_flags=collision_flags,
             cluster_collision_stats=per_cluster_collision.get(medoid["cluster_label"]),
             n_clusters=n_clusters,
+            silhouette=silhouette,
         ):
             success_count += 1
 
     # --- Step 7: Create manifest ---
-    manifest = build_run_manifest(dataset_name, n_clusters, medoids, run_id)
+    manifest = build_run_manifest(dataset_name, n_clusters, medoids, run_id, batch_id=batch_id_out)
     manifest_path = run_dir / "manifest.json"
     with manifest_path.open("w") as f:
         json.dump(manifest, f, indent=2)

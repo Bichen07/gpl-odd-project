@@ -4,8 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-from repo_paths import REPO_ROOT
-XODR_DIR = REPO_ROOT / "alldatasets/resources/xodr"
+from repo_paths import REPO_ROOT, MAP_DIR
+# Shared map assets (xodr + odrplot tracks) now live under results/map.
+XODR_DIR = MAP_DIR
 
 # Payload trial_id = trial_id_base + esmini CSV trial_index
 DATASETS: Dict[str, Dict] = {

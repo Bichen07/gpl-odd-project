@@ -181,6 +181,52 @@ def build_cluster_stats(
     }
 
 
+def action_log_from_description(cluster_dir: Path) -> str:
+    """Preferred LLM text signal: the rule-based Labeller/Describer output.
+
+    Uses `context.md` if present (header + description + action table), else
+    `description.txt`, else `action.yaml` rendered to a compact timeline.
+    Returns "" when none are available (caller falls back to observations).
+    """
+    context_md = cluster_dir / "context.md"
+    if context_md.is_file():
+        text = context_md.read_text(encoding="utf-8").strip()
+        if text:
+            return text
+
+    description = cluster_dir / "description.txt"
+    if description.is_file():
+        text = description.read_text(encoding="utf-8").strip()
+        if text:
+            return text
+
+    action_yaml = cluster_dir / "action.yaml"
+    if action_yaml.is_file():
+        try:
+            import yaml
+
+            data = yaml.safe_load(action_yaml.read_text(encoding="utf-8")) or {}
+        except Exception:
+            data = {}
+        lines: List[str] = []
+        for ag in data.get("agents", []):
+            rel = ag.get("relation_to_ego")
+            head = f"{ag.get('name', '?')} ({ag.get('role', 'npc')})"
+            if rel:
+                head += f" — {rel}"
+            lines.append(head)
+            for ev in ag.get("actions", []):
+                st, et = ev.get("start_time"), ev.get("end_time")
+                span = f"{st}s" if st == et else f"{st}-{et}s"
+                lines.append(
+                    f"  {span}: {ev.get('action')} (road {ev.get('road_id')}, lane {ev.get('lane_id')})"
+                )
+        if lines:
+            return "\n".join(lines)
+
+    return ""
+
+
 def action_log_from_observations(observations: List[Dict[str, Any]]) -> str:
     """Lightweight action log when xosc_gen Labeller output is unavailable."""
     if not observations:
@@ -414,10 +460,27 @@ def interpret_cluster_dir(
     max_llm_snapshots: Optional[int] = None,
 ) -> Optional[Path]:
     """Run interpretation for one ``llm_artifacts/.../clusters/cluster_*`` directory."""
-    stats_path = cluster_dir / "stats.json"
+    # Prefer the consolidated cluster.json (2026-06 layout); fall back to the
+    # legacy stats.json / medoid.json triplet for older runs.
     stats: Dict[str, Any] = {}
-    if stats_path.is_file():
-        stats = json.loads(stats_path.read_text(encoding="utf-8"))
+    cluster_json_path = cluster_dir / "cluster.json"
+    if cluster_json_path.is_file():
+        doc = json.loads(cluster_json_path.read_text(encoding="utf-8"))
+        c = doc.get("cluster", {})
+        m = doc.get("medoid", {})
+        stats = {
+            "cluster_label": c.get("label"),
+            "cluster_size": c.get("size"),
+            "n_trials": c.get("n_trials"),
+            "n_clusters": c.get("n_clusters"),
+            "collision_rate": c.get("collision_rate"),
+            "collision_count": c.get("collision_count"),
+            "medoid_trial_id": m.get("trial_id"),
+        }
+    else:
+        stats_path = cluster_dir / "stats.json"
+        if stats_path.is_file():
+            stats = json.loads(stats_path.read_text(encoding="utf-8"))
 
     medoid_trial_id = str(stats.get("medoid_trial_id") or stats.get("trial_id", ""))
     if not medoid_trial_id:
@@ -466,12 +529,16 @@ def interpret_cluster_dir(
                 "parameter_ranges": {},
             }
 
-    obs_path = cluster_dir / "observations.json"
-    if obs_path.is_file():
-        observations = json.loads(obs_path.read_text(encoding="utf-8"))
-    else:
-        observations = []
-    action_log = action_log_from_observations(observations)
+    # Text signal for the LLM: prefer the rich Labeller/Describer output
+    # (description.txt + action.yaml). Fall back to the crude per-frame log
+    # derived from observations.json only for legacy runs.
+    action_log = action_log_from_description(cluster_dir)
+    if not action_log:
+        obs_path = cluster_dir / "observations.json"
+        observations = (
+            json.loads(obs_path.read_text(encoding="utf-8")) if obs_path.is_file() else []
+        )
+        action_log = action_log_from_observations(observations)
 
     bev_paths = collect_bev_snapshot_paths(cluster_dir, max_llm_snapshots=max_llm_snapshots)
     if max_llm_snapshots is not None and bev_paths:
