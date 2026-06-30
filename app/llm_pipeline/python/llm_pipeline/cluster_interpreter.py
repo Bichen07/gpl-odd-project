@@ -84,6 +84,8 @@ class ClusterInterpreter:
         temperature: float = 0.1,
         prompt_dir: Optional[str] = None,
         api_key: Optional[str] = None,
+        prompt_overrides: Optional[Dict[str, str]] = None,
+        do_review: bool = True,
     ):
         self.model = normalize_model_name(model)
         self.temperature = temperature
@@ -91,6 +93,13 @@ class ClusterInterpreter:
             Path(prompt_dir) if prompt_dir else PROMPT_TEMPLATES_DIR
         )
         self.xodr_path = xodr_path
+        # Optional UI-supplied prompt text overrides, keyed:
+        #   "system" | "common_sense" | "interaction" | "reviewer".
+        # A blank/None value falls back to the on-disk template.
+        self.prompt_overrides = {
+            k: v for k, v in (prompt_overrides or {}).items() if v
+        }
+        self.do_review = do_review
         
         self.llm = create_interpretation_llm(
             self.model,
@@ -114,7 +123,7 @@ class ClusterInterpreter:
         medoid_trial_id: str,
         medoid_action_log: str,
         bev_snapshot_paths: List[str],
-        mfpca_heatmap_path: str,
+        mfpca_heatmap_path: Optional[str] = None,
         map_description: Optional[str] = None,
     ) -> Optional[ClusterInterpretation]:
         """
@@ -143,11 +152,11 @@ class ClusterInterpreter:
         print(f"[ClusterInterpreter] Medoid trial: {medoid_trial_id}")
         print(f"{'='*60}")
         
-        # Load prompts
-        system_prompt = self._load_prompt("cluster_system_prompt.txt")
-        common_sense = self._load_prompt("cluster_common_sense.txt")
-        interaction_prompt_template = self._load_prompt("cluster_interaction_prompt.txt")
-        reviewer_prompt_template = self._load_prompt("cluster_reviewer_prompt.txt")
+        # Load prompts (UI override wins over the on-disk template)
+        system_prompt = self._prompt("system", "cluster_system_prompt.txt")
+        common_sense = self._prompt("common_sense", "cluster_common_sense.txt")
+        interaction_prompt_template = self._prompt("interaction", "cluster_interaction_prompt.txt")
+        reviewer_prompt_template = self._prompt("reviewer", "cluster_reviewer_prompt.txt")
         
         if not all([system_prompt, common_sense, interaction_prompt_template]):
             print("❌ ERROR: Failed to load prompt templates")
@@ -160,20 +169,26 @@ class ClusterInterpreter:
         if map_description is None:
             map_description = self._get_map_description()
         
-        # Format main prompt
-        interaction_prompt = interaction_prompt_template.format(
+        # Format main prompt (tolerant of user-edited prompts with stray braces)
+        interaction_prompt = self._safe_format(
+            interaction_prompt_template,
             cluster_stats=stats_text,
             agent_actions_log=medoid_action_log,
             map_description=map_description,
         )
         
-        # Encode images
-        print(f"[ClusterInterpreter] Encoding {len(bev_snapshot_paths)} BEV snapshots + MFPCA heatmap...")
+        # Encode images. The MFPCA heatmap is OPTIONAL — if no genuine
+        # trajectory-variation image exists we omit it rather than feeding a
+        # duplicate BEV frame mislabeled as a heatmap.
         bev_images = [self._encode_image(p) for p in bev_snapshot_paths]
-        heatmap_image = self._encode_image(mfpca_heatmap_path)
-        
-        if not all(bev_images) or not heatmap_image:
-            print("❌ ERROR: Failed to encode images")
+        heatmap_image = self._encode_image(mfpca_heatmap_path) if mfpca_heatmap_path else None
+        print(
+            f"[ClusterInterpreter] Encoding {len(bev_snapshot_paths)} BEV snapshots"
+            + (" + variation heatmap..." if heatmap_image else " (no heatmap)...")
+        )
+
+        if not all(bev_images):
+            print("❌ ERROR: Failed to encode BEV images")
             return None
         
         # --- PASS 1: Initial analysis ---
@@ -193,24 +208,39 @@ class ClusterInterpreter:
         
         print(f"✅ Initial analysis complete: {initial_tokens['Total']} tokens")
         
-        # --- PASS 2: Reviewer verification ---
-        print("[ClusterInterpreter] Pass 2: Reviewer verification...")
-        final_yaml, review_tokens = self._run_reviewer_pass(
-            stats_text=stats_text,
-            medoid_action_log=medoid_action_log,
-            preliminary_yaml=initial_yaml,
-            reviewer_prompt_template=reviewer_prompt_template,
-        )
-        
-        if not final_yaml:
-            print("⚠️  WARNING: Reviewer pass failed, using initial analysis")
+        # --- PASS 2: Reviewer verification (optional) ---
+        review_tokens = {"Prompt": 0, "Completion": 0, "Total": 0}
+        if not self.do_review:
+            print("[ClusterInterpreter] Review pass disabled — using initial analysis")
             final_yaml = initial_yaml
-            review_tokens = {"Prompt": 0, "Completion": 0, "Total": 0}
         else:
-            print(f"✅ Reviewer pass complete: {review_tokens['Total']} tokens")
+            print("[ClusterInterpreter] Pass 2: Reviewer verification...")
+            final_yaml, review_tokens = self._run_reviewer_pass(
+                stats_text=stats_text,
+                medoid_action_log=medoid_action_log,
+                preliminary_yaml=initial_yaml,
+                reviewer_prompt_template=reviewer_prompt_template,
+            )
+            if not final_yaml:
+                print("⚠️  WARNING: Reviewer pass failed, using initial analysis")
+                final_yaml = initial_yaml
+                review_tokens = {"Prompt": 0, "Completion": 0, "Total": 0}
+            else:
+                print(f"✅ Reviewer pass complete: {review_tokens['Total']} tokens")
         
-        # Parse YAML (tolerate prose wrapper or missing ```yaml fence)
+        # Parse YAML (tolerate prose wrapper or missing ```yaml fence).
+        # The reviewer (Pass 2) frequently returns a long Chain-of-Thought audit
+        # and omits / truncates the final ```yaml block. In that case fall back
+        # to the Pass-1 baseline rather than discarding a good analysis.
         parsed = self._parse_interpretation_yaml(final_yaml)
+        if parsed is None and self.do_review and final_yaml is not initial_yaml:
+            print(
+                "⚠️  WARNING: Reviewer output was not valid YAML — "
+                "falling back to Pass 1 baseline analysis"
+            )
+            parsed = self._parse_interpretation_yaml(initial_yaml)
+            if parsed is not None:
+                final_yaml = initial_yaml
         if parsed is None:
             return None
         
@@ -252,6 +282,25 @@ class ClusterInterpreter:
         except FileNotFoundError:
             print(f"❌ ERROR: Prompt file not found: {path}")
             return None
+
+    def _prompt(self, key: str, filename: str) -> Optional[str]:
+        """Return the UI override for *key* if provided, else the on-disk template."""
+        override = self.prompt_overrides.get(key)
+        if override:
+            return override
+        return self._load_prompt(filename)
+
+    @staticmethod
+    def _safe_format(template: str, **values: str) -> str:
+        """Substitute ``{key}`` placeholders without str.format brace-sensitivity.
+
+        User-edited prompts may contain stray ``{`` / ``}`` (e.g. YAML examples)
+        that would make ``str.format`` raise; plain replacement avoids that.
+        """
+        out = template or ""
+        for key, val in values.items():
+            out = out.replace("{" + key + "}", str(val))
+        return out
     
     @staticmethod
     def _fmt_metric(value, fmt: str, unit: str) -> str:
@@ -326,7 +375,7 @@ Intersection geometry:
         common_sense: str,
         interaction_prompt: str,
         bev_images: List[str],
-        heatmap_image: str,
+        heatmap_image: Optional[str],
         map_description: str,
     ) -> tuple[Optional[str], Dict]:
         """Run initial LLM analysis pass."""
@@ -336,10 +385,15 @@ Intersection geometry:
             {"type": "text", "text": common_sense},
             {"type": "text", "text": "### Map Context"},
             {"type": "text", "text": map_description},
-            {"type": "text", "text": "\n### MFPCA Heatmap (Trajectory Variation)"},
-            {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{heatmap_image}"}},
-            {"type": "text", "text": "\n### BEV Snapshots (Medoid Trial)"},
         ]
+        if heatmap_image:
+            prompt_parts.append(
+                {"type": "text", "text": "\n### MFPCA Heatmap (Trajectory Variation)"}
+            )
+            prompt_parts.append(
+                {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{heatmap_image}"}}
+            )
+        prompt_parts.append({"type": "text", "text": "\n### BEV Snapshots (Medoid Trial)"})
         
         for i, b64_img in enumerate(bev_images):
             prompt_parts.append({"type": "text", "text": f"Snapshot {i+1}:"})
@@ -376,8 +430,11 @@ Intersection geometry:
         reviewer_prompt_template: str,
     ) -> tuple[Optional[str], Dict]:
         """Run reviewer verification pass."""
-        reviewer_system = self._load_prompt("cluster_reviewer_prompt.txt").split("<Your Task>")[0]
-        reviewer_prompt = reviewer_prompt_template.format(
+        # Use the passed-in template (which already honours UI overrides) for the
+        # system part too, instead of re-reading the file from disk.
+        reviewer_system = (reviewer_prompt_template or "").split("<Your Task>")[0]
+        reviewer_prompt = self._safe_format(
+            reviewer_prompt_template,
             cluster_stats=stats_text,
             agent_actions_log=medoid_action_log,
             preliminary_yaml=preliminary_yaml,
@@ -402,18 +459,33 @@ Intersection geometry:
 
     @staticmethod
     def _extract_yaml_block(text: str) -> str:
-        """Pull YAML from a fenced block or from bare cluster_* keys."""
+        """Pull YAML from a fenced block or from bare cluster_* keys.
+
+        Models often emit a long Chain-of-Thought before the YAML, sometimes in
+        a ``yaml``/``yml``/un-tagged fence and sometimes unfenced. Strategy:
+        1. Prefer the **last** fenced block that looks like the report
+           (contains ``cluster_label:``/``cluster_id:``); else the last fence.
+        2. Otherwise slice from the **first** top-level ``cluster_id:`` /
+           ``cluster_label:`` line (column 0) to the end.
+        """
         text = (text or "").strip()
         if not text:
             return ""
-        fenced = re.search(
-            r"```(?:yaml|YAML)\s*([\s\S]*?)\s*```", text, re.IGNORECASE
-        )
-        if fenced:
-            return fenced.group(1).strip()
-        for marker in ("cluster_id:", "cluster_label:"):
-            if marker in text:
-                return text[text.index(marker) :].strip()
+
+        fences = [
+            f.strip()
+            for f in re.findall(r"```(?:ya?ml)?\s*([\s\S]*?)```", text, re.IGNORECASE)
+            if f.strip()
+        ]
+        if fences:
+            yaml_like = [
+                f for f in fences if ("cluster_label:" in f or "cluster_id:" in f)
+            ]
+            return (yaml_like or fences)[-1]
+
+        m = re.search(r"(?m)^\s*(?:cluster_id|cluster_label)\s*:", text)
+        if m:
+            return text[m.start() :].strip()
         return text
 
     def _parse_interpretation_yaml(self, raw: str) -> Optional[Dict]:

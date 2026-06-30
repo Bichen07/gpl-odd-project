@@ -126,11 +126,6 @@ SEMANTIC_ACTION_TYPES = frozenset({
     "EXIT_JUNCTION",
     "EMERGENCY_BRAKE",
     "STOPPED",
-    "CUTTING_IN",
-    "ONCOMING",
-    "YIELD_TO_EGO",
-    "CROSSING",
-    "PARKED",
 })
 
 
@@ -155,20 +150,25 @@ def _slug_label(label: str) -> str:
     return "".join(c if c.isalnum() or c in "-_" else "_" for c in label).strip("_")
 
 
-def _action_entry_times(action: dict) -> List[float]:
-    """Collect start/end boundaries from gpl-odd or xosc_gen action dict."""
-    times: List[float] = []
-    attrs = action.get("attributes") or {}
-    st = action.get("start_time", attrs.get("start_time"))
-    et = action.get("end_time", attrs.get("end_time"))
-    dur = action.get("duration", attrs.get("duration"))
-    if st is not None:
-        times.append(float(st))
-    if dur is not None and st is not None:
-        times.append(float(st) + float(dur))
-    if et is not None:
-        times.append(float(et))
-    return times
+def _combine_labels(prev: str, new: str, max_parts: int = 3) -> str:
+    """Join co-occurring frame labels with ``+`` but cap the count so a frame
+    where many agents act at once (e.g. every parked car ``start STOPPED`` at
+    t=0) does not produce an unbounded title / filename."""
+    parts = prev.split("+")
+    if new in parts:
+        return prev
+    if len(parts) >= max_parts:
+        return prev if prev.endswith("\u2026") else prev + "\u2026"
+    return prev + "+" + new
+
+
+def _agent_token(agent: dict) -> str:
+    """Short BEV-title token for an agent: 'ego' or its NPC name."""
+    role = str(agent.get("role", "")).lower()
+    tid = agent.get("track_id")
+    if role == "ego" or tid == 0:
+        return "ego"
+    return str(agent.get("name") or f"agent{tid}")
 
 
 def extract_action_timestamps_gpl(
@@ -177,8 +177,12 @@ def extract_action_timestamps_gpl(
     semantic_only: bool = False,
 ) -> List[Tuple[float, str]]:
     """
-    Extract key times from ``action.yaml`` (gpl-odd top-level schema + xosc_gen
-    ``attributes`` nesting). Returns ``(timestamp, action_label)`` pairs.
+    Extract key times from ``action.yaml`` (gpl-odd top-level schema). Returns
+    ``(timestamp, label)`` pairs where the label names the **agent** and the
+    **phase** of the maneuver, e.g. ``"ego start DECELERATE"`` /
+    ``"Opposite end STOPPED"`` — so the BEV title states who is doing what and
+    whether the frame is the start or end of the action (interval actions get
+    both boundaries; instantaneous ones get a single label).
     """
     path = Path(action_yaml_path)
     if not path.is_file():
@@ -191,14 +195,45 @@ def extract_action_timestamps_gpl(
         print(f"[tier2] Warning: failed to read action YAML {path}: {exc}")
         return []
 
+    agents = data.get("agents") or []
+    id_to_token = {a.get("track_id"): _agent_token(a) for a in agents}
+
     raw: List[Tuple[float, str]] = []
-    for agent in data.get("agents") or []:
+    for agent in agents:
+        token = _agent_token(agent)
         for action in agent.get("actions") or []:
             name = str(action.get("action", "action"))
             if semantic_only and name not in SEMANTIC_ACTION_TYPES:
                 continue
-            for t in _action_entry_times(action):
-                raw.append((float(t), name))
+            attrs = action.get("attributes") or {}
+            st = action.get("start_time", attrs.get("start_time"))
+            et = action.get("end_time", attrs.get("end_time"))
+            if st is None:
+                st = et
+            if et is None:
+                et = st
+            if st is None:
+                continue
+            st, et = float(st), float(et)
+            if et - st > 1e-6:  # interval action → label both boundaries
+                raw.append((st, f"{token} start {name}"))
+                raw.append((et, f"{token} end {name}"))
+            else:               # instantaneous (junction enter/exit, etc.)
+                raw.append((st, f"{token} {name}"))
+
+    # Multi-agent interactions (NEAR_MISS / DANGEROUS_CUT_IN) are always
+    # significant — feed their peak-conflict timestamp into frame selection so
+    # the closest-approach moment is never skipped (independent of semantic_only).
+    for inter in data.get("interactions") or []:
+        name = str(inter.get("type", "interaction"))
+        partner = id_to_token.get(inter.get("with_track_id"))
+        suffix = f" with {partner}" if partner else ""
+        kt = inter.get("key_time")
+        if kt is not None:
+            raw.append((float(kt), f"{name}{suffix}"))
+        ct = inter.get("cut_in_time")
+        if ct is not None:
+            raw.append((float(ct), f"{name} start{suffix}"))
 
     if not raw:
         return []
@@ -209,7 +244,7 @@ def extract_action_timestamps_gpl(
         if merged and (t - merged[-1][0]) < min_gap:
             prev_t, prev_label = merged[-1]
             if prev_label != label:
-                merged[-1] = (prev_t, f"{prev_label}+{label}")
+                merged[-1] = (prev_t, _combine_labels(prev_label, label))
             continue
         merged.append((t, label))
     return merged
@@ -232,7 +267,7 @@ def _times_to_indices(
         if out and (t_snap - last_t) < min_gap:
             prev_idx, prev_label = out[-1]
             if prev_label != label:
-                out[-1] = (prev_idx, f"{prev_label}+{label}")
+                out[-1] = (prev_idx, _combine_labels(prev_label, label))
             continue
         out.append((idx, label))
         last_t = t_snap
@@ -269,10 +304,13 @@ def merge_key_frame_times(
 
     merged: List[Tuple[int, str]] = list(action_picks)
     picked_times = [float(time_steps[i]) for i, _ in merged]
-    proximity_labels = {"closest_approach", "within_20m", "collision"}
+    # Closest-approach frames (label "closest_*") are always kept — a crossing or
+    # oncoming pass is critical even without a collision. Only the broad
+    # "within_20m" marker stays behind the proximity gate.
+    gated_labels = {"within_20m"}
 
     for idx, label in heur_picks:
-        if not include_proximity_heuristics and label in proximity_labels:
+        if not include_proximity_heuristics and label in gated_labels:
             continue
         if idx in action_indices:
             continue
@@ -281,6 +319,25 @@ def merge_key_frame_times(
             continue
         merged.append((idx, label))
         picked_times.append(t)
+
+    # The collision frame is authoritative: never let it be dropped or hidden
+    # behind a nearby action label (the ego is usually braking/stopping at impact,
+    # so its index coincides with an action boundary). Mark the nearest frame as
+    # "collision" — or add a dedicated frame if none is close.
+    if collision_timestep is not None and time_steps:
+        tc = float(collision_timestep)
+        coll_idx = min(range(len(time_steps)), key=lambda i: abs(time_steps[i] - tc))
+        hit = None
+        for n_i, (idx, _label) in enumerate(merged):
+            if idx == coll_idx or abs(time_steps[idx] - time_steps[coll_idx]) < min_gap:
+                hit = n_i
+                break
+        if hit is not None:
+            idx, label = merged[hit]
+            parts = [p for p in label.split("+") if p and p != "collision"]
+            merged[hit] = (idx, "+".join(["collision"] + parts[:2]))
+        else:
+            merged.append((coll_idx, "collision"))
 
     merged.sort(key=lambda x: time_steps[x[0]])
     return merged
@@ -409,6 +466,15 @@ def pick_critical_timestamps(
     names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
     ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
     others = sorted(nm for nm in names if nm != ego_name)
+    # display_id is the number drawn on each car in the BEV image; label closest-
+    # approach frames as "ID:<disp> <name>" so the title matches the on-image legend
+    # ("ID:10 → Parking"). The "ID:" prefix makes clear that the number is the
+    # display id, not the name's own numeric suffix (e.g. "BackgroundParking6").
+    name_to_display = {a["name"]: a["display_id"] for a in build_agent_registry(df)}
+
+    def _other_tag(nm: str) -> str:
+        disp = name_to_display.get(nm)
+        return f"ID:{disp} {nm}" if disp is not None else nm
 
     if ego_name:
         ego = df[df["name"].astype(str).str.strip() == ego_name].sort_values("time")
@@ -434,24 +500,37 @@ def pick_critical_timestamps(
                 t_evt = float(ego_t[np.where(valid)[0][worst] + 1])
                 add(24, idx_near(t_evt), "ego_max_deceleration")
 
+        # Turn apex = moment of maximum heading-rate (|dθ/dt|).
+        if "h" in ego.columns and len(ego_t) > 2:
+            h = np.unwrap(ego["h"].astype(float).to_numpy())
+            dt_h = np.diff(ego_t)
+            dh = np.diff(h)
+            valid_h = dt_h > 1e-6
+            if np.any(valid_h):
+                rate = np.abs(dh[valid_h] / dt_h[valid_h])
+                if rate.size and float(rate.max()) > 0.15:  # ~8.6°/s ⇒ real turn
+                    apex = int(np.argmax(rate))
+                    t_apex = float(ego_t[np.where(valid_h)[0][apex] + 1])
+                    add(26, idx_near(t_apex), "ego_turn_apex")
+
         if "roadId" in ego.columns and len(ego) > 1:
             rid = ego["roadId"].fillna(0).astype(int).to_numpy()
             changes = np.where(np.diff(rid) != 0)[0]
             for j, ci in enumerate(changes[:3]):
                 add(28 + j, idx_near(float(ego_t[ci + 1])), f"ego_road_change_{j + 1}")
 
-        if others:
-            other_name = others[0]
+        # Closest-approach frames. The medoid often has many agents (one moving
+        # conflict vehicle + several parked/background cars). Snapshotting only
+        # the first agent (alphabetical) missed the actual conflict, so compute
+        # min-distance per agent and prioritise *moving* agents. These frames are
+        # always included (a crossing/oncoming pass is critical even without a
+        # collision) — only the broad "within_20m" marker stays gated.
+        approach: List[Tuple[float, float, str, bool]] = []  # (min_dist, t, name, moving)
+        for other_name in others:
             oth = (
                 df[df["name"].astype(str).str.strip() == other_name]
                 .sort_values("time")
-                .rename(
-                    columns={
-                        "x": "x_o",
-                        "y": "y_o",
-                        "speed": "speed_o",
-                    }
-                )
+                .rename(columns={"x": "x_o", "y": "y_o", "speed": "speed_o"})
             )
             merged = pd.merge_asof(
                 ego.sort_values("time"),
@@ -460,22 +539,48 @@ def pick_critical_timestamps(
                 direction="nearest",
                 tolerance=0.06,
             )
-            if not merged.empty and "x" in merged.columns and "x_o" in merged.columns:
-                dist = np.hypot(
-                    merged["x"].astype(float) - merged["x_o"].astype(float),
-                    merged["y"].astype(float) - merged["y_o"].astype(float),
+            if merged.empty or "x" not in merged.columns or "x_o" not in merged.columns:
+                continue
+            dist = np.hypot(
+                merged["x"].astype(float) - merged["x_o"].astype(float),
+                merged["y"].astype(float) - merged["y_o"].astype(float),
+            ).to_numpy()
+            if not dist.size:
+                continue
+            imin_d = int(np.argmin(dist))
+            t_ca = float(merged["time"].iloc[imin_d])
+            moving = False
+            if "speed_o" in merged.columns:
+                sp = pd.to_numeric(merged["speed_o"], errors="coerce").abs()
+                moving = float(sp.max() or 0.0) > 0.3  # m/s (Thresholds.STOPPED_SPEED)
+            approach.append((float(dist[imin_d]), t_ca, other_name, moving))
+
+        # Moving agents first, then nearest. Snapshot the closest few within 30 m.
+        approach.sort(key=lambda c: (not c[3], c[0]))
+        n_added = 0
+        for min_dist, t_ca, other_name, moving in approach:
+            if min_dist > 30.0:  # Thresholds.NEAR_GAP — beyond this, not relevant
+                break
+            if n_added >= 3:
+                break
+            add(8 + n_added, idx_near(t_ca), f"ego closest to {_other_tag(other_name)}")
+            n_added += 1
+            if include_proximity_heuristics and moving:
+                # Approach onset (first time within 20 m of this agent).
+                oth2 = (
+                    df[df["name"].astype(str).str.strip() == other_name]
+                    .sort_values("time")
+                    .rename(columns={"x": "x_o", "y": "y_o"})
                 )
-                if include_proximity_heuristics:
-                    imin_d = int(np.argmin(dist))
-                    t_ca = float(merged["time"].iloc[imin_d])
-                    add(8, idx_near(t_ca), "closest_approach")
-                    close = np.where(dist < 20.0)[0]
+                m2 = pd.merge_asof(ego.sort_values("time"), oth2.sort_values("time"),
+                                   on="time", direction="nearest", tolerance=0.06)
+                if not m2.empty and "x_o" in m2.columns:
+                    d2 = np.hypot(m2["x"].astype(float) - m2["x_o"].astype(float),
+                                  m2["y"].astype(float) - m2["y_o"].astype(float)).to_numpy()
+                    close = np.where(d2 < 20.0)[0]
                     if len(close):
-                        add(
-                            14,
-                            idx_near(float(merged["time"].iloc[int(close[0])])),
-                            "within_20m",
-                        )
+                        add(16, idx_near(float(m2["time"].iloc[int(close[0])])),
+                            f"ego within 20m of {_other_tag(other_name)}")
 
     if collision_timestep is not None:
         add(5, idx_near(float(collision_timestep)), "collision")
@@ -665,8 +770,151 @@ def unique_time_steps(df: pd.DataFrame) -> List[float]:
     return sorted(df["time"].unique().tolist())
 
 
+def _ego_position_lookup(df: pd.DataFrame):
+    """Return f(t) → (ego_x, ego_y) using the nearest esmini frame, or None."""
+    names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
+    ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
+    if ego_name is None:
+        return lambda _t: None
+    ego = (
+        df[df["name"].astype(str).str.strip() == ego_name]
+        .sort_values("time")
+        .reset_index(drop=True)
+    )
+    if ego.empty:
+        return lambda _t: None
+    et = ego["time"].to_numpy(dtype=float)
+    ex = ego["x"].to_numpy(dtype=float)
+    ey = ego["y"].to_numpy(dtype=float)
+
+    def _at(t: float):
+        i = int(np.argmin(np.abs(et - t)))
+        return float(ex[i]), float(ey[i])
+
+    return _at
+
+
+def _autocrop_white(im, pad: int = 8):
+    """Trim surrounding pure-white margin, leaving a small uniform padding."""
+    from PIL import Image, ImageChops
+
+    bg = Image.new(im.mode, im.size, (255, 255, 255))
+    bbox = ImageChops.difference(im, bg).getbbox()
+    if not bbox:
+        return im
+    l, t, r, b = bbox
+    l = max(0, l - pad)
+    t = max(0, t - pad)
+    r = min(im.width, r + pad)
+    b = min(im.height, b + pad)
+    return im.crop((l, t, r, b))
+
+
+def _load_title_font(size: int):
+    from PIL import ImageFont
+
+    for name in ("DejaVuSans-Bold.ttf", "DejaVuSans.ttf", "Arial.ttf"):
+        try:
+            return ImageFont.truetype(name, size)
+        except Exception:
+            continue
+    return ImageFont.load_default()
+
+
+def compose_dual_bev(
+    full_path: str,
+    zoom_path: str,
+    out_path: str,
+    title: Optional[str] = None,
+    border_px: int = 3,
+    gap_px: int = 14,
+) -> bool:
+    """Combine two BEV panels into one labelled image.
+
+    Layout: a white title bar on top, then the two panels side by side —
+    left = whole-scene view, right = ego-centric zoom. Each panel keeps its own
+    aspect ratio (no forced 4:3) after redundant white margins are trimmed, and
+    is framed by a black border so the two views are clearly distinguishable.
+    Returns False if Pillow is unavailable or a panel is missing (caller keeps
+    the single whole-scene image).
+    """
+    try:
+        from PIL import Image, ImageDraw, ImageOps
+    except Exception:
+        return False
+    if not (os.path.isfile(full_path) and os.path.isfile(zoom_path)):
+        return False
+
+    left = _autocrop_white(Image.open(full_path).convert("RGB"))
+    right = _autocrop_white(Image.open(zoom_path).convert("RGB"))
+
+    # Match panels to a common content height (preserve each panel's own width).
+    panel_h = max(left.height, right.height)
+
+    def _to_height(im, h):
+        if im.height == h:
+            return im
+        w = max(1, int(round(im.width * h / im.height)))
+        return im.resize((w, h), Image.LANCZOS)
+
+    left = _to_height(left, panel_h)
+    right = _to_height(right, panel_h)
+
+    # Black frame on each panel boundary (distinguishes the two views).
+    left = ImageOps.expand(left, border=border_px, fill=(0, 0, 0))
+    right = ImageOps.expand(right, border=border_px, fill=(0, 0, 0))
+
+    row_w = left.width + gap_px + right.width
+    row_h = left.height  # == right.height after expand
+
+    title_h = max(40, int(panel_h * 0.07)) if title else 0
+    canvas = Image.new("RGB", (row_w, title_h + row_h), (255, 255, 255))
+
+    if title_h:
+        draw = ImageDraw.Draw(canvas)
+        max_w = row_w - 24  # side margin
+
+        def _text_wh(s, font):
+            try:
+                tb = draw.textbbox((0, 0), s, font=font)
+                return tb[2] - tb[0], tb[3] - tb[1]
+            except Exception:
+                return (font.getsize(s) if hasattr(font, "getsize") else (0, 0))
+
+        # Shrink font to fit the width; if still too wide at the floor size,
+        # truncate the title with an ellipsis (long multi-agent action slugs).
+        text = title
+        size = max(18, int(title_h * 0.55))
+        font = _load_title_font(size)
+        tw, th = _text_wh(text, font)
+        while tw > max_w and size > 12:
+            size -= 2
+            font = _load_title_font(size)
+            tw, th = _text_wh(text, font)
+        while tw > max_w and len(text) > 8:
+            text = text[:-2]
+            tw, th = _text_wh(text + "\u2026", font)
+        if text != title:
+            text += "\u2026"
+            tw, th = _text_wh(text, font)
+        draw.text(((row_w - tw) // 2, max(0, (title_h - th) // 2 - 2)),
+                  text, fill=(0, 0, 0), font=font)
+        # Thin separator under the title bar.
+        draw.line([(0, title_h - 1), (row_w, title_h - 1)], fill=(0, 0, 0), width=1)
+
+    canvas.paste(left, (0, title_h))
+    canvas.paste(right, (left.width + gap_px, title_h))
+    canvas.save(out_path, quality=90)
+    return True
+
+
 def infer_collision_timestep(df: pd.DataFrame, threshold_m: float = 2.5) -> Optional[float]:
-    """Approximate collision time as ego–NPC minimum distance below *threshold_m*."""
+    """Approximate the collision time as the moment of the **global** minimum
+    ego–NPC distance, scanning **every** NPC (not just the first alphabetical one,
+    which is usually a far parked car). This is invoked only for trials whose
+    collision KPI is already True, so the closest-approach moment across all agents
+    is the collision instant; ``threshold_m`` only gates a clearly-spurious result
+    (no agent ever comes near the ego)."""
     names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
     ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
     others = sorted(nm for nm in names if nm != ego_name)
@@ -674,28 +922,42 @@ def infer_collision_timestep(df: pd.DataFrame, threshold_m: float = 2.5) -> Opti
         return None
 
     ego = df[df["name"].astype(str).str.strip() == ego_name].sort_values("time")
-    oth = (
-        df[df["name"].astype(str).str.strip() == others[0]]
-        .sort_values("time")
-        .rename(columns={"x": "x_o", "y": "y_o"})
-    )
-    merged = pd.merge_asof(
-        ego.sort_values("time"),
-        oth.sort_values("time"),
-        on="time",
-        direction="nearest",
-        tolerance=0.06,
-    )
-    if merged.empty or "x_o" not in merged.columns:
+    best_t: Optional[float] = None
+    best_d = float("inf")
+    for nm in others:
+        oth = (
+            df[df["name"].astype(str).str.strip() == nm]
+            .sort_values("time")
+            .rename(columns={"x": "x_o", "y": "y_o"})
+        )
+        merged = pd.merge_asof(
+            ego.sort_values("time"),
+            oth.sort_values("time"),
+            on="time",
+            direction="nearest",
+            tolerance=0.06,
+        )
+        if merged.empty or "x_o" not in merged.columns:
+            continue
+        dist = np.hypot(
+            merged["x"].astype(float) - merged["x_o"].astype(float),
+            merged["y"].astype(float) - merged["y_o"].astype(float),
+        )
+        if not len(dist):
+            continue
+        imin = int(np.argmin(dist))
+        d = float(dist.iloc[imin])
+        if d < best_d:
+            best_d = d
+            best_t = float(merged["time"].iloc[imin])
+
+    if best_t is None:
         return None
-    dist = np.hypot(
-        merged["x"].astype(float) - merged["x_o"].astype(float),
-        merged["y"].astype(float) - merged["y_o"].astype(float),
-    )
-    imin = int(np.argmin(dist))
-    if float(dist.iloc[imin]) > threshold_m:
+    # A genuine collision should bring some agent very close; if nothing comes
+    # within ~3x the threshold, treat it as un-inferable rather than mislabel.
+    if best_d > threshold_m * 3.0:
         return None
-    return float(merged["time"].iloc[imin])
+    return best_t
 
 
 def df_to_trajectory_dict(df: pd.DataFrame) -> Tuple[Dict[str, List[dict]], List[float]]:
@@ -742,6 +1004,7 @@ class Tier2BevRenderer:
         snapshot_output_px: int = 1024,
         snapshot_border_frac: float = 0.10,
         typography: BevTypography = DEFAULT_BEV_TYPOGRAPHY,
+        ego_zoom_radius: float = 30.0,
     ):
         self.map_tracks_csv = map_tracks_csv
         self.xodr_path = xodr_path
@@ -750,6 +1013,9 @@ class Tier2BevRenderer:
         self.snapshot_output_px = snapshot_output_px
         self.snapshot_border_frac = snapshot_border_frac
         self.typography = typography
+        # Right panel of each snapshot zooms to ±radius metres around the ego.
+        # 0/None disables the composite (whole-scene only).
+        self.ego_zoom_radius = ego_zoom_radius
         if not Path(map_tracks_csv).is_file():
             raise FileNotFoundError(
                 f"Map tracks CSV not found: {map_tracks_csv}\n"
@@ -844,30 +1110,25 @@ class Tier2BevRenderer:
                 title="Map overview — cluster medoid roads",
             )
 
+            ego_xy_at = _ego_position_lookup(df)
+
             for rank, (idx, label) in enumerate(key_indices):
                 t = time_steps[idx]
-                slug = _slug_label(label)
+                slug = _slug_label(label)[:80]  # filesystem name-length safety
                 out_path = os.path.join(
                     output_dir,
                     f"{prefix}_t_{t:05.2f}_{slug}.jpg",
                 )
-                self._plotter.render_scene(
-                    self.map_tracks_csv,
-                    out_path,
-                    highlight_road_ids_list=highlight,
-                    view_bounds=vbounds,
-                    draw_labels=False,
-                    typography=self.typography,
-                    tracks_csv_path=str(traj_csv),
-                    metadata_yaml_path=str(meta_yaml),
-                    timestamp=float(t),
-                    ego_id=0,
-                    heading_in_degrees=True,
-                    draw_trajectory_trails=True,
-                    time_label=f"t = {t:.2f}s — {label}",
-                    scope_bounds=vbounds,
-                    output_px=self.snapshot_output_px,
-                    white_border_frac=self.snapshot_border_frac,
+                self._render_snapshot(
+                    out_path=out_path,
+                    traj_csv=traj_csv,
+                    meta_yaml=meta_yaml,
+                    highlight=highlight,
+                    vbounds=vbounds,
+                    t=float(t),
+                    label=label,
+                    ego_xy=ego_xy_at(float(t)),
+                    work=work,
                 )
                 snapshots.append(BevSnapshot(timestep=t, label=label, path=out_path))
                 print(f"[Tier2BevRenderer] Saved {out_path}")
@@ -876,6 +1137,82 @@ class Tier2BevRenderer:
             import shutil
 
             shutil.rmtree(work, ignore_errors=True)
+
+    def _render_one_panel(
+        self,
+        out_path: str,
+        *,
+        traj_csv: Path,
+        meta_yaml: Path,
+        highlight: List[str],
+        view_bounds: Tuple[float, float, float, float],
+        t: float,
+        time_label: str,
+    ) -> None:
+        self._plotter.render_scene(
+            self.map_tracks_csv,
+            out_path,
+            highlight_road_ids_list=highlight,
+            view_bounds=view_bounds,
+            draw_labels=False,
+            typography=self.typography,
+            tracks_csv_path=str(traj_csv),
+            metadata_yaml_path=str(meta_yaml),
+            timestamp=float(t),
+            ego_id=0,
+            heading_in_degrees=True,
+            draw_trajectory_trails=True,
+            time_label=time_label,
+            scope_bounds=view_bounds,
+            output_px=self.snapshot_output_px,
+            white_border_frac=self.snapshot_border_frac,
+        )
+
+    def _render_snapshot(
+        self,
+        *,
+        out_path: str,
+        traj_csv: Path,
+        meta_yaml: Path,
+        highlight: List[str],
+        vbounds: Tuple[float, float, float, float],
+        t: float,
+        label: str,
+        ego_xy: Optional[Tuple[float, float]],
+        work: Path,
+    ) -> None:
+        """Render a snapshot — dual-panel (whole + ego zoom) when enabled."""
+        radius = self.ego_zoom_radius or 0.0
+        if radius <= 0 or ego_xy is None:
+            self._render_one_panel(
+                out_path, traj_csv=traj_csv, meta_yaml=meta_yaml,
+                highlight=highlight, view_bounds=vbounds, t=t,
+                time_label=f"t = {t:.2f}s — {label}",
+            )
+            return
+
+        ex, ey = ego_xy
+        zoom_bounds = (ex - radius, ex + radius, ey - radius, ey + radius)
+        full_tmp = str(work / "panel_full.jpg")
+        zoom_tmp = str(work / "panel_zoom.jpg")
+        self._render_one_panel(
+            full_tmp, traj_csv=traj_csv, meta_yaml=meta_yaml,
+            highlight=highlight, view_bounds=vbounds, t=t,
+            time_label="whole scene",
+        )
+        self._render_one_panel(
+            zoom_tmp, traj_csv=traj_csv, meta_yaml=meta_yaml,
+            highlight=highlight, view_bounds=zoom_bounds, t=t,
+            time_label=f"ego \u00b1{radius:.0f}m",
+        )
+        title = f"t = {t:.2f}s  \u2014  {label}"
+        if not compose_dual_bev(full_tmp, zoom_tmp, out_path, title=title):
+            # Pillow missing / panel failed → fall back to whole-scene only.
+            self._render_one_panel(
+                out_path, traj_csv=traj_csv, meta_yaml=meta_yaml,
+                highlight=highlight, view_bounds=vbounds, t=t,
+                time_label=f"t = {t:.2f}s — {label}",
+            )
 
     def render_cluster_medoids(
         self,

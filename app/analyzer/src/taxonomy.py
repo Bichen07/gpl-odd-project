@@ -18,19 +18,21 @@ from typing import List, Optional
 
 class EgoAction(str, Enum):
     MAINTAIN_SPEED = "MAINTAIN_SPEED"
-    DECELERATE = "DECELERATE"
-    ACCELERATE = "ACCELERATE"
+    DECELERATE = "DECELERATE"          # xosc_gen "slow_down"
+    ACCELERATE = "ACCELERATE"          # xosc_gen "speed_up"
     LANE_CHANGE_LEFT = "LANE_CHANGE_LEFT"
     LANE_CHANGE_RIGHT = "LANE_CHANGE_RIGHT"
     ENTER_JUNCTION = "ENTER_JUNCTION"
     EXIT_JUNCTION = "EXIT_JUNCTION"
+    TURN_LEFT = "TURN_LEFT"            # xosc_gen "turn_left"
+    TURN_RIGHT = "TURN_RIGHT"          # xosc_gen "turn_right"
+    GO_STRAIGHT = "GO_STRAIGHT"        # xosc_gen "go_straight" (through a junction)
     EMERGENCY_BRAKE = "EMERGENCY_BRAKE"
     STOPPED = "STOPPED"
 
 
 class NpcAction(str, Enum):
     FOLLOWING_EGO = "FOLLOWING_EGO"
-    CUTTING_IN = "CUTTING_IN"
     ONCOMING = "ONCOMING"
     YIELD_TO_EGO = "YIELD_TO_EGO"
     CROSSING = "CROSSING"
@@ -38,16 +40,47 @@ class NpcAction(str, Enum):
     IRRELEVANT = "IRRELEVANT"
 
 
+class InteractionAction(str, Enum):
+    """Composite, multi-agent labels produced by the Interactive Action Detector."""
+    NEAR_MISS = "NEAR_MISS"
+    DANGEROUS_CUT_IN = "DANGEROUS_CUT_IN"
+
+
 # Detection thresholds (tuned for esmini @ ~0.1s sampling, m/s, m/s²).
 class Thresholds:
-    ACCEL = 1.0            # m/s² → ACCELERATE
-    DECEL = -1.0           # m/s² → DECELERATE
-    EMERGENCY_DECEL = -4.0  # m/s² → EMERGENCY_BRAKE
+    # Longitudinal coarse pass (xosc_gen label_longitudinal_actions, thesis §4.2):
+    # a per-frame acceleration with |a| > CRUISE_BAND is speed_up/slow_down, else
+    # cruise (the implicit baseline). This is the xosc-faithful segmentation.
+    CRUISE_BAND = 0.05     # m/s² → |a| below this is "cruise" (not a maneuver)
+    EMERGENCY_DECEL = -4.0  # m/s² → a slow_down with mean accel ≤ this ⇒ EMERGENCY_BRAKE
     STOPPED_SPEED = 0.3    # m/s  → STOPPED / PARKED
-    MIN_EVENT_DURATION = 0.8  # s   → merge shorter same-type events
+    MIN_EVENT_DURATION = 0.5  # s   → a kept speed segment must last ≥ this (thesis §4.2)
+    # Conciseness filters (thesis §4.2 "eliminate spurious or insignificant events").
+    # A speed-change segment is kept only if it lasts ≥ MIN_EVENT_DURATION AND the
+    # velocity actually changes by ≥ MIN_DELTA_V; MAINTAIN_SPEED is never emitted
+    # (it is the implicit baseline between real maneuvers).
+    MIN_DELTA_V = 0.2      # m/s  → discard speed changes smaller than this
+    STOPPED_MIN_DURATION = 1.0  # s → only report a sustained stop (≥ this long)
+    # Intensity sub-split (xosc_gen label_longitudinal_actions, thesis §4.2 stage 2).
+    # Within one same-category run, split when the mean acceleration of the recent
+    # MIN_CHANGE_DURATION window deviates from the established segment by more than
+    # ACCEL_DEV_THRESHOLD (captures e.g. gentle-decel → hard-brake compound moves).
+    ACCEL_DEV_THRESHOLD = 1.5  # m/s² → deviation that triggers an intensity split
+    MIN_CHANGE_DURATION = 1.0  # s   → the new intensity must be sustained this long
+    MERGE_SHORT_S = 1.5    # s    → re-merge same-type segments shorter than this
+    # Lateral lane-change maneuver duration window (xosc_gen label_lateral_actions).
+    LANE_CHANGE_MIN_S = 1.0  # s  → discard lane changes faster than this
+    LANE_CHANGE_MAX_S = 3.0  # s  → cap (centre on jump) lane changes slower than this
     FOLLOW_GAP = 18.0      # m    → NPC FOLLOWING_EGO if gap below this
     NEAR_GAP = 30.0        # m    → NPC considered "relevant" to ego
     ONCOMING_HEADING = 2.2  # rad  → |Δheading| above this ⇒ opposing direction
+    TURN_HEADING_DEG = 40.0  # deg → net |Δheading| through a junction ⇒ a turn
+    #   (xosc_gen label_route_decisions uses 40°: |Δθ|≤40 ⇒ straight, else turn)
+    ROUTE_MIN_DISP = 0.1   # m    → skip a junction passage with displacement below this
+    # Interactive Action Detector (composite, multi-agent).
+    TTC_NEAR_MISS = 2.5    # s    → TTC below this while closing ⇒ near_miss
+    CUT_IN_REACTION_S = 2.0  # s   → ego must react within this after NPC cut-in
+    CUT_IN_DECEL = -1.5    # m/s² → ego decel sharper than this ⇒ dangerous cut-in
 
 
 @dataclass

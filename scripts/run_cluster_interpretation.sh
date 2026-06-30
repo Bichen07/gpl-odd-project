@@ -2,12 +2,12 @@
 # Phase 6 — run cluster interpretation (stage2b) on an existing llm_artifacts run.
 #
 # Usage:
-#   ./scripts/run_cluster_interpretation.sh <run_id> [dataset] [--dry-run]
+#   ./scripts/run_cluster_interpretation.sh <run_id> [batch_id|dataset] [--dry-run]
 #
-# Example:
-#   bash scripts/build_llm_dataset.sh dataset1 3 my_run_001
-#   ./scripts/run_cluster_interpretation.sh my_run_001 dataset1
-#   ./scripts/run_cluster_interpretation.sh my_run_001 dataset1 --dry-run
+# Example (batch-centric, preferred):
+#   ./scripts/run_cluster_interpretation.sh my_run_001 1          # batch id
+#   ./scripts/run_cluster_interpretation.sh my_run_001 1 --dry-run
+#   ./scripts/run_cluster_interpretation.sh my_run_001 dataset1   # legacy alias still works
 #
 # Gemini (default): export GOOGLE_API_KEY=...
 # OpenAI gpt-*:     export OPENAI_API_KEY=...
@@ -47,7 +47,12 @@ export PYTHONPATH="${PROJECT_ROOT}/app/llm_pipeline/python:${PROJECT_ROOT}/app/a
 
 CMD=(python3 -m llm_pipeline.cli cluster-interpret --run-id "$RUN_ID")
 if [[ -n "$DATASET" && "$DATASET" != --* ]]; then
-  CMD+=(--dataset "$DATASET")
+  # Numeric → treat as Payload batch id (batch-centric); else legacy dataset alias.
+  if [[ "$DATASET" =~ ^[0-9]+$ ]]; then
+    CMD+=(--batch-id "$DATASET")
+  else
+    CMD+=(--dataset "$DATASET")
+  fi
 fi
 if [[ -n "$DRY_RUN" ]]; then
   CMD+=("$DRY_RUN")

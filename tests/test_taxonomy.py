@@ -98,9 +98,12 @@ def test_accelerate_and_decelerate(tmp_path):
 
 
 def test_lane_change_left_and_right(tmp_path):
+    # The xosc-faithful lateral rule only keeps a maneuver whose grown duration is
+    # within [LANE_CHANGE_MIN_S, LANE_CHANGE_MAX_S] = [1.0, 3.0] s, so the synthetic
+    # change must span ≥ 1.0 s of stable-before / stable-after lanes.
     rows = (
-        [_row(0, i * 0.1, 0, i, 5, road=51, lane=1) for i in range(5)]
-        + [_row(0, 0.5 + i * 0.1, 0, 5 + i, 5, road=51, lane=2) for i in range(5)]
+        [_row(0, i * 0.1, 0, i, 5, road=51, lane=1) for i in range(8)]
+        + [_row(0, 0.8 + i * 0.1, 0, 8 + i, 5, road=51, lane=2) for i in range(8)]
     )
     traj = tmp_path / "trajectory.csv"
     meta = tmp_path / "meta.yaml"
@@ -109,7 +112,7 @@ def test_lane_change_left_and_right(tmp_path):
 
     data = labeller.label_trajectory(traj, meta, None)
     actions = {a["action"] for a in data["agents"][0]["actions"]}
-    assert "LANE_CHANGE_LEFT" in actions  # lane 1 -> 2 increases
+    assert "LANE_CHANGE_LEFT" in actions  # lane 1 -> 2 increases ⇒ left (OpenDRIVE)
 
 
 def test_enter_exit_junction(tmp_path):
@@ -134,7 +137,9 @@ def test_enter_exit_junction(tmp_path):
 
 
 def test_world_xy_aliases_accepted(tmp_path):
-    # xosc_gen-style column names world_x/world_y must be accepted
+    # xosc_gen-style column names world_x/world_y must be accepted. Use an
+    # accelerating profile so a maneuver survives the §4.2 conciseness filter
+    # (a constant-velocity track correctly yields no action under the new rules).
     traj = tmp_path / "trajectory.csv"
     meta = tmp_path / "meta.yaml"
     with traj.open("w", newline="") as fh:
@@ -142,9 +147,9 @@ def test_world_xy_aliases_accepted(tmp_path):
                   "heading", "road_id", "lane_id", "lane_offset", "s"]
         w = csv.DictWriter(fh, fieldnames=fields)
         w.writeheader()
-        for i in range(6):
+        for i in range(8):
             w.writerow({"trackId": 0, "time": i * 0.1, "world_x": i,
-                        "world_y": 0, "velocity": 5, "heading": 0,
+                        "world_y": 0, "velocity": 1.0 + i, "heading": 0,
                         "road_id": 51, "lane_id": 1, "lane_offset": 0, "s": 0})
     _meta(meta, [{"track_id": 0, "name": "Ego", "class": "car"}])
 

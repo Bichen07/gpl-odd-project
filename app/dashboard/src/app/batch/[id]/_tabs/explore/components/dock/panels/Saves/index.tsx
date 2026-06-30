@@ -333,7 +333,14 @@ export default function Saves(props: Props) {
               const loadSave = async () => {
                 setLoadingFilename(item.filename);
                 try {
-                  const response = await axios.get(item?.url ?? "", {
+                  // Fetch via the same-origin proxy (/api/payload-file) instead of
+                  // hitting the Payload host directly: the browser may be unable to
+                  // reach that LAN host or be blocked by CORS, but the dashboard
+                  // server can reach Payload.
+                  const fetchUrl = item?.url
+                    ? `/api/payload-file?url=${encodeURIComponent(item.url)}`
+                    : "";
+                  const response = await axios.get(fetchUrl, {
                     responseType: "arraybuffer",
                   });
                   const fileBlob = response.data;

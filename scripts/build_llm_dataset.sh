@@ -12,6 +12,7 @@
 #     [--save-doc-id 46] \
 #     [--dataset dataset1] \
 #     [--ego-name ITRI] \
+#     [--ego-zoom-radius 30] \
 #     [--duration-mode full]
 #
 # Examples:
@@ -182,6 +183,7 @@ echo "🎉 Done! See the 'Output dir:' path printed above:"
 echo "   results/batch<id>/<k>_cluster_s=<silhouette>/cluster<i>/"
 echo "   Each cluster dir has: context.md, cluster.json, action.yaml,"
 echo "   description.txt, trajectory.csv, map_overview.jpg, snapshots/"
+echo "   snapshots/*.jpg are dual-panel: whole scene (left) + ego zoom (right)"
 echo "   Shared map assets: results/map/"
 echo ""
 echo "One-time map assets (if results/map/ is empty):"

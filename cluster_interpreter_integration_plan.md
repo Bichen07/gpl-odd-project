@@ -203,7 +203,7 @@ Storage location:
 - **Payload `documents` collection** (uploaded by Analyzer backend)
 - **What is persisted here:** intermediate analysis artifacts generated server-side during `/trajectory_analysis`
 
-Code path (`app/analyzer/src/controller.py`):
+Code path ([`app/analyzer/src/controller.py`](app/analyzer/src/controller.py)):
 
 - Analyzer zips and uploads:
   - `trajectories.json` (as document; mapped to `heatmapFileinfo` in response)
@@ -691,9 +691,16 @@ Verified runs (2026-06):
 
 ## Phase D — LLM interpretation
 
+Batch-centric (the 2nd argument is the **Payload batch id**, not `dataset1/2/3`):
+
 ```bash
-bash scripts/run_cluster_interpretation.sh <dataset> <k>
+bash scripts/run_cluster_interpretation.sh <run_id> <batch_id> [--dry-run]
+# e.g. bash scripts/run_cluster_interpretation.sh my_run_001 1
 ```
+
+`<batch_id>` is resolved to its map/track assets via `dataset_config.dataset_for_batch_id()`;
+a legacy `dataset1` alias is still accepted for backward compatibility. The CLI exposes
+this as `--batch-id` (preferred) or `--dataset` (alias).
 
 Output:
 
@@ -702,6 +709,90 @@ Output:
 Exit criteria:
 
 - interpretation YAML exists for all target clusters
+
+> Note: `DATASETS`' internal keys (`dataset1/2/3`) in `dataset_config.py` are intentionally
+> kept — they are the human-readable map/trial-id registry. Every *interface* (build,
+> interpretation, map-asset scripts) is now batch-centric; the keys are an internal lookup
+> table only.
+
+---
+
+## Phase D deep-dive — what the LLM sees, and how actions are derived
+
+### D.1 What a single (medoid) trajectory hands to the LLM
+
+The interpreter (`cluster_interpreter.analyze_cluster`) builds one multimodal prompt per cluster:
+
+| Slot in prompt                | Source artifact                                  | Notes |
+| ----------------------------- | ------------------------------------------------ | ----- |
+| `{cluster_stats}`             | `cluster.json` (→ `_format_cluster_stats`)       | size, k, silhouette, collision rate, medoid trial id |
+| `{agent_actions_log}`         | `context.md` (→ `action_log_from_description`)   | header + prose description + **per-agent action table** + **interactions table** + snapshot index |
+| BEV images (`image_url[]`)    | `snapshots/*.jpg` + MFPCA heatmap                | now **dual-panel** (whole scene + ego ±R zoom) |
+| `{map_description}`           | map context                                      | road network / junction geometry |
+
+So the LLM's *textual* signal for a trajectory is the single `context.md` card (not the raw
+`observations.json`, which was dropped). `context.md` is the editing surface for "give the LLM
+better data": anything added to it (turn labels, interactions, peak-intensity timestamps) is
+seen directly.
+
+### D.2 xosc_gen reference: how it picks "key actions" + snapshots
+
+`xosc_gen/main.py` (Steps 0–2.5) → `results/inD/action/07_3100_3500.yaml`:
+
+- Per agent it emits a small set of **typed actions** with start/end + attributes:
+  `go_straight | turn_left | turn_right` (route, with legal flag + entry/exit points),
+  `slow_down | speed_up` (longitudinal, with acceleration + target_speed + duration),
+  `follow` (pedestrian/cyclist polyline).
+- Snapshots (BEV) are rendered at the **action boundaries / kinematic extrema**, i.e. it
+  keyframes on *when something changes* rather than uniform time sampling.
+
+### D.3 Our taxonomy vs xosc_gen — coverage check
+
+| xosc_gen action | gpl-odd equivalent (`taxonomy.EgoAction`)          | status |
+| --------------- | -------------------------------------------------- | ------ |
+| `speed_up`      | `ACCELERATE`                                        | ✅ |
+| `slow_down`     | `DECELERATE` / `EMERGENCY_BRAKE`                    | ✅ |
+| `lane_change`   | `LANE_CHANGE_LEFT` / `LANE_CHANGE_RIGHT`           | ✅ |
+| `turn_*`        | `TURN_LEFT` / `TURN_RIGHT` / `GO_STRAIGHT`         | ✅ **added (V1-5)** |
+| (junction)      | `ENTER_JUNCTION` / `EXIT_JUNCTION`                  | ✅ (gpl-odd extra) |
+
+**Gap closed:** previously we only flagged junction *entry/exit* but never the **turn
+direction**. `labeller._agent_speed_actions` now classifies each junction passage by net
+heading change (`Thresholds.TURN_HEADING_DEG = 30°`; +Δheading ⇒ left, −Δ ⇒ right, else straight).
+
+### D.4 Interactive Action Detector (V1-5, multi-agent)
+
+New layer `labeller.detect_interactions(df)` reads **all** agents and emits ego-relative
+composite labels into `action.yaml`/`context.md` under `interactions:`. Implemented subset
+(chosen for being computable from the esmini tracks we already have — no right-of-way or
+traffic-signal metadata required):
+
+| Label              | Trigger                                                                 | Key timestamp captured |
+| ------------------ | ---------------------------------------------------------------------- | ---------------------- |
+| `NEAR_MISS`        | ego–NPC TTC < 2.5 s **and** distance decreasing                        | moment of **absolute minimum distance** |
+| `DANGEROUS_CUT_IN` | NPC changes into ego's (road, lane) within 30 m, ego then decelerates ≤ −1.5 m/s² within 2 s | min-distance moment + cut-in time |
+
+Deferred (need data we don't have yet): `yield`/`aggressive_pass` (requires right-of-way at a
+junction) and traffic-light transitions (requires signal-phase metadata in the map).
+
+### D.5 Keyframe selection (peak-intensity)
+
+`tier2_renderer.pick_critical_timestamps` already snapshots **max deceleration**
+(`ego_max_deceleration`) and **closest approach / min distance** (`closest_approach`). Added in
+V1-5: **turn apex** = `ego_turn_apex`, the moment of maximum heading-rate (|dθ/dt|), so turns
+are captured at their sharpest point.
+
+### D.6 Dual-panel BEV snapshots
+
+Each `snapshots/*.jpg` is now a single ~4:3 image composed of two panels
+(`tier2_renderer.compose_dual_bev`):
+
+- **left** — whole-scene BEV (full trajectory context, as before),
+- **right** — ego-centric zoom to **±`--ego-zoom-radius` metres** (default 30 m) for close-in detail.
+
+Panels are letterboxed (never distorted). Set `--ego-zoom-radius 0` to fall back to the
+single whole-scene image. Pillow is required for the composite; if missing, the renderer
+silently falls back to whole-scene only.
 
 ---
 
@@ -792,10 +883,11 @@ bash scripts/build_llm_dataset.sh \
 #          --clustering-index 445 (exact index instead of --k)
 #          --list-clusterings     (print candidates for --k, then pick an index)
 #          --ego-name ITRI        (default: ITRI)
+#          --ego-zoom-radius 30   (right BEV panel zoom; 0 disables dual-panel)
 #          --duration-mode full   (default: full)
 
-# C) Run interpretation
-bash scripts/run_cluster_interpretation.sh dataset1 4
+# C) Run interpretation (batch-centric: 2nd arg is the run id, 3rd is the batch id)
+bash scripts/run_cluster_interpretation.sh my_run_001 1
 ```
 
 ---

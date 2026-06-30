@@ -161,12 +161,6 @@ export interface BatchState {
   };
 
   heatmapSortedBy: string;
-
-  llmMedoidTrialIds: string[];
-  llmBehaviorExplanations: {
-    [clusterId: string]: { label: string; description: string };
-  } | null;
-  showBehaviorOverlay: boolean;
 }
 
 const initialState: BatchState = {
@@ -225,10 +219,6 @@ const initialState: BatchState = {
 
   tree: {},
   treePoints: {},
-
-  llmMedoidTrialIds: [],
-  llmBehaviorExplanations: null,
-  showBehaviorOverlay: false,
 };
 
 export const batchSlice = createSlice({
@@ -783,24 +773,6 @@ export const batchSlice = createSlice({
       action: PayloadAction<typeof initialState.clipPaused>
     ) => {
       state.clipPaused = action.payload;
-    },
-    setLlmMedoidTrialIds: (
-      state: BatchState,
-      action: PayloadAction<typeof initialState.llmMedoidTrialIds>
-    ) => {
-      state.llmMedoidTrialIds = action.payload;
-    },
-    setLlmBehaviorExplanations: (
-      state: BatchState,
-      action: PayloadAction<typeof initialState.llmBehaviorExplanations>
-    ) => {
-      state.llmBehaviorExplanations = action.payload;
-    },
-    setShowBehaviorOverlay: (
-      state: BatchState,
-      action: PayloadAction<typeof initialState.showBehaviorOverlay>
-    ) => {
-      state.showBehaviorOverlay = action.payload;
     },
   },
 });

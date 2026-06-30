@@ -33,9 +33,19 @@ _EGO_PHRASES = {
     "EXIT_JUNCTION": "exits the junction",
 }
 
+_INTENT_PHRASES = {
+    "TURN_LEFT": "turn left",
+    "TURN_RIGHT": "turn right",
+    "GO_STRAIGHT": "go straight",
+}
+
+_INTERACTION_PHRASES = {
+    "NEAR_MISS": "near miss",
+    "DANGEROUS_CUT_IN": "dangerous cut-in",
+}
+
 _RELATION_PHRASES = {
     "FOLLOWING_EGO": "follows the ego vehicle",
-    "CUTTING_IN": "cuts in front of the ego vehicle",
     "ONCOMING": "approaches from the opposite direction (oncoming)",
     "YIELD_TO_EGO": "yields to the ego vehicle",
     "CROSSING": "crosses the ego vehicle's path",
@@ -62,13 +72,17 @@ def _narrate_agent(agent: Dict) -> List[str]:
         when = f"t={t0:.1f}s" if t0 == t1 else f"t={t0:.1f}-{t1:.1f}s"
         attrs = act.get("attributes", {})
         extra = ""
-        if "speed" in attrs:
+        if "target_speed" in attrs:                       # longitudinal maneuver
+            extra = f" from {attrs.get('start_speed')} to {attrs['target_speed']} m/s"
+        elif "speed" in attrs:                            # sustained stop
             extra = f" (~{attrs['speed']} m/s)"
-        elif "to_lane" in attrs:
+        elif "to_lane" in attrs:                          # lane change
             extra = f" (lane {attrs['from_lane']}→{attrs['to_lane']})"
-        elif "entry_road" in attrs:
-            extra = f" (road {attrs['entry_road']})"
-        elif "exit_road" in attrs:
+        elif "intent" in attrs:                           # junction entry
+            intent_word = _INTENT_PHRASES.get(attrs["intent"], attrs["intent"].lower())
+            extra = (f", intending to {intent_word} "
+                     f"(road {attrs.get('entry_road')}→{attrs.get('exit_road')})")
+        elif "exit_road" in attrs:                        # junction exit
             extra = f" (road {attrs['exit_road']})"
         lines.append(
             f"  {when}: {phrase} on road {act['road_id']}, lane {act['lane_id']}{extra}"
@@ -93,6 +107,27 @@ def build_description(action_data: Dict) -> str:
     for agent in agents:
         parts.extend(_narrate_agent(agent))
         parts.append("")
+
+    # Multi-agent interactions (ego-relative conflicts).
+    interactions = action_data.get("interactions") or []
+    if interactions:
+        parts.append("Interactions:")
+        for iv in interactions:
+            phrase = _INTERACTION_PHRASES.get(iv.get("type"), str(iv.get("type")).lower())
+            kt = iv.get("key_time")
+            det = []
+            if iv.get("min_distance_m") is not None:
+                det.append(f"min distance {iv['min_distance_m']} m")
+            if iv.get("min_ttc_s") is not None:
+                det.append(f"min TTC {iv['min_ttc_s']} s")
+            if iv.get("ego_reaction_accel") is not None:
+                det.append(f"ego braking {iv['ego_reaction_accel']} m/s²")
+            tail = f" ({', '.join(det)})" if det else ""
+            parts.append(
+                f"  t={kt:.1f}s: {phrase} with track {iv.get('with_track_id')}{tail}"
+            )
+        parts.append("")
+
     return "\n".join(parts).rstrip() + "\n"
 
 

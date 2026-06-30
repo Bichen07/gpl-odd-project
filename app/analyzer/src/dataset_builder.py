@@ -264,6 +264,284 @@ def _fetch_payload_analysis(
     return scores, clustering_list, ego_data, selected_meta_raw
 
 
+def _collision_flags_from_ego(ego_data: Dict) -> Dict[str, bool]:
+    """Build a ``{payload_trial_id: collided_bool}`` map from the saved analysis.
+
+    The Dashboard stores collision as a per-trial criticality KPI at
+    ``trials[tid].testObjectives.criticalityMetrics[name=="collision"].value``
+    (0 = no collision, ≥1 = collision). This mirrors the legacy
+    ``alldatasets/<dataset>/collision.json`` file so the payload-save path can feed
+    the same ``build_collision_cluster_stats`` / ``trial_collision_flag`` helpers.
+    """
+    flags: Dict[str, bool] = {}
+    trials = ego_data.get("trials") or {}
+    for tid, t_info in trials.items():
+        if not isinstance(t_info, dict):
+            continue
+        cms = ((t_info.get("testObjectives") or {}).get("criticalityMetrics")) or []
+        for m in cms:
+            if not isinstance(m, dict):
+                continue
+            kpi = m.get("keyPerformanceIndicator") or {}
+            if kpi.get("name") == "collision":
+                val = m.get("value")
+                try:
+                    flags[str(tid)] = float(val) > 0.0
+                except (TypeError, ValueError):
+                    flags[str(tid)] = bool(val)
+                break
+    return flags
+
+
+def _cluster_metric_stats_from_ego(
+    ego_data: Dict, result_data: Dict
+) -> Dict[str, Dict[str, Any]]:
+    """Per-cluster aggregate of TTC / SPrET / parameter ranges from the saved analysis.
+
+    Returns ``{label_str: {mean_ttc, min_ttc, mean_spret, parameter_ranges}}``.
+    Collision is handled separately by ``build_collision_cluster_stats``; this fills
+    the metrics that were previously left ``n/a`` in the ``results/`` builder layout.
+    Missing pieces degrade gracefully (e.g. no ``parameters`` → empty ranges).
+    """
+    from collections import defaultdict
+
+    trials = ego_data.get("trials") or {}
+    assignments = (result_data or {}).get("data", {}) or {}
+
+    param_id_to_name: Dict[str, str] = {}
+    sp = (
+        (ego_data.get("scenario") or {}).get("parameters")
+        or ego_data.get("parameters")
+        or []
+    )
+    for p in sp:
+        if not isinstance(p, dict):
+            continue
+        pid = p.get("id") or p.get("parameterId")
+        if pid is not None:
+            param_id_to_name[str(pid)] = p.get("name") or str(pid)
+
+    ttc: Dict[str, List[float]] = defaultdict(list)
+    spret: Dict[str, List[float]] = defaultdict(list)
+    params: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
+
+    for tid, item in assignments.items():
+        label = item.get("label") if isinstance(item, dict) else item
+        if label is None or str(label) == "-1":
+            continue
+        lb = str(label)
+        t = trials.get(str(tid)) or trials.get(tid)
+        if not isinstance(t, dict):
+            continue
+        for m in ((t.get("testObjectives") or {}).get("criticalityMetrics") or []):
+            if not isinstance(m, dict):
+                continue
+            kpi = (m.get("keyPerformanceIndicator") or {}).get("name", "")
+            val = m.get("value")
+            if val is None:
+                continue
+            try:
+                fval = float(val)
+            except (TypeError, ValueError):
+                continue
+            if kpi == "ttc_min":
+                ttc[lb].append(fval)
+            elif kpi == "spret_min":
+                spret[lb].append(min(fval, 9.0))
+        for tp in (t.get("parameters") or []):
+            if not isinstance(tp, dict):
+                continue
+            pid = str(tp.get("parameterId", ""))
+            name = param_id_to_name.get(pid, pid or "param")
+            try:
+                params[lb][name].append(float(tp.get("value", 0)))
+            except (TypeError, ValueError):
+                continue
+
+    out: Dict[str, Dict[str, Any]] = {}
+    for lb in set(ttc) | set(spret) | set(params):
+        pr = {
+            k: [float(min(v)), float(max(v))]
+            for k, v in params[lb].items()
+            if v
+        }
+        out[lb] = {
+            "mean_ttc": round(float(np.mean(ttc[lb])), 3) if ttc[lb] else None,
+            "min_ttc": round(float(np.min(ttc[lb])), 3) if ttc[lb] else None,
+            "mean_spret": round(float(np.mean(spret[lb])), 3) if spret[lb] else None,
+            "parameter_ranges": pr,
+        }
+    return out
+
+
+def render_cluster_trajectory_overlay(
+    out_path: Path,
+    members: List[Tuple[int, int]],
+    medoid_member: Optional[Tuple[int, int]] = None,
+    title: str = "",
+    max_members: int = 80,
+) -> bool:
+    """Render a per-cluster ego-trajectory variation image (spaghetti plot).
+
+    Overlays every cluster member's ego path (faint blue) with the medoid path
+    highlighted (red). This is the genuine "trajectory variation" signal that
+    replaces the previous behaviour of mislabeling BEV[0] as an MFPCA heatmap.
+    Best-effort: returns False (and writes nothing) if matplotlib is unavailable
+    or no member CSV could be read.
+    """
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except Exception as e:  # pragma: no cover
+        print(f"  ⚠️  Trajectory overlay skipped (matplotlib unavailable: {e})")
+        return False
+
+    def _ego_xy(batch: int, idx: int):
+        if not csv_exists(batch, idx):
+            return None
+        df = get_csv_road_data(batch, idx)
+        if df is None or df.empty:
+            return None
+        ego = df[df["name"] == "Ego"].sort_values("time")
+        if ego.empty:
+            return None
+        return ego["x"].to_numpy(), ego["y"].to_numpy()
+
+    paths = []
+    for (b, idx) in members[:max_members]:
+        xy = _ego_xy(b, idx)
+        if xy is not None:
+            paths.append(xy)
+    medoid_xy = _ego_xy(*medoid_member) if medoid_member else None
+    if not paths and medoid_xy is None:
+        return False
+
+    fig, ax = plt.subplots(figsize=(6, 6), dpi=120)
+    for xs, ys in paths:
+        ax.plot(xs, ys, color="#1f77b4", alpha=0.18, linewidth=1.0)
+    if medoid_xy is not None:
+        mx, my = medoid_xy
+        ax.plot(mx, my, color="#d62728", linewidth=2.5, label="medoid")
+        ax.scatter([mx[0]], [my[0]], color="#2ca02c", s=36, zorder=5, label="start")
+    ax.set_aspect("equal", adjustable="datalim")
+    ax.set_title(title or f"Cluster ego-trajectory variation (n={len(paths)})")
+    ax.set_xlabel("x [m]")
+    ax.set_ylabel("y [m]")
+    ax.grid(True, alpha=0.2)
+    if medoid_xy is not None:
+        ax.legend(loc="best", fontsize=8)
+    fig.tight_layout()
+    try:
+        fig.savefig(out_path)
+    finally:
+        plt.close(fig)
+    return True
+
+
+def _cluster_members_from_result(
+    result_data: Dict, cluster_id: int, trial_index_map: Dict[str, Tuple[int, int]]
+) -> List[Tuple[int, int]]:
+    """(batch, index) tuples for every member trial of *cluster_id* with a CSV map."""
+    out: List[Tuple[int, int]] = []
+    for tid, item in (result_data.get("data", {}) or {}).items():
+        label = item.get("label") if isinstance(item, dict) else item
+        if str(label) != str(cluster_id):
+            continue
+        bi = trial_index_map.get(str(tid))
+        if bi:
+            out.append(bi)
+    return out
+
+
+def backfill_cluster_stats_in_dir(
+    results_dir: str,
+    batch_id: int,
+    save_doc_id: Optional[int] = None,
+    k: Optional[int] = None,
+    clustering_index: Optional[int] = None,
+    silhouette: Optional[float] = None,
+    duration_mode: str = "full",
+    ego_name: str = "ITRI",
+) -> bool:
+    """Patch collision + TTC/SPrET/parameter stats into existing cluster.json files.
+
+    Re-fetches the saved Payload analysis (same selection knobs as a build) and
+    rewrites only the ``cluster`` block of each ``cluster<N>/cluster.json`` under
+    *results_dir* — no BEV/labelling regeneration. Pass the same ``--k`` /
+    ``--silhouette`` / ``--clustering-index`` that produced the folder.
+    """
+    rd = Path(results_dir)
+    if not rd.is_dir():
+        print(f"❌ Results dir not found: {rd}")
+        return False
+
+    clustering_data = load_clustering_from_payload_save(
+        batch_id=batch_id,
+        save_doc_id=save_doc_id,
+        k=k,
+        clustering_index=clustering_index,
+        duration_mode=duration_mode,
+        ego_name=ego_name,
+        silhouette=silhouette,
+    )
+    if not clustering_data:
+        return False
+    _emb, result_data, trial_index_map, collision_flags, metric_stats = clustering_data
+
+    from pipeline_imports import ensure_llm_pipeline
+
+    ensure_llm_pipeline()
+    from llm_pipeline.cluster_stats import build_collision_cluster_stats
+
+    patched = 0
+    for cdir in sorted(rd.glob("cluster*")):
+        if not (cdir.is_dir() and cdir.name[len("cluster"):].isdigit()):
+            continue
+        cid = int(cdir.name[len("cluster"):])
+        cj = cdir / "cluster.json"
+        if not cj.is_file():
+            continue
+        try:
+            doc = json.loads(cj.read_text(encoding="utf-8"))
+        except Exception as e:
+            print(f"  ⚠️  Skipping {cdir.name}: {e}")
+            continue
+        c = doc.get("cluster", {}) or {}
+        if collision_flags and result_data:
+            cs = build_collision_cluster_stats(cid, result_data, collision_flags)
+            c["n_trials"] = cs.get("n_trials", c.get("n_trials"))
+            c["collision_count"] = cs.get("collision_count")
+            c["collision_rate"] = cs.get("collision_rate")
+        ms = metric_stats.get(str(cid)) or metric_stats.get(cid) or {}
+        c["mean_ttc"] = ms.get("mean_ttc")
+        c["min_ttc"] = ms.get("min_ttc")
+        c["mean_spret"] = ms.get("mean_spret")
+        c["parameter_ranges"] = ms.get("parameter_ranges") or {}
+        doc["cluster"] = c
+        cj.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+        patched += 1
+        print(
+            f"  ✓ patched {cdir.name}/cluster.json "
+            f"(min_ttc={c.get('min_ttc')}, params={len(c['parameter_ranges'])})"
+        )
+
+        # Real trajectory-variation image (replaces the mislabeled BEV[0]).
+        members = _cluster_members_from_result(result_data, cid, trial_index_map)
+        med = doc.get("medoid", {}) or {}
+        medoid_member = None
+        if med.get("batch_id") is not None and med.get("trial_index") is not None:
+            medoid_member = (int(med["batch_id"]), int(med["trial_index"]))
+        if render_cluster_trajectory_overlay(
+            cdir / "trajectory_overlay.png", members, medoid_member,
+            title=f"Cluster {cid} ego-trajectory variation",
+        ):
+            print(f"     ↳ trajectory_overlay.png ({len(members)} members)")
+
+    print(f"✅ Backfilled {patched} cluster.json file(s) in {rd}")
+    return patched > 0
+
+
 def list_clusterings_from_payload_save(
     batch_id: int,
     save_doc_id: Optional[int] = None,
@@ -326,14 +604,17 @@ def load_clustering_from_payload_save(
     clustering_index: Optional[int] = None,
     duration_mode: str = "full",
     ego_name: str = "ITRI",
-) -> Optional[Tuple[Dict, Dict, Dict]]:
+    silhouette: Optional[float] = None,
+) -> Optional[Tuple[Dict, Dict, Dict, Dict]]:
     """Fetch a saved Dashboard analysis zip from Payload and extract clustering data.
 
-    Returns (embeddings_data, result_data, trial_index_map) or None on error.
+    Returns (embeddings_data, result_data, trial_index_map, collision_flags) or
+    None on error.
 
     embeddings_data: { "embeddings": { trialId: [float, ...] } }
     result_data:     { "data": { trialId: { "trialId": ..., "label": ... } } }
     trial_index_map: { trialId_str: (batch_id_int, trial_index_int) }
+    collision_flags: { trialId_str: collided_bool }  (from the collision KPI)
 
     Either k or clustering_index must be provided (not both), unless the zip
     carries a selected.json with the user's choice.
@@ -393,12 +674,23 @@ def load_clustering_from_payload_save(
             print(f"❌ ERROR: No clustering result found with k={k}.")
             print(f"   Available cluster counts: {available_ks}")
             return None
-        candidates.sort(reverse=True)
-        best_sil, best_idx, selected = candidates[0]
-        print(f"  Selected best k={k} result: index={best_idx}, "
-              f"silhouette={best_sil:.4f}, task={selected.get('task')}")
-        if len(candidates) > 1:
-            print(f"  ({len(candidates)} candidates with k={k} evaluated)")
+        if silhouette is not None:
+            # Select the k-result whose silhouette is closest to the requested value.
+            best_sil, best_idx, selected = min(
+                candidates,
+                key=lambda c: abs((c[0] if c[0] is not None else -1.0) - silhouette),
+            )
+            print(f"  Selected k={k} result nearest silhouette={silhouette:.4f}: "
+                  f"index={best_idx}, silhouette={best_sil:.4f}, task={selected.get('task')}")
+            distinct_sils = sorted({round(c[0], 4) for c in candidates if c[0] is not None}, reverse=True)
+            print(f"  (k={k} silhouettes available: {distinct_sils})")
+        else:
+            candidates.sort(reverse=True)
+            best_sil, best_idx, selected = candidates[0]
+            print(f"  Selected best k={k} result: index={best_idx}, "
+                  f"silhouette={best_sil:.4f}, task={selected.get('task')}")
+            if len(candidates) > 1:
+                print(f"  ({len(candidates)} candidates with k={k} evaluated)")
 
     # 7. Build trial_index_map from esminiDat.filename
     _DAT_PAT = re.compile(r"esmini_(\d+)_(\d+)\.dat")
@@ -420,8 +712,17 @@ def load_clustering_from_payload_save(
     # 8. Shape return values to match load_clustering_data() contract
     embeddings_data = {"embeddings": scores}
     result_data = selected
+    collision_flags = _collision_flags_from_ego(ego_data)
+    n_coll = sum(1 for v in collision_flags.values() if v)
+    print(f"  Loaded collision KPI for {len(collision_flags)} trials "
+          f"({n_coll} collided).")
 
-    return embeddings_data, result_data, trial_index_map
+    metric_stats = _cluster_metric_stats_from_ego(ego_data, result_data)
+    n_with_ttc = sum(1 for s in metric_stats.values() if s.get("mean_ttc") is not None)
+    print(f"  Computed per-cluster metric stats for {len(metric_stats)} clusters "
+          f"({n_with_ttc} with TTC).")
+
+    return embeddings_data, result_data, trial_index_map, collision_flags, metric_stats
 
 
 def compute_medoids(
@@ -709,6 +1010,27 @@ def write_context_md(
                 )
             lines.append("")
 
+    # Interactive (multi-agent) events from the Interactive Action Detector.
+    interactions = (action_data or {}).get("interactions") or []
+    if interactions:
+        lines.append("## Interactions (multi-agent conflicts)")
+        lines.append("")
+        lines.append("| key time | type | with agent | detail |")
+        lines.append("|----------|------|------------|--------|")
+        for iv in interactions:
+            det = []
+            if iv.get("min_distance_m") is not None:
+                det.append(f"min dist {iv['min_distance_m']}m")
+            if iv.get("min_ttc_s") is not None:
+                det.append(f"min TTC {iv['min_ttc_s']}s")
+            if iv.get("ego_reaction_accel") is not None:
+                det.append(f"ego accel {iv['ego_reaction_accel']}m/s²")
+            lines.append(
+                f"| {iv.get('key_time')}s | {iv.get('type')} | "
+                f"track {iv.get('with_track_id')} | {', '.join(det)} |"
+            )
+        lines.append("")
+
     # BEV snapshot index
     snap_dir = cluster_dir / "snapshots"
     snaps = sorted(p.name for p in snap_dir.glob("*.jpg")) if snap_dir.is_dir() else []
@@ -740,6 +1062,7 @@ def process_medoid(
     cluster_collision_stats: Optional[Dict[str, Any]] = None,
     n_clusters: Optional[int] = None,
     silhouette: Optional[float] = None,
+    ego_zoom_radius: float = 30.0,
 ) -> bool:
     """Process a single medoid trial: generate all required files.
     
@@ -868,6 +1191,7 @@ def process_medoid(
                 snapshot_output_px=snapshot_output_px,
                 snapshot_border_frac=snapshot_border_frac,
                 typography=typography,
+                ego_zoom_radius=ego_zoom_radius,
             )
             snaps = tier2.render_trial_from_esmini_csv(
                 batch_id,
@@ -903,6 +1227,10 @@ def process_medoid(
                 "silhouette": round(float(silhouette), 4) if silhouette is not None else None,
                 "collision_count": cc.get("collision_count"),
                 "collision_rate": cc.get("collision_rate"),
+                "mean_ttc": cc.get("mean_ttc"),
+                "min_ttc": cc.get("min_ttc"),
+                "mean_spret": cc.get("mean_spret"),
+                "parameter_ranges": cc.get("parameter_ranges") or {},
             },
             "medoid": {
                 "trial_id": medoid.get("trial_id"),
@@ -1003,7 +1331,16 @@ def main():
         type=int,
         default=None,
         dest="k_clusters",
-        help="Target cluster count: pick best-silhouette result with this k from the saved analysis",
+        help="Target cluster count: pick best-silhouette result with this k "
+             "(or the one matching --silhouette) from the saved analysis",
+    )
+    parser.add_argument(
+        "--silhouette",
+        type=float,
+        default=None,
+        help="With --k, select the result whose silhouette is closest to this value "
+             "(e.g. --k 4 --silhouette 0.7037 to pick the lower-silhouette k=4 result). "
+             "Without it, --k picks the highest silhouette.",
     )
     parser.add_argument(
         "--clustering-index",
@@ -1016,6 +1353,13 @@ def main():
         action="store_true",
         help="payload-save only: print all clustering candidates (index, k, silhouette, "
              "task params) and exit without building. Filter with --k.",
+    )
+    parser.add_argument(
+        "--backfill-stats",
+        metavar="RESULTS_DIR",
+        help="payload-save only: re-fetch the analysis and patch collision + TTC/SPrET/"
+             "parameter-range stats into each cluster<N>/cluster.json under RESULTS_DIR "
+             "(e.g. results/batch2/4_cluster_s=0.6945), without rebuilding BEV. Needs --batch-id.",
     )
     parser.add_argument(
         "--duration-mode",
@@ -1053,6 +1397,13 @@ def main():
         type=float,
         default=0.10,
         help="White border as fraction of map content per side (default: 0.10 → 100 m → 120 m frame)",
+    )
+    parser.add_argument(
+        "--ego-zoom-radius",
+        type=float,
+        default=30.0,
+        help="Right BEV panel zooms to ±this many metres around the ego "
+             "(default: 30). Set 0 to disable the dual-panel composite.",
     )
     parser.add_argument(
         "--road-label-size",
@@ -1137,6 +1488,25 @@ def main():
         )
         sys.exit(0 if ok else 1)
 
+    # --- Backfill-stats mode: patch existing cluster.json files and exit ---
+    if args.backfill_stats:
+        if not is_payload_save:
+            parser.error("--backfill-stats requires --source payload-save")
+        if args.batch_id is None:
+            parser.error("--backfill-stats requires --batch-id")
+        print(f"🩹 Backfilling stats into {args.backfill_stats} (batch {args.batch_id})")
+        ok = backfill_cluster_stats_in_dir(
+            args.backfill_stats,
+            batch_id=args.batch_id,
+            save_doc_id=args.save_doc_id,
+            k=args.k_clusters,
+            clustering_index=args.clustering_index,
+            silhouette=args.silhouette,
+            duration_mode=args.duration_mode,
+            ego_name=args.ego_name,
+        )
+        sys.exit(0 if ok else 1)
+
     if not args.trials:
         if is_payload_save:
             if args.batch_id is None:
@@ -1181,6 +1551,8 @@ def main():
 
     result_data: Optional[Dict[str, Any]] = None
     trial_index_map: Optional[Dict[str, Tuple[int, int]]] = None
+    payload_collision_flags: Optional[Dict[str, bool]] = None
+    payload_metric_stats: Dict[str, Dict[str, Any]] = {}
 
     # --- Step 1: Load clustering data ---
     if args.trials:
@@ -1211,11 +1583,12 @@ def main():
             clustering_index=args.clustering_index,
             duration_mode=args.duration_mode,
             ego_name=args.ego_name,
+            silhouette=args.silhouette,
         )
         if not clustering_data:
             sys.exit(1)
 
-        embeddings_data, result_data, trial_index_map = clustering_data
+        embeddings_data, result_data, trial_index_map, payload_collision_flags, payload_metric_stats = clustering_data
         # Update n_clusters from the actual selection (real label count)
         real_labels = {v["label"] for v in result_data.get("data", {}).values()} - {"-1"}
         n_clusters = len(real_labels)
@@ -1343,15 +1716,23 @@ def main():
         else:
             print(f"⚠️  Clustering result file not found: {result_src} (skipped)")
 
-    # --- Collision flags (optional, alldatasets only) ---
+    # --- Collision flags ---
+    # payload-save: collision KPI parsed from the saved analysis (per Payload trial).
+    # alldatasets:  legacy alldatasets/<dataset>/collision.json file.
     collision_flags: Optional[Dict[str, bool]] = None
-    collision_path = PROJECT_ROOT / "alldatasets" / dataset_name / "collision.json"
-    if collision_path.is_file():
-        try:
-            collision_flags = json.loads(collision_path.read_text(encoding="utf-8"))
-            print(f"✓ Loaded collision flags from {collision_path.name}")
-        except Exception as e:
-            print(f"⚠️  Could not load collision.json: {e}")
+    if payload_collision_flags:
+        collision_flags = payload_collision_flags
+        n_coll = sum(1 for v in collision_flags.values() if v)
+        print(f"✓ Using collision KPI from Payload analysis "
+              f"({n_coll}/{len(collision_flags)} trials collided)")
+    else:
+        collision_path = PROJECT_ROOT / "alldatasets" / dataset_name / "collision.json"
+        if collision_path.is_file():
+            try:
+                collision_flags = json.loads(collision_path.read_text(encoding="utf-8"))
+                print(f"✓ Loaded collision flags from {collision_path.name}")
+            except Exception as e:
+                print(f"⚠️  Could not load collision.json: {e}")
 
     from pipeline_imports import ensure_llm_pipeline
 
@@ -1371,10 +1752,18 @@ def main():
             per_cluster_collision[lb] = build_collision_cluster_stats(
                 int(lb), result_data, collision_flags
             )
+            # Merge TTC / SPrET / parameter ranges (payload-save only) so the LLM
+            # gets the full stats picture instead of n/a.
+            metrics = payload_metric_stats.get(lb) or payload_metric_stats.get(str(lb))
+            if metrics:
+                per_cluster_collision[lb].update(metrics)
             cs = per_cluster_collision[lb]
+            extra = ""
+            if cs.get("min_ttc") is not None:
+                extra = f", min_ttc={cs['min_ttc']}s"
             print(
                 f"  ℹ cluster {lb}: collision_rate={cs['collision_rate']}% "
-                f"({cs['collision_count']}/{cs['n_trials']} trials)"
+                f"({cs['collision_count']}/{cs['n_trials']} trials){extra}"
             )
 
     # --- Step 6: Process each medoid ---
@@ -1396,8 +1785,24 @@ def main():
             cluster_collision_stats=per_cluster_collision.get(medoid["cluster_label"]),
             n_clusters=n_clusters,
             silhouette=silhouette,
+            ego_zoom_radius=args.ego_zoom_radius,
         ):
             success_count += 1
+
+        # Per-cluster trajectory-variation overlay (real "heatmap" input for the LLM).
+        if result_data is not None and trial_index_map:
+            try:
+                lb = medoid["cluster_label"]
+                members = _cluster_members_from_result(result_data, int(lb), trial_index_map)
+                medoid_member = (medoid["batch_id"], medoid["trial_index"])
+                if render_cluster_trajectory_overlay(
+                    run_dir / f"cluster{lb}" / "trajectory_overlay.png",
+                    members, medoid_member,
+                    title=f"Cluster {lb} ego-trajectory variation",
+                ):
+                    print(f"  ✓ trajectory_overlay.png ({len(members)} members)")
+            except Exception as e:
+                print(f"  ⚠️  Trajectory overlay failed: {e}")
 
     # --- Step 7: Create manifest ---
     manifest = build_run_manifest(dataset_name, n_clusters, medoids, run_id, batch_id=batch_id_out)

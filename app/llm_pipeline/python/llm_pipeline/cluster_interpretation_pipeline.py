@@ -442,7 +442,23 @@ def write_stub_interpretation(
         "ego_perspective_summary": [],
     }
     out = cluster_dir / "cluster_interpretation.yaml"
-    out.write_text(yaml.safe_dump(payload, sort_keys=False), encoding="utf-8")
+    raw_yaml = yaml.safe_dump(payload, sort_keys=False)
+    out.write_text(raw_yaml, encoding="utf-8")
+    # Also persist a meta sidecar so the dashboard can reload results (stub or real)
+    # without re-running the analysis.
+    meta = cluster_dir / "interpretation_meta.json"
+    meta.write_text(
+        json.dumps(
+            {
+                **payload,
+                "token_usage": {"Prompt": 0, "Completion": 0, "Total": 0},
+                "raw_yaml": raw_yaml,
+                "stub": True,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     return out
 
 
@@ -458,8 +474,21 @@ def interpret_cluster_dir(
     scenario_parameters: Optional[List[Dict]] = None,
     clustering_result: Any = None,
     max_llm_snapshots: Optional[int] = None,
+    prompt_overrides: Optional[Dict[str, str]] = None,
+    bev_selection: Optional[List[str]] = None,
+    temperature: float = 0.1,
+    do_review: bool = True,
 ) -> Optional[Path]:
-    """Run interpretation for one ``llm_artifacts/.../clusters/cluster_*`` directory."""
+    """Run interpretation for one cluster directory.
+
+    Works for both the ``llm_artifacts/.../clusters/cluster_*`` layout and the
+    builder's ``results/batch<id>/<k>_cluster_s=.../cluster<N>/`` layout.
+
+    Optional UI overrides: ``prompt_overrides`` (dict of prompt text keyed
+    system|common_sense|interaction|reviewer), ``bev_selection`` (explicit list
+    of snapshot file names or paths to send to the LLM), ``temperature`` and
+    ``do_review`` (skip the reviewer pass when False).
+    """
     # Prefer the consolidated cluster.json (2026-06 layout); fall back to the
     # legacy stats.json / medoid.json triplet for older runs.
     stats: Dict[str, Any] = {}
@@ -475,6 +504,10 @@ def interpret_cluster_dir(
             "n_clusters": c.get("n_clusters"),
             "collision_rate": c.get("collision_rate"),
             "collision_count": c.get("collision_count"),
+            "mean_ttc": c.get("mean_ttc"),
+            "min_ttc": c.get("min_ttc"),
+            "mean_spret": c.get("mean_spret"),
+            "parameter_ranges": c.get("parameter_ranges") or {},
             "medoid_trial_id": m.get("trial_id"),
         }
     else:
@@ -503,10 +536,10 @@ def interpret_cluster_dir(
             "cluster_label": label,
             "n_trials": stats.get("n_trials", stats.get("cluster_size", 1)),
             "collision_rate": float(stats.get("collision_rate", 0.0)),
-            "mean_ttc": None,
-            "min_ttc": None,
-            "mean_spret": None,
-            "parameter_ranges": {},
+            "mean_ttc": stats.get("mean_ttc"),
+            "min_ttc": stats.get("min_ttc"),
+            "mean_spret": stats.get("mean_spret"),
+            "parameter_ranges": stats.get("parameter_ranges") or {},
         }
     else:
         collision_flags = load_collision_flags(dataset)
@@ -540,15 +573,42 @@ def interpret_cluster_dir(
         )
         action_log = action_log_from_observations(observations)
 
-    bev_paths = collect_bev_snapshot_paths(cluster_dir, max_llm_snapshots=max_llm_snapshots)
-    if max_llm_snapshots is not None and bev_paths:
-        print(
-            f"[interpret] Using {len(bev_paths)} evenly spaced BEV snapshots "
-            f"(max_llm_snapshots={max_llm_snapshots})"
-        )
-    heatmap = resolve_mfpca_heatmap(dataset, cluster_id, heatmap_search_dirs)
-    if heatmap is None and bev_paths:
-        heatmap = Path(bev_paths[0])
+    # Explicit user selection of snapshots wins; otherwise auto-collect (with
+    # optional even subsampling). Selection entries may be bare file names
+    # (resolved under snapshots/ or bev/) or absolute/relative paths.
+    bev_paths: List[str] = []
+    if bev_selection:
+        snap_dirs = [cluster_dir / "snapshots", cluster_dir / "bev"]
+        for entry in bev_selection:
+            p = Path(entry)
+            if p.is_file():
+                bev_paths.append(str(p))
+                continue
+            name = p.name
+            for d in snap_dirs:
+                cand = d / name
+                if cand.is_file():
+                    bev_paths.append(str(cand))
+                    break
+        bev_paths.sort(key=extract_snapshot_timestamp)
+        print(f"[interpret] Using {len(bev_paths)} user-selected BEV snapshots")
+    else:
+        bev_paths = collect_bev_snapshot_paths(cluster_dir, max_llm_snapshots=max_llm_snapshots)
+        if max_llm_snapshots is not None and bev_paths:
+            print(
+                f"[interpret] Using {len(bev_paths)} evenly spaced BEV snapshots "
+                f"(max_llm_snapshots={max_llm_snapshots})"
+            )
+    # Prefer a genuine per-cluster variation image (trajectory overlay / MFPCA
+    # heatmap) living next to the cluster; else fall back to alldatasets search.
+    # If none exists we leave it None — we no longer reuse BEV[0] as a fake heatmap.
+    heatmap = None
+    for cand in (cluster_dir / "trajectory_overlay.png", cluster_dir / "mfpca_heatmap.png"):
+        if cand.is_file():
+            heatmap = cand
+            break
+    if heatmap is None:
+        heatmap = resolve_mfpca_heatmap(dataset, cluster_id, heatmap_search_dirs)
 
     model = normalize_model_name(model)
     if dry_run or not has_llm_credentials(model, api_key):
@@ -560,13 +620,13 @@ def interpret_cluster_dir(
             cluster_dir, cluster_id, medoid_trial_id, cluster_stats, reason
         )
 
-    if not bev_paths or heatmap is None:
+    if not bev_paths:
         return write_stub_interpretation(
             cluster_dir,
             cluster_id,
             medoid_trial_id,
             cluster_stats,
-            "missing BEV snapshots or MFPCA heatmap",
+            "missing BEV snapshots",
         )
 
     from .cluster_interpreter import ClusterInterpreter
@@ -580,6 +640,9 @@ def interpret_cluster_dir(
         xodr_path=str(xodr) if xodr.is_file() else None,
         prompt_dir=str(prompt_dir),
         api_key=llm_api_key_for_model(model, api_key),
+        temperature=temperature,
+        prompt_overrides=prompt_overrides,
+        do_review=do_review,
     )
 
     result = interpreter.analyze_cluster(
@@ -588,7 +651,7 @@ def interpret_cluster_dir(
         medoid_trial_id=medoid_trial_id,
         medoid_action_log=action_log,
         bev_snapshot_paths=bev_paths,
-        mfpca_heatmap_path=str(heatmap),
+        mfpca_heatmap_path=str(heatmap) if heatmap else None,
     )
     if result is None:
         return write_stub_interpretation(
@@ -867,6 +930,87 @@ def run_stage2b_for_dataset_k(
         if out:
             outputs[str(cluster_id)] = str(out)
             print(f"  ✓ cluster{cluster_id} → {out.name}")
+    return outputs
+
+
+def _dataset_for_results_dir(results_dir: Path, dataset: Optional[str], batch_id: Optional[int]) -> Optional[str]:
+    """Resolve dataset name for a ``results/batch<id>/<k>_cluster_s=.../`` dir."""
+    if dataset:
+        return dataset
+    bid = batch_id
+    if bid is None:
+        # results/batch<id>/<k>_cluster_s=.../  → grab the batch<id> component
+        for part in results_dir.resolve().parts:
+            m = re.fullmatch(r"batch(\d+)", part)
+            if m:
+                bid = int(m.group(1))
+                break
+    if bid is not None:
+        try:
+            from dataset_config import dataset_for_batch_id
+            return dataset_for_batch_id(bid)
+        except Exception:
+            return dataset_from_batch_id(bid)
+    return None
+
+
+def run_results_dir_interpretation(
+    results_dir: Path,
+    dataset: Optional[str] = None,
+    batch_id: Optional[int] = None,
+    model: str = DEFAULT_MODEL,
+    dry_run: bool = False,
+    api_key: Optional[str] = None,
+    clusters: Optional[List[int]] = None,
+    prompt_overrides: Optional[Dict[str, str]] = None,
+    images_by_cluster: Optional[Dict[str, List[str]]] = None,
+    temperature: float = 0.1,
+    do_review: bool = True,
+    max_llm_snapshots: Optional[int] = None,
+) -> Dict[str, str]:
+    """Interpret every ``cluster<N>`` under a builder ``results/batch<id>/<k>_..`` dir.
+
+    Each cluster's ``cluster.json`` already carries collision stats, so no external
+    clustering/collision files are required. UI overrides (prompts, per-cluster image
+    selection, temperature, review toggle) are threaded straight to the interpreter.
+    """
+    results_dir = Path(results_dir)
+    if not results_dir.is_dir():
+        raise FileNotFoundError(f"No results dir: {results_dir}")
+
+    ds = _dataset_for_results_dir(results_dir, dataset, batch_id)
+    if not ds:
+        raise ValueError(
+            "Could not resolve dataset for results dir; pass --dataset or --batch-id"
+        )
+
+    model = normalize_model_name(model)
+    search_dirs = [results_dir, REPO_ROOT, Path.cwd()]
+    cluster_dirs = sorted(
+        d for d in results_dir.glob("cluster*")
+        if d.is_dir() and d.name[len("cluster"):].isdigit()
+    )
+    if not cluster_dirs:
+        raise FileNotFoundError(f"No cluster<N> folders under {results_dir}")
+
+    outputs: Dict[str, str] = {}
+    for cluster_dir in cluster_dirs:
+        cid = int(cluster_dir.name[len("cluster"):])
+        if clusters is not None and cid not in clusters:
+            continue
+        sel = None
+        if images_by_cluster:
+            sel = images_by_cluster.get(str(cid)) or images_by_cluster.get(cid)  # type: ignore[arg-type]
+        out = interpret_cluster_dir(
+            cluster_dir, cid, ds,
+            model=model, dry_run=dry_run, heatmap_search_dirs=search_dirs,
+            api_key=api_key, max_llm_snapshots=max_llm_snapshots,
+            prompt_overrides=prompt_overrides, bev_selection=sel,
+            temperature=temperature, do_review=do_review,
+        )
+        if out:
+            outputs[str(cid)] = str(out)
+            print(f"  ✓ cluster{cid} → {out.name}")
     return outputs
 
 
