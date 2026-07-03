@@ -1,4 +1,5 @@
 import { gql } from "@/app/_shared/graphql/__generated__";
+import { api } from "@/app/_shared/api";
 import request from "graphql-request";
 import { Object, List, O } from "ts-toolbelt";
 import {
@@ -97,6 +98,25 @@ export const getTrajectoryAnalysisSaves = async (batchId?: number) => {
     GET_TRAJECTORY_ANALYSIS_SAVES,
     { id: batchId ?? 0 },
   ).then((response) => response.Batch?.savedTrajectoryAnalysis ?? []);
+};
+
+export const appendBatchTrajectoryAnalysisSave = async (
+  batchId: number,
+  documentId: number,
+  existingDocumentIds: number[],
+) => {
+  return api.patch(`/batches/${batchId}`, {
+    savedTrajectoryAnalysis: [...existingDocumentIds, documentId],
+  });
+};
+
+export const setBatchTrajectoryAnalysisSaves = async (
+  batchId: number,
+  documentIds: number[],
+) => {
+  return api.patch(`/batches/${batchId}`, {
+    savedTrajectoryAnalysis: documentIds,
+  });
 };
 export type SavedTrajectoryAnalysis = Object.Path<
   GetBatchTrajectoryAnalysisQuery,

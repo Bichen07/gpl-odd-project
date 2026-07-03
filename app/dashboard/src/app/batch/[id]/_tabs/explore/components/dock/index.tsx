@@ -4,6 +4,7 @@ import "./rc-dock.css";
 import DockLayout, { PanelData, TabData } from "rc-dock";
 import { useRef, useState, createContext, useEffect } from "react";
 import { Box } from "@mui/material";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 import layout from "./layout";
 import Saves from "./panels/Saves";
 import {
@@ -70,6 +71,16 @@ export default function Dock({ batchId, saves, trials, batch }: Props) {
     >
       <Provider store={store}>
         <DockLayoutContext.Provider value={dockLayoutRefState}>
+          <Box
+            sx={{
+              position: "absolute",
+              top: 8,
+              right: 12,
+              zIndex: 1000,
+            }}
+          >
+            <ThemeToggleButton />
+          </Box>
           <DataLoader trials={trials} batch={batch} />
           <DockLayout
             ref={dockLayoutRef}

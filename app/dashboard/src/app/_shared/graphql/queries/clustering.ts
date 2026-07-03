@@ -156,3 +156,18 @@ export const getTrajectoryAnalysis = (query: TrajectoryAnalysisRequest) => {
     query
   );
 };
+
+export type AnalysisProgress = {
+  active: boolean;
+  batchIds: string[];
+  phase: string;
+  current: number;
+  total: number;
+  percent: number;
+  message: string;
+  elapsedSec: number;
+};
+
+export const getAnalysisProgress = () => {
+  return analyzerApi.get<AnalysisProgress>("/analysis_progress");
+};

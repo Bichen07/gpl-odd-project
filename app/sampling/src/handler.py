@@ -39,6 +39,7 @@ from botorch.models.transforms.outcome import Standardize
 from common import ConfigData, RegisterData, SuggestData, compare
 from dotenv import load_dotenv
 from optimizer import Optimizer
+import sys
 
 # Load the .env file from the parent directory
 dotenv_path = "../.env"
@@ -47,6 +48,25 @@ dotenv_path = "../.env"
 load_dotenv(dotenv_path)
 
 ax_logger: Logger = get_logger(__name__)
+
+
+def _load_capture():
+    here = Path(__file__).resolve()
+    repo_root = next((p for p in [here, *here.parents] if p.name == "gpl-odd-project"), None)
+    if repo_root is None:
+        return None
+    llm_pkg = repo_root / "app" / "llm_pipeline" / "python"
+    if str(llm_pkg) not in sys.path:
+        sys.path.append(str(llm_pkg))
+    try:
+        from llm_pipeline.capture import PipelineCapture
+
+        return PipelineCapture(__file__)
+    except Exception:
+        return None
+
+
+_capture = _load_capture()
 
 
 # Custom encoder function to handle datetime objects
@@ -64,6 +84,7 @@ class Runner(AxRunner):
 
 class SurrogateHandler:
     def __init__(self, data: ConfigData):
+        self.run_id = None
         self.PAYLOAD_API = os.getenv("PAYLOAD_API")
 
         response = requests.get(
@@ -230,6 +251,17 @@ class SurrogateHandler:
         self.passed_failed_record = {}
 
         self.states: Optional[pd.DataFrame] = None
+        if _capture is not None:
+            _capture.record(
+                "stage1_capture",
+                f"batch_{data.batch_id}_boot",
+                "sampling_handler_bootstrap",
+                {
+                    "batch_id": data.batch_id,
+                    "parameter_names": self.parameter_names,
+                    "outcome_names": self.outcome_names,
+                },
+            )
 
     def get_trial(self, trial_index: int) -> Trial:
         """Return a trial on experiment cast as Trial"""
@@ -329,6 +361,18 @@ class SurrogateHandler:
         finally:
             self.data_lock.release()
             print("TRIALID: {}".format(trial_id))
+            if _capture is not None:
+                run_id = self.run_id or f"batch_{data.batch_id}_boot"
+                _capture.record(
+                    "stage1_capture",
+                    run_id,
+                    "sampling_handler_register_state",
+                    {
+                        "trial_index": data.trial_index,
+                        "current_generation_step_index": self.current_generation_step_index,
+                        "current_generation_step_sampling_count": self.current_generation_step_sampling_count,
+                    },
+                )
 
         return trial_id
 
@@ -467,6 +511,17 @@ class SurrogateHandler:
         parameters: TParameterization | None
         parameters, trial_index = self._get_next_trial(ttl_seconds=180)
         pprint(parameters)
+        if _capture is not None:
+            _capture.record(
+                "stage1_capture",
+                self.run_id or "unknown_run",
+                "sampling_handler_suggest_state",
+                {
+                    "trial_index": trial_index,
+                    "parameters": parameters,
+                    "generation_step_index": self.current_generation_step_index,
+                },
+            )
         return SuggestData(trial_index, parameters)
 
     def _fit_surrogate(

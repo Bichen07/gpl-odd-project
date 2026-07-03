@@ -6,6 +6,7 @@ import Controls from "./panels/Controls";
 import ProjectionSpace from "./panels/ProjectionSpace";
 import ParameterSpace from "./panels/ParameterSpace";
 import Legends from "./panels/Legends";
+import MissionControl from "./panels/MissionControl";
 
 const layout: LayoutData = {
   dockbox: {
@@ -34,6 +35,13 @@ const layout: LayoutData = {
                 id: "legends",
                 title: "Legends",
                 content: <Legends />,
+              },
+              {
+                id: "missionControl",
+                title: "🚀 Mission Control",
+                content: <MissionControl />,
+                // Keep WebSocket + run state when maximizing another panel (rc-dock otherwise unmounts).
+                cached: true,
               },
             ],
           },

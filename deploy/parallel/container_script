@@ -15,5 +15,5 @@ elif [ "$2" == "--scenario_updater" ]; then
 elif [ "$2" == "--scenario_search" ]; then
     roslaunch scenario_search single_parameterized_scenario_search.launch
 elif [ "$2" == "--scenario_search_headless" ]; then
-    roslaunch scenario_search single_parameterized_scenario_search.launch headless:=true
+    roslaunch scenario_search single_parameterized_scenario_search.launch headless:=false
 fi

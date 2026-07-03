@@ -47,6 +47,14 @@ def unique_list(sequence):
     return [x for x in sequence if not (x in seen or seen.add(x))]
 
 
+def _safe_dump_json(path, payload):
+    parent = path.parent if hasattr(path, "parent") else os.path.dirname(str(path))
+    if parent and not os.path.isdir(str(parent)):
+        os.makedirs(str(parent))
+    with open(str(path), "w") as f:
+        json.dump(payload, f, indent=2, default=str)
+
+
 def main():
     SPSS = SingleParameterizedScenarioSearch()
     SPSS.run()
@@ -129,6 +137,12 @@ class SingleParameterizedScenarioSearch:
         )
         response.raise_for_status()
         self.search_data = response.json()
+        self.run_id = "batch_{}_{}".format(
+            self.search_data["id"], datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+        )
+        self._stage1_capture_dir = (
+            self.SHARE_FOLDER_PATH / "llm_pipeline" / "artifacts" / "stage1_capture" / self.run_id
+        )
 
         response = requests.get(
             url=self.PAYLOAD_API
@@ -138,6 +152,16 @@ class SingleParameterizedScenarioSearch:
         )
         response.raise_for_status()
         self.scenario_data = response.json()
+        _safe_dump_json(
+            self._stage1_capture_dir / "simulation_bootstrap.json",
+            {
+                "event": "simulation_bootstrap",
+                "batch_id": self.batch_id,
+                "sampling_api": self.parameter_search_service_url,
+                "map_name": self.map_name,
+                "route_name": self.route_name,
+            },
+        )
 
         self.parameter_id_mapping = {
             value["id"]: value for value in self.scenario_data["parameters"]
@@ -611,6 +635,14 @@ class SingleParameterizedScenarioSearch:
                                     current_register_data["esmini_dat_id"] = str(
                                         esmini_dat_id
                                     )
+                                    _safe_dump_json(
+                                        self._stage1_capture_dir / "esmini_file_refs.json",
+                                        {
+                                            "event": "esmini_file_refs",
+                                            "esmini_dat_id": str(esmini_dat_id),
+                                            "source_path": str(self.current_esmini_record_filepath),
+                                        },
+                                    )
 
                                     rospy.loginfo(
                                         "[ssps] current_register_data: {}".format(
@@ -622,6 +654,22 @@ class SingleParameterizedScenarioSearch:
                                         url=self.parameter_search_service_url
                                         + "/register",
                                         json=current_register_data,
+                                    )
+                                    _safe_dump_json(
+                                        self._stage1_capture_dir / "simulation_register_payload.json",
+                                        {
+                                            "event": "simulation_register_payload",
+                                            "trial_index": self.current_trial_index,
+                                            "payload": current_register_data,
+                                        },
+                                    )
+                                    _safe_dump_json(
+                                        self._stage1_capture_dir / "simulation_outcome.json",
+                                        {
+                                            "event": "simulation_outcome",
+                                            "trial_index": self.current_trial_index,
+                                            "outcome": current_register_data.get("outcome"),
+                                        },
                                     )
                                     response.raise_for_status()
                                     rospy.loginfo(
@@ -815,6 +863,14 @@ class SingleParameterizedScenarioSearch:
                                 url=self.parameter_search_service_url + "/register",
                                 json=current_register_data,
                             )
+                            _safe_dump_json(
+                                self._stage1_capture_dir / "simulation_register_payload.json",
+                                {
+                                    "event": "simulation_register_payload",
+                                    "trial_index": self.current_trial_index,
+                                    "payload": current_register_data,
+                                },
+                            )
                             rospy.logerr(
                                 "[single_parameterized_scenario_search] something went wrong... end by signal from scenario or esmini record not exists or esmini simulation time too short"
                             )
@@ -988,6 +1044,14 @@ class SingleParameterizedScenarioSearch:
         self.current_trial_index = response.json()["trial_index"]
         # self.current_parameters = response.json()["parameters"]
         self.current_parameters = response.json()["parameters"]
+        _safe_dump_json(
+            self._stage1_capture_dir / "simulation_suggest_response.json",
+            {
+                "event": "simulation_suggest_response",
+                "trial_index": self.current_trial_index,
+                "parameters": self.current_parameters,
+            },
+        )
         # self.current_parameters["TriggerTime"] = 8.481417374685407
         # self.current_parameters["OncomingSpeed"] = 3.5349813625216484
 

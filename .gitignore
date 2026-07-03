@@ -1,1 +1,34 @@
 .temp
+
+# Large local datasets — do not push to GitHub (files exceed 100MB limit)
+alldatasets/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# BEV output images — generated locally, not committed
+bev_output/**/*.jpg
+bev_output/**/*.png
+
+# results/ — generated outputs (local only)
+results/
+!results/README.md
+
+# Legacy name kept for backwards compat during transition
+llm_artifacts/**
+!llm_artifacts/.gitkeep
+!llm_artifacts/README.md
+
+# LLM pipeline run captures — auto-generated, not committed
+app/llm_pipeline/artifacts/
+
+# Mission Control per-run logs and generated launch scripts
+simulation/ros/.cache/mission_control/runs/
+
+# start_dev_stack.sh / stop_dev_stack.sh logs and pid files
+logs/dev_stack/
+
+# PDF files
+*.pdf

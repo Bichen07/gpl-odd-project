@@ -18,6 +18,7 @@ import {
   Typography,
 } from "@mui/material";
 import Tooltip from "@mui/material/Tooltip";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ClusteringResult,
@@ -35,6 +36,8 @@ export default function PerEgoSelection({
   egoName?: string;
 }) {
   const dispatch = useAppDispatch();
+  const router = useRouter();
+  const routeParams = useParams();
 
   const [editing, setEditing] = useState<{
     [label: string]: Set<string>;
@@ -293,6 +296,24 @@ export default function PerEgoSelection({
     setEditing(newEditing);
   }, [clusteringResult]);
 
+  const handleSelectAndAnalyze = useCallback(() => {
+    if (clusteringResult == null) return;
+    const sil = (clusteringResult.scores as { silhouetteScore?: number })
+      ?.silhouetteScore;
+    const k = Object.keys(clusteringResult.trialOrder ?? {}).filter(
+      (label) => Number(label) >= 0
+    ).length;
+    const batchId = Array.isArray(routeParams?.id)
+      ? routeParams?.id[0]
+      : routeParams?.id;
+    const sParam = sil != null ? sil.toFixed(4) : "";
+    router.push(
+      `/batch/${batchId}/analyze?ego=${encodeURIComponent(
+        egoName
+      )}&k=${k}&s=${sParam}`
+    );
+  }, [clusteringResult, routeParams, router, egoName]);
+
   if (trajectoryAnalysis == null) {
     return <Typography></Typography>;
   }
@@ -310,6 +331,26 @@ export default function PerEgoSelection({
         p: 1,
       }}
     >
+      <Tooltip
+        title={
+          clusteringResult == null
+            ? "Select a clustering result below first"
+            : "Open the LLM analysis page for the selected clustering result"
+        }
+      >
+        <span>
+          <Button
+            variant="contained"
+            size="small"
+            fullWidth
+            disabled={clusteringResult == null}
+            onClick={handleSelectAndAnalyze}
+            sx={{ mb: 1 }}
+          >
+            Select and analyze
+          </Button>
+        </span>
+      </Tooltip>
       <Accordion elevation={0} disableGutters square defaultExpanded>
         <AccordionSummary expandIcon={<ExpandMore />}>
           <Typography component="span" fontSize="14px">
