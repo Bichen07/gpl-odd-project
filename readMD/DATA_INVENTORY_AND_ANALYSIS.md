@@ -814,9 +814,10 @@ For each `cluster<N>/`, `interpret_cluster_dir()` assembles **one multimodal req
 
 | Slot | Source (builder `results/` layout) | Notes |
 |------|------------------------------------|-------|
-| Cluster stats (text) | `cluster<N>/cluster.json` → `cluster` block | `n_trials`, `collision_rate`/`collision_count`, **and now `mean_ttc` / `min_ttc` / `mean_spret` / `parameter_ranges`** (populated at build time in payload-save mode from the per-trial `criticalityMetrics`; backfill existing folders with `--backfill-stats`). |
-| Medoid action log (text) | `cluster<N>/description.txt` (else `context.md`, else `action.yaml`) | Rule-based Labeller/Describer timeline of the cluster **medoid** trial — the primary textual signal. |
-| BEV snapshots (images) | `cluster<N>/snapshots/*.jpg` | The user's selection from the analyze page (or evenly-spaced default). Each frame is the medoid trial at a key `action.yaml` timestamp. |
+| Cluster stats (text) | `cluster<N>/cluster.json` → `cluster` block | `n_trials`, `collision_rate`/`collision_count`, `mean_ttc` / `min_ttc` / `mean_spret` / `parameter_ranges` (populated at build time in payload-save mode from the per-trial `criticalityMetrics`; backfill existing folders with `--backfill-stats`). |
+| **Medoid (single-trajectory) outcome (text)** | `cluster<N>/cluster.json` → `medoid.collided` + `Interactions:` line of `description.txt` | **Whether the medoid trajectory itself collided** (`medoid_collided`) and its **critical/closest-approach timestamp** (`medoid_critical_time`, parsed from the `collision` / `near miss` / `min TTC` line). Surfaced in the stats text **distinct from the cluster-wide collision rate** so the LLM doesn't conflate "this trajectory" with "the whole cluster". |
+| Medoid action log (text) | `cluster<N>/description.txt` (else `context.md`, else `action.yaml`) | Rule-based Labeller/Describer timeline of the cluster **medoid** trial — the primary textual signal. Ends with an `Interactions:` section (e.g. `t=27.7s: near miss with track 2 (min distance 5.37 m, min TTC 0.0 s)`) that anchors the final outcome. |
+| BEV snapshots (images) | `cluster<N>/snapshots/*.jpg` | The user's selection from the analyze page (or evenly-spaced default). Each frame is the medoid trial at a key `action.yaml` timestamp. **Each image is now labelled in the prompt with its timestamp + event** (parsed from the filename, e.g. `Snapshot 8 — t=27.71s — ... STOPPED`) so the LLM can anchor images temporally and describe the latest frames. |
 | Variation heatmap (image, optional) | `cluster<N>/trajectory_overlay.png` (else `mfpca_heatmap.png`, else `alldatasets/<dataset>/mfpca_heatmap_cluster<N>.png`) | A real per-cluster **ego-trajectory overlay** (all members faint, medoid highlighted) generated at build time / by `--backfill-stats`. If none exists the slot is **omitted** — we no longer reuse BEV[0] as a fake heatmap. |
 | Map description (text) | static placeholder in `_get_map_description()` | Not yet parsed from the per-run OpenDRIVE. |
 
@@ -832,9 +833,25 @@ where `interaction_prompt` interpolates `{cluster_stats}`, `{agent_actions_log}`
 **Output parsing & resilience:** the YAML report is extracted from the **last** ```yaml fence
 (or the **first** top-level `cluster_*:` key when unfenced). If the reviewer returns only
 Chain-of-Thought prose — common with `gemini-2.5-flash`, whose thinking budget can truncate the
-final block — the pipeline now **falls back to the Pass-1 baseline** instead of writing a stub.
+final block — the pipeline **falls back to the Pass-1 baseline** instead of writing a stub.
 Disable the reviewer (UI **Reviewer pass** toggle / `--no-review`) to save ~40% tokens when the
 audit isn't needed.
+
+> **Intermittent failures don't destroy good results.** `gemini-2.5-flash` at higher temperature
+> occasionally emits prose in **both** passes (no parseable YAML at all) → the cluster would get a
+> failure stub. `write_stub_interpretation` now **refuses to overwrite a previously successful
+> (non-stub) `interpretation_meta.json`**: a re-run that fails keeps the last good result on disk
+> and logs `keeping previous successful interpretation`. This is why a "Run all" that fails on
+> cluster 0 no longer clobbers a result you already produced with a per-cluster run. Re-running
+> a single cluster until it succeeds is the reliable recovery path. (A lower temperature, e.g. 0.1,
+> also markedly reduces the no-YAML rate.)
+
+**Full-timeline coverage:** the interaction prompt's *Ego-Perspective Summary* step now requires
+**4-8 events spanning the whole scenario**, with the **last event being the final outcome**
+(collision / near-miss / safe resolution). It explicitly instructs the model to use the labelled
+**latest** snapshots, the `Interactions:` line of the action log, and the `medoid_critical_time`
+stat — fixing the previous behaviour where the summary stopped at the emergency-braking apex
+(e.g. 20.95 s) and never reached the 27.7 s collision.
 
 ```text
 cluster.json ─┐
@@ -845,6 +862,28 @@ heatmap/BEV[0] ┘                      ├→ Pass 1 (multimodal) → baseline 
 cluster.json + description + baseline ┴→ Pass 2 (text-only) → reviewed YAML ──┘  (+ interpretation_meta.json)
                                               └─ unparseable? fall back to baseline ─┘
 ```
+
+### What collision & safety context actually reaches the LLM
+
+Answering "do we send collision info?" — yes, at **three** levels, all inside the Pass-1
+multimodal request (and Pass-2 text). The medoid is a **single trajectory**, so it is kept
+distinct from the cluster aggregate:
+
+| Signal | Sent? | Where it comes from | How it appears in the prompt |
+|--------|-------|---------------------|------------------------------|
+| Cluster-wide **collision rate** | ✅ | `cluster.json` → `cluster.collision_rate` | `Collision rate (whole cluster): 99.8%` |
+| **This trajectory** collided (true/false) | ✅ (new) | `cluster.json` → `medoid.collided` | `Medoid trial outcome (shown in snapshots): COLLISION / no collision (near-miss/safe)` |
+| **Critical / closest-approach time** | ✅ (new) | `description.txt` `Interactions:` (`collision`/`near miss`/`min TTC`) | `Medoid critical/closest-approach time: t=27.70s` |
+| Mean / min **TTC**, mean **SPrET** | ✅ | `cluster.json` `cluster` block | listed in the stats text |
+| Full per-agent **action timeline + interactions** | ✅ | `description.txt` (rule-based Describer) | the `agent_actions_log` block, incl. the final `t=…s: near miss / collision …` line |
+| Per-snapshot **timestamp + event** | ✅ (new) | parsed from snapshot filenames | `Snapshot N — t=20.95s — ego max deceleration:` |
+| Parameter ranges | ✅ | `cluster.json` `parameter_ranges` | listed in the stats text |
+
+So both the **single-trajectory collision flag** and the **cluster collision rate** are organised
+and sent. The action/`description.txt` timeline (including the near-miss/collision interaction) is
+sent verbatim as the textual signal; the snapshots are the medoid's BEV frames, now timestamp-
+labelled. The prompt instructs the model to reason about *this* trajectory's outcome and to cover
+the timeline through the critical moment rather than the cluster average alone.
 
 ### Prompt templates
 
@@ -879,6 +918,19 @@ The dashboard is the primary entry point (the old `LlmAnalysis` dock panel has b
    On revisiting the page, the `GET /api/cluster-analyze` config call returns any saved
    interpretations, which load automatically into the cards (clusters with a stored result
    show an **analyzed** chip) — no re-run needed unless you want to refresh.
+5. **Per-cluster runs:** each cluster has its own **Analyze** button (run one medoid at a
+   time to save API quota) in addition to **Run all selected**. Clusters are always sent to
+   the LLM **one at a time, sequentially** — each cluster is an independent request (Pass 1
+   + optional Pass 2), never one giant multi-cluster payload.
+6. **Live progress + logs:** `POST /api/cluster-analyze/run` streams NDJSON
+   (`{type:"log"|"done"}`) with `PYTHONUNBUFFERED=1`, so the page shows a progress bar
+   (completed/total clusters) and the child's stdout/stderr live. The full run log is saved
+   to `results/batch<id>/<folder>/logs/analysis_<timestamp>_<clusters>.log` (API key is never
+   logged) for later inspection. **Timestamps are in Taiwan time (UTC+8)** — both the log
+   filename (`analysis_2026-06-30_13-36-03_c0.log`) and the `# time:` header (`... (UTC+8)`).
+7. **Models:** only currently-served models are offered. `gemini-2.0-flash` was retired by
+   Google (`404 ... no longer available`) and has been removed — use `gemini-2.5-flash` /
+   `gemini-2.5-pro` / `gemini-2.5-flash-lite` or the OpenAI `gpt-4o*` models.
 
 API routes ([`app/dashboard/src/app/api/cluster-analyze/`](../app/dashboard/src/app/api/cluster-analyze/)):
 
@@ -925,9 +977,11 @@ python3 -m dataset_builder --source payload-save --batch-id 2 --k 4 \
 Gemini (default): `export GOOGLE_API_KEY=…`  ·  OpenAI `gpt-*`: `export OPENAI_API_KEY=…`.
 Dataset is resolved automatically from the `batch<id>` component of the path (or pass `--batch-id`).
 
-> The legacy `run_cluster_interpretation.sh <run_id> <batch_id>` path (operating on the
-> `llm_artifacts/<run_id>/` layout) still exists for analyzer-capture runs, but the batch-centric
-> `--results-dir` flow above is the single source of truth for interpreting builder output.
+> The analyzer controller can still interpret its own capture runs automatically
+> (`run_post_analyzer_cluster_interpretation()` on the `llm_artifacts/<run_id>/` layout it builds
+> internally), but the batch-centric `--results-dir` flow above is the single source of truth for
+> interpreting builder output. The old standalone `run_cluster_interpretation.sh` / `--run-id` CLI
+> adapter has been removed.
 
 ---
 

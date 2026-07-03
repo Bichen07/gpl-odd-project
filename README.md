@@ -718,7 +718,7 @@ cd /path/to/gpl-odd-project
 export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
 ```
 
-Scripts such as `scripts/build_llm_dataset.sh` and `scripts/run_cluster_interpretation.sh` set this automatically.
+Scripts such as `scripts/build_llm_dataset.sh` and `scripts/run_cluster_analyze.sh` set this automatically.
 
 ### BEV renderer
 
@@ -783,19 +783,20 @@ python3 -m llm_pipeline.cluster_interpretation_pipeline \
 
 Remove `--dry-run` and set `GOOGLE_API_KEY` (Gemini, default) or `OPENAI_API_KEY` (gpt-*) for live LLM output.
 
-**Stage 2b CLI — interpret an existing `llm_artifacts/<run_id>/` tree:**
+**Cluster-interpret CLI — interpret a builder results folder:**
 
 ```bash
-python3 -m llm_pipeline.cli cluster-interpret --run-id <run_id> --dataset dataset1
+python3 -m llm_pipeline.cli cluster-interpret \
+  --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2
 # Stub only (no API call):
-python3 -m llm_pipeline.cli cluster-interpret --run-id <run_id> --dataset dataset1 --dry-run
+python3 -m llm_pipeline.cli cluster-interpret \
+  --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2 --dry-run
 ```
 
-Or use the wrapper script:
+Or use the wrapper script (this is what the Dashboard "Select and analyze" page calls):
 
 ```bash
-bash scripts/run_cluster_interpretation.sh <run_id> dataset1
-bash scripts/run_cluster_interpretation.sh <run_id> dataset1 --dry-run
+bash scripts/run_cluster_analyze.sh --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2
 ```
 
 **Optional — run interpretation automatically after Dashboard Analyze:**

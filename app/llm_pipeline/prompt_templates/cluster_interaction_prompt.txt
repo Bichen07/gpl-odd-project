@@ -16,13 +16,18 @@ You have been provided with:
 
 1. **Cluster Statistics:**
    - Number of trials in this cluster
-   - Collision rate (% of trials ending in collision)
+   - Collision rate (% of trials ending in collision — this is the WHOLE cluster)
+   - Medoid trial outcome: whether the single trajectory shown in the snapshots
+     itself collided, and its critical/closest-approach timestamp. Do NOT confuse
+     the medoid's own outcome with the cluster-wide collision rate.
    - Safety metrics: mean/min TTC (Time-To-Collision), mean SPrET (safe distance margin)
    - Parameter distributions: ranges of scenario parameters (e.g., oncoming speed, start delay)
 
 2. **Medoid Trial Visualization:**
    - This is the most "representative" trial from the cluster (closest to cluster center in trajectory space)
-   - BEV (Bird's Eye View) snapshots at key timestamps
+   - BEV (Bird's Eye View) snapshots at key timestamps. **Each snapshot is labelled
+     with its timestamp and the key event at that moment** — use these labels to
+     order events and to make sure you describe the final/latest snapshots.
    - Each agent is shown as a colored bounding box with velocity arrow
    - Ego vehicle is **orange**, other agents are **blue**
 
@@ -123,12 +128,20 @@ Safe range: Start delay > 1.5s OR oncoming speed < 55 kph
 Risky boundary: Start delay < 1.0s AND oncoming speed > 65 kph (collision risk 15%)"
 
 ### Step 6: Ego-Perspective Summary
-Provide 2-4 key events from ego's perspective:
-- Focus on decision points and interaction moments
-- Use natural language (no agent IDs, no colons)
-- Include timestamps
+Provide **4-8 key events** from ego's perspective spanning the WHOLE scenario:
+- Cover the full timeline from the first relevant maneuver to the FINAL OUTCOME.
+- The BEV snapshots are labelled with their timestamps — use the LATEST snapshots
+  and the `Interactions:` section of the action log; do NOT stop at the emergency-
+  braking apex if the trajectory continues.
+- The action log lists the scenario duration and a final interaction (e.g.
+  `t=27.7s: near miss / collision ...`). Your **last event MUST describe that final
+  outcome** (collision / near-miss / safe resolution) with its timestamp. If the
+  Cluster Statistics report a "Medoid critical/closest-approach time", your summary
+  MUST reach at least that timestamp.
+- Focus on decision points and interaction moments.
+- Use natural language (no agent IDs, no colons). Include timestamps.
 
-Example:
+Example (note how the LAST event is the final outcome, not the braking moment):
 - timestamp: 1.5
   description: Ego detected oncoming vehicle approaching from opposite direction
 - timestamp: 2.2
@@ -137,6 +150,8 @@ Example:
   description: Ego came to near-complete stop before entering conflict zone
 - timestamp: 5.5
   description: After oncoming vehicle cleared, ego accelerated through intersection
+- timestamp: 7.8
+  description: Ego completed the turn and exited the intersection without conflict
 </Mandatory Workflow & Chain Of Thought>
 
 <Final Output Instructions>
@@ -167,7 +182,8 @@ ego_perspective_summary:
     description: "<event description>"
   - timestamp: <float>
     description: "<event description>"
-  # ... (2-4 key events)
+  # ... (4-8 key events; the LAST event MUST be the final outcome /
+  #      collision / near-miss, reaching the end of the scenario)
 ```
 
 **Formatting rules:**

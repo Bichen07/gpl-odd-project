@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Accordion,
@@ -16,6 +16,7 @@ import {
   Divider,
   FormControlLabel,
   IconButton,
+  LinearProgress,
   MenuItem,
   Paper,
   Select,
@@ -312,9 +313,12 @@ export default function AnalyzeClient({
 
   // --- run state ---
   const [running, setRunning] = useState<boolean>(false);
+  const [activeClusters, setActiveClusters] = useState<number[]>([]);
   const [results, setResults] = useState<ResultEntry[]>([]);
   const [logs, setLogs] = useState<string>("");
+  const [logFile, setLogFile] = useState<string>("");
   const [runError, setRunError] = useState<string | null>(null);
+  const logBoxRef = useRef<HTMLPreElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -386,22 +390,54 @@ export default function AnalyzeClient({
     [results],
   );
 
-  const run = async () => {
-    if (!config) return;
+  // Progress: count completed clusters ("✓ clusterN →") against the active run.
+  const completedCount = useMemo(
+    () => (logs.match(/✓ cluster\d+ →/g) ?? []).length,
+    [logs],
+  );
+  const progressPct =
+    activeClusters.length > 0
+      ? Math.min(100, (completedCount / activeClusters.length) * 100)
+      : 0;
+
+  // Keep the live log scrolled to the bottom as it streams.
+  useEffect(() => {
+    const el = logBoxRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [logs]);
+
+  // Merge incoming results into existing ones (per-cluster runs accumulate).
+  const mergeResults = useCallback((incoming: ResultEntry[]) => {
+    setResults((prev) => {
+      const map = new Map<number, ResultEntry>();
+      for (const r of prev) map.set(r.cluster, r);
+      for (const r of incoming) map.set(r.cluster, r);
+      return [...map.values()].sort((a, b) => a.cluster - b.cluster);
+    });
+  }, []);
+
+  const run = async (subset?: number[]) => {
+    if (!config || running) return;
+    const clustersToRun = (subset && subset.length ? subset : [...runClusters]).sort(
+      (a, b) => a - b,
+    );
+    if (clustersToRun.length === 0) return;
+
     setRunning(true);
+    setActiveClusters(clustersToRun);
     setLogs("");
-    setResults([]);
+    setLogFile("");
     setRunError(null);
     try {
       const selectedImages: Record<string, string[]> = {};
-      for (const c of [...runClusters]) selectedImages[String(c)] = selected[c] ?? [];
+      for (const c of clustersToRun) selectedImages[String(c)] = selected[c] ?? [];
       const res = await fetch("/api/cluster-analyze/run", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           batchId,
           folder: config.folder,
-          clusters: [...runClusters].sort((a, b) => a - b),
+          clusters: clustersToRun,
           model,
           apiKey,
           temperature,
@@ -411,14 +447,52 @@ export default function AnalyzeClient({
           selectedImages,
         }),
       });
-      const data = await res.json();
-      setResults(data.results ?? []);
-      setLogs(data.logs ?? "");
-      if (!data.ok) setRunError(`Run exited with code ${data.exitCode}. See logs.`);
+
+      // Non-streaming fallback (e.g. error responses are JSON).
+      if (!res.body || !res.headers.get("content-type")?.includes("ndjson")) {
+        const data = await res.json();
+        if (Array.isArray(data.results)) mergeResults(data.results);
+        setLogs(data.logs ?? data.error ?? "");
+        if (!data.ok) setRunError(`Run failed (code ${data.exitCode ?? "?"}).`);
+        return;
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      let live = "";
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let nl: number;
+        while ((nl = buf.indexOf("\n")) >= 0) {
+          const line = buf.slice(0, nl);
+          buf = buf.slice(nl + 1);
+          if (!line.trim()) continue;
+          let msg: any;
+          try {
+            msg = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (msg.type === "log") {
+            live += msg.data;
+            setLogs(live);
+          } else if (msg.type === "done") {
+            if (Array.isArray(msg.results)) mergeResults(msg.results);
+            if (msg.logFile) setLogFile(String(msg.logFile));
+            if (!msg.ok) {
+              setRunError(`Run exited with code ${msg.exitCode}. Check the live log below.`);
+            }
+          }
+        }
+      }
     } catch (err) {
       setRunError(String(err));
     } finally {
       setRunning(false);
+      setActiveClusters([]);
     }
   };
 
@@ -612,6 +686,19 @@ export default function AnalyzeClient({
                       >
                         None
                       </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={running || (selected[c.cluster] ?? []).length === 0}
+                        onClick={() => run([c.cluster])}
+                        startIcon={
+                          running && activeClusters.length === 1 && activeClusters[0] === c.cluster ? (
+                            <CircularProgress size={14} color="inherit" />
+                          ) : undefined
+                        }
+                      >
+                        Analyze
+                      </Button>
                     </Stack>
                     <Box
                       sx={{
@@ -677,21 +764,68 @@ export default function AnalyzeClient({
           </Paper>
 
           <Paper variant="outlined" sx={{ p: 2 }}>
-            <Stack direction="row" alignItems="center" spacing={2}>
+            <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
               <Button
                 variant="contained"
                 disabled={running || runClusters.size === 0}
-                onClick={run}
+                onClick={() => run()}
                 startIcon={running ? <CircularProgress size={16} color="inherit" /> : undefined}
               >
-                {running ? "Analyzing…" : `Run analysis (${runClusters.size} cluster${runClusters.size === 1 ? "" : "s"})`}
+                {running
+                  ? "Analyzing…"
+                  : `Run all selected (${runClusters.size} cluster${runClusters.size === 1 ? "" : "s"})`}
               </Button>
+              <Typography variant="caption" color="text.secondary">
+                Tip: use a cluster&apos;s <strong>Analyze</strong> button to run one at a time and save API quota.
+              </Typography>
               {!apiKey && !dryRun && (
                 <Typography variant="caption" color="warning.main">
                   No API key entered — server env key will be used if present, else a stub is written.
                 </Typography>
               )}
             </Stack>
+
+            {(running || logs) && (
+              <Box sx={{ mt: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                  <Typography variant="body2" sx={{ flexGrow: 1 }}>
+                    {running
+                      ? `Running ${activeClusters.length} cluster${activeClusters.length === 1 ? "" : "s"}` +
+                        (activeClusters.length ? ` — ${completedCount}/${activeClusters.length} done` : "")
+                      : "Last run output"}
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant={running && progressPct === 0 ? "indeterminate" : "determinate"}
+                  value={progressPct}
+                  sx={{ mb: 1, borderRadius: 1 }}
+                />
+                <Box
+                  component="pre"
+                  ref={logBoxRef}
+                  sx={{
+                    m: 0,
+                    p: 1,
+                    bgcolor: "#0b0b0b",
+                    color: "#d6e2c4",
+                    borderRadius: 1,
+                    fontSize: 11,
+                    lineHeight: 1.5,
+                    maxHeight: 260,
+                    overflow: "auto",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {logs || "(waiting for output…)"}
+                </Box>
+                {logFile && (
+                  <Typography variant="caption" color="text.secondary">
+                    Log saved to <code>{logFile}</code>
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             {runError && (
               <Alert severity="error" sx={{ mt: 2 }}>
                 {runError}
@@ -714,22 +848,6 @@ export default function AnalyzeClient({
           {results.map((r) => (
             <ResultCard key={r.cluster} r={r} onDownload={downloadYaml} />
           ))}
-
-          {logs && (
-            <Accordion disableGutters elevation={0} square>
-              <AccordionSummary expandIcon={<ExpandMore />}>
-                <Typography fontSize={14}>Run logs</Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Box
-                  component="pre"
-                  sx={{ m: 0, p: 1, bgcolor: "action.hover", borderRadius: 1, fontSize: 11, overflowX: "auto" }}
-                >
-                  {logs}
-                </Box>
-              </AccordionDetails>
-            </Accordion>
-          )}
         </Stack>
       </Stack>
     </Container>

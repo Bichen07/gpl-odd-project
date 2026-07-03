@@ -3,12 +3,6 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .context_builder import build_context
-from .cluster_interpret import cluster_interpret
-from .evaluate import evaluate_run
-from .llm_runner import run_llm
-from .prompt_builder import build_prompt
-
 
 def _source_path() -> Path:
     return Path(__file__).resolve()
@@ -17,16 +11,11 @@ def _source_path() -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description="GPL-ODD LLM pipeline CLI")
     sub = parser.add_subparsers(dest="cmd", required=True)
-    for name in ("context", "prompt", "llm", "eval"):
-        p = sub.add_parser(name)
-        p.add_argument("--run-id", required=True)
 
-    # cluster-interpret supports two layouts: legacy llm_artifacts/<run-id>/ and
-    # the builder's results/batch<id>/<k>_cluster_s=.../ (via --results-dir).
+    # cluster-interpret runs on the builder layout:
+    # results/batch<id>/<k>_cluster_s=.../cluster<N>/ (via --results-dir).
     ci = sub.add_parser("cluster-interpret")
-    ci.add_argument("--run-id", default=None,
-                    help="llm_artifacts/<run-id> run (legacy layout)")
-    ci.add_argument("--results-dir", default=None,
+    ci.add_argument("--results-dir", required=True,
                     help="results/batch<id>/<k>_cluster_s=.../ (builder layout)")
     ci.add_argument("--batch-id", type=int, default=None,
                     help="Payload batch id (resolves dataset via dataset_config). Preferred.")
@@ -59,13 +48,7 @@ def main() -> None:
 
     args = parser.parse_args()
     source = _source_path()
-    if args.cmd == "context":
-        out = build_context(source, args.run_id)
-    elif args.cmd == "prompt":
-        out = build_prompt(source, args.run_id)
-    elif args.cmd == "llm":
-        out = run_llm(source, args.run_id)
-    elif args.cmd == "cluster-interpret":
+    if args.cmd == "cluster-interpret":
         import json as _json
         model = " ".join(getattr(args, "model", ["gemini-2.5-flash"]))
         dataset = getattr(args, "dataset", None)
@@ -79,51 +62,39 @@ def main() -> None:
             except Exception:
                 dataset = None
 
-        results_dir = getattr(args, "results_dir", None)
-        if results_dir:
-            # Builder layout: results/batch<id>/<k>_cluster_s=.../cluster<N>/
-            from .cluster_interpretation_pipeline import run_results_dir_interpretation
+        # Builder layout: results/batch<id>/<k>_cluster_s=.../cluster<N>/
+        from .cluster_interpretation_pipeline import run_results_dir_interpretation
 
-            prompt_overrides = None
-            pj = getattr(args, "prompts_json", None)
-            if pj and Path(pj).is_file():
-                prompt_overrides = _json.loads(Path(pj).read_text(encoding="utf-8"))
-            images_by_cluster = None
-            ij = getattr(args, "images_json", None)
-            if ij and Path(ij).is_file():
-                images_by_cluster = _json.loads(Path(ij).read_text(encoding="utf-8"))
-            clusters = None
-            cl = getattr(args, "clusters", None)
-            if cl:
-                clusters = [int(x) for x in str(cl).split(",") if x.strip() != ""]
-            max_snaps = getattr(args, "max_llm_snapshots", 10)
-            outputs = run_results_dir_interpretation(
-                Path(results_dir),
-                dataset=dataset,
-                batch_id=batch_id,
-                model=model,
-                dry_run=getattr(args, "dry_run", False),
-                api_key=getattr(args, "api_key", None),
-                clusters=clusters,
-                prompt_overrides=prompt_overrides,
-                images_by_cluster=images_by_cluster,
-                temperature=getattr(args, "temperature", 0.1),
-                do_review=getattr(args, "review", True),
-                max_llm_snapshots=max_snaps if max_snaps and max_snaps > 0 else None,
-            )
-            out = f"Wrote {len(outputs)} interpretation(s): {sorted(outputs.keys())}"
-        else:
-            if not args.run_id:
-                parser.error("cluster-interpret requires --run-id or --results-dir")
-            out = cluster_interpret(
-                source,
-                args.run_id,
-                dataset=dataset,
-                model=model,
-                dry_run=getattr(args, "dry_run", False),
-            )
+        prompt_overrides = None
+        pj = getattr(args, "prompts_json", None)
+        if pj and Path(pj).is_file():
+            prompt_overrides = _json.loads(Path(pj).read_text(encoding="utf-8"))
+        images_by_cluster = None
+        ij = getattr(args, "images_json", None)
+        if ij and Path(ij).is_file():
+            images_by_cluster = _json.loads(Path(ij).read_text(encoding="utf-8"))
+        clusters = None
+        cl = getattr(args, "clusters", None)
+        if cl:
+            clusters = [int(x) for x in str(cl).split(",") if x.strip() != ""]
+        max_snaps = getattr(args, "max_llm_snapshots", 10)
+        outputs = run_results_dir_interpretation(
+            Path(args.results_dir),
+            dataset=dataset,
+            batch_id=batch_id,
+            model=model,
+            dry_run=getattr(args, "dry_run", False),
+            api_key=getattr(args, "api_key", None),
+            clusters=clusters,
+            prompt_overrides=prompt_overrides,
+            images_by_cluster=images_by_cluster,
+            temperature=getattr(args, "temperature", 0.1),
+            do_review=getattr(args, "review", True),
+            max_llm_snapshots=max_snaps if max_snaps and max_snaps > 0 else None,
+        )
+        out = f"Wrote {len(outputs)} interpretation(s): {sorted(outputs.keys())}"
     else:
-        out = evaluate_run(source, args.run_id)
+        parser.error(f"unknown command: {args.cmd}")
     print(out)
 
 

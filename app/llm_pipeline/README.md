@@ -1,32 +1,40 @@
 # GPL-ODD LLM Pipeline
 
-This folder contains stage-based tooling for extracting, transforming, and
-running LLM analysis from the GPL-ODD workflow.
+Multimodal LLM interpretation of behavioral **clusters** produced by the analyzer
+(`results/batch<id>/<k>_cluster_s=<sil>/cluster<N>/`). The dashboard "Select and
+analyze" page is the primary entry point.
 
 ## Layout
 
-- `contracts/`: JSON schema contracts for stage outputs.
-- `artifacts/`: materialized run artifacts grouped by stage.
-- `runs/`: optional run-level logs.
-- `prompt_templates/`: versioned prompt templates.
-- `python/llm_pipeline/`: reusable Python package (stages 1–6, cluster interpretation, LLM factory)
+- `prompt_templates/`: the four editable cluster-interpretation prompts
+  (`cluster_system_prompt.txt`, `cluster_common_sense.txt`,
+  `cluster_interaction_prompt.txt`, `cluster_reviewer_prompt.txt`).
+- `python/llm_pipeline/`: the Python package.
+- `requirements-llm.txt`: Python dependencies for this pipeline.
 
-## Stage Summary
+Runtime debug dumps (`PipelineCapture`) are written to `artifacts/` at run time;
+that folder is git-ignored and safe to delete.
 
-1. Capture raw IO from sampling/simulation/analyzer boundaries.
-2. Build compact LLM context from captured artifacts.
-3. Render prompt payloads from templates and context.
-4. Run LLM request and record traceable outputs.
-5. Evaluate stage completeness and schema conformance.
-6. Expose artifacts in dashboard panel.
+## Python package
 
-## CLI Usage
+| Module | Role |
+|--------|------|
+| `cli.py` | Entry point: `python -m llm_pipeline.cli cluster-interpret …` |
+| `cluster_interpretation_pipeline.py` | Orchestrates per-cluster interpretation from a `results/` folder; also `run_post_analyzer_cluster_interpretation()` for the analyzer controller's auto Phase 6. |
+| `cluster_interpreter.py` | `ClusterInterpreter`: two-pass (analysis + reviewer) multimodal LLM calls. |
+| `cluster_stats.py` | Cluster/collision statistics (also used by the analyzer's `dataset_builder`). |
+| `llm_factory.py` | Model construction + defaults (Gemini / OpenAI). |
+| `analyzer_bridge.py` | Makes `app/analyzer/src` importable. |
+| `paths.py` | Repo/results/prompt-template path helpers. |
+| `capture.py` | `PipelineCapture` debug recorder used by the sampling/analyzer services. |
 
-Run from project root:
+## CLI usage
+
+Run from project root (the dashboard invokes the first form via
+`scripts/run_cluster_analyze.sh`):
 
 ```bash
-python -m app.llm_pipeline.python.llm_pipeline.cli context --run-id <run_id>
-python -m app.llm_pipeline.python.llm_pipeline.cli prompt --run-id <run_id>
-python -m app.llm_pipeline.python.llm_pipeline.cli llm --run-id <run_id>
-python -m app.llm_pipeline.python.llm_pipeline.cli eval --run-id <run_id>
+python -m llm_pipeline.cli cluster-interpret \
+    --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2 \
+    --model gemini-2.5-flash --temperature 0.1 [--clusters 0,2] [--no-review] [--dry-run]
 ```

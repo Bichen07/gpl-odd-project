@@ -227,6 +227,29 @@ def action_log_from_description(cluster_dir: Path) -> str:
     return ""
 
 
+def critical_time_from_action_log(action_log: str) -> Optional[float]:
+    """Latest collision / near-miss / min-TTC timestamp mentioned in the log.
+
+    The rule-based Describer emits an ``Interactions:`` section such as
+    ``t=27.7s: near miss with track 2 (min distance 5.37 m, min TTC 0.0 s)``.
+    Surfacing this time lets the LLM prompt explicitly demand coverage through
+    the critical moment instead of stopping at the emergency-braking apex.
+    """
+    if not action_log:
+        return None
+    times: List[float] = []
+    for m in re.finditer(
+        r"t=(\d+(?:\.\d+)?)s?:[^\n]*(?:collision|near miss|min TTC)",
+        action_log,
+        re.I,
+    ):
+        try:
+            times.append(float(m.group(1)))
+        except ValueError:
+            continue
+    return max(times) if times else None
+
+
 def action_log_from_observations(observations: List[Dict[str, Any]]) -> str:
     """Lightweight action log when xosc_gen Labeller output is unavailable."""
     if not observations:
@@ -425,6 +448,24 @@ def write_stub_interpretation(
     cluster_stats: Dict[str, Any],
     reason: str,
 ) -> Path:
+    out = cluster_dir / "cluster_interpretation.yaml"
+    meta = cluster_dir / "interpretation_meta.json"
+
+    # Do NOT clobber a previously successful (non-stub) interpretation with a
+    # failure stub. A re-run that fails (e.g. the LLM intermittently returns
+    # prose instead of YAML) must preserve the good result already on disk.
+    if reason not in ("dry_run",) and meta.is_file():
+        try:
+            prior = json.loads(meta.read_text(encoding="utf-8"))
+            if not prior.get("stub", False):
+                print(
+                    f"  ⚠️  cluster{cluster_id}: new run failed ({reason}); "
+                    "keeping previous successful interpretation on disk."
+                )
+                return out
+        except (json.JSONDecodeError, OSError):
+            pass
+
     payload = {
         "cluster_id": cluster_id,
         "cluster_label": f"Cluster {cluster_id} (offline stub)",
@@ -441,12 +482,10 @@ def write_stub_interpretation(
         "parameter_conditions": cluster_stats.get("parameter_ranges", {}),
         "ego_perspective_summary": [],
     }
-    out = cluster_dir / "cluster_interpretation.yaml"
     raw_yaml = yaml.safe_dump(payload, sort_keys=False)
     out.write_text(raw_yaml, encoding="utf-8")
     # Also persist a meta sidecar so the dashboard can reload results (stub or real)
     # without re-running the analysis.
-    meta = cluster_dir / "interpretation_meta.json"
     meta.write_text(
         json.dumps(
             {
@@ -509,6 +548,7 @@ def interpret_cluster_dir(
             "mean_spret": c.get("mean_spret"),
             "parameter_ranges": c.get("parameter_ranges") or {},
             "medoid_trial_id": m.get("trial_id"),
+            "medoid_collided": m.get("collided"),
         }
     else:
         stats_path = cluster_dir / "stats.json"
@@ -572,6 +612,15 @@ def interpret_cluster_dir(
             json.loads(obs_path.read_text(encoding="utf-8")) if obs_path.is_file() else []
         )
         action_log = action_log_from_observations(observations)
+
+    # Surface the single-trajectory (medoid) outcome separately from the
+    # cluster-wide collision rate, plus the critical/closest-approach time, so
+    # the LLM can reason about THIS trajectory and cover the full timeline.
+    if stats.get("medoid_collided") is not None:
+        cluster_stats["medoid_collided"] = bool(stats.get("medoid_collided"))
+    crit_time = critical_time_from_action_log(action_log)
+    if crit_time is not None:
+        cluster_stats["medoid_critical_time"] = crit_time
 
     # Explicit user selection of snapshots wins; otherwise auto-collect (with
     # optional even subsampling). Selection entries may be bare file names

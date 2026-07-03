@@ -1,9 +1,0 @@
-{
-  "run_id": "demo_run_stage",
-  "stage": "stage4_llm",
-  "provider": "openai_compatible",
-  "model": "gpt-4o-mini",
-  "latency_ms": 0.0,
-  "usage": {},
-  "result": "Stub result: configure LLM_API_KEY, LLM_MODEL and LLM_ENDPOINT to run live inference."
-}

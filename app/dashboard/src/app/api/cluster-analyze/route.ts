@@ -30,14 +30,15 @@ const PROMPT_FILES: Record<string, string> = {
   reviewer: "cluster_reviewer_prompt.txt",
 };
 
+// Keep this list to models that are currently served. gemini-2.0-flash was
+// retired by Google (404 "no longer available") and must not be offered.
 const MODELS = [
   { id: "gemini-2.5-flash", provider: "Google" },
   { id: "gemini-2.5-pro", provider: "Google" },
-  { id: "gemini-2.0-flash", provider: "Google" },
-  { id: "gemini-3-flash-preview", provider: "Google" },
+  { id: "gemini-2.5-flash-lite", provider: "Google" },
   { id: "gpt-4o", provider: "OpenAI" },
+  { id: "gpt-4o-mini", provider: "OpenAI" },
   { id: "gpt-4-turbo", provider: "OpenAI" },
-  { id: "gpt-5", provider: "OpenAI" },
 ];
 
 function snapshotTimestamp(name: string): number {

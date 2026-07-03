@@ -193,11 +193,13 @@ class ClusterInterpreter:
         
         # --- PASS 1: Initial analysis ---
         print("[ClusterInterpreter] Pass 1: Initial cluster analysis...")
+        bev_labels = [self._snapshot_label(p) for p in bev_snapshot_paths]
         initial_yaml, initial_tokens = self._run_initial_analysis(
             system_prompt=system_prompt,
             common_sense=common_sense,
             interaction_prompt=interaction_prompt,
             bev_images=bev_images,
+            bev_labels=bev_labels,
             heatmap_image=heatmap_image,
             map_description=map_description,
         )
@@ -312,6 +314,25 @@ class ClusterInterpreter:
         except (TypeError, ValueError):
             return f"n/a {unit}".strip()
 
+    @staticmethod
+    def _snapshot_label(path: str) -> str:
+        """Human-readable timestamp+event label parsed from a snapshot filename.
+
+        Snapshots are named like
+        ``trial_795_t_20.95_ego_max_deceleration.jpg`` or
+        ``trial_795_t_27.71_..._STOPPED.jpg``. The LLM only sees images, so we
+        surface the encoded timestamp/event as text to anchor it temporally.
+        """
+        name = Path(path).name
+        m = re.search(r"_t_(\d+(?:\.\d+)?)_(.+?)\.(?:jpe?g|png)$", name, re.I)
+        if m:
+            ts, event = m.group(1), m.group(2).replace("_", " ").strip()
+            return f"t={ts}s — {event}"
+        m2 = re.search(r"_t_(\d+(?:\.\d+)?)", name)
+        if m2:
+            return f"t={m2.group(1)}s"
+        return name
+
     def _format_cluster_stats(self, stats: Dict) -> str:
         """Format cluster statistics for prompt."""
         n = stats.get("n_trials", 0)
@@ -320,13 +341,27 @@ class ClusterInterpreter:
 
         lines = [
             f"Number of trials: {n}",
-            f"Collision rate: {float(collision_rate):.1f}%",
+            f"Collision rate (whole cluster): {float(collision_rate):.1f}%",
             f"Mean TTC: {self._fmt_metric(stats.get('mean_ttc'), '{:.2f}', 'seconds')}",
             f"Minimum TTC: {self._fmt_metric(stats.get('min_ttc'), '{:.2f}', 'seconds')}",
             f"Mean SPrET: {self._fmt_metric(stats.get('mean_spret'), '{:.2f}', 'meters')}",
-            "",
-            "Parameter ranges:",
         ]
+
+        # Medoid (the trial shown in the BEV snapshots & action log) outcome.
+        # collision_rate above is cluster-wide; this is the single trajectory
+        # the snapshots actually depict, so the LLM must not conflate the two.
+        medoid_collided = stats.get("medoid_collided")
+        if medoid_collided is not None:
+            outcome = "COLLISION" if medoid_collided else "no collision (near-miss/safe)"
+            lines.append(f"Medoid trial outcome (shown in snapshots): {outcome}")
+        crit = stats.get("medoid_critical_time")
+        if crit is not None:
+            lines.append(
+                f"Medoid critical/closest-approach time: t={float(crit):.2f}s "
+                "(describe the scenario through this moment)"
+            )
+
+        lines += ["", "Parameter ranges:"]
 
         if not param_ranges:
             lines.append("  (not available for this cluster)")
@@ -375,10 +410,12 @@ Intersection geometry:
         common_sense: str,
         interaction_prompt: str,
         bev_images: List[str],
+        bev_labels: Optional[List[str]],
         heatmap_image: Optional[str],
         map_description: str,
     ) -> tuple[Optional[str], Dict]:
         """Run initial LLM analysis pass."""
+        bev_labels = bev_labels or []
         # Construct multi-modal message
         prompt_parts = [
             {"type": "text", "text": "### Traffic Safety Principles & Reference"},
@@ -393,10 +430,21 @@ Intersection geometry:
             prompt_parts.append(
                 {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{heatmap_image}"}}
             )
-        prompt_parts.append({"type": "text", "text": "\n### BEV Snapshots (Medoid Trial)"})
+        prompt_parts.append({
+            "type": "text",
+            "text": (
+                "\n### BEV Snapshots (Medoid Trial)\n"
+                "Each snapshot is labelled with its scenario timestamp and the key "
+                "event at that moment. Snapshots are ordered chronologically — use "
+                "the timestamps to anchor your ego_perspective_summary and make sure "
+                "you describe the LATEST snapshots (the final outcome), not only the "
+                "early ones."
+            ),
+        })
         
         for i, b64_img in enumerate(bev_images):
-            prompt_parts.append({"type": "text", "text": f"Snapshot {i+1}:"})
+            label = bev_labels[i] if i < len(bev_labels) else f"Snapshot {i+1}"
+            prompt_parts.append({"type": "text", "text": f"Snapshot {i+1} — {label}:"})
             prompt_parts.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_img}"}})
         
         prompt_parts.append({"type": "text", "text": f"\n{interaction_prompt}"})
