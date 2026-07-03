@@ -840,22 +840,21 @@ All 30 tests should end with `OK`.
 | `**update**` | Senior WIP feature branch (content largely merged into `dev`)                              | `6e3a1de`     |
 
 
-**Which branch do we build from?** Lab fork work tracks senior `**dev`**. Local branch `carlos1` is pinned to `upstream/dev` (`9019911`). Active development is on `feature/cluster-medoid` (lab-specific commits on the fork — analyzer, Mission Control, LLM pipeline, etc.).
+**Which branch do we build from?** Lab fork work is on **`main`** (`origin/main`, default on `Bichen07/gpl-odd-project`). It contains the integrated lab-specific work (analyzer, Mission Control, LLM pipeline, cluster interpretation, etc.). Senior upstream default is `**dev**` on `ian-chiu/gpl-odd-project`.
 
 ```
 ian-chiu/gpl-odd-project (upstream)
-  ├── dev      ← default; carlos1 tracks this
+  ├── dev      ← upstream default
   ├── main
   └── update
 
 Bichen07/gpl-odd-project (origin — your fork)
-  ├── carlos1                 ← clean sync with upstream/dev
-  └── feature/cluster-medoid  ← current work (Phases 1–3)
+  └── main     ← default; all integrated lab work lives here
 ```
 
 ```bash
-git branch                        # see current branch
-git push origin feature/cluster-medoid   # push to YOUR fork only
+git branch                        # see current branch (should be main)
+git push origin main              # push to YOUR fork
 
 git remote -v
 # origin    https://github.com/Bichen07/gpl-odd-project.git   ← your fork (push here)
