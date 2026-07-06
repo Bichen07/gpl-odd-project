@@ -496,9 +496,52 @@ Intersection geometry:
         
         extracted = self._extract_yaml_block(analysis_result)
         if not re.search(r"```(?:yaml|YAML)", analysis_result, re.I):
-            print("⚠️  WARNING: No ```yaml fence in response; extracted best-effort YAML")
+            print("⚠️  WARNING: No ```yaml fence in response; running YAML extraction follow-up...")
+            extracted, extra_tokens = self._run_yaml_extraction_pass(
+                messages, analysis_result
+            )
+            tokens = {k: tokens.get(k, 0) + extra_tokens.get(k, 0) for k in set(tokens) | set(extra_tokens)}
         return extracted, tokens
     
+    def _run_yaml_extraction_pass(
+        self,
+        prior_messages: list,
+        prior_analysis: str,
+    ) -> tuple[Optional[str], Dict]:
+        """Pass 3 (fallback): model produced CoT but no YAML fence.
+
+        Send a brief follow-up in the same conversation asking the model to
+        emit only the final YAML block.  This is cheap (no images) and is
+        highly reliable for models that output prose instead of a fenced block.
+        """
+        follow_up_text = (
+            "Your analysis above is excellent. "
+            "Now please output ONLY the final YAML report as a single fenced "
+            "```yaml ... ``` code block — no additional prose, no Chain of Thought. "
+            "Use exactly the schema specified in the Final Output Instructions, "
+            "including all required top-level keys "
+            "(cluster_id, cluster_label, confidence, behavior_description, "
+            "safety_assessment, parameter_conditions, ego_perspective_summary). "
+            "The ego_perspective_summary MUST have 10-15 timestamped events "
+            "spanning the FULL scenario timeline."
+        )
+        messages_ext = list(prior_messages) + [
+            {"role": "assistant", "content": prior_analysis},
+            HumanMessage(content=follow_up_text),
+        ]
+        try:
+            response, tokens = self._invoke_messages(messages_ext, timeout=120)
+            follow_text = self._response_to_text(response.content)
+            extracted = self._extract_yaml_block(follow_text)
+            if re.search(r"```(?:yaml|YAML)", follow_text, re.I):
+                print("✅ YAML extraction follow-up succeeded")
+            else:
+                print("⚠️  WARNING: YAML extraction follow-up also produced no fence; best-effort")
+            return extracted, tokens
+        except Exception as e:
+            print(f"❌ ERROR: YAML extraction follow-up failed: {e}")
+            return self._extract_yaml_block(prior_analysis), {}
+
     def _run_reviewer_pass(
         self,
         stats_text: str,

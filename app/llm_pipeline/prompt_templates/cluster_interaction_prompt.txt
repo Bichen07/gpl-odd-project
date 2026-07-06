@@ -128,7 +128,48 @@ Safe range: Start delay > 1.5s OR oncoming speed < 55 kph
 Risky boundary: Start delay < 1.0s AND oncoming speed > 65 kph (collision risk 15%)"
 
 ### Step 6: Ego-Perspective Summary
-Provide **4-8 key events** from ego's perspective spanning the WHOLE scenario:
+Provide **10-15 key events** from ego's perspective spanning the WHOLE scenario.
+
+Rules:
+- Cover the full timeline from the first relevant maneuver to the FINAL OUTCOME.
+- The BEV snapshots are labelled with their timestamps — use the LATEST snapshots
+  and the `Interactions:` section of the action log; do NOT stop at the emergency-
+  braking apex if the trajectory continues.
+- The action log lists the scenario duration and a final interaction (e.g.
+  `t=27.7s: near miss / collision ...`). Your **last event MUST describe that final
+  outcome** (collision / near-miss / safe resolution) with its timestamp. If the
+  Cluster Statistics report a "Medoid critical/closest-approach time", your summary
+  MUST reach at least that timestamp.
+- Spread events evenly across the scenario timeline — do NOT cluster all events
+  near the peak conflict moment; include early approach, mid-scenario developments,
+  and post-conflict resolution or crash aftermath.
+- Focus on decision points and interaction moments: speed changes, heading changes,
+  gap acceptance/rejection, reaction to other agents, and final outcome.
+- Use natural language (no agent IDs, no colons). Include timestamps.
+
+Example (10+ events spanning the whole scenario):
+- timestamp: 1.5
+  description: Ego entered the road network and began accelerating toward the intersection
+- timestamp: 3.0
+  description: Ego maintained constant speed while approaching the intersection in the through lane
+- timestamp: 5.2
+  description: Ego detected an oncoming vehicle approaching from the opposite direction
+- timestamp: 6.8
+  description: Ego started gradual deceleration to assess the oncoming vehicle's speed and trajectory
+- timestamp: 8.5
+  description: Ego committed to yielding and reduced speed significantly before the conflict zone
+- timestamp: 10.1
+  description: Ego came to a near-complete stop at the intersection entry point
+- timestamp: 12.0
+  description: Oncoming vehicle passed through the intersection at high speed
+- timestamp: 13.5
+  description: Ego verified the path was clear and began cautious acceleration
+- timestamp: 15.2
+  description: Ego proceeded through the intersection, completing the intended maneuver
+- timestamp: 17.0
+  description: Ego exited the intersection and resumed normal driving speed
+- timestamp: 18.5
+  description: Ego completed the scenario without any collision or near-miss
 
 ### Step 7: Intra-Cluster Consistency
 Using the "Intra-cluster spread" statistics provided above (if available):
@@ -144,29 +185,6 @@ Example:
 "The spread std=0.08 is moderate. The most atypical trial collided while the medoid did not,
 suggesting occasional aggressive behavior in the cluster boundary.
 Rating: 6 — mostly consistent yielding but with edge-case failures."
-- Cover the full timeline from the first relevant maneuver to the FINAL OUTCOME.
-- The BEV snapshots are labelled with their timestamps — use the LATEST snapshots
-  and the `Interactions:` section of the action log; do NOT stop at the emergency-
-  braking apex if the trajectory continues.
-- The action log lists the scenario duration and a final interaction (e.g.
-  `t=27.7s: near miss / collision ...`). Your **last event MUST describe that final
-  outcome** (collision / near-miss / safe resolution) with its timestamp. If the
-  Cluster Statistics report a "Medoid critical/closest-approach time", your summary
-  MUST reach at least that timestamp.
-- Focus on decision points and interaction moments.
-- Use natural language (no agent IDs, no colons). Include timestamps.
-
-Example (note how the LAST event is the final outcome, not the braking moment):
-- timestamp: 1.5
-  description: Ego detected oncoming vehicle approaching from opposite direction
-- timestamp: 2.2
-  description: Ego began gradual deceleration to yield right of way
-- timestamp: 4.0
-  description: Ego came to near-complete stop before entering conflict zone
-- timestamp: 5.5
-  description: After oncoming vehicle cleared, ego accelerated through intersection
-- timestamp: 7.8
-  description: Ego completed the turn and exited the intersection without conflict
 </Mandatory Workflow & Chain Of Thought>
 
 <Final Output Instructions>
@@ -181,8 +199,9 @@ cluster_id: <int>
 cluster_label: "<concise name, 2-5 words>"
 confidence: <"high" | "medium" | "low">
 behavior_description: >
-  <2-3 sentence description of the behavioral pattern.
-   Explain what ego does, how other agents behave, and what makes this distinct.>
+  <3-5 sentence description of the behavioral pattern.
+   Explain what ego does, how other agents behave, the decision point, and what makes this distinct.
+   Mention the overall risk level and typical outcome.>
 safety_assessment:
   risk_level: <"low" | "medium" | "high">
   failure_mode: >
@@ -197,7 +216,7 @@ ego_perspective_summary:
     description: "<event description>"
   - timestamp: <float>
     description: "<event description>"
-  # ... (4-8 key events; the LAST event MUST be the final outcome /
+  # ... (10-15 key events; the LAST event MUST be the final outcome /
   #      collision / near-miss, reaching the end of the scenario)
 # Optional — include only if intra-cluster spread data was provided:
 intra_consistency_score: <int 1-10 or omit>
