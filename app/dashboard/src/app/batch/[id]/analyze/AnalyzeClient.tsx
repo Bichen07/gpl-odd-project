@@ -23,16 +23,50 @@ import {
   Slider,
   Stack,
   Switch,
+  Tab,
+  Tabs,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from "@mui/material";
 import { ArrowBack, ExpandMore } from "@mui/icons-material";
+import { selectDefaultSnapshots, snapshotTimestamp } from "@/app/_shared/utils/snapshotSelection";
 
 type ClusterEntry = {
   cluster: number;
   stats: Record<string, unknown> | null;
   medoid: Record<string, unknown> | null;
+  intraVariance: Record<string, unknown> | null;
   snapshots: string[];
+};
+
+type ClusteringQuality = {
+  folder: string;
+  k: number | null;
+  silhouette: number | null;
+  rule_score: number;
+  llm_score: number | null;
+  final_score: number;
+  rank: number | null;
+  has_llm_eval: boolean;
+  sub_scores: Record<string, unknown>;
+  cross_cluster_eval?: {
+    behavioral_separation_score: number | null;
+    boundary_clarity_score: number | null;
+    inter_notes: string;
+    cluster_summaries: Array<{cluster_id: number; archetype: string; intra_score?: number}>;
+    merge_candidates?: string[];
+    split_candidates?: string[];
+  } | null;
+  boundary_pairs?: Array<{
+    cluster_a: number; trial_a: string; collided_a: boolean;
+    cluster_b: number; trial_b: string; collided_b: boolean;
+    embedding_dist: number;
+  }>;
 };
 
 type ModelOption = { id: string; provider: string };
@@ -59,20 +93,8 @@ const PROMPT_LABELS: Array<{ key: string; label: string; help: string }> = [
   { key: "reviewer", label: "Reviewer Prompt (Pass 2)", help: "Skeptical audit. Placeholders: {cluster_stats} {agent_actions_log} {preliminary_yaml}" },
 ];
 
-function evenlySpaced(items: string[], n: number): string[] {
-  if (n <= 0 || items.length === 0) return [];
-  if (items.length <= n) return [...items];
-  if (n === 1) return [items[0]];
-  const out: string[] = [];
-  for (let i = 0; i < n; i += 1) {
-    out.push(items[Math.round((i * (items.length - 1)) / (n - 1))]);
-  }
-  return Array.from(new Set(out));
-}
-
 function snapshotLabel(name: string): string {
-  const m = name.match(/_t_(\d+(?:\.\d+)?)/i);
-  return m ? `t=${m[1]}s` : name;
+  return `t=${snapshotTimestamp(name)}s`;
 }
 
 type EgoEvent = { t: number | null; text: string };
@@ -303,6 +325,45 @@ export default function AnalyzeClient({
   const [review, setReview] = useState<boolean>(true);
   const [dryRun, setDryRun] = useState<boolean>(false);
 
+  // --- evaluation tab ---
+  const [activeTab, setActiveTab] = useState<number>(0);
+  const [evalConfigs, setEvalConfigs] = useState<ClusteringQuality[]>([]);
+  const [evalLoading, setEvalLoading] = useState(false);
+  const [evalRunning, setEvalRunning] = useState(false);
+  const [evalError, setEvalError] = useState<string | null>(null);
+
+  // Load evaluation configs
+  useEffect(() => {
+    if (!batchId) return;
+    fetch(`/api/cluster-evaluate?batchId=${encodeURIComponent(batchId)}`)
+      .then((r) => r.json())
+      .then((d) => setEvalConfigs(d.configs ?? []))
+      .catch(() => {});
+  }, [batchId]);
+
+  const runCrossClusterEval = async () => {
+    if (!config?.folder) return;
+    setEvalRunning(true);
+    setEvalError(null);
+    try {
+      const res = await fetch("/api/cluster-evaluate/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId: Number(batchId), folder: config.folder, model, apiKey: apiKey || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      // Refresh eval configs
+      const r2 = await fetch(`/api/cluster-evaluate?batchId=${encodeURIComponent(batchId)}`);
+      const d2 = await r2.json();
+      setEvalConfigs(d2.configs ?? []);
+    } catch (err) {
+      setEvalError(String(err));
+    } finally {
+      setEvalRunning(false);
+    }
+  };
+
   // --- prompts (editable) ---
   const [prompts, setPrompts] = useState<Record<string, string>>({});
 
@@ -335,7 +396,9 @@ export default function AnalyzeClient({
         setPrompts(cfg.prompts ?? {});
         if (cfg.models?.length) setModel(cfg.models[0].id);
         const sel: Record<number, string[]> = {};
-        for (const c of cfg.clusters) sel[c.cluster] = evenlySpaced(c.snapshots, autoCount);
+        for (const c of cfg.clusters) {
+          sel[c.cluster] = selectDefaultSnapshots(c.snapshots, autoCount, c.medoid);
+        }
         setSelected(sel);
         setRunClusters(new Set(cfg.clusters.map((c) => c.cluster)));
         // Show previously-saved interpretations so a re-run isn't required.
@@ -367,8 +430,11 @@ export default function AnalyzeClient({
     });
   };
 
-  const applyAuto = (cluster: number, snapshots: string[]) => {
-    setSelected((prev) => ({ ...prev, [cluster]: evenlySpaced(snapshots, autoCount) }));
+  const applyAuto = (cluster: number, snapshots: string[], medoid?: Record<string, unknown> | null) => {
+    setSelected((prev) => ({
+      ...prev,
+      [cluster]: selectDefaultSnapshots(snapshots, autoCount, medoid),
+    }));
   };
 
   const toggleRunCluster = (cluster: number) => {
@@ -528,6 +594,11 @@ export default function AnalyzeClient({
     );
   }
 
+  // Find quality entry for current folder
+  const currentQuality = evalConfigs.find((c) => c.folder === config.folder);
+  const currentBoundaryPairs = currentQuality?.boundary_pairs ?? [];
+  const currentCrossEval = currentQuality?.cross_cluster_eval;
+
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
       {/* Header */}
@@ -543,6 +614,175 @@ export default function AnalyzeClient({
         </Box>
       </Stack>
 
+      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
+        <Tab label="Analysis" />
+        <Tab label={`Evaluation${currentQuality ? ` (score ${currentQuality.final_score?.toFixed(1)})` : ""}`} />
+      </Tabs>
+
+      {/* ===== EVALUATION TAB ===== */}
+      {activeTab === 1 && (
+        <Stack spacing={2}>
+          {/* Run button */}
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
+              <Button
+                variant="contained"
+                disabled={evalRunning}
+                onClick={runCrossClusterEval}
+                startIcon={evalRunning ? <CircularProgress size={16} color="inherit" /> : undefined}
+              >
+                {evalRunning ? "Running LLM eval…" : "Run Cross-Cluster Eval (LLM)"}
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Requires a valid API key (set in the Analysis tab). Updates the composite score with the LLM behavioral layer.
+              </Typography>
+            </Stack>
+            {evalError && <Alert severity="error" sx={{ mt: 1 }}>{evalError}</Alert>}
+          </Paper>
+
+          {/* All configs ranking table */}
+          {evalConfigs.length > 0 && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>All Clustering Configurations (ranked)</Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Rank</TableCell>
+                    <TableCell>Config</TableCell>
+                    <TableCell align="right">k</TableCell>
+                    <TableCell align="right">Silhouette</TableCell>
+                    <TableCell align="right">Rule Score</TableCell>
+                    <TableCell align="right">LLM Score</TableCell>
+                    <TableCell align="right">Final Score</TableCell>
+                    <TableCell>LLM Eval?</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {evalConfigs.map((c) => (
+                    <TableRow
+                      key={c.folder}
+                      sx={{ bgcolor: c.folder === config.folder ? "action.selected" : undefined }}
+                    >
+                      <TableCell><strong>#{c.rank ?? "—"}</strong></TableCell>
+                      <TableCell sx={{ fontFamily: "monospace", fontSize: 12 }}>{c.folder}</TableCell>
+                      <TableCell align="right">{c.k ?? "—"}</TableCell>
+                      <TableCell align="right">{c.silhouette?.toFixed(4) ?? "—"}</TableCell>
+                      <TableCell align="right">{c.rule_score?.toFixed(1)}</TableCell>
+                      <TableCell align="right">{c.llm_score != null ? c.llm_score.toFixed(1) : "—"}</TableCell>
+                      <TableCell align="right"><strong>{c.final_score?.toFixed(1)}</strong></TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          label={c.has_llm_eval ? "Yes" : "Rule only"}
+                          color={c.has_llm_eval ? "primary" : "default"}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Paper>
+          )}
+
+          {/* Current config: per-cluster intra panel */}
+          {config.clusters.length > 0 && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>Per-Cluster Intra Variance</Typography>
+              <Stack spacing={1}>
+                {config.clusters.map((cl) => {
+                  const iv = cl.intraVariance as Record<string, unknown> | null;
+                  if (!iv) return null;
+                  const outlierIds = (iv.outlier_trial_ids as string[] | undefined) ?? [];
+                  const outlierColl = (iv.outlier_collision as boolean[] | undefined) ?? [];
+                  const meta = results.find((r) => r.cluster === cl.cluster);
+                  const intraScore = (meta?.meta as Record<string, unknown> | null)?.intra_consistency_score;
+                  return (
+                    <Paper key={cl.cluster} variant="outlined" sx={{ p: 1.5 }}>
+                      <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+                        <Typography fontWeight="bold">Cluster {cl.cluster}</Typography>
+                        {Boolean((meta?.meta as Record<string, unknown> | null)?.cluster_label) && (
+                          <Chip size="small" label={String((meta!.meta as Record<string,unknown>).cluster_label)} />
+                        )}
+                        {intraScore != null && (
+                          <Chip
+                            size="small"
+                            color={Number(intraScore) >= 7 ? "success" : Number(intraScore) >= 5 ? "warning" : "error"}
+                            label={`consistency ${intraScore}/10`}
+                          />
+                        )}
+                      </Stack>
+                      <Stack direction="row" spacing={2} sx={{ mt: 0.5 }} flexWrap="wrap">
+                        <Typography variant="caption">mean dist: {String(iv.mean_dist_to_medoid ?? "—")}</Typography>
+                        <Typography variant="caption">std: {String(iv.std_dist_to_medoid ?? "—")}</Typography>
+                        <Typography variant="caption">max: {String(iv.max_dist_to_medoid ?? "—")}</Typography>
+                        <Typography variant="caption">n_members: {String(iv.n_members ?? "—")}</Typography>
+                      </Stack>
+                      {outlierIds.length > 0 && (
+                        <Typography variant="caption" sx={{ mt: 0.5, display: "block" }}>
+                          Outliers: {outlierIds.map((tid, i) => (
+                            <span key={tid}>{tid}{outlierColl[i] ? " (COLLISION)" : ""}{i < outlierIds.length - 1 ? ", " : ""}</span>
+                          ))}
+                        </Typography>
+                      )}
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            </Paper>
+          )}
+
+          {/* Inter-cluster notes from cross_cluster_eval.json */}
+          {currentCrossEval && (
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="h6" gutterBottom>Inter-Cluster Analysis (LLM)</Typography>
+              <Stack direction="row" spacing={2} sx={{ mb: 1 }} flexWrap="wrap">
+                <Chip
+                  label={`Behavioral separation: ${currentCrossEval.behavioral_separation_score ?? "?"}/10`}
+                  color="primary"
+                  variant="outlined"
+                />
+                <Chip
+                  label={`Boundary clarity: ${currentCrossEval.boundary_clarity_score ?? "?"}/10`}
+                  color="secondary"
+                  variant="outlined"
+                />
+              </Stack>
+              <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mb: 1 }}>
+                {currentCrossEval.inter_notes}
+              </Typography>
+              {(currentCrossEval.merge_candidates?.length ?? 0) > 0 && (
+                <Alert severity="warning" sx={{ mb: 1 }}>
+                  <Typography variant="body2" fontWeight="bold">Merge candidates:</Typography>
+                  {currentCrossEval.merge_candidates!.map((m, i) => (
+                    <Typography key={i} variant="caption" display="block">{m}</Typography>
+                  ))}
+                </Alert>
+              )}
+              {(currentCrossEval.split_candidates?.length ?? 0) > 0 && (
+                <Alert severity="info">
+                  <Typography variant="body2" fontWeight="bold">Split candidates:</Typography>
+                  {currentCrossEval.split_candidates!.map((m, i) => (
+                    <Typography key={i} variant="caption" display="block">{m}</Typography>
+                  ))}
+                </Alert>
+              )}
+            </Paper>
+          )}
+
+          {/* Boundary comparison (Phase J) */}
+          {currentBoundaryPairs.length > 0 && (
+            <BoundaryComparePanel
+              batchId={batchId}
+              folder={config.folder}
+              boundaryPairs={currentBoundaryPairs}
+              crossEval={currentCrossEval}
+            />
+          )}
+        </Stack>
+      )}
+
+      {/* ===== ANALYSIS TAB (existing content) ===== */}
+      {activeTab === 0 && (
       <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="flex-start">
         {/* LEFT: model + prompts */}
         <Stack spacing={2} sx={{ flex: 1, minWidth: 0, width: "100%" }}>
@@ -640,6 +880,9 @@ export default function AnalyzeClient({
                     </MenuItem>
                   ))}
                 </Select>
+                <Typography variant="caption" color="text.secondary">
+                  Default: ±2 frames around NEAR_MISS / COLLISION, rest evenly spaced
+                </Typography>
               </Stack>
             </Stack>
 
@@ -677,7 +920,7 @@ export default function AnalyzeClient({
                       <Typography variant="caption" color="text.secondary">
                         {sel.size}/{c.snapshots.length} selected
                       </Typography>
-                      <Button size="small" onClick={() => applyAuto(c.cluster, c.snapshots)}>
+                      <Button size="small" onClick={() => applyAuto(c.cluster, c.snapshots, c.medoid)}>
                         Auto
                       </Button>
                       <Button
@@ -850,6 +1093,154 @@ export default function AnalyzeClient({
           ))}
         </Stack>
       </Stack>
+      )}
     </Container>
+  );
+}
+
+// ─── BoundaryCompare Panel (Phase J) ────────────────────────────────────────
+
+type BoundaryPair = {
+  cluster_a: number; trial_a: string; collided_a: boolean;
+  cluster_b: number; trial_b: string; collided_b: boolean;
+  embedding_dist: number;
+};
+
+type CrossEvalData = {
+  behavioral_separation_score: number | null;
+  boundary_clarity_score: number | null;
+  inter_notes: string;
+  cluster_summaries: Array<{cluster_id: number; archetype: string; intra_score?: number}>;
+  merge_candidates?: string[];
+  split_candidates?: string[];
+} | null | undefined;
+
+function BoundaryComparePanel({
+  batchId,
+  folder,
+  boundaryPairs,
+  crossEval,
+}: {
+  batchId: string;
+  folder: string;
+  boundaryPairs: BoundaryPair[];
+  crossEval?: CrossEvalData;
+}) {
+  const [selectedPairIdx, setSelectedPairIdx] = useState(0);
+  const [descA, setDescA] = useState<string | null>(null);
+  const [descB, setDescB] = useState<string | null>(null);
+  const [loadingDesc, setLoadingDesc] = useState(false);
+
+  const pair = boundaryPairs[selectedPairIdx];
+
+  useEffect(() => {
+    if (!pair) return;
+    setLoadingDesc(true);
+    // Fetch descriptions from the boundary sub-dirs via a lightweight text API
+    const baseUrl = `/api/cluster-analyze?batchId=${batchId}&batchFolder=${folder}`;
+    const fetchDesc = (side: "a" | "b") => {
+      const clLabel = side === "a" ? pair.cluster_a : pair.cluster_b;
+      const otherLabel = side === "a" ? pair.cluster_b : pair.cluster_a;
+      const trialId = side === "a" ? pair.trial_a : pair.trial_b;
+      return fetch(
+        `${baseUrl}&boundaryDesc=1&cluster=${clLabel}&boundaryWith=${otherLabel}`
+      )
+        .then((r) => r.text())
+        .catch(() => "(description not available)");
+    };
+    Promise.all([fetchDesc("a"), fetchDesc("b")]).then(([a, b]) => {
+      setDescA(a || "(description not available)");
+      setDescB(b || "(description not available)");
+      setLoadingDesc(false);
+    });
+  }, [pair, batchId, folder]);
+
+  if (!pair) return null;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>Boundary Trial Comparison</Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        Trials at the cluster boundary — similar initial conditions, potentially different outcomes.
+      </Typography>
+
+      {/* Pair selector */}
+      <Select
+        size="small"
+        value={selectedPairIdx}
+        onChange={(e) => setSelectedPairIdx(Number(e.target.value))}
+        sx={{ mb: 2, minWidth: 280 }}
+      >
+        {boundaryPairs.map((bp, i) => (
+          <MenuItem key={i} value={i}>
+            {`C${bp.cluster_a} ↔ C${bp.cluster_b} — embedding dist ${bp.embedding_dist.toFixed(3)}`}
+          </MenuItem>
+        ))}
+      </Select>
+
+      {/* Outcome badges */}
+      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+        <Chip
+          label={`C${pair.cluster_a} trial ${pair.trial_a}${pair.collided_a ? " 💥 COLLISION" : " ✓ safe"}`}
+          color={pair.collided_a ? "error" : "success"}
+          size="small"
+        />
+        <Chip
+          label={`C${pair.cluster_b} trial ${pair.trial_b}${pair.collided_b ? " 💥 COLLISION" : " ✓ safe"}`}
+          color={pair.collided_b ? "error" : "success"}
+          size="small"
+        />
+      </Stack>
+
+      {/* Side-by-side description diff */}
+      {loadingDesc ? (
+        <CircularProgress size={24} />
+      ) : (
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Cluster {pair.cluster_a} — trial {pair.trial_a}
+            </Typography>
+            <Box
+              component="pre"
+              sx={{
+                p: 1, bgcolor: "background.paper", borderRadius: 1,
+                border: "1px solid", borderColor: "divider",
+                fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap",
+                maxHeight: 320, overflowY: "auto",
+              }}
+            >
+              {descA ?? "(loading…)"}
+            </Box>
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="subtitle2" gutterBottom>
+              Cluster {pair.cluster_b} — trial {pair.trial_b}
+            </Typography>
+            <Box
+              component="pre"
+              sx={{
+                p: 1, bgcolor: "background.paper", borderRadius: 1,
+                border: "1px solid", borderColor: "divider",
+                fontSize: 11, lineHeight: 1.5, whiteSpace: "pre-wrap",
+                maxHeight: 320, overflowY: "auto",
+              }}
+            >
+              {descB ?? "(loading…)"}
+            </Box>
+          </Box>
+        </Stack>
+      )}
+
+      {/* LLM caption from cross_cluster_eval */}
+      {crossEval?.inter_notes && (
+        <Box sx={{ mt: 2 }}>
+          <Typography variant="subtitle2">LLM Boundary Analysis:</Typography>
+          <Typography variant="body2" color="text.secondary">
+            {crossEval.inter_notes}
+          </Typography>
+        </Box>
+      )}
+    </Paper>
   );
 }

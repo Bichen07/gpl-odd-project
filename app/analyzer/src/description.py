@@ -31,6 +31,7 @@ _EGO_PHRASES = {
     "LANE_CHANGE_RIGHT": "changes lane to the right",
     "ENTER_JUNCTION": "enters a junction",
     "EXIT_JUNCTION": "exits the junction",
+    "COLLISION": "collides",
 }
 
 _INTENT_PHRASES = {
@@ -72,10 +73,13 @@ def _narrate_agent(agent: Dict) -> List[str]:
         return lines
 
     for act in agent["actions"]:
-        phrase = _EGO_PHRASES.get(act["action"], act["action"].lower().replace("_", " "))
+        attrs = act.get("attributes", {})
+        if act["action"] == "COLLISION" and attrs.get("role") == "partner":
+            phrase = "is struck by"
+        else:
+            phrase = _EGO_PHRASES.get(act["action"], act["action"].lower().replace("_", " "))
         t0, t1 = act["start_time"], act["end_time"]
         when = f"t={t0:.1f}s" if t0 == t1 else f"t={t0:.1f}-{t1:.1f}s"
-        attrs = act.get("attributes", {})
         extra = ""
         if "target_speed" in attrs:                       # longitudinal maneuver
             extra = f" from {attrs.get('start_speed')} to {attrs['target_speed']} m/s"
@@ -89,10 +93,43 @@ def _narrate_agent(agent: Dict) -> List[str]:
                      f"(road {attrs.get('entry_road')}→{attrs.get('exit_road')})")
         elif "exit_road" in attrs:                        # junction exit
             extra = f" (road {attrs['exit_road']})"
+        elif act["action"] == "COLLISION":
+            lines.append(_format_collision_action_line(when, phrase, act, role))
+            continue
         lines.append(
             f"  {when}: {phrase} on road {act['road_id']}, lane {act['lane_id']}{extra}"
         )
     return lines
+
+
+def _format_collision_action_line(when: str, phrase: str, act: dict, role: str) -> str:
+    attrs = act.get("attributes", {})
+    partner = attrs.get("with_name", "unknown agent")
+    ptid = attrs.get("with_track_id")
+    who = f"{partner} (track {ptid})" if ptid is not None else str(partner)
+    if attrs.get("role") == "partner" or role != "ego":
+        target = f" {who}"
+    else:
+        target = f" with {who}"
+
+    loc = f"on road {act['road_id']}, lane {act['lane_id']}"
+    ex, ey = attrs.get("ego_x"), attrs.get("ego_y")
+    px, py = attrs.get("partner_x"), attrs.get("partner_y")
+    if role == "ego" and ex is not None and ey is not None:
+        loc += f" at (x={ex}, y={ey})"
+    elif px is not None and py is not None:
+        loc += f" at (x={px}, y={py})"
+
+    speeds = []
+    if attrs.get("ego_speed_mps") is not None:
+        speeds.append(f"ego {attrs['ego_speed_mps']} m/s")
+    if attrs.get("partner_speed_mps") is not None:
+        speeds.append(f"partner {attrs['partner_speed_mps']} m/s")
+    speed_txt = f" — {', '.join(speeds)}" if speeds else ""
+    clearance = ""
+    if attrs.get("min_clearance_m") is not None:
+        clearance = f" (clearance {attrs['min_clearance_m']} m)"
+    return f"  {when}: {phrase}{target} {loc}{speed_txt}{clearance}"
 
 
 def _partner_label(iv: Dict) -> str:

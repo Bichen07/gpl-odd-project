@@ -29,6 +29,7 @@ class EgoAction(str, Enum):
     GO_STRAIGHT = "GO_STRAIGHT"        # xosc_gen "go_straight" (through a junction)
     EMERGENCY_BRAKE = "EMERGENCY_BRAKE"
     STOPPED = "STOPPED"
+    COLLISION = "COLLISION"            # instantaneous contact with another agent
 
 
 class NpcAction(str, Enum):

@@ -428,7 +428,7 @@ def medoids_to_process_list(
 
 
 def interpretation_to_dict(interp: Any) -> Dict[str, Any]:
-    return {
+    d: Dict[str, Any] = {
         "cluster_id": interp.cluster_id,
         "cluster_label": interp.cluster_label,
         "confidence": interp.confidence,
@@ -439,6 +439,11 @@ def interpretation_to_dict(interp: Any) -> Dict[str, Any]:
         "token_usage": interp.token_usage,
         "raw_yaml": interp.raw_yaml,
     }
+    if getattr(interp, "intra_consistency_score", None) is not None:
+        d["intra_consistency_score"] = interp.intra_consistency_score
+    if getattr(interp, "intra_notes", None) is not None:
+        d["intra_notes"] = interp.intra_notes
+    return d
 
 
 def write_stub_interpretation(
@@ -621,6 +626,26 @@ def interpret_cluster_dir(
     crit_time = critical_time_from_action_log(action_log)
     if crit_time is not None:
         cluster_stats["medoid_critical_time"] = crit_time
+
+    # Intra-cluster variance (Phase A) — read from cluster.json and pass to formatter.
+    iv = stats.get("intra_variance") or {}
+    if not iv and cluster_json_path.is_file():
+        doc = json.loads(cluster_json_path.read_text(encoding="utf-8"))
+        iv = doc.get("cluster", {}).get("intra_variance") or {}
+    if iv:
+        cluster_stats["intra_variance"] = iv
+        # Load outlier description from the generated sub-directory (Phase I).
+        outlier_ids = iv.get("outlier_trial_ids", [])
+        if outlier_ids:
+            outlier_desc_text = ""
+            outlier_trials_dir = cluster_dir / "outlier_trials"
+            for sub in sorted(outlier_trials_dir.glob("trial_*")) if outlier_trials_dir.is_dir() else []:
+                desc_f = sub / "description.txt"
+                if desc_f.is_file():
+                    outlier_desc_text = desc_f.read_text(encoding="utf-8").strip()
+                    break
+            if outlier_desc_text:
+                cluster_stats["outlier_description"] = outlier_desc_text
 
     # Explicit user selection of snapshots wins; otherwise auto-collect (with
     # optional even subsampling). Selection entries may be bare file names

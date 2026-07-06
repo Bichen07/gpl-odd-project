@@ -224,6 +224,12 @@ def extract_action_timestamps_gpl(
             if st is None:
                 continue
             st, et = float(st), float(et)
+            attrs = action.get("attributes") or {}
+            if name == "COLLISION":
+                partner = attrs.get("with_name")
+                suffix = f" with {partner}" if partner else ""
+                raw.append((st, f"{token} {name}{suffix}"))
+                continue
             if et - st > 1e-6:  # interval action → label both boundaries
                 raw.append((st, f"{token} start {name}"))
                 raw.append((et, f"{token} end {name}"))

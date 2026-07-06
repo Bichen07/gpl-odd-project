@@ -878,15 +878,140 @@ def compute_medoids(
     return medoids
 
 
+def compute_intra_variance_and_boundaries(
+    embeddings_data: Dict[str, Any],
+    result_data: Dict[str, Any],
+    trial_index_map: Optional[Dict[str, Tuple[int, int]]] = None,
+    collision_flags: Optional[Dict[str, bool]] = None,
+    n_outliers: int = 3,
+) -> Tuple[Dict[str, Dict[str, Any]], List[Dict[str, Any]]]:
+    """Compute per-cluster intra variance metrics and cross-cluster boundary pairs.
+
+    Returns:
+        intra_by_cluster: label_str → {mean_dist_to_medoid, std_dist_to_medoid,
+                                        max_dist_to_medoid, outlier_trial_ids,
+                                        outlier_collision, boundary_neighbors, n_members}
+        boundary_pairs:   sorted list of {cluster_a, trial_a, …, cluster_b, trial_b,
+                                           …, embedding_dist} dicts (closest first)
+    """
+    embeddings_dict = embeddings_data.get("embeddings", {})
+    assignments = result_data.get("data", {})
+
+    if not embeddings_dict or not assignments:
+        return {}, []
+
+    trial_ids_list: List[str] = []
+    embeds: List[List[float]] = []
+    label_list: List[int] = []
+
+    for tid, item in assignments.items():
+        if tid not in embeddings_dict:
+            continue
+        trial_ids_list.append(tid)
+        embeds.append(embeddings_dict[tid])
+        raw = item if isinstance(item, str) else item.get("label", str(item))
+        try:
+            label_list.append(int(raw))
+        except (ValueError, TypeError):
+            label_list.append(-1)
+
+    if not trial_ids_list:
+        return {}, []
+
+    trial_ids_arr = np.array(trial_ids_list)
+    X = np.array(embeds, dtype=np.float64)
+    labels_arr = np.array(label_list, dtype=int)
+    unique_labels = sorted(set(label_list) - {-1})
+
+    cluster_centroids: Dict[int, np.ndarray] = {}
+    intra_by_cluster: Dict[str, Dict[str, Any]] = {}
+
+    for label in unique_labels:
+        mask = labels_arr == label
+        X_cl = X[mask]
+        ids_cl = trial_ids_arr[mask]
+        centroid = X_cl.mean(axis=0)
+        dists = np.linalg.norm(X_cl - centroid, axis=1)
+        cluster_centroids[label] = centroid
+
+        # outliers = furthest from centroid (most "atypical")
+        order_desc = np.argsort(dists)[::-1]
+        top_n = min(n_outliers, len(order_desc))
+        outlier_ids = [str(ids_cl[i]) for i in order_desc[:top_n]]
+        outlier_coll = [
+            bool((collision_flags or {}).get(str(ids_cl[i]), False))
+            for i in order_desc[:top_n]
+        ]
+
+        intra_by_cluster[str(label)] = {
+            "mean_dist_to_medoid": round(float(np.mean(dists)), 4),
+            "std_dist_to_medoid": round(float(np.std(dists)), 4),
+            "max_dist_to_medoid": round(float(np.max(dists)), 4),
+            "outlier_trial_ids": outlier_ids,
+            "outlier_collision": outlier_coll,
+            "boundary_neighbors": {},
+            "n_members": int(mask.sum()),
+        }
+
+    # Cross-cluster boundary pairs: for each (A, B) find the nearest trial pair
+    # across the cluster boundary (smallest L2 distance in embedding space).
+    boundary_pairs: List[Dict[str, Any]] = []
+    processed: set = set()
+
+    for a in unique_labels:
+        X_a = X[labels_arr == a]
+        ids_a = trial_ids_arr[labels_arr == a]
+        for b in unique_labels:
+            if b <= a or (a, b) in processed:
+                continue
+            processed.add((a, b))
+            X_b = X[labels_arr == b]
+            ids_b = trial_ids_arr[labels_arr == b]
+
+            # (na, nb) pairwise distance matrix
+            diff = X_a[:, np.newaxis, :] - X_b[np.newaxis, :, :]
+            pdists = np.linalg.norm(diff, axis=2)
+            ia, ib = np.unravel_index(int(np.argmin(pdists)), pdists.shape)
+            min_dist = float(pdists[ia, ib])
+
+            ta, tb = str(ids_a[ia]), str(ids_b[ib])
+            coll_a = bool((collision_flags or {}).get(ta, False))
+            coll_b = bool((collision_flags or {}).get(tb, False))
+            dist_a = round(float(np.linalg.norm(X_a[ia] - cluster_centroids[a])), 4)
+            dist_b = round(float(np.linalg.norm(X_b[ib] - cluster_centroids[b])), 4)
+
+            boundary_pairs.append({
+                "cluster_a": a,
+                "trial_a": ta,
+                "dist_a_to_centroid": dist_a,
+                "collided_a": coll_a,
+                "cluster_b": b,
+                "trial_b": tb,
+                "dist_b_to_centroid": dist_b,
+                "collided_b": coll_b,
+                "embedding_dist": round(min_dist, 4),
+            })
+            intra_by_cluster[str(a)]["boundary_neighbors"][str(b)] = ta
+            intra_by_cluster[str(b)]["boundary_neighbors"][str(a)] = tb
+
+    boundary_pairs.sort(key=lambda p: p["embedding_dist"])
+
+    n_bp = len(boundary_pairs)
+    print(f"  📐 Intra-variance computed for {len(unique_labels)} clusters, "
+          f"{n_bp} boundary pair(s)")
+    return intra_by_cluster, boundary_pairs
+
+
 def build_run_manifest(
     dataset: str,
     n_clusters: int,
     medoids: List[Dict[str, Any]],
     run_id: str,
     batch_id: Optional[int] = None,
+    boundary_pairs: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Create the top-level manifest.json for this run."""
-    return {
+    manifest: Dict[str, Any] = {
         "run_id": run_id,
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "dataset": dataset,
@@ -904,6 +1029,9 @@ def build_run_manifest(
             for m in medoids
         ],
     }
+    if boundary_pairs is not None:
+        manifest["boundary_pairs"] = boundary_pairs
+    return manifest
 
 
 def _df_to_observations(df: "pd.DataFrame") -> List[Dict[str, Any]]:
@@ -1112,6 +1240,7 @@ def process_medoid(
     trials_meta: Optional[Dict[str, Any]] = None,
     contact_clearance_m: float = 0.5,
     conflict_relevance_m: float = 5.0,
+    intra_variance: Optional[Dict[str, Any]] = None,
 ) -> bool:
     """Process a single medoid trial: generate all required files.
     
@@ -1299,20 +1428,23 @@ def process_medoid(
         }
         if collision_doc:
             medoid_block["collision"] = collision_doc
+        cluster_blk: Dict[str, Any] = {
+            "label": label,
+            "size": medoid["size"],
+            "n_trials": cc.get("n_trials", medoid["size"]),
+            "n_clusters": n_clusters,
+            "silhouette": round(float(silhouette), 4) if silhouette is not None else None,
+            "collision_count": cc.get("collision_count"),
+            "collision_rate": cc.get("collision_rate"),
+            "mean_ttc": cc.get("mean_ttc"),
+            "min_ttc": cc.get("min_ttc"),
+            "mean_spret": cc.get("mean_spret"),
+            "parameter_ranges": cc.get("parameter_ranges") or {},
+        }
+        if intra_variance is not None:
+            cluster_blk["intra_variance"] = intra_variance
         cluster_doc = {
-            "cluster": {
-                "label": label,
-                "size": medoid["size"],
-                "n_trials": cc.get("n_trials", medoid["size"]),
-                "n_clusters": n_clusters,
-                "silhouette": round(float(silhouette), 4) if silhouette is not None else None,
-                "collision_count": cc.get("collision_count"),
-                "collision_rate": cc.get("collision_rate"),
-                "mean_ttc": cc.get("mean_ttc"),
-                "min_ttc": cc.get("min_ttc"),
-                "mean_spret": cc.get("mean_spret"),
-                "parameter_ranges": cc.get("parameter_ranges") or {},
-            },
+            "cluster": cluster_blk,
             "medoid": medoid_block,
             "scene": {
                 "dataset": "gpl-odd-simulated",
@@ -1356,6 +1488,257 @@ def process_medoid(
     
     print(f"  ✅ Cluster {label} processing complete")
     return True
+
+
+def process_trial_to_dir(
+    batch_id: int,
+    trial_index: int,
+    trial_id: str,
+    out_dir: Path,
+    xodr_path: Path,
+    parser_xodr: XodrParser,
+    dataset_name: str = "dataset1",
+    snapshot_output_px: int = 1024,
+    snapshot_border_frac: float = 0.10,
+    typography=None,
+    key_frame_mode: str = "action",
+    max_snapshots: Optional[int] = None,
+    semantic_only: bool = False,
+    collided: bool = False,
+    trial_events: Optional[Any] = None,
+    ego_zoom_radius: float = 30.0,
+    contact_clearance_m: float = 0.5,
+    conflict_relevance_m: float = 5.0,
+) -> bool:
+    """Generate action.yaml + description.txt + BEV snapshots for one trial.
+
+    Mirrors the core of ``process_medoid`` but writes only the per-trial artifacts
+    (no cluster.json / context.md) to *out_dir*.  Used for outlier and boundary
+    trials under ``cluster<N>/outlier_trials/`` and ``cluster<N>/boundary_c<M>/``.
+    """
+    from map_plotter import DEFAULT_BEV_TYPOGRAPHY
+
+    if typography is None:
+        typography = DEFAULT_BEV_TYPOGRAPHY
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    if not csv_exists(batch_id, trial_index):
+        print(f"    ❌ CSV missing for batch {batch_id} trial {trial_index} — skipped")
+        return False
+
+    df = get_csv_road_data(batch_id, trial_index)
+    if df is None or df.empty:
+        print(f"    ❌ Failed to load CSV for batch {batch_id} trial {trial_index}")
+        return False
+
+    try:
+        observations = _df_to_observations(df)
+    except Exception as e:
+        print(f"    ❌ DataFrame conversion failed: {e}")
+        return False
+
+    trajectory_path = out_dir / "trajectory.csv"
+    meta_path = out_dir / "meta.yaml"
+    location_for_meta = Path(xodr_path).stem
+
+    try:
+        registry = build_trajectory_csv(observations, parser_xodr, trajectory_path)
+        build_meta_yaml(
+            registry, observations, meta_path,
+            dataset="gpl-odd-simulated", location=location_for_meta,
+        )
+    except Exception as e:
+        print(f"    ❌ trajectory/meta build failed: {e}")
+        return False
+
+    from pipeline_imports import ensure_llm_pipeline
+    ensure_llm_pipeline()
+    from llm_pipeline.cluster_stats import trial_collision_flag
+
+    action_data = None
+    try:
+        from labeller import label_trajectory, save_action_yaml
+        from description import build_description, save_description_txt
+
+        map_yaml = (
+            Path(xodr_path).parent.parent / "map" / f"{location_for_meta}.yaml"
+        )
+        action_data = label_trajectory(
+            trajectory_path, meta_path,
+            map_yaml if map_yaml.is_file() else None,
+            esmini_df=df,
+            trial_events=trial_events,
+            collided=collided,
+            contact_clearance_m=contact_clearance_m,
+            conflict_relevance_m=conflict_relevance_m,
+        )
+        save_action_yaml(action_data, out_dir / "action.yaml")
+        save_description_txt(build_description(action_data), out_dir / "description.txt")
+    except Exception as e:
+        print(f"    ⚠️  Action/description failed: {e}")
+
+    snapshots_dir = out_dir / "snapshots"
+    try:
+        from tier2_renderer import (
+            Tier2BevRenderer,
+            infer_collision_timestep,
+            resolve_tier2_paths,
+        )
+        import yaml as _yaml
+
+        _xodr, map_tracks, location = resolve_tier2_paths(dataset_name)
+        if map_tracks.is_file():
+            collision_ts = None
+            if collided:
+                with open(meta_path) as mf:
+                    meta_for_col = _yaml.safe_load(mf) or {}
+                collision_ts = infer_collision_timestep(
+                    df, meta_agents=meta_for_col.get("agents", []),
+                    trial_events=trial_events, collided=True,
+                )
+
+            tier2 = Tier2BevRenderer(
+                str(map_tracks),
+                str(xodr_path if xodr_path.is_file() else _xodr),
+                location=location,
+                dataset_name=dataset_name,
+                snapshot_output_px=snapshot_output_px,
+                snapshot_border_frac=snapshot_border_frac,
+                typography=typography,
+                ego_zoom_radius=ego_zoom_radius,
+            )
+            action_yaml_path = out_dir / "action.yaml"
+            snaps = tier2.render_trial_from_esmini_csv(
+                batch_id, trial_index,
+                str(snapshots_dir),
+                n_snapshots=max_snapshots,
+                file_prefix=f"trial_{trial_index}",
+                overview_dir=None,
+                action_yaml_path=str(action_yaml_path) if action_yaml_path.is_file() else None,
+                key_frame_mode=key_frame_mode,
+                semantic_only=semantic_only,
+                collision_timestep=collision_ts,
+                collision_trial=collided,
+            )
+            print(f"    ✓ {len(snaps)} BEV snapshots")
+    except Exception as e:
+        print(f"    ⚠️  BEV generation failed: {e}")
+
+    try:
+        meta_path.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+    del df
+    return True
+
+
+def process_auxiliary_trials(
+    run_dir: Path,
+    intra_by_cluster: Dict[str, Dict[str, Any]],
+    boundary_pairs: List[Dict[str, Any]],
+    trial_index_map: Dict[str, Tuple[int, int]],
+    collision_flags: Optional[Dict[str, bool]],
+    trials_meta: Optional[Dict[str, Any]],
+    xodr_path: Path,
+    parser_xodr: XodrParser,
+    dataset_name: str = "dataset1",
+    snapshot_output_px: int = 1024,
+    snapshot_border_frac: float = 0.10,
+    typography=None,
+    key_frame_mode: str = "action",
+    max_snapshots: Optional[int] = None,
+    semantic_only: bool = False,
+    ego_zoom_radius: float = 30.0,
+    contact_clearance_m: float = 0.5,
+    conflict_relevance_m: float = 5.0,
+) -> None:
+    """Build full trial artifacts for outlier and boundary trials.
+
+    Outlier → ``cluster<N>/outlier_trials/trial_<id>/``
+    Boundary → ``cluster<N>/boundary_c<M>/trial_<id>/``
+    """
+    def _resolve(tid: str) -> Tuple[Optional[int], Optional[int]]:
+        bi = trial_index_map.get(str(tid))
+        return (bi[0], bi[1]) if bi else (None, None)
+
+    def _trial_events(tid: str):
+        info = (trials_meta or {}).get(str(tid))
+        return info.get("events") if isinstance(info, dict) else None
+
+    # --- outlier trials ---
+    for label_str, iv in intra_by_cluster.items():
+        outlier_ids = iv.get("outlier_trial_ids", [])
+        if not outlier_ids:
+            continue
+        top_tid = str(outlier_ids[0])
+        b, ti = _resolve(top_tid)
+        if b is None:
+            print(f"  ⚠️  Outlier trial {top_tid} not in index map — skipped")
+            continue
+        collided = bool((collision_flags or {}).get(top_tid, False))
+        out_dir = run_dir / f"cluster{label_str}" / "outlier_trials" / f"trial_{ti}"
+        print(f"  🔸 Outlier cluster {label_str}: trial {top_tid} (batch {b}, idx {ti})"
+              f"{' COLLISION' if collided else ''}")
+        process_trial_to_dir(
+            b, ti, top_tid, out_dir, xodr_path, parser_xodr,
+            dataset_name=dataset_name,
+            snapshot_output_px=snapshot_output_px,
+            snapshot_border_frac=snapshot_border_frac,
+            typography=typography,
+            key_frame_mode=key_frame_mode,
+            max_snapshots=max_snapshots,
+            semantic_only=semantic_only,
+            collided=collided,
+            trial_events=_trial_events(top_tid),
+            ego_zoom_radius=ego_zoom_radius,
+            contact_clearance_m=contact_clearance_m,
+            conflict_relevance_m=conflict_relevance_m,
+        )
+
+    # --- boundary trials ---
+    processed_boundary: set = set()
+    for bp in boundary_pairs:
+        ca, ta = bp["cluster_a"], bp["trial_a"]
+        cb, tb = bp["cluster_b"], bp["trial_b"]
+
+        for (src_label, tgt_label, tid) in [(ca, cb, ta), (cb, ca, tb)]:
+            key = (src_label, tgt_label, str(tid))
+            if key in processed_boundary:
+                continue
+            processed_boundary.add(key)
+            b, ti = _resolve(str(tid))
+            if b is None:
+                print(f"  ⚠️  Boundary trial {tid} not in index map — skipped")
+                continue
+            collided = bool((collision_flags or {}).get(str(tid), False))
+            out_dir = (
+                run_dir
+                / f"cluster{src_label}"
+                / f"boundary_c{tgt_label}"
+                / f"trial_{ti}"
+            )
+            print(
+                f"  🔹 Boundary c{src_label}↔c{tgt_label}: trial {tid} "
+                f"(batch {b}, idx {ti}, emb_dist={bp['embedding_dist']:.3f})"
+                f"{' COLLISION' if collided else ''}"
+            )
+            process_trial_to_dir(
+                b, ti, str(tid), out_dir, xodr_path, parser_xodr,
+                dataset_name=dataset_name,
+                snapshot_output_px=snapshot_output_px,
+                snapshot_border_frac=snapshot_border_frac,
+                typography=typography,
+                key_frame_mode=key_frame_mode,
+                max_snapshots=max_snapshots,
+                semantic_only=semantic_only,
+                collided=collided,
+                trial_events=_trial_events(str(tid)),
+                ego_zoom_radius=ego_zoom_radius,
+                contact_clearance_m=contact_clearance_m,
+                conflict_relevance_m=conflict_relevance_m,
+            )
 
 
 def main():
@@ -1645,6 +2028,7 @@ def main():
     print(f"   Run ID: {run_id}")
 
     result_data: Optional[Dict[str, Any]] = None
+    embeddings_data: Optional[Dict[str, Any]] = None
     trial_index_map: Optional[Dict[str, Tuple[int, int]]] = None
     payload_collision_flags: Optional[Dict[str, bool]] = None
     payload_metric_stats: Dict[str, Dict[str, Any]] = {}
@@ -1899,6 +2283,20 @@ def main():
                 f"({cs['collision_count']}/{cs['n_trials']} trials){extra}"
             )
 
+    # --- Intra-cluster variance + cross-cluster boundary detection (Phase A/H) ---
+    intra_by_cluster: Dict[str, Dict[str, Any]] = {}
+    boundary_pairs_data: List[Dict[str, Any]] = []
+    if result_data is not None and embeddings_data is not None:
+        try:
+            intra_by_cluster, boundary_pairs_data = compute_intra_variance_and_boundaries(
+                embeddings_data,
+                result_data,
+                trial_index_map=trial_index_map,
+                collision_flags=collision_flags,
+            )
+        except Exception as exc:
+            print(f"  ⚠️  Intra-variance/boundary computation failed: {exc}")
+
     # --- Step 6: Process each medoid ---
     success_count = 0
     for medoid in medoids:
@@ -1922,6 +2320,7 @@ def main():
             trials_meta=trials_meta,
             contact_clearance_m=args.contact_clearance_m,
             conflict_relevance_m=args.conflict_relevance_m,
+            intra_variance=intra_by_cluster.get(medoid["cluster_label"]),
         ):
             success_count += 1
 
@@ -1940,11 +2339,51 @@ def main():
             except Exception as e:
                 print(f"  ⚠️  Trajectory overlay failed: {e}")
 
-    # --- Step 7: Create manifest ---
-    manifest = build_run_manifest(dataset_name, n_clusters, medoids, run_id, batch_id=batch_id_out)
+    # --- Step 7a: Auxiliary trials (outlier + boundary) ---
+    if trial_index_map and (intra_by_cluster or boundary_pairs_data):
+        print("\n🔸 Processing auxiliary trials (outlier + boundary)…")
+        try:
+            process_auxiliary_trials(
+                run_dir=run_dir,
+                intra_by_cluster=intra_by_cluster,
+                boundary_pairs=boundary_pairs_data,
+                trial_index_map=trial_index_map,
+                collision_flags=collision_flags,
+                trials_meta=trials_meta,
+                xodr_path=xodr_path,
+                parser_xodr=parser_xodr,
+                dataset_name=dataset_name,
+                snapshot_output_px=args.snapshot_size,
+                snapshot_border_frac=args.snapshot_border_frac,
+                typography=bev_typography,
+                key_frame_mode=args.key_frame_mode,
+                max_snapshots=args.max_snapshots,
+                semantic_only=args.semantic_only,
+                ego_zoom_radius=args.ego_zoom_radius,
+                contact_clearance_m=args.contact_clearance_m,
+                conflict_relevance_m=args.conflict_relevance_m,
+            )
+        except Exception as exc:
+            print(f"  ⚠️  Auxiliary trial processing failed: {exc}")
+
+    # --- Step 7b: Create manifest ---
+    manifest = build_run_manifest(
+        dataset_name, n_clusters, medoids, run_id,
+        batch_id=batch_id_out,
+        boundary_pairs=boundary_pairs_data or None,
+    )
     manifest_path = run_dir / "manifest.json"
     with manifest_path.open("w") as f:
         json.dump(manifest, f, indent=2)
+
+    # --- Step 8: Rule-based clustering quality score (Phase D) ---
+    try:
+        from pipeline_imports import ensure_llm_pipeline
+        ensure_llm_pipeline()
+        from llm_pipeline.clustering_quality_scorer import score_run_dir
+        score_run_dir(run_dir)
+    except Exception as exc:
+        print(f"  ⚠️  Clustering quality scoring failed: {exc}")
 
     print(f"\n{'='*60}")
     print(f"✅ LLM dataset build complete!")

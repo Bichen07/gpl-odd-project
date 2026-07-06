@@ -10,6 +10,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   CircularProgress,
   MenuItem,
   Select,
@@ -29,6 +30,45 @@ import _ from "lodash";
 import { getClusterInfos } from "@/app/_shared/utils";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
 import { ExpandMore } from "@mui/icons-material";
+
+const SORT_LABELS: Record<string, string> = {
+  default: "Default (task order)",
+  silhouetteScore: "Silhouette",
+  calinskiHarabazScore: "Calinski–Harabasz",
+  relativeValidity: "Relative validity",
+  compositeScore: "Composite Score ★",
+};
+
+interface CompositeScoreEntry {
+  final_score: number;
+  rule_score: number;
+  llm_score: number | null;
+  rank: number;
+  has_llm_eval: boolean;
+  folder: string;
+}
+
+function clusterCountFromInfo(info: ClusterInfo | undefined): number {
+  if (!info) {
+    return 0;
+  }
+  const keys = Object.keys(info);
+  return "-1" in info ? keys.length - 1 : keys.length;
+}
+
+function formatSortTooltip(
+  sortBy: string | null,
+  scores: ClusteringResult["scores"] | undefined
+): string {
+  if (!sortBy || sortBy === "default") {
+    return "Pipeline order (HDBSCAN task index)";
+  }
+  const value = scores?.[sortBy];
+  if (value == null || Number.isNaN(Number(value))) {
+    return `${SORT_LABELS[sortBy] ?? sortBy}: n/a`;
+  }
+  return `${SORT_LABELS[sortBy] ?? sortBy}: ${Number(value).toFixed(4)}`;
+}
 
 export default function PerEgoSelection({
   egoName = "ITRI",
@@ -87,7 +127,77 @@ export default function PerEgoSelection({
   const [noiseRatioMapping, setNoiseRatioMapping] = useState<{
     [index: number]: number;
   }>({});
-  const [clusterCounts, setClusterCounts] = useState(1);
+  const [clusterCounts, setClusterCounts] = useState(-1);
+
+  // Composite quality scores from /api/cluster-evaluate
+  const [compositeScores, setCompositeScores] = useState<
+    Record<string, CompositeScoreEntry>
+  >({});
+
+  const batchId = Array.isArray(routeParams?.id)
+    ? routeParams?.id[0]
+    : routeParams?.id;
+
+  useEffect(() => {
+    if (!batchId) return;
+    fetch(`/api/cluster-evaluate?batchId=${batchId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const map: Record<string, CompositeScoreEntry> = {};
+        for (const c of data.configs ?? []) {
+          map[c.folder] = c as CompositeScoreEntry;
+        }
+        setCompositeScores(map);
+      })
+      .catch(() => {/* best-effort */});
+  }, [batchId]);
+
+  // Build folder key for a clustering result: "<k>_cluster_s=<sil>"
+  const resultFolderKey = useCallback(
+    (result: ClusteringResult, resultIndex: number): string => {
+      const sil = (result.scores as Record<string, number> | undefined)
+        ?.silhouetteScore;
+      const k =
+        infos[resultIndex] != null
+          ? clusterCountFromInfo(infos[resultIndex])
+          : 0;
+      if (k < 1 || sil == null) return "";
+      return `${k}_cluster_s=${sil.toFixed(4)}`;
+    },
+    [infos]
+  );
+
+  const scoreKeys = useMemo(() => {
+    const fromScores = Object.keys(
+      trajectoryAnalysis?.mfpca["full"]?.clustering[0]?.scores ?? {}
+    ).filter((v) => !v.includes("davies"));
+    const base = ["default", ...fromScores];
+    if (Object.keys(compositeScores).length > 0 && !base.includes("compositeScore")) {
+      base.push("compositeScore");
+    }
+    return base;
+  }, [trajectoryAnalysis, compositeScores]);
+
+  const availableClusterCounts = useMemo(() => {
+    const fromApi = mfpca?.availableClusterCounts;
+    if (fromApi != null && fromApi.length > 0) {
+      return [-1, ...fromApi];
+    }
+    const counts = new Set<number>();
+    for (let index = 0; index < (results?.length ?? 0); index++) {
+      const k = clusterCountFromInfo(infos[index]);
+      if (k >= 1) {
+        counts.add(k);
+      }
+    }
+    return [-1, ...Array.from(counts).sort((a, b) => a - b)];
+  }, [mfpca?.availableClusterCounts, results, infos]);
+
+  useEffect(() => {
+    if (!availableClusterCounts.includes(clusterCounts)) {
+      setClusterCounts(availableClusterCounts[0] ?? -1);
+    }
+  }, [availableClusterCounts, clusterCounts]);
 
   useEffect(() => {
     if (trajectoryAnalysis == null) {
@@ -184,7 +294,7 @@ export default function PerEgoSelection({
   }, [clusterInfos, durationMode]);
 
   const sortedResults = useMemo(() => {
-    if (clusterCounts == 1) {
+    if (clusterCounts === 1) {
       return [];
     }
     const temp = [...(results ?? [])]
@@ -214,6 +324,15 @@ export default function PerEgoSelection({
         if (sortBy === "default") {
           return 0;
         }
+        if (sortBy === "compositeScore") {
+          const idxA = results?.findIndex((v) => v === a) ?? -1;
+          const idxB = results?.findIndex((v) => v === b) ?? -1;
+          const keyA = idxA >= 0 ? resultFolderKey(a, idxA) : "";
+          const keyB = idxB >= 0 ? resultFolderKey(b, idxB) : "";
+          const scoreA = compositeScores[keyA]?.final_score ?? -Infinity;
+          const scoreB = compositeScores[keyB]?.final_score ?? -Infinity;
+          return scoreB - scoreA;
+        }
         let aV =
           a.scores == null || a.scores[sortBy] == null
             ? -Infinity
@@ -234,6 +353,9 @@ export default function PerEgoSelection({
     clusterCounts,
     duplicatedFilterRatio,
     noiseFilterRatio,
+    infos,
+    compositeScores,
+    resultFolderKey,
   ]);
 
   useEffect(() => {
@@ -370,23 +492,16 @@ export default function PerEgoSelection({
               <Select
                 sx={{ p: 0 }}
                 size="small"
-                value={sortBy}
+                value={sortBy ?? "silhouetteScore"}
                 onChange={(event) => {
                   setSortBy(event.target.value);
                 }}
               >
-                {[
-                  "default",
-                  ...Object.keys(
-                    trajectoryAnalysis.mfpca["full"].clustering[0]?.scores ?? {}
-                  ).filter((v) => !v.includes("davies")),
-                ].map((key, index) => {
-                  return (
-                    <MenuItem key={key} value={key ?? ""}>
-                      {key ?? "unknown"}
-                    </MenuItem>
-                  );
-                })}
+                {scoreKeys.map((key) => (
+                  <MenuItem key={key} value={key}>
+                    {SORT_LABELS[key] ?? key}
+                  </MenuItem>
+                ))}
               </Select>
             </Stack>
             <Stack
@@ -463,16 +578,14 @@ export default function PerEgoSelection({
                 size="small"
                 value={clusterCounts}
                 onChange={(event) => {
-                  setClusterCounts(Number(event.target.value ?? 1));
+                  setClusterCounts(Number(event.target.value ?? -1));
                 }}
               >
-                {[-1, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((key, index) => {
-                  return (
-                    <MenuItem key={index} value={key}>
-                      {key === -1 ? "all" : key}
-                    </MenuItem>
-                  );
-                })}
+                {availableClusterCounts.map((key) => (
+                  <MenuItem key={key} value={key}>
+                    {key === -1 ? "all" : key}
+                  </MenuItem>
+                ))}
               </Select>
             </Stack>
           </Stack>
@@ -716,9 +829,10 @@ export default function PerEgoSelection({
                       {
                         <Stack sx={{ marginTop: "10px" }}>
                           <Typography>
-                            {`${sortBy}: ${sortedResults[i].scores[
-                              sortBy ?? ""
-                            ].toFixed(4)}`}
+                            {formatSortTooltip(
+                              sortBy,
+                              sortedResults[i]?.scores
+                            )}
                           </Typography>
                         </Stack>
                       }
@@ -773,6 +887,33 @@ export default function PerEgoSelection({
                     ))}
                   </Stack>
                 </Tooltip>
+                {/* Composite score chip + rank badge */}
+                {(() => {
+                  const key = resultFolderKey(result, index);
+                  const cs = compositeScores[key];
+                  if (!cs) return null;
+                  const tooltip = cs.has_llm_eval
+                    ? `Rule: ${cs.rule_score?.toFixed(1)} | LLM: ${cs.llm_score?.toFixed(1)} | Final: ${cs.final_score?.toFixed(1)}`
+                    : `Rule-based score: ${cs.rule_score?.toFixed(1)} (LLM eval pending)`;
+                  return (
+                    <Tooltip title={tooltip}>
+                      <Stack direction="row" alignItems="center" gap={0.5} sx={{ ml: 0.5 }}>
+                        <Chip
+                          label={`${cs.final_score?.toFixed(1)} ★`}
+                          size="small"
+                          color={cs.has_llm_eval ? "primary" : "default"}
+                          sx={{ fontSize: "11px", height: "20px" }}
+                        />
+                        <Chip
+                          label={`#${cs.rank}`}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: "11px", height: "20px" }}
+                        />
+                      </Stack>
+                    </Tooltip>
+                  );
+                })()}
                 {/* <Tooltip */}
                 {/*   followCursor */}
                 {/*   title={ */}

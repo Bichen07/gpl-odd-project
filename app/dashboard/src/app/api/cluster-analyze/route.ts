@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  selectDefaultSnapshots,
+  snapshotTimestamp,
+} from "@/app/_shared/utils/snapshotSelection";
 
 /**
  * Config + image server for the "Select and analyze" page.
@@ -41,11 +45,6 @@ const MODELS = [
   { id: "gpt-4-turbo", provider: "OpenAI" },
 ];
 
-function snapshotTimestamp(name: string): number {
-  const m = name.match(/_t_(\d+(?:\.\d+)?)/i);
-  return m ? parseFloat(m[1]) : 0;
-}
-
 // results/batch<id>/<k>_cluster_s=<sil>/ — exact match, else closest silhouette.
 function resolveFolder(batchDir: string, k: string, s: string): string | null {
   if (!fs.existsSync(batchDir)) return null;
@@ -77,6 +76,31 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "valid batchId required" }, { status: 400 });
   }
   const batchDir = path.join(projectRoot, "results", `batch${batchId}`);
+
+  // --- boundary description mode ---
+  const boundaryDesc = url.searchParams.get("boundaryDesc");
+  if (boundaryDesc) {
+    const cluster = url.searchParams.get("cluster") ?? "";
+    const batchFolder = url.searchParams.get("batchFolder") ?? "";
+    const boundaryWith = url.searchParams.get("boundaryWith") ?? "";
+    if (!/^\d+$/.test(cluster) || !batchFolder || !/^\d+$/.test(boundaryWith)) {
+      return NextResponse.json({ error: "invalid boundary request" }, { status: 400 });
+    }
+    const boundaryDir = path.join(
+      batchDir, batchFolder, `cluster${cluster}`, `boundary_c${boundaryWith}`
+    );
+    if (!fs.existsSync(boundaryDir)) {
+      return new NextResponse("(no boundary data generated)", { headers: { "Content-Type": "text/plain" } });
+    }
+    const subs = fs.readdirSync(boundaryDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && e.name.startsWith("trial_"));
+    if (subs.length === 0) {
+      return new NextResponse("(no trial sub-directory)", { headers: { "Content-Type": "text/plain" } });
+    }
+    const descPath = path.join(boundaryDir, subs[0].name, "description.txt");
+    const text = fs.existsSync(descPath) ? fs.readFileSync(descPath, "utf-8") : "(description.txt not found)";
+    return new NextResponse(text, { headers: { "Content-Type": "text/plain" } });
+  }
 
   // --- image mode ---
   const file = url.searchParams.get("file");
@@ -121,7 +145,9 @@ export async function GET(req: NextRequest) {
     cluster: number;
     stats: unknown;
     medoid: unknown;
+    intraVariance: unknown;
     snapshots: string[];
+    defaultSnapshots: string[];
   }> = [];
   for (const entry of fs.readdirSync(runDir, { withFileTypes: true })) {
     const m = entry.isDirectory() ? entry.name.match(/^cluster(\d+)$/) : null;
@@ -129,12 +155,14 @@ export async function GET(req: NextRequest) {
     const clusterDir = path.join(runDir, entry.name);
     let stats: unknown = null;
     let medoid: unknown = null;
+    let intraVariance: unknown = null;
     const cjPath = path.join(clusterDir, "cluster.json");
     if (fs.existsSync(cjPath)) {
       try {
         const doc = JSON.parse(fs.readFileSync(cjPath, "utf-8"));
         stats = doc.cluster ?? null;
         medoid = doc.medoid ?? null;
+        intraVariance = (doc.cluster as Record<string, unknown>)?.intra_variance ?? null;
       } catch {
         /* ignore malformed cluster.json */
       }
@@ -147,7 +175,18 @@ export async function GET(req: NextRequest) {
         .filter((f) => /\.(jpg|jpeg|png)$/i.test(f))
         .sort((a, b) => snapshotTimestamp(a) - snapshotTimestamp(b));
     }
-    clusters.push({ cluster: parseInt(m[1], 10), stats, medoid, snapshots });
+    clusters.push({
+      cluster: parseInt(m[1], 10),
+      stats,
+      medoid,
+      intraVariance,
+      snapshots,
+      defaultSnapshots: selectDefaultSnapshots(
+        snapshots,
+        10,
+        medoid as Record<string, unknown> | null,
+      ),
+    });
   }
   clusters.sort((a, b) => a.cluster - b.cluster);
 

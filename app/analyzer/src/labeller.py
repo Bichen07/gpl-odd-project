@@ -535,6 +535,9 @@ def label_trajectory(
             contact_clearance_m=contact_clearance_m,
             conflict_relevance_m=conflict_relevance_m,
         )
+        from collision_partner import inject_collision_agent_actions
+
+        inject_collision_agent_actions(agents_out, interactions)
     else:
         track_to_name = {
             int(ag["track_id"]): str(ag.get("name", f"agent_{ag['track_id']}"))

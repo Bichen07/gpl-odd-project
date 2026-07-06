@@ -1,0 +1,1821 @@
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+1
+
+Behavior-Centric Visual Analytics for Scenario-Based
+Safety Evaluation of Autonomous Vehicles
+Shih-Yi Chiu, Wen-Chieh Lin, Yu-Shuen Wang, Chen-Hui Hu, Chieh-Chih Wang
+
+Abstract—Evaluating the safety of autonomous vehicles (AVs)
+requires testing across diverse conditions to characterize their
+Operational Design Domain (ODD) and its boundaries. Scenariobased testing has emerged as a key approach, yet interpreting
+its results remains challenging due to the complexity and scale
+of simulation data. We present a visual analytics framework for
+behavior-centric analysis of scenario-based AV testing, linking AV
+behaviors with scenario parameters (e.g., oncoming vehicle speed
+and start delay) to support interpretable safety assessment. By
+integrating dimensionality reduction, clustering, and coordinated
+visualizations, the framework reveals diverse interaction patterns
+and identifies safety-critical regions, such as collision boundaries and regions of high risk variation. We demonstrate the
+framework through three case studies—intersection navigation,
+overtaking, and multi-lane cut-ins—which illustrate its ability
+to uncover nuanced behavioral differences, analyze boundary
+conditions, and compare AV planning systems. Expert feedback
+indicates that the framework provides interpretable and actionable insights to support safety-oriented behavioral analysis in
+simulation-based AV testing workflows.
+Index Terms—Methods for safety, Data analytics and data
+science, Autonomous driving, Operational design domain
+
+I. I NTRODUCTION
+Autonomous vehicles (AVs) must demonstrate safe operation across diverse conditions within their Operational Design
+Domain (ODD) [1]. Scenario-based testing provides an effective approach to evaluate safety performance [2], [3] by defining a scenario parameter space that captures traffic situations
+through variable parameters (e.g., oncoming vehicle speed,
+start delay) [4]. Each point in this space instantiates a concrete
+scenario (hereafter, a scenario), corresponding to a specific test
+execution. Systematically varying these parameters enables the
+identification of safe, failure, and boundary scenarios using
+collision outcomes [3] or criticality metrics [5]. This paradigm
+supports coverage-driven testing of the ODD [6] and facilitates
+characterization of safety-critical boundaries [7]. Recent work
+further explores generating diverse and critical scenarios to
+improve test coverage and efficiency [6]–[12].
+Despite these advances, interpreting results from scenariobased testing remains challenging. Prior studies primarily
+report aggregated safety outcomes, such as criticality metrics
+Shih-Yi Chiu, Wen-Chieh Lin, and Yu-Shuen Wang are with the Department of Computer Science, National Yang Ming Chiao Tung University, Hsinchu, Taiwan. (e-mail: ianchiu41@gmail.com; wclin@cs.nycu.edu.tw;
+yushuen@nycu.edu.tw)
+Chen-Hui Hu is with the Mechanical and Mechatronics Systems Laboratories, Industrial Technology Research Institute, Hsinchu, Taiwan. (e-mail:
+chenhuihu@itri.org.tw)
+Chieh-Chih Wang is with the Department of Electronics and Electrical
+Engineering, National Yang Ming Chiao Tung University, and the Mechanical
+and Mechatronics Systems Laboratories, Industrial Technology Research
+Institute, Hsinchu, Taiwan. (e-mail: bobwang@ieee.org)
+
+and collisions [9]–[11], which provide limited insight into
+how AV behavior varies near safety-critical boundaries or
+under challenging conditions. This limitation becomes more
+pronounced as the number of sampled scenarios increases,
+making it difficult to systematically analyze behavior across
+diverse testing conditions.
+Visual analytics offers a promising approach to transform
+raw simulation data into interpretable representations. It supports understanding of AV behavior, anomaly detection, and
+safety analysis, helping stakeholders build trust in AV systems [13]. While automated behavior labeling could categorize
+vehicle interactions into coarse classes, it often overlooks
+the nuanced dynamics of multi-agent behavior. By keeping
+humans in the loop, visual analytics enables interactive exploration to validate safety performance and uncover subtle behavioral differences [13]. Beyond aggregate outcomes,
+analyzing interaction trajectories provides richer insight into
+how AVs respond to dynamic agents and varying scenario
+conditions.
+In this work, we present a visual analytics framework for
+behavior-centric analysis of scenario-based AV testing. The
+framework characterizes interaction trajectories, clusters recurrent behavioral patterns, and links these behaviors to scenario
+parameters and safety outcomes. It integrates coordinated,
+linked views that support filtering, comparison, and drill-down
+across multiple perspectives, enabling efficient exploration and
+deeper interpretation of AV behavior.
+We demonstrate the framework on the safety evaluation
+of the AV’s motion planning module, where vehicle actions
+and agent interactions are directly observable in trajectory
+data. Three case studies, including intersection navigation,
+overtaking, and multi-lane cut-ins, show how the framework
+reveals distinct behavioral patterns near safety-critical regions,
+such as collision boundaries and regions of high risk variation.
+These results suggest that the approach supports comparative
+evaluation of planning modules and highlights the importance
+of behavior-level analysis in safety validation.
+This paper contributes an interpretable, ODD-aware visual
+analytics workflow for AV safety assessment that supports systematic exploration across large scenario spaces. The proposed
+system enables visual examination of behavioral and safety
+variations over scenario parameters, including conditions both
+within and beyond the ODD. By integrating behavior-centric
+representations with interactive analysis, the workflow exposes
+recurring patterns and behavioral differences across thousands
+of simulated cases, facilitating more nuanced interpretation of
+AV behavior. More broadly, this work highlights the value of
+visual analytics in complementing existing automated testing
+pipelines, supporting more informed evaluation and decision-
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+making in scenario-based AV testing.
+II. R ELATED W ORK
+This section reviews related work and identifies research
+gaps that motivate our framework.
+
+2
+
+support for analyzing behavioral patterns across scenarios.
+This limitation highlights the need for visualization-driven
+approaches that bridge computational scenario exploration
+with interpretable analysis of AV behaviors.
+C. Visualizations in Safety-Critical Scenario Exploration
+
+A. Vehicle Trajectory Visualization
+Vehicle trajectory visualization provides insights into how
+vehicles move through space and time. Classical methods,
+such as space–time cubes, stacked trajectories, and density heatmaps, reveal motion structures and traffic flow patterns [14], [15]. However, these approaches are primarily
+designed for macroscopic transportation analysis, focusing
+on aggregate trends rather than safety-critical behaviors or
+scenario-level reasoning in AV testing. More recent work
+moves toward AV-oriented analysis by introducing visualization and data management frameworks for large-scale driving
+data, supporting querying, organization, and visual exploration
+for scenario-based evaluation [16], [17].
+Despite these advances, visualization of AV interaction
+behaviors within scenario parameter spaces remains limited.
+Existing replay-based or re-simulation tools operate at the
+level of individual runs, allowing users to replay or modify
+an instantiated scenario to examine system responses under
+varying conditions [18]–[21]. As the number of variations
+increases, however, analysts must inspect many runs individually, making the process time-consuming and visually
+cluttered. This workflow hinders systematic analysis, limiting
+the ability to compare behaviors across variations, identify
+consistent patterns, and extract higher-level insights.
+B. Scenario Space Exploration for AV Safety Assessment
+AV safety evaluation is grounded in system performance
+across diverse conditions defined by the ODD. To enable
+systematic evaluation, researchers adopt parametric scenario
+testing [4], [6], where scenario variables (e.g., agent behaviors)
+are represented within a formal parameter space. Safety validation is then formulated as a search problem over this space to
+identify boundary conditions where system performance fails
+to meet the safety requirements.
+Various methods have been proposed to efficiently explore scenario parameter spaces and identify safety-critical
+regions, including adaptive sampling [8], importance sampling [22], and surrogate modeling approaches such as neural
+networks [9], probabilistic metamodels [10], and Gaussian
+process regression [11]. These techniques aim to characterize
+safety boundaries in high-dimensional spaces by estimating
+regions associated with failure or degraded performance. More
+recent work [12] further incorporates agent behaviors into
+the exploration process, enabling coordinated searches across
+scenario and behavior spaces to discover behaviorally diverse
+and safety-critical cases.
+While effective for identifying safety-critical regions, these
+approaches often produce large collections of trajectories that
+are difficult to interpret collectively. Existing methods emphasize the discovery of safety-critical regions but provide limited
+
+Most scenario-space exploration methods [6]–[12] are not
+designed as visualization techniques; their primary goal is
+to identify safety-critical regions efficiently. Visualization is
+typically used as a secondary tool to present results, such as
+outcome fields or safety boundaries.
+For instance, UNECE R157 [3] visualizes collision outcomes from parameter sweeps for automated lane keeping
+system certification. Similarly, surrogate models [9], [11]
+interpolate safety outcomes over parameter spaces, enabling
+visualization of outcome fields or decision boundaries for
+diagnostic analysis or benchmarking across scenarios.
+However, these visualizations focus on where safety-critical
+boundaries occur rather than how AV behaviors evolve as
+scenario parameters vary. They emphasize final outcomes
+without capturing the behavioral variations leading to them.
+Although prior work has visualized AV decision-making logic
+for failure analysis or causal interpretation [23]–[25], these
+approaches typically focus on individual scenarios and do not
+provide a systematic view of behavior variation across the
+parameter space.
+D. Research Gaps
+Based on the literature, we identify four key gaps (R1–R4)
+in the visualization and analysis of AV behavior within scenario parameter spaces. Existing approaches provide limited
+support in the following aspects:
+• R1. Scalable behavior summarization. Existing replaybased tools lack efficient mechanisms to aggregate and
+summarize AV behaviors across large numbers of scenarios
+in parameter space, limiting scalability in analysis.
+• R2. Understanding parameter-driven behavioral variations. Prior work rarely reveals how behaviors vary with
+underlying scenario parameters, making it difficult to identify triggers of behavioral changes and how variations arise.
+• R3. Integrating behavior with safety context. Existing
+visualizations identify safe and unsafe regions but rarely
+incorporate the behavioral variations that lead to these
+outcomes, particularly near ODD boundaries.
+• R4. Multi-scale behavioral analysis. Existing approaches
+do not effectively support seamless exploration across analysis scales, making it difficult to relate trajectory-level
+behaviors in individual scenarios to aggregated patterns
+across the scenario parameter space, or to compare behavior
+patterns across AV systems.
+III. V ISUAL A NALYTICS S YSTEM
+This section presents our visual analytics framework, including its design goals and the methodologies and implementations of its components.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+A. Design Goals
+Based on the research gaps (R1–R4) identified in Section II,
+we define four design goals (G1–G4) to guide the design of
+our visualization framework.
+G1. Scalable and interpretable analysis of AV behaviors.
+To address the challenge of summarizing AV behaviors
+across the scenario parameter space (R1), the system should
+automatically cluster trajectories and assist in summarizing
+recurring behavioral patterns from large-scale data. These
+summaries should be presented through interpretable visual
+forms that reveal trajectory structures and behavioral differences, enabling systematic analysis beyond single-scenario
+inspection.
+• G2. Linking behaviors to scenario parameters. To address the limited connection between behaviors and scenario
+parameters (R2), the system should integrate behavioral
+summaries with parameter space representations. By mapping trajectory clusters to regions of the parameter space,
+the system reveals how parameter variations correspond to
+distinct behavioral responses.
+• G3. Behavior-aware safety-related region analysis. To integrate behavioral analysis with safety context (R3), the system should combine behavioral representations with safety
+outcomes, enabling analysis of how behaviors vary across
+safe and unsafe regions and how these variations influence
+safety outcomes. This supports diagnostic reasoning near
+safety-critical boundaries and regions of high risk variation.
+• G4. Multi-scale and Interactive Exploration. To address
+the lack of cross-scale analysis (R4), the system should
+support seamless exploration across scales, from trajectorylevel behaviors in individual scenarios to aggregated patterns across the scenario parameter space. Through interactive, cross-scale linking, users can relate local behaviors
+to global patterns for safety analysis, and compare behavioral patterns across scenarios, including those near critical
+regions and boundaries, as well as across AV systems.
+•
+
+B. System Overview
+Fig. 1 presents an overview of the system for exploring AV
+interaction trajectories within a scenario parameter space. The
+system integrates trajectory clustering, synchronized replay,
+trajectory heatmaps, and scenario-parameter visualizations, all
+coordinated through linked views with interactive filtering and
+selection. These components support comparison across scenarios and focused examination of behavioral patterns under
+varying parameter settings.
+This exploration is organized as a multi-stage workflow
+(Fig. 2) that guides users from raw simulation data to interpretable insights. The process begins by projecting and clustering trajectory data to produce low-dimensional representations
+and candidate clusterings that capture potential behavioral
+patterns.
+Users then preview and select candidate clustering results
+through the clustering selection view and projection view. With
+a selected clustering, they use the heatmaps and replayer to
+understand behavioral differences across clusters, and examine
+
+3
+
+how clusters distribute over the scenario parameter space, revealing how behavioral patterns relate to parameter variations
+and safety outcomes. Users can further focus on safety-critical
+boundaries or regions of high risk variation by filtering these
+areas and exploring them in detail through coordinated views.
+Through this workflow, users move from raw data to interpretable insights. By integrating trajectory clustering with
+interactive visualization, the system helps users compare
+clusters and their behavioral differences, uncover unexpected
+behaviors, understand how scenario parameters shape those
+behaviors, and examine how safety-related risks emerge, ultimately supporting the development of safer and more reliable
+AVs. The following sections describe the underlying methods
+of each visual analysis component.
+C. Behavioral Analysis: Trajectory Clustering and Projection
+To identify recurring behavioral patterns (G1) within a
+scenario parameter space, the system analyzes interaction
+trajectories generated under each scenario. These trajectories
+are high-dimensional, multivariate time series capturing spatiotemporal dynamics (e.g., position, speed, and direction) across
+multiple vehicles and numerous scenarios. Users can choose
+which attributes to include, allowing the analysis to adapt
+to different traffic contexts (e.g., road structures and traffic
+conditions) or specific safety requirements. However, directly
+analyzing raw trajectories at scale is computationally prohibitive, motivating compact representations that preserve key
+interaction characteristics while enabling efficient clustering
+for behavioral pattern discovery.
+We adopt Multivariate Functional Principal Component
+Analysis (MFPCA) [26] to derive low-dimensional representations of trajectories. MFPCA models each trajectory as a multivariate function over time and summarizes it using Functional
+Principal Component (FPC) scores, capturing dominant modes
+of variation. This yields a unified embedding suitable for
+clustering and visualization. Compared to deep learning–based
+embeddings (e.g., autoencoder) that require training and hyperparameter tuning, MFPCA offers a more transparent and
+computationally efficient alternative for exploratory analysis.
+MFPCA represents each trajectory over the time domain
+using population-level mean and covariance functions (Appendix A). We retain components explaining over 95% of the
+variance, and use the resulting FPC scores for clustering and
+projection.
+To handle variable-length trajectories caused by eventdriven termination (e.g., collisions), we adopt a padding strategy that preserves termination time information while enabling
+functional analysis. Specifically, early-terminated trajectories
+are padded with their own mean values plus low-level Gaussian noise [27]–[29]. This provides a neutral continuation
+without introducing population-level artifacts. Unlike distancebased methods such as Dynamic Time Warping (DTW) [30],
+which rely on pairwise alignment and do not produce explicit
+embeddings, this approach supports efficient, scalable clustering.
+Clustering is performed on FPC scores using HDBSCAN [31]. We vary key hyperparameters (e.g., minimum
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+a
+
+c
+
+4
+
+e
+
+f
+
+d
+b
+
+Fig. 1: System interface with four scenarios selected from each cluster. Views: (a) Filter settings; (b) Clustering Selection;
+(c) Scenario Parameter Space, with selected scenarios highlighted (circled and crossed); (d) Trajectory Projection Space; (e)
+Replayer; (f) Trajectory Heatmaps, where the gray line indicates the current replay time (t = 15.419). Each heatmap visualizes
+one feature (e.g., ego speed, ego acceleration), with trajectories stacked along the y-axis and time along the x-axis.
+
+cluster size, minimum samples, and selection epsilon) to generate candidate clustering results, which are evaluated using
+the silhouette score [32]. Rather than offering a single solution,
+the system retains distinct candidates for exploration. The
+clustering selection view (Fig. 1(b)) presents these candidates
+ranked by silhouette score, with interactive filtering by cluster
+count.
+Users can further assess clustering quality via the trajectory
+projection view (Fig. 1(d)), which visualizes trajectories in the
+FPC score space. By default, the two components explaining
+the most variance are shown, with options to explore alternative component pairs. This view supports the assessment
+of cluster separation, overlap, and internal structure. Together
+with filtering by cluster count, it enables informed selection
+of clustering results and supports interpretation of behavioral
+patterns.
+D. Replayer
+To support intuitive comparison of behavioral differences
+across scenarios, the system includes a replayer (Fig. 1(e))
+that synchronizes trajectory playback along a shared timeline
+(G1, G4). Scenarios from different clusters are displayed
+in separate windows, enabling side-by-side comparison to
+distinguish cluster-level behavioral differences.
+The replayer presents a top-down 2D map with animated
+trajectories of the AV and surrounding agents, effectively
+replaying the simulation. By aligning and showing multiple
+
+scenarios on a common timeline, it enables direct comparison
+of behavioral differences both within and across clusters.
+Interactive timeline controls (e.g., time slider, play/pause)
+allow users to inspect specific moments in detail. Depending
+on filtering or user selection (e.g., lasso or clicking), the
+replayer adapts to display either a single scenario or a group
+of scenarios. When multiple scenarios are selected, vehicles
+from all scenarios are overlaid at the same timestamp, enabling
+direct spatial comparison across scenarios and clusters. When
+a single scenario is selected, the replayer presents its detailed
+temporal evolution. This design supports both comparison of
+behavioral patterns and variations across scenarios and clusters
+and detailed inspection of individual cases, enabling flexible,
+multi-scale visual analysis (G4).
+E. Trajectory Heatmap
+To examine and compare large numbers of scenarios simultaneously, the system provides a trajectory heatmap view
+(Fig. 1(f)) that color-encodes trajectory features across many
+scenarios in a compact, aligned representation (G1). Specifically, it displays trajectory features (e.g., AV speed, acceleration), with one heatmap per feature and cluster, and allows
+users to choose which features to visualize.
+In each heatmap, columns represent time (or aligned reference) and rows represent scenarios, where each row corresponds to a single trajectory. Feature values are color-encoded
+along the horizontal axis. Scenarios are ordered along the
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+Scenario Parameters
+Start
+
+Criticality Metrics
+
+5
+
+Start/End
+
+Process
+
+Input/Output
+
+Visualization Interface
+
+Visualization
+
+3
+Interpret and compare
+behaviors between clusters
+
+Collision Outcomes
+
+Replayer
+
+Trajectories
+
+Workﬂow Direction
+
+4
+Observe trajectory clusters
+and safety outcomes in the
+scenario parameter space
+Scenario Parameter Space
+
+Trajectory Heatmap
+
+Trajectory Clusters &
+Their Behavioral Diﬀerences
+Unexpected Behaviors
+Knowledge
+
+Clustering
+MFPCA
+Projection Data
+HDBSCAN
+
+1
+
+Selected Clustering Result
+Select a meaningful
+clustering result
+
+2
+
+Clustering Result Selection
+
+Trajectory Projection
+
+Focus on interested areas
+
+5
+
+(e.g., collision boundary, criticality
+metric change, trajectory diﬀerences)
+
+Filtering
+
+Scenario Selection Tools
+
+End
+
+Behavior & ScenarioParameter Relation
+How Behaviors Diﬀer on
+Safety-Related Regions
+
+Clustering Results
+
+Fig. 2: Simulation data (scenario parameters, trajectories, criticality metrics, and collision outcomes) serve as input to the
+analysis. Trajectories are projected and clustered to generate candidate clustering results, ranked by quality scores for selection.
+Users interpret behavioral patterns by examining trajectory heatmaps, exploring their distributions in the scenario parameter
+space, and investigating regions of interest. The workflow supports the discovery of behavioral patterns and understanding of
+how they relate to scenario parameters and safety-related regions.
+vertical axis according to the dendrogram leaf order obtained
+using Ward’s linkage [33] on MFPCA scores, and refined by
+optimal leaf ordering [34]. This ordering places similar trajectories adjacent to facilitate pattern detection and comparison.
+This ordering is recomputed after each clustering selection
+or filtering to maintain visual coherence during interactive
+analysis.
+To enable meaningful cross-scenario comparison, trajectories are aligned to a shared reference, either temporal or
+spatial. Temporal alignment highlights the evolution of behaviors (e.g., braking or acceleration), while spatial alignment
+aligns trajectories by road location, enabling comparison at the
+same position despite speed differences. These complementary
+modes provide both temporal and spatial perspectives for
+analysis.
+Specifically, the heatmap supports two alignment modes:
+time step and road s-distance, where s denotes longitudinal
+distance along the road centerline. In time-step mode, columns
+correspond to trajectory states sampled at 0.1-second intervals.
+In s-distance mode, columns align trajectories at fixed spatial
+intervals (1/4 meter). Feature values between samples are interpolated. These modes enable direct comparison of behaviors
+at corresponding temporal or spatial locations across scenarios.
+The integration with the replayer differs by alignment mode.
+In time-step mode, a gray indicator moves across the heatmap
+to mark the current replay time, linking animation to temporal
+segments. In s-distance mode, the indicator represents the
+ego vehicle’s longitudinal position, and time controls are
+replaced by an s-distance slider, allowing comparison of agent
+configurations when the AV reaches the same road location
+across scenarios.
+
+F. Scenario Parameter Space
+The scenario parameter space view (Fig. 1(c), Fig. 3)
+visualizes scenarios within a two-dimensional parameter space
+to link behavioral patterns and safety outcomes with scenario
+parameters (G2 & G3). The x- and y-axes correspond to
+selected scenario parameters. Each scenario is represented as
+a point, where color encodes its trajectory cluster and shape
+indicates the collision outcome (cross for collision, dot for
+non-collision), enabling identification of safety outcomes such
+as collision boundaries (or ODD) across the parameter space.
+Building on this parameter–behavior–safety mapping,
+the view further supports risk analysis by incorporating criticality metrics (G3). A background layer can be overlaid by
+interpolating either criticality values or their gradient magnitudes, forming a continuous risk field. The color encoding
+reflects either risk levels or the magnitude of risk variation
+(i.e., gradient magnitude). Users can toggle foreground and
+background layers to support focused exploration, as illustrated in Fig. 3.
+Together, these visual encodings enable the identification
+of salient regions in the parameter space, including cluster
+transitions, collision boundaries, and regions of rapid risk
+variation, supporting interpretation of scenario-based results
+and safety/risk analysis for improving AV system robustness.
+G. Filtering and Selection Tools
+The filtering view (Fig. 1(a)) enables users to select scenarios based on trajectory clusters, collision outcomes, boundary
+regions, criticality gradient magnitude, or custom selections
+made in any view. Boundary scenarios are identified using a
+k-nearest-neighbor criterion in the parameter space: a scenario
+is considered a boundary one if its k nearest neighbors include
+different collision outcomes (collision boundary) or different
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+6
+
+Oncoming Opp
+Start
+osi
+te
+Delay
+Oncoming
+Speed
+
+Park
+ing
+
+Park
+ing
+
+5
+Seconds
+Away
+
+Oncoming
+Speed
+Ego
+
+(a) Combined view
+
+(b) Alternative encodings
+
+Fig. 3: Parameter-space visualizations. (a) Trajectory clusters
+overlaid on risk-gradient magnitude fields. (b) foreground
+(clusters and collision outcomes), background (risk field), and
+background (risk-gradient magnitudes).
+
+(a) Lasso tool
+(b) Box selection tool
+Fig. 4: Selection tools. Selected scenarios are highlighted
+across linked views to support coordinated exploration.
+clusters (cluster boundary). These filtering mechanisms reduce
+visual clutter and help users focus on regions of interest.
+Each view, including the trajectory projection, trajectory
+heatmap, and scenario parameter space, supports interactive
+tools such as lasso and box selection (Fig. 4), along with
+panning and zooming. Selected scenarios are synchronized and
+highlighted across all views, enabling coordinated exploration
+and cross-view comparison. This allows users to interpret how
+specific scenarios manifest across different visual contexts.
+Together, the filtering and selection tools provide a flexible
+interface for customizing the analysis process. By supporting
+dynamic filtering and linked selections across views, they
+enable more focused and coordinated exploration, and hence
+clearer interpretation of relationships within the data.
+IV. C ASE S TUDIES
+We present three case studies of distinct driving scenarios
+(Fig. 5): (1) the AV crosses an unsignalized intersection with
+a motorbike approaching from the right; (2) the AV overtakes
+a parked vehicle as an oncoming vehicle approaches from
+the opposite lane; (3) the AV passes a parked vehicle while
+another vehicle cuts in from the left on a three-lane road. In
+Cases 1 and 2, the oncoming vehicles share the same initial
+position. In Case 3, the initial position is adjusted based on
+speed to enforce a fixed merge point with a 5 sec time-tomerge, providing a realistic and informative response window
+for the AV. The AV under test is referred to as the ego vehicle,
+and the two terms are used interchangeably.
+
+Oncoming
+Start
+Delay
+
+Ego
+
+Cut
+-in
+
+Start
+Cut-In
+Gap
+(Fixed 30 m)
+
+Oncoming
+Speed
+
+Oncoming Cut
+Start
+-in
+Delay
+
+Ego
+
+(a) Case 1
+(b) Case 2
+(c) Case 3
+Fig. 5: Scenario schematics for the case studies. The oncoming
+vehicle remains stationary before moving after a start delay.
+The system remains flexible, allowing users to select scenario parameters, trajectory features, and safety outcomes
+based on their analytical objectives. In these studies, users
+analyze two parameters: Oncoming Start Delay (when the
+oncoming vehicle begins moving) and Oncoming Speed. For
+trajectory features, users adopt AV speed, acceleration, yaw
+rate, and the relative positions of the nearest surrounding
+agents. Relative positions are defined in the AV-centered
+frame, with the heading direction as the x-axis and the
+left-hand direction as the y-axis. Safety outcomes and risk
+levels are evaluated using collisions and criticality metrics,
+respectively. The minimum Time-to-Collision (TTCmin ) and
+minimum Scaled Predictive Encroachment Time (SPrETmin )
+[5], [35] are available metrics in the scenario parameter space
+view, and other metrics can be used if their measurements are
+provided in the data.
+A. Case Study 1
+1) Illustration of Behavioral Analysis: Clustering and
+Interpretation. The user begins by browsing candidate clustering results. By examining the MFPCA projection and
+interpreting clusters using the heatmaps and replayer (see
+accompanying video), the user selects the four-cluster result
+shown in Fig. 6a–Fig. 6c.
+From the trajectory heatmaps (first row) in Fig. 6c, cluster
+C1 shows a green-to-pink transition in relative angle, indicating the motorbike moves from the ego’s front-right to rearleft. This reveals a pass-first pattern, where the ego crosses
+the intersection first.
+C2 contains trajectories that terminate early with bright
+distance colors, indicating collisions. In C3, the relative angle
+shifts from green to blue, meaning the motorbike moves from
+front-right to front-left and enters the intersection first. This
+reflects a proactive-yield pattern, where the ego brakes earlier
+(red in acceleration) and maintains larger gaps (darker distance
+color) than in C4.
+C4 shows the same green-to-blue transition but with later
+braking and smaller gaps, indicated by delayed red in acceleration and lighter distance colors, reflecting a late-yield pattern.
+These behaviors are confirmed through scenario replayer, and
+the projection space (Fig. 6b) shows clear cluster separation.
+This fulfills design goal G1: scalable and interpretable analysis
+of AV behaviors.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+7
+
+Clusters of
+System A
+
+Relative (Rel.) Angle [deg]
+
+C1:
+C2:
+C3:
+C4:
+Pass First Collision Proactive Yield Late Yield Ego Acceleration (Acc.) [m/s2]
+
+Clusters of
+System B
+
+Relative Distance (Rel. Dist.) [m]
+
+C1:
+C2:
+C3:
+Pass First Collision Yield
+
+(a) Parameter Space
+Ego Speed
+
+Ego Acc.
+
+(b) MFPCA Projection
+Rel. Dist.
+
+Rel. Angle
+
+(c) Trajectory Heatmaps: C1 to C4 (1st to 4th row)
+
+(d) Parameter Space
+Ego Speed
+
+Ego Acc.
+
+(e) MFPCA Projection
+Rel. Dist.
+
+Rel. Angle
+
+(f) Trajectory Heatmaps: C1 to C3 (1st to 3rd row)
+
+Fig. 6: Case Study 1: Behavioral analysis of two AV planning systems. System A (a–c). In (c), heatmaps reveal four patterns:
+pass-first (C1), indicated by a green-to-pink relative-angle shift (motorbike from the ego’s front-right to rear-left), implying
+the ego passes first; collision (C2), with early termination and bright distance colors at the end; proactive-yield (C3), showing
+a green-to-blue shift (front-right to front-left) with earlier braking and larger gaps than C4; late-yield (C4), exhibiting the
+same shift but with later braking and smaller gaps. System B (d–f). Comparing (d) with (a), the pass-first (C1) region is
+larger. System B remains in yield (C3) up to the collision boundary, whereas System A transitions from proactive-yield (C3)
+to late-yield (C4). (f) System B starts with higher ego speed and maintains smaller gaps in yield (C3) than System A. Overall,
+these analyses suggest that System B adopts a more aggressive strategy but more consistent yielding pattern.
+Safety outcome analysis at ODD boundaries. The user
+examines behaviors near ODD (collision) boundaries to assess collision causes. Two boundaries are considered: (1)
+the left boundary between C4 (late-yield) and C2 (collision)
+(Fig. 7a); (2) the right boundary between C2 and C1 (passfirst) (Fig. 7d). Scenarios are automatically filtered across
+collision and non-collision regions to support this analysis.
+
+collisions occur at the ego’s rear-right (relative angle ending
+in yellow/red, Fig. 7e) while the ego maintains speed and is
+struck from behind, indicating externally initiated collisions.
+
+Heatmaps reveal distinct collision locations. At the left
+boundary, collisions occur at the ego’s front-right (relative
+angle ending in green, Fig. 7b) when the ego delays or fails to
+brake, suggesting ego-induced collisions; at the right boundary,
+
+Criticality Analysis in High-Variation Regions. Beyond safety outcome analysis, the user examines regions of
+large risk variation by visualizing the gradient magnitude of
+SPrETmin , suitable for intersection scenarios (Fig. 8). A high
+
+Together, these contrasting collision patterns and ego responses suggest that behavior-level analysis helps distinguish
+whether unsafe outcomes originate from the ego vehicle or
+other traffic participants.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+Relative (Rel.) Angle [deg]
+
+C1:
+C4:
+C2:
+Pass First Collision Late Yield
+Collision
+No
+
+8
+
+C2:
+Collision
+
+Proactive
+to Late Yield
+
+Rel. Dist. Rel. Angle
+
+(a) With sample points
+(b) C4/C2 Heatmaps
+Ego Speed Ego Acc.
+
+(d) Right boundary
+
+Yes
+
+Relative Distance (Rel. Dist.) [m]
+
+Ego Speed Ego Acc.
+
+(a) Left boundary
+
+Collision
+No
+
+SPrETmin Gradient Magnitude
+C4:
+C3:
+Collision
+Proactive Yield Late Yield
+Boundaries
+
+Ego Acceleration (Acc.) [m/s2]
+
+Yes
+
+SPrETmin [s2]
+
+C1:
+Pass First
+
+(c) Snap.
+
+Rel. Dist. Rel. Angle
+
+(e) C1/C2 Heatmaps
+
+(f) Snap.
+
+Fig. 7: Collision analysis in Case Study 1. Scenarios are automatically filtered across collision and non-collision regions.
+Top row: left collision boundary (C4–C2). (a) Parameter space
+with filtered scenarios and a zoomed view highlighting two
+user-selected scenarios; (b) C2/C4 heatmaps; (c) corresponding snapshots, showing front-side contact. Bottom row: right
+collision boundary (C2–C1). (d) Parameter space with filtered
+scenarios; (e) C1/C2 heatmaps; (f) corresponding snapshots of
+two selected scenarios, showing rear-side contact. Collisions
+at the left boundary involve delayed or no braking and frontside contact (relative angle ending in green in (b)), whereas
+those at the right boundary show steady ego motion and rearside contact (relative angle ending in red in (e)), indicating
+ego-induced versus externally initiated collisions.
+risk-gradient region (bright background, indicated by the red
+line) aligns with the boundary between C3 (proactive-yield)
+and C4 (late-yield), suggesting that this behavior transition is
+associated with increased risk and may contribute to collisions
+(toward C2, indicated by the red dashed line).
+To further investigate, the user discusses this finding with
+AV developers, who indicate that it may relate to a limitation
+in their rule-based planning strategy. A detailed analysis is
+provided in Appendix B.
+By iteratively exploring and filtering safety- and risk-related
+regions, and using parameter-space views, trajectory heatmaps,
+and scenario replay, users examine both aggregate patterns
+and detailed trajectories. This workflow links specific AV
+behaviors to broader structures in the scenario space, helping
+reveal how individual interactions shape overall safety outcomes (G4).
+
+(b) Without sample points
+
+Fig. 8: Case Study 1. Cluster boundaries in parameter space
+and criticality analysis. The transition from proactive-yield
+(C3) to late-yield (C4) (solid line) aligns with a high riskgradient region (bright background), emerging before the
+collision boundary (dashed line).
+2) Comparison of Two Systems: The framework also enables comparison of planning systems. Fig. 6 shows that
+System B exhibits a more uniform yielding pattern, without the
+additional variations observed in System A. Across clusters,
+System B also starts with higher ego speeds, resulting in a
+larger pass-first region (C1) in the parameter space (Fig. 6d)
+than System A (Fig. 6a). This is expected, as higher speed
+allows the ego to clear the intersection earlier but reduces the
+margin for braking.
+Despite this consistency, System B shows a larger highrisk region in the upper-left parameter space compared to
+System A (Figs. 9c and 9b). This difference relates to braking
+behavior. Using heatmaps with road-aligned s-distance as the
+x-axis (Fig. 9a), the user observes that System A begins
+braking earlier along the road, whereas System B brakes later.
+Combined with higher initial speeds, this leads System B to
+yield closer to the intersection, leaving less time and distance
+to react, and thus a smaller safety margin.
+Overall, System B is more behaviorally consistent but can
+incur higher risk under certain conditions. This highlights that
+outcome metrics alone are insufficient; analyzing behaviors
+such as planning strategy and speed regulation is necessary to
+understand system-level risk.
+B. Case Study 2
+By applying the same clustering process as in Case Study 1,
+four clusters are identified: pass-first (C1), opposite-collision
+(C2), yield (C3), and parked-collision (C4), as shown in
+Fig. 10. The parameter space (Fig. 10a) indicates that yielding
+is more likely under shorter start delays and higher oncoming
+speeds, where available passing time and space are reduced
+(fulfilling G2).
+A detailed analysis of boundary behaviors is provided in Appendix C. Examining scenarios near cluster boundaries reveals
+that similar parameter settings can lead to different outcomes
+depending on the ego vehicle’s response. In particular, near the
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+System A
+C3:
+Proactive Yield
+System B
+C3:
+Yield
+
+Ego Acc.
+
+Rel. Dist
+
+SPrETmin [s2]
+
+Relative (Rel.) Angle [deg]
+
+9
+
+C1:
+Pass First
+
+Relative Distance (Rel. D.) [m]
+
+Ego Lane Oﬀset (L.Oﬀ.) [m]
+1.75
+
+-1.75
+
+Left Edge Lane Center Right Edge
+C2:
+Relative Angle (Rel. A.) [deg]
+Opposite Collision Ego Speed [kph]
+
+Ego Acceleration (Acc.) [m/s2]
+
+C3:
+Yield
+
+Relative Distance (Rel. Dist.) [m]
+
+C4:
+Parked Collision
+
+Ego Acceleration (Acc.) [m/s2]
+
+Rel. Angle.
+
+(b) System A
+
+(a) Scenario parameter space
+Ego L . Oﬀ. Ego Speed Ego Acc.
+
+(b) MFPCA projection
+
+Opp. Rel. A. Park. Rel. A. Opp. Rel. D. Park. Rel. D.
+
+(a) Trajectory heatmaps with s-distance (roadaligned) as the x-axis. Top: System A; Bottom:
+System B
+
+(c) System B
+
+Fig. 9: Case Study 1. Road s-distance visualization of risk
+differences in the yielding cluster (C3) for System A (top)
+and System B (bottom). (a) System A initiates braking (red
+acceleration) and yielding (relative-angle shift from green
+to blue) earlier along the road than System B, with larger
+interaction gaps (darker distance tones). (b,c) Risk fields for
+System A and System B, respectively. System B shows higher
+risk (darker background) in the top-left parameter region. Two
+scenarios with similar parameters, one from each system, are
+filtered for comparison.
+(c) Heatmaps
+boundary between pass-first (C1) and the collision clusters,
+small variations can result in either collisions with oncoming
+traffic (C2) or with the parked vehicle (C4). This demonstrates
+how distinct collision types can arise under comparable conditions and highlights the importance of analyzing variations
+in AV responses (fulfilling G3).
+C. Case Study 3
+Using the same clustering procedure as in previous case
+studies, the user selects a six-cluster solution after reviewing
+candidate results. The heatmaps (Fig. 11) reveal six trajectory
+patterns: smooth-pass (C1), cut-in-collision (C2), yield (C3),
+braking-rear-end (C4), yield-stop-collision (C5), and passslowdown (C6), fulfilling G1.
+To understand how these behaviors relate to scenario conditions, the user examines the parameter space (Fig. 11a). The
+oncoming start delay is the dominant factor: short delays lead
+to early cut-ins, causing the ego to consistently yield (C3),
+largely independent of cut-in speed. As the delay increases,
+speed becomes a secondary factor. Because all cut-in vehicles
+must reach a fixed merge point at a prescribed time, higher
+speeds require longer approach distances. This reduces the
+immediacy of the cut-in, shifting the ego’s behavior from
+yielding toward proceeding first, which can result in cut-in
+
+Fig. 10: Case Study 2: Behavioral clusters in overtaking with
+oncoming traffic. Heatmaps reveal four interaction patterns:
+pass-first (C1), where the parked vehicle’s (Park.) relative
+angle shifts from cyan to red earlier than that of the opposite
+vehicle (Opp.), indicating that the ego overtakes the parked
+vehicle first; opposite-collision (C2), where the ego stops
+before colliding with the oncoming vehicle, reflected by nearzero speed (white) and minimal distance (brightest tones) to
+the opposite vehicle; yield (C3), where the opposite vehicle’s
+relative angle shifts from cyan to red earlier than that of
+the parked vehicle, indicating yielding; the ego vehicle stops
+and delays its lane change, which is reflected in its lateral
+position relative to the lane center transitioning from green
+(left) to brown (right) compared to C1; parked-collision (C4),
+which terminates earliest, with collision indicated by minimal
+distance (brightest tones) to the parked vehicle.
+collision (C2). With sufficiently high speed (i.e., long approach
+distance), the ego passes first, leading to smooth-pass (C1).
+Mapping these clusters to the trajectory heatmaps (Fig. 11c)
+reveals the underlying interaction dynamics. For scenarios in
+the bottom-left “yielding” zone (C3, C5), the relative angle
+remains blue-to-cyan, indicating that the ego stays behind. As
+scenarios transition toward C2, the angle shifts toward pink
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+but does not reach red. In contrast, for scenarios in the topright “non-yielding” zone (C1), the angle fully transitions to
+red, indicating that the merging vehicle moves behind the ego,
+corresponding to a smooth-pass (C1).
+In the intermediate region between C1 and C2, brakingrear-end (C4) and pass-slowdown (C6) emerge. Their
+heatmaps show the angle turning red followed by ego braking,
+indicating that the ego slows down after committing to pass.
+These patterns reveal unexpected responses near this transition.
+To further investigate, the user consulted AV developers, who
+explained that these behaviors reflect a safety conflict in the
+planning module: the ego must avoid a potential collision
+with a parked vehicle ahead, yet late or abrupt braking can
+reduce the reaction time for following vehicles, leading to
+rear-end collisions. This conflict is further complicated by
+competing lateral clearance requirements between the parked
+vehicle and the cut-in vehicle. A detailed analysis is provided
+in Appendix D.
+To further assess safety changes, the users examine behaviors near collision boundaries. Distinct behavioral differences
+emerge near the collision boundaries. On the left boundary
+(Fig. 12(a)–(c)), some scenarios yield early, while others fail
+to decelerate sufficiently, leading to collisions. On the right
+boundary (Fig. 12(d)–(f)), abrupt braking after passing can
+trigger rear-end collisions with following vehicles.
+These results demonstrate how behavioral differences under
+similar conditions can lead to different safety outcomes (G3).
+The analysis not only identifies collision scenarios but also
+explains how variations in behavior drive transitions across
+collision or ODD boundaries.
+D. Expert Review and Feedback
+Tasks and Procedures. We recruited four domain experts
+(two AV testing engineers and two planning engineers) to
+evaluate the framework. After a tutorial, the experts completed
+two structured tasks designed to assess the system’s analytical
+capabilities. Following each task, they reported their insights
+and rated their task confidence. Participants then engaged in
+an open exploration phase using a think-aloud protocol. After
+completing both phases, they provided quantitative feedback
+through the System Usability Scale (SUS) and a customized
+domain-specific effectiveness questionnaire, followed by semistructured interviews. Detailed protocols and survey instruments are provided in Appendix E.
+Evaluation Results. Table I summarizes the quantitative results. Experts reported high task confidence (average
+4.50/5.00), and the framework achieved a SUS score of 76.88,
+indicating good usability. The domain-specific questionnaire
+yielded a high average score of 4.88/5.00.
+Qualitative feedback further highlights the system’s utility.
+Expert 1 described the heatmap as “impressively useful” for
+“quickly identifying behavioral differences,” while Expert 4
+noted that synchronized cross-view interactions made analysis
+“intuitive” (G4). Experts also identified previously overlooked
+safety issues, including inconsistent yielding behavior and
+potential rear-end collision risks (G3). These findings suggest
+that the framework effectively supports safety-oriented analysis in simulation-based AV testing workflows.
+
+10
+
+C1:
+Smooth
+Pass
+
+Relative (Rel.) Angle [deg]
+
+C4:
+Braking
+Rear-End
+
+C5:
+C2:
+Yield Stop
+Cut-In
+Collision Collision
+C6:
+C3:
+Pass
+Yield
+Slowdown
+
+Ego Acceleration (Acc.) [m/s2]
+
+Relative Distance (Rel. Dist.) [m]
+
+(a) Clusters on Parameter Space
+Ego Speed
+
+Ego Acc.
+
+(b) MFPCA Projection
+Cut-in Rel. Dist. Cut-in Rel. Angle
+
+(c) Trajectory heatmaps
+Fig. 11: Case Study 3 behavioral clusters. C1, C4, and C6
+involve the ego vehicle already having passed the cut-in vehicle, indicated by the relative angle shifting from cyan to red,
+meaning the cut-in vehicle moves from the ego’s front to its
+rear; Among them, smooth-pass (C1) shows remaining higher
+speed (darker tone) and darker distance colors (widening gap)
+after the shift from cyan to red; braking-rear-end (C4) shows
+the cyan-to-red shift followed by ego speed turning white
+(abrupt stop) and brightening distance colors (decreasing gap);
+pass-slowdown (C6) resembles C4 but shows a gradual speed
+slow-down with smoother color transition and darker postpass distance colors, without rear-end contact; Clusters C2,
+C3, and C5 do not fully pass the cut-in vehicle, as the relative
+angle does not turn red or remains blue. In yield (C3), ego
+speed turns white (strong slowdown) while distance remains
+darker. yield-stop-collision (C5) is similar but ends with bright
+distance colors, indicating collision after stopping. In cut-incollision (C2), ego speed stays darker blue (no stop) and
+distance brightens as the cut-in merges, indicating impact.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+C1:
+Smooth Pass
+
+Collision
+No
+
+Relative Distance (Rel. Dist.) [m]
+
+Yes
+
+C2:
+Cut-In Collision
+C3:
+Yield
+
+11
+
+Relative (Rel.) Angle [deg]
+0°
+
+Ego Speed [kph]
+
+180°/-180°
+
+Ego Speed
+
+(a) Left boundary
+
+-90°
+
+90°
+
+C4:
+Braking Rear-End
+
+Cut-in Rel. Dist.
+
+(b) Heatmaps of filtered C2 & C3
+Ego Speed
+
+(c)
+
+Cut-in Rel. Dist. Cut-in Rel. Angle
+
+enabling the analysis of complex parameter dependencies
+without exhaustive pairwise exploration.
+While these approaches focus primarily on parameter-space
+exploration, our framework complements them by emphasizing behavior-centric clustering and comparison. Future work
+will integrate high-dimensional parameter exploration with
+behavior-based analysis to support more scalable and interpretable safety-oriented evaluation in complex testing scenarios.
+Impact of Representation and Clustering Design
+Choices. Behavioral clustering results depend on design
+choices such as trajectory alignment, padding for variablelength data, and the use of MFPCA embeddings as a proxy
+for similarity. These factors can influence the resulting cluster
+structures. To mitigate this, the system presents multiple
+clustering candidates and supports interactive comparison,
+allowing users to assess the consistency and interpretability
+of patterns rather than relying on a single result. Despite these
+dependencies, the current design choices appear effective for
+behavioral analysis in our case studies, consistently yielding
+interpretable and meaningful patterns. Improving robustness to
+these design choices remains an important direction for future
+work.
+TABLE I: User Study Results Across All Measures
+
+(d) Right boundary
+
+(e) Heatmaps of filtered C1 & C4
+
+(f)
+
+Fig. 12: Case Study 3: Behavioral differences near collision
+boundaries. Top row: left boundary between C2 (cut-incollision) and C3 (yield). (a) Filtered scenarios in the parameter space with two selected scenarios. (b) Heatmaps show
+that C2 leads to collision with insufficient deceleration (darker
+speed tones) and reduced separation (lighter distance tones),
+whereas C3 results in safe yielding. (c) Snapshots of selected
+scenarios illustrate how small parameter differences lead to
+either yielding or collision. Bottom row: right boundary
+between C1 (smooth-pass) and C4 (braking-rear-end). (d)
+Filtered scenarios with two selected ones. (e) Heatmaps show
+that although both scenarios pass, C4 exhibits a sharper speed
+drop (lighter blue) after passing (angle turning red), leading
+to a rear-end collision. (f) Snapshots illustrate how small
+parameter differences lead to either smooth passing or brakinginduced rear-end collision.
+
+V. D ISCUSSION
+Scalability Beyond Two-Dimensional Parameter Spaces.
+The parameter space view currently supports analysis of
+two parameters at a time to maintain visual clarity and
+interpretability. However, real-world scenarios often involve
+higher-dimensional parameter spaces. Prior work [36]–[38]
+has explored such spaces using techniques including projection, slicing, parallel coordinates, and coordinated views,
+
+Measure
+Expert 1
+Expert 2
+Expert 3
+Expert 4
+Task Confidence
+Task A
+4.00
+4.00
+5.00
+5.00
+Task B
+5.00
+4.00
+5.00
+4.00
+System Usability Scale (SUS)
+Score
+67.50
+62.50
+87.50
+90.00
+Customized Domain-specific Effectiveness Questionnaire
+Q1
+5.00
+4.50
+5.00
+5.00
+Q2
+5.00
+4.50
+5.00
+5.00
+Q3
+5.00
+4.50
+5.00
+5.00
+
+Mean
+4.50
+4.50
+76.88
+4.88
+4.88
+4.88
+
+VI. C ONCLUSION
+This work presents a novel visual analytics framework
+for scenario-based testing of autonomous vehicles, addressing
+the limitations of outcome-focused methods by emphasizing
+behavior-centric analysis. Through clustering and interactive
+exploration of trajectory data, our system enables stakeholders
+to identify distinct trajectory patterns and behavioral differences, relate them to scenario parameters, and uncover
+how these differences correspond to regions where safety
+performance degrades. The case studies demonstrate that the
+framework provides insight into how AV behavior affects
+safety across scenarios and enables a deeper understanding of
+safety-performance differences between AV planning modules
+through behavior-based comparisons.
+Expert feedback highlights the framework’s ability to generate interpretable and actionable insights, particularly in exposing safety-related behavioral differences and guiding decisions
+about system adjustments. Ultimately, this behavior-focused
+approach contributes to building safer and more reliable autonomous vehicle systems by bridging the gap between raw
+simulation data and interpretable safety analysis.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+R EFERENCES
+[1] ISO 21448:2022 Road Vehicles - Safety of the Intended Functionality
+(SOTIF), International Organization for Standardization Std., 2022.
+[2] ISO 34502:2022 Road vehicles - Test scenarios for automated driving
+systems - Scenario based safety evaluation framework, International
+Organization for Standardization Std., 2022.
+[3] United Nations Economic Commission for Europe, “UN Regulation No.
+157 - Automated Lane Keeping Systems (ALKS),” 2020.
+[4] T. Menzel, G. Bagschik, and M. Maurer, “Scenarios for development,
+test and validation of automated vehicles,” in 2018 IEEE Intelligent
+Vehicles Symposium (IV), 2018, pp. 1821–1827.
+[5] L. Westhofen, C. Neurohr, T. Koopmann, M. Butz, B. Schütt, F. Utesch,
+B. Kramer, C. Gutenkunst, and E. Böde, “Criticality metrics for automated driving: A review and suitability analysis of the state of the art,”
+Archives of Computational Methods in Engineering, 2022.
+[6] X. Zhang, S. Khastgir, J.-K. Tiele, K. Takenaka, T. Hayakawa, and
+P. Jennings, “ODD and behavior based scenario generation for automated driving systems,” IEEE Access, vol. 12, pp. 10 652–10 663, 2024.
+[7] Z. Zhong, Y. Tang, Y. Zhou, V. de Oliveira Neves, Y. Liu, and B. Ray,
+“A survey on scenario-based testing for automated driving systems in
+high-fidelity simulation,” CoRR, 2021.
+[8] S. Feng, Y. Feng, H. Sun, Y. Zhang, and H. X. Liu, “Testing scenario
+library generation for connected and automated vehicles: An adaptive
+framework,” IEEE T-ITS, vol. 23, no. 2, pp. 1213–1222, 2022.
+[9] Y. Wang, R. Yu, S. Qiu, J. Sun, and H. Farah, “Safety performance
+boundary identification of highly automated vehicles: A surrogate
+model-based gradient descent searching approach,” IEEE T-ITS, vol. 23,
+no. 12, pp. 23 809–23 820, 2022.
+[10] M. Winkelmann, M. Kohlhoff, H. H. Tadjine, and S. Müller, “Probabilistic metamodels for an efficient characterization of complex driving
+scenarios,” IEEE T-ITS, vol. 23, no. 12, pp. 23 896–23 905, 2022.
+[11] J. Tu, S. Suo, C. Zhang, K. Wong, and R. Urtasun, “Towards scalable
+coverage-based testing of autonomous vehicles,” in 7th Annual Conference on Robot Learning, 2023.
+[12] Q. Chu, Y. Yue, D. Yao, and H. Pei, “DiCriTest: Testing scenario
+generation for decision-making agents considering diversity and
+criticality,” 2025. [Online]. Available: https://arxiv.org/abs/2508.11514
+[13] S. K. Routray, “Visualization and visual analytics in autonomous driving,” IEEE Computer Graphics and Applications, vol. 44, no. 3, pp.
+43–53, 2024.
+[14] W. Chen, F. Guo, and F.-Y. Wang, “A survey of traffic data visualization,”
+T-ITS, vol. 16, no. 6, pp. 2970–2984, 2015.
+[15] A. Clarinval and B. Dumas, “Intra-city traffic data visualization: A
+systematic literature review,” IEEE T-ITS, vol. 23, no. 7, pp. 6298–6315,
+2022.
+[16] T. Liu, D. Sun, C. Bi, Y. Sun, and S. Chen, “Dynamic-scene-graphsupported visual understanding of autonomous driving scenarios,” in
+2024 IEEE 17th PacificVis, 2024, pp. 82–91.
+[17] C. Chang, D. Cao, L. Chen, K. Su, K. Su, Y. Su, F.-Y. Wang,
+J. Wang, P. Wang, J. Wei, G. Wu, X. Wu, H. Xu, N. Zheng, and
+L. Li, “Metascenario: A framework for driving scenario data description,
+storage and indexing,” IEEE Transactions on Intelligent Vehicles, vol. 8,
+no. 2, pp. 1156–1175, 2023.
+[18] Applied Intuition. (2021, Oct.) Using re-simulation to verify an AV stack
+against disengagements. [Online; accessed 2026-04-15]. [Online]. Available: https://www.appliedintuition.com/blog/closed-loop-log-replay
+[19] Foretellix. (2025) Unlocking scalable neural reconstruction for AV
+development. [Online; accessed 2026-04-15]. [Online]. Available:
+https://www.foretellix.com/scalable-neural-reconstruction-av/
+[20] H. Caesar, J. Kabzan, K. S. Tan, W. K. Fong, E. Wolff, A. Lang,
+L. Fletcher, O. Beijbom, and S. Omari, “Nuplan: A closed-loop mlbased planning benchmark for autonomous vehicles,” 2022.
+[21] J. Bach, M. Holzäpfel, S. Otten, and E. Sax, “Reactive-replay approach
+for verification and validation of closed-loop control systems in early
+development,” in SAE Technical Paper, no. 2017-01-1671, 2017.
+[22] D. Zhao, H. Lam, H. Peng, S. Bao, D. J. LeBlanc, K. Nobukawa, and
+C. S. Pan, “Accelerated evaluation of automated vehicles safety in lanechange scenarios based on importance sampling techniques,” IEEE TITS, vol. 18, no. 3, pp. 595–607, 2017.
+[23] Y. Hou, C. Wang, J. Wang, X. Xue, X. L. Zhang, J. Zhu, D. Wang, and
+S. Chen, “Visual evaluation for autonomous driving,” IEEE Transactions
+on Visualization and Computer Graphics, vol. 28, no. 1, pp. 1030–1039,
+2022.
+[24] Y. Sun, Z. Shao, X. Qiu, Y. Li, T. Liu, L. Xiang, D. Sun, and S. Chen,
+“Interpreting autonomous driving corner cases: A visual analytics approach,” in IEEE PacificVis, 2024, pp. 92–101.
+
+12
+
+[25] R. Shi, T. Li, Y. Yamaguchi, and L. Zhang, “Exploring decision shifts in
+autonomous driving with attribution-guided visualization,” IEEE T-ITS,
+vol. 26, no. 3, pp. 4165–4177, 2025.
+[26] C. Happ and S. Greven, “Multivariate functional principal component
+analysis for data observed on different (dimensional) domains,” Journal
+of the American Statistical Association, vol. 113, no. 522, pp. 649–659,
+2018.
+[27] M. Middlehurst, P. Schäfer, and A. Bagnall, “Bake off redux: a review and experimental evaluation of recent time series classification
+algorithms,” Data Mining and Knowledge Discovery, vol. 38, no. 4, p.
+1958–2031, 2024.
+[28] C. W. Tan, F. Petitjean, E. Keogh, and G. I. Webb, “Time series
+classification for varying length series,” 2019. [Online]. Available:
+https://arxiv.org/abs/1910.04341
+[29] A. Bier, A. Jastrzebska, and P. Olszewski, “Variable-length multivariate
+time series classification using rocket: A case study of incident detection,” IEEE Access, vol. 10, pp. 95 701–95 715, 2022.
+[30] F. Petitjean, A. Ketterlin, and P. Gançarski, “A global averaging method
+for dynamic time warping, with applications to clustering,” Pattern
+Recognition, vol. 44, no. 3, pp. 678–693, 2011.
+[31] R. J. G. B. Campello, D. Moulavi, and J. Sander, “Density-based
+clustering based on hierarchical density estimates,” in PAKDD 2013,
+vol. 7819, 2013, pp. 160–172.
+[32] P. J. Rousseeuw, “Silhouettes: A graphical aid to the interpretation and
+validation of cluster analysis,” Journal of Computational and Applied
+Mathematics, vol. 20, pp. 53–65, 1987.
+[33] F. Murtagh and P. Legendre, “Ward’s hierarchical agglomerative clustering method: Which algorithms implement ward’s criterion?” Journal
+of Classification, vol. 31, no. 3, pp. 274–295, 2014.
+[34] Z. Bar-Joseph, D. K. Gifford, and T. S. Jaakkola, “Fast optimal leaf ordering for hierarchical clustering,” Bioinformatics, vol. 17, no. Suppl 1,
+pp. S22–S29, 2001.
+[35] C. Neurohr, L. Westhofen, M. Butz, M. H. Bollmann, U. Eberle, and
+R. Galbas, “Criticality analysis for the verification and validation of
+automated vehicles,” IEEE Access, vol. 9, pp. 18 016–18 041, 2021.
+[36] A. Tyagi, “Visualization and optimization techniques for high
+dimensional parameter spaces,” 2022. [Online]. Available: https:
+//arxiv.org/abs/2204.13812
+[37] M. Evers and L. Linsen, “Multi-dimensional parameter-space partitioning of spatio-temporal simulation ensembles,” Computers and Graphics,
+vol. 104, pp. 140–151, 2022.
+[38] U. Laa and G. Valencia, “Clustering and visualization tools to study
+high dimensional parameter spaces: B anomalies example,” 2023.
+[Online]. Available: https://arxiv.org/abs/2304.00151
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+13
+
+A PPENDIX A
+E QUATIONS FOR MFPCA AND FPC S CORE C OMPUTATION
+
+B. Constructing Uniform-Length Trajectories via Padding
+(Without Estimating Post-Termination Behavior)
+
+This appendix presents the mathematical formulation for
+computing Functional Principal Component (FPC) scores using Multivariate Functional Principal Component Analysis
+(MFPCA) [26].
+
+The scenarios in our dataset are observed over different time
+intervals [0, Ti ], where each trajectory has its own end time
+Ti ≤ T . As a result, the raw trajectories Xi (t) do not share a
+common domain. MFPCA assumes a common domain [0, T ]
+for all trajectories, so each trajectory must be represented over
+this full interval. To satisfy this requirement, we construct fulldomain versions X∗i (t) for all t ∈ [0, T ].
+i
+Let {tm }N
+m=1 denote the observed time points for scenario
+i, with tNi = Ti . For each trajectory, we compute its withintrajectory empirical mean
+
+A. Multivariate Functional Principal Component Analysis
+(MFPCA) Foundation
+Let Xi (t) be the p-variate functional trajectory for scenario i, defined over the time domain T = [0, T ]. Each
+trajectory consists of p coordinate functions: Xi (t) =
+[Xi,1 (t), . . . , Xi,p (t)]⊤ , where i = 1, . . . , n indexes the n
+observed scenario trajectories. For notational convenience,
+let X(t) denote a generic p-variate trajectory drawn from
+the same population as {Xi (t)}ni=1 . This allows population
+quantities to be expressed using expectations.
+1) Population Mean and Covariance Functions: The MFPCA framework begins by estimating the population mean
+function µ(t) and the p × p covariance kernel G(s, t). The
+population mean function is defined as the expected value of
+the trajectory at time t:
+⊤
+
+µ(t) = E[X(t)] = [µ1 (t), . . . , µp (t)] .
+The covariance kernel G(s, t) is the p × p matrix of crosscovariances between the trajectory at time s and the trajectory
+at time t:
+
+X̄i =
+
+Ni
+1 X
+Xi (tm ),
+Ni m=1
+
+where X̄i is a constant p-vector summarizing the average level
+of that trajectory over its observed window.
+To extend each trajectory over (Ti , T ], we define
+
+Xi (t),
+t ∈ [0, Ti ],
+X∗i (t) =
+X̄ + v (t), t ∈ (T , T ],
+i
+i
+i
+where the noise term vi (t) = [vi,1 (t), . . . , vi,p (t)]⊤ has
+independent components
+vi,j (t) ∼ N (0, σ 2 ),
+
+t ∈ (Ti , T ],
+
+with σ chosen as a small fraction of the global empirical
+standard deviation for the variable j. This padding procedure
+⊤
+G(s, t) = Cov[X(s), X(t)] = E[(X(s)−µ(s))(X(t)−µ(t)) ]. yields trajectories of equal length without attempting to estimate behavior past the last observation.
+These quantities are estimated from the observed data,
+yielding µ̂(t) and Ĝ(s, t). For example, the jth component
+of the mean function is estimated by the sample mean:
+µ̂j (t) =
+
+n
+1X
+
+n i=1
+
+Xi,j (t).
+
+2) Functional Eigendecomposition: The MFPCA basis
+functions, or eigenfunctions ψ k (t), are found by solving the
+multivariate integral eigenproblem:
+Z
+G(s, t)ψ k (t)dt = λk ψ k (s),
+T
+
+where ψ k (t) = [ψk,1 (t), . . . , ψk,p (t)]⊤ is the k-th eigenfunction and λk is the corresponding eigenvalue. The eigenfunctions are constrained to be orthonormal:
+p Z
+X
+ψk,j (t)ψm,j (t)dt = δkm ,
+j=1
+
+T
+
+where δkm is the Kronecker delta.
+The eigenproblem is well defined as long as the trajectories
+lie in L2 (T ), meaning each function has a finite integral of
+its squared values, which ensures that the covariance operator
+is well defined and admits a valid eigendecomposition.
+
+C. Normalization of Functional Trajectories
+After padding the trajectories to a common domain, each
+observation for variable j is centered by subtracting the
+estimated mean function,
+∗
+Zi,j (t) = Xi,j
+(t) − µ̂j (t).
+
+To place all trajectories for variable j on a comparable scale,
+we compute the pointwise empirical variance across scenarios,
+N
+
+σ
+bj2 (t) =
+
+1 X
+Zi,j (t)2 .
+N i=1
+
+A global normalization weight for variable j is then obtained
+by integrating this variance over the domain,
+Z
+wj =
+σ
+bj2 (t) dt.
+T
+
+Each centered trajectory is finally rescaled using this weight,
+i,j (t)
+ei,j (t) = Z√
+X
+,
+wj
+
+so that the integrated variance of variable j across scenarios
+is 1.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+14
+
+D. Functional Principal Component (FPC) Score Derivation
+1) Karhunen–Loève Expansion: After normalization, each
+e i (t) on
+scenario’s multivariate trajectory is represented by X
+the common domain T . We then perform MFPCA on the
+covariance operator of these normalized trajectories. The mean
+function of the normalized sample is
+N
+
+e (t) =
+µ
+
+1 Xe
+Xi (t),
+N i=1
+
+and we define the centered normalized trajectories as
+e i (t) = X
+e i (t) − µ
+e (t).
+Z
+e i (t) is
+The Karhunen–Loève expansion of X
+e i (t) = µ
+e (t) +
+X
+
+∞
+X
+
+ci,k ψ k (t),
+
+k=1
+
+where ψ k (t) are the eigenfunctions of the empirical covariance
+structure and ci,k are the associated FPC scores.
+2) FPC Score Computation: Because the eigenfunctions
+are orthonormal, the FPC scores are obtained by projecting
+the centered normalized trajectories onto the eigenfunctions,
+Z T
+e i (t)⊤ ψ k (t) dt.
+ci,k =
+Z
+0
+
+3) Dimension Reduction Criterion: The number of retained
+components, K, is selected to explain a cumulative proportion
+P (e.g., P > 0.95) of the total variance:
+Pm
+
+
+k=1 λk
+P
+≥P .
+K = min m ∈ N
+∞
+k=1 λk
+
+observation highlights the importance of analyzing high riskgradient regions: they reveal where behavioral changes occur,
+even before collision boundaries are reached.
+To better understand this transition, the user brought this
+case to the AV developers, who suspected that the observed
+behavioral discontinuity might be related to a limitation in
+the rule-based planning logic. Guided by this discussion, we
+further examined the relative longitudinal distance (Rel. X) to
+the oncoming vehicle, which is used to determine whether the
+oncoming vehicle has passed the ego vehicle’s front bumper.
+As shown in Fig. 13(b), the system initiates yielding (red
+braking regions) only when this condition is satisfied, indicated
+by green Rel. X values at the gray marker. In C3, the condition
+is met, leading to timely braking. In contrast, small parameter
+changes from C3 to C4 keep Rel. X in purple at the same
+moment, meaning the triggering condition is not yet satisfied
+and braking is delayed. As parameters continue to vary, this
+delayed response can further lead to collision (C2).
+This collaborative analysis helped reveal a limitation of
+the planning module: small parameter variations can trigger
+distinct behaviors because of the rule-based priority condition. The result demonstrates that the proposed approach can
+identify high risk-gradient regions and support diagnosis of
+behavior-level limitations that warrant further refinement.
+
+C2:
+C3:
+C4:
+Collision
+Collision Proactive Yield Late Yield
+No
+
+SPrETmin Gradient Magnitude
+Yes
+
+Ego Acceleration (Acc.) [m/s2]
+
+Ego Acc.
+
+Relative Distance (Rel. Dist.) [m]
+
+Rel. Dist.
+
+Rel. X
+
+⊤
+
+The resulting vector of FPC scores ci = (ci,1 , . . . , ci,K )
+is the compact and stable representation used for subsequent
+analysis.
+A PPENDIX B
+C ASE S TUDY 1: D IAGNOSING P LANNING L IMITATIONS VIA
+R ISK -G RADIENT AND B EHAVIORAL A NALYSIS
+This appendix provides a detailed analysis of the high
+risk-gradient regions identified in Case Study 1. As shown
+in Fig. 8(a), regions of large gradient magnitude indicate
+areas where small changes in scenario parameters lead to
+rapid changes in risk. These regions align with cluster boundaries, particularly between C3 (proactive-yield) and C4 (lateyield), and extend toward the boundary between C3 and C2
+(collision), suggesting that behavioral transitions are closely
+associated with sharp increases in risk.
+To investigate this effect, we examine a representative region
+where C2, C3, and C4 intersect (Fig. 13(a)). The heatmaps
+in Fig. 13(b) show that the elevated risk variation arises
+from transitions between proactive-yield (C3) and late-yield
+(C4). In C3, the ego vehicle initiates earlier and more sustained deceleration (red braking regions), maintaining larger
+separation distances (darker distance tones). However, small
+variations in parameters can delay or suppress braking, leading
+to late-yield behavior (C4) or eventually to collision (C2), as
+illustrated by the selected scenarios in the zoomed view. This
+
+(a)
+
+(b)
+
+(c)
+
+Fig. 13: Case Study 1: Diagnosing a planning limitation via
+risk-gradient analysis. Scenarios with risk-gradient magnitudes
+are filtered near the C2–C4 boundary to analyze behavioral
+discontinuities. (a) Parameter space with filtered scenarios
+and three representative cases of similar parameter values. (b)
+Heatmaps comparing behaviors across C3 (proactive-yield),
+C4 (late-yield), and C2 (collision). In C3, the ego decelerates
+earlier (red zones) when the oncoming vehicle has passed the
+front bumper (green Rel. X at the gray marker). In contrast,
+in C4 and C2 the vehicle remains behind the bumper (purple
+relative x), delaying or preventing braking. (c) Snapshots at a
+comparable interaction moment illustrate how small parameter
+variations lead to distinct behaviors, revealing a limitation of
+the rule-based planning logic.
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+15
+
+A PPENDIX C
+C ASE S TUDY 2: B OUNDARY B EHAVIOR A NALYSIS OF
+D ISTINCT C OLLISION O UTCOMES
+This appendix examines boundary behaviors in Case Study
+2, focusing on how subtle parameter variations near cluster boundaries lead to different collision types and system
+responses. Near the boundary between pass-first (C1) and
+the collision clusters (C2, C4), small variations give rise to
+two distinct outcomes (Figure 14): opposite-collision (C2),
+where stopping near the lane boundary creates conflicts with
+oncoming traffic, and parked-collision (C4), where the ego
+vehicle fails to maintain sufficient clearance from the parked
+vehicle.
+These divergent behaviors occur under similar parameter
+settings, demonstrating how distinct collision types can emerge
+near the same boundary and underscoring the importance of
+analyzing variations in AV responses (G3).
+C1:
+Pass First Collision
+No
+C2:
+Opposite
+Collision
+
+Ego Lane Oﬀset (L.Oﬀ.) [m]
+
+Ego Speed [kph]
+
+1.75
+
+Yes
+Ego Acceleration (Acc.) [m/s2]
+
+C4:
+Parked
+Collision
+
+(b)
+
+Lane Center Right Edge
+
+Relative Distance (Rel. D.) [m]
+
+Ego L . Off. Ego Speed Ego Acc.
+
+(a)
+
+-1.75
+
+Left Edge
+
+Park. Rel. D.
+
+(c)
+
+Fig. 14: Case Study 2: Collision boundary near the pass-first
+(C1) cluster. Scenarios are automatically filtered across C1, C2
+(opposite-collision), and C4 (parked-collision). (a) Parameter
+space near the boundary, with three representative scenarios of
+similar parameter values highlighted. (b) Heatmaps compare
+the non-collision cluster C1 (top) with two collision types: C2
+(middle) and C4 (bottom). Strong braking appears as dark red;
+in C2, speed transitions to sustained white (full stop) while the
+lane offset remains near the left edge (dark green), indicating
+a stop near the lane boundary. In contrast, C4 shows minimal
+distance to the parked vehicle (brightest tones), indicating
+collision with the parked vehicle. (c) Snapshots illustrate how
+small parameter variations near the boundary lead to either
+passing first or distinct collision types.
+
+A PPENDIX D
+C ASE S TUDY 3: A NALYSIS OF S AFETY C ONFLICT IN
+P OST-PASS B RAKING
+To investigate the unexpected braking behavior observed in
+braking-rear-end (C4) and pass-slowdown (C6), we consulted
+with the AV developers. As shown in Fig. 15(b), both clusters
+
+initially resemble a successful overtaking maneuver similar to
+pass-first (C1). However, the heatmaps reveal a critical safety
+conflict in the post-pass phase: the ego acceleration profiles for
+C4 and C6 show a distinct braking region (red) immediately
+after passing (indicated by the gray marker), whereas C1
+maintains a more consistent profile.
+The developers explained that this braking is a reactive
+safety response to avoid a potential collision with a static
+obstacle (the parked vehicle). When braking occurs earlier
+(C6), the following vehicle (i.e., the cut-in vehicle) has sufficient time to decelerate. In contrast, when braking occurs
+later—immediately after passing—it reduces the available
+reaction time for the following vehicle, increasing the risk of
+rear-end collisions (C4). The abrupt deceleration in C4 is thus
+a key factor contributing to this risk.
+Further analysis, guided by the developers, indicates that
+this behavior is triggered by a collision-checking mechanism based on the ego vehicle’s projected right boundary.
+Specifically, the system evaluates whether the ego vehicle’s
+right edge, extended forward, would intersect with the parked
+vehicle. As illustrated in Fig. 15(c), the projected boundary
+(black line) in C4 and C6 intersects with the parked vehicle
+downstream, prompting braking. In contrast, in C1, sufficient
+lateral clearance is maintained, and no intersection occurs.
+These findings illustrate how the proposed visual analytics
+framework supports collaborative diagnosis with AV developers, enabling the identification of behavior-level conflicts
+and potential limitations in planning strategies. In this case, a
+possible mitigation—e.g., increasing lateral clearance from the
+parked vehicle—may in turn reduce clearance from the cutin vehicle during overtaking, highlighting the complexity of
+planning under competing spatial constraints. This example
+demonstrates how the system helps reveal such intertwined
+considerations and supports informed refinement of planning
+behaviors.
+A PPENDIX E
+E XPERT E VALUATION D ETAILS
+A. Detailed Study Procedure
+Tutorial. The session began with a tutorial using the Case
+Study 2 dataset. During this phase, we introduced the main
+system views and interactions and demonstrated several example analysis workflows.
+Structured Tasks. Next, experts conducted a task-based
+evaluation using the Case Study 1 dataset. They performed two
+structured analytical tasks: (A) selecting the most meaningful
+clustering result and describing the behavioral characteristics
+of each cluster (addressing G1), and (B) identifying safetyrelated regions in the parameter space and linking them to
+behavioral differences (addressing G2 and G3). After completing each task, participants rated their confidence in their
+conclusions with the following question: “How confident are
+you in the correctness and completeness of your analysis
+results?” Responses were recorded on a 5-point Likert scale
+(1 = Not confident at all, 5 = Very confident).
+After completing Tasks A and B, experts engaged in a
+reflection phase (Task C). They were instructed to combine
+
+JOURNAL OF LATEX CLASS FILES, VOL. 14, NO. 8, AUGUST 2021
+
+C1:
+C4:
+C6:
+Smooth Braking Pass
+Pass
+Rear-End Slowdown
+
+16
+
+Ego Acceleration (Acc.) [m/s2]
+
+Ego Acc.
+
+Q2: The system helps me identify and understand potential risks or critical scenarios.
+• Q3: The system helps me generate actionable insights
+from the data.
+•
+
+C. Semi-structured Interview Questions
+1) How did the system support your analysis? Were there
+any particularly impressive aspects?
+2) Which functions were difficult to use or in need of
+improvement?
+3) What limitations remain, and what additional visualizations or analytical capabilities would you like to see in
+future versions?
+
+(a) Clusters in Parameter Space
+
+(b) Heatmaps
+
+(c) Shots
+
+Fig. 15: Case Study 3: Post-pass braking behavior across
+clusters. Braking after passing occurs in braking-rear-end (C4)
+and pass-slowdown (C6), but not in smooth-pass (C1). (a)
+Three clusters, with one representative scenario selected from
+each cluster. (b) The gray marker indicates the onset of postpass braking in C4 and C6, absent in C1. (c) Snapshots at
+the same moment as in (b). As explained by AV developers,
+the projected boundary (black line) from the ego vehicle’s
+front-right edge intersects with a parked vehicle in C4 and
+C6, triggering braking, while no intersection occurs in C1.
+Although this response avoids a potential collision with the
+parked vehicle, delayed braking (C4) reduces the reaction time
+for the following vehicle, increasing rear-end collision risk.
+
+their findings into higher-level insights and highlight notable
+behavior patterns or anomalies worth further investigation,
+along with potential implications for safety and system improvement.
+Open Exploration. After completing the structured tasks,
+the study transitioned to an open exploration phase using
+the Case Study 3 dataset. During this phase, experts freely
+investigated the dataset without predefined goals. They were
+asked to think aloud throughout the exploration, continuously
+verbalizing their questions of interest, exploration strategies,
+and emerging insights while interacting with the system.
+Experts could use any system views, identify regions they
+considered interesting or critical, and discuss possible explanations for safety changes in relation to observed behavioral
+patterns.
+
+B. Survey Instruments
+The SUS evaluation utilized the standard 10-item instrument
+to assess ease of use and learnability. Domain-specific effectiveness was assessed via three customized 5-point Likert-scale
+statements:
+•
+
+Q1: The system helps me effectively understand AV
+behavior patterns.
+
+

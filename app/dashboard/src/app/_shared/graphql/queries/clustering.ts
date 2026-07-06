@@ -123,6 +123,8 @@ export type Mfpca = {
   trialOrder: string[];
   moreToVizTrialOrder: string[];
   moreToVizSeconds: number;
+  /** Distinct k values (non-noise clusters) present in ``clustering`` results. */
+  availableClusterCounts?: number[];
 };
 
 export type TrajectoryAnalysisResponse = {

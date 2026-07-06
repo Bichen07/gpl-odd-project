@@ -62,6 +62,8 @@ class ClusterInterpretation:
     ego_perspective_summary: List[Dict]
     raw_yaml: str  # Full YAML string
     token_usage: Dict  # {"Prompt": int, "Completion": int, "Total": int}
+    intra_consistency_score: Optional[int] = None   # 1-10 from Step 7
+    intra_notes: Optional[str] = None               # free-text from Step 7
 
 
 class ClusterInterpreter:
@@ -263,6 +265,8 @@ class ClusterInterpreter:
             ego_perspective_summary=parsed.get("ego_perspective_summary", []),
             raw_yaml=final_yaml,
             token_usage=total_tokens,
+            intra_consistency_score=parsed.get("intra_consistency_score"),
+            intra_notes=parsed.get("intra_notes"),
         )
         
         print(f"\n[ClusterInterpreter] ✅ Analysis complete for Cluster {cluster_id}")
@@ -374,6 +378,31 @@ class ClusterInterpreter:
                 f"  - {param}: {self._fmt_metric(min_val, '{:.1f}', '')} to "
                 f"{self._fmt_metric(max_val, '{:.1f}', '')}"
             )
+
+        # Intra-cluster variance (Phase A data injected from cluster.json)
+        iv = stats.get("intra_variance") or {}
+        if iv:
+            lines += ["", "Intra-cluster spread (MFPCA embedding space):"]
+            lines.append(f"  mean_dist_to_centroid: {iv.get('mean_dist_to_medoid', 'n/a')}")
+            lines.append(f"  std_dist_to_centroid:  {iv.get('std_dist_to_medoid', 'n/a')}")
+            lines.append(f"  max_dist_to_centroid:  {iv.get('max_dist_to_medoid', 'n/a')}")
+            outlier_ids = iv.get("outlier_trial_ids", [])
+            outlier_coll = iv.get("outlier_collision", [])
+            if outlier_ids:
+                pairs = [
+                    f"trial {tid} ({'COLLISION' if c else 'no collision'})"
+                    for tid, c in zip(outlier_ids, outlier_coll)
+                ]
+                lines.append(f"  most_atypical_trials: {', '.join(pairs)}")
+
+        # Outlier description text (if a full description was generated for the outlier)
+        outlier_desc = stats.get("outlier_description")
+        if outlier_desc:
+            lines += [
+                "",
+                "Most atypical cluster member (outlier trial) action log:",
+                outlier_desc,
+            ]
 
         return "\n".join(lines)
     

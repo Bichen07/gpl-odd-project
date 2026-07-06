@@ -15,6 +15,7 @@ from collision_partner import (  # noqa: E402
     augment_interactions,
     collision_interaction_to_medoid_doc,
     enrich_collision_interaction,
+    inject_collision_agent_actions,
     parse_collision_from_events,
     polygon_clearance,
     resolve_collision_partner,
@@ -103,6 +104,54 @@ def test_collision_enrichment_has_kinematics():
     assert doc is not None
     assert doc["partner_name"] == "Parking"
     assert doc["ego_speed_mps"] == pytest.approx(4.2, abs=0.1)
+
+
+def test_inject_collision_agent_actions():
+    from description import build_description
+
+    agents = [
+        {"track_id": 0, "name": "Ego", "type": "car", "role": "ego", "actions": []},
+        {"track_id": 1, "name": "Parking", "type": "car", "role": "npc", "actions": []},
+    ]
+    iv = enrich_collision_interaction(
+        {
+            "type": "COLLISION",
+            "with_name": "Parking",
+            "with_track_id": 1,
+            "key_time": 31.69,
+            "min_clearance_m": 0.0,
+            "source": "polygon",
+        },
+        pd.DataFrame({
+            "name": ["Ego", "Parking"],
+            "time": [31.69, 31.69],
+            "x": [430.12, 434.18],
+            "y": [149.9, 149.9],
+            "h": [0.0, 0.0],
+            "speed": [4.3, 0.0],
+            "roadId": [21, 21],
+            "laneId": [-1, -1],
+            "width": [2.2, 2.0],
+            "length": [5.17, 4.5],
+        }),
+        [{"track_id": 0, "name": "Ego"}, {"track_id": 1, "name": "Parking"}],
+    )
+    inject_collision_agent_actions(agents, [iv])
+    ego_coll = [a for a in agents[0]["actions"] if a["action"] == "COLLISION"]
+    park_coll = [a for a in agents[1]["actions"] if a["action"] == "COLLISION"]
+    assert len(ego_coll) == 1
+    assert len(park_coll) == 1
+    assert ego_coll[0]["attributes"]["with_name"] == "Parking"
+
+    text = build_description({
+        "location": "hct_6",
+        "duration": 31.69,
+        "junction_aware": True,
+        "agents": agents,
+        "interactions": [iv],
+    })
+    assert "collides with Parking" in text
+    assert "is struck by Ego" in text
 
 
 @pytest.mark.skipif(

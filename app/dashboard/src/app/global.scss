@@ -2,10 +2,6 @@ body {
   margin: 0;
 }
 
-html[data-color-mode="dark"] {
-  color-scheme: dark;
-}
-
-html[data-color-mode="light"] {
+html {
   color-scheme: light;
 }

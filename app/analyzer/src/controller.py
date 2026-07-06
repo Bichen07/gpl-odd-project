@@ -14,7 +14,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm, LinearSegmentedColor
 import numpy.typing as npt
 from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 from urllib.parse import urlencode, parse_qs, urlparse, quote
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import itertools
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import torch
@@ -1178,6 +1178,27 @@ class UmapProjection:
     data: Dict[str, List[float]]
 
 
+def _real_cluster_count(result: Optional[ClusteringResult]) -> int:
+    """Number of non-noise cluster labels in a clustering result."""
+    if result is None:
+        return 0
+    labels = {str(item.label) for item in result.data.values()}
+    labels.discard("-1")
+    return len(labels)
+
+
+def available_cluster_counts(
+    results: List[Optional[ClusteringResult]],
+) -> List[int]:
+    """Distinct k values (real clusters, excluding noise) present in the grid."""
+    counts: set[int] = set()
+    for result in results:
+        k = _real_cluster_count(result)
+        if k >= 1:
+            counts.add(k)
+    return sorted(counts)
+
+
 @dataclass
 class Mfpca:
     scores: Dict[str, List[float]]
@@ -1190,6 +1211,7 @@ class Mfpca:
     attributes: List[str]
     durationIndices: Optional[Dict[str, List[int]]]
     trialOrder: List[str]
+    availableClusterCounts: List[int] = field(default_factory=list)
     # moreToVizTrialOrder: List[str]
     # moreToVizSeconds: float
     # dendrogram: Dict[str, Dendrogram]
@@ -1450,6 +1472,7 @@ class TrajectoryAnalysisController(Controller):
                     umapProjections=deepcopy(umapProjections),
                     durationIndices=value["clustering_duration_indices"],
                     trialOrder=value["trial_order"],
+                    availableClusterCounts=available_cluster_counts(results),
                 )
 
                 mfpca_dict[key] = mfpcaResult

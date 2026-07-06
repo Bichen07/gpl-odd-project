@@ -366,6 +366,90 @@ def collision_interaction_to_medoid_doc(interaction: Optional[dict]) -> Optional
     }
 
 
+def _collision_action_attributes(iv: dict, *, as_partner: bool) -> dict:
+    """Build action.yaml attributes for a per-agent COLLISION event."""
+    ego = iv.get("ego_at_collision") or {}
+    partner = iv.get("partner_at_collision") or {}
+    base = {
+        "min_clearance_m": iv.get("min_clearance_m"),
+        "source": iv.get("source"),
+        "ego_speed_mps": ego.get("speed_mps"),
+        "partner_speed_mps": partner.get("speed_mps"),
+        "ego_road_id": ego.get("road_id"),
+        "ego_lane_id": ego.get("lane_id"),
+        "ego_x": ego.get("x"),
+        "ego_y": ego.get("y"),
+        "partner_road_id": partner.get("road_id"),
+        "partner_lane_id": partner.get("lane_id"),
+        "partner_x": partner.get("x"),
+        "partner_y": partner.get("y"),
+    }
+    if as_partner:
+        base["with_name"] = ego.get("name", "Ego")
+        base["with_track_id"] = 0
+        base["role"] = "partner"
+    else:
+        base["with_name"] = iv.get("with_name")
+        base["with_track_id"] = iv.get("with_track_id")
+        base["role"] = "ego"
+    return {k: v for k, v in base.items() if v is not None}
+
+
+def inject_collision_agent_actions(
+    agents: List[dict],
+    interactions: List[dict],
+) -> None:
+    """Append sorted per-agent COLLISION actions from enriched interactions."""
+    collisions = [
+        iv for iv in interactions if iv.get("type") == InteractionAction.COLLISION.value
+    ]
+    if not collisions:
+        return
+
+    by_track = {int(a["track_id"]): a for a in agents}
+
+    for iv in collisions:
+        t = round(float(iv.get("key_time") or 0), 2)
+        ego = iv.get("ego_at_collision") or {}
+        partner = iv.get("partner_at_collision") or {}
+        partner_tid = iv.get("with_track_id")
+
+        ego_agent = by_track.get(0)
+        if ego_agent is not None:
+            ego_agent.setdefault("actions", []).append(
+                {
+                    "action": InteractionAction.COLLISION.value,
+                    "start_time": t,
+                    "end_time": t,
+                    "duration": 0.0,
+                    "road_id": int(ego.get("road_id", 0) or 0),
+                    "lane_id": int(ego.get("lane_id", 0) or 0),
+                    "attributes": _collision_action_attributes(iv, as_partner=False),
+                }
+            )
+
+        if partner_tid is not None:
+            pa = by_track.get(int(partner_tid))
+            if pa is not None:
+                pa.setdefault("actions", []).append(
+                    {
+                        "action": InteractionAction.COLLISION.value,
+                        "start_time": t,
+                        "end_time": t,
+                        "duration": 0.0,
+                        "road_id": int(partner.get("road_id", 0) or 0),
+                        "lane_id": int(partner.get("lane_id", 0) or 0),
+                        "attributes": _collision_action_attributes(iv, as_partner=True),
+                    }
+                )
+
+    for agent in agents:
+        agent["actions"] = sorted(
+            agent.get("actions", []),
+            key=lambda a: (float(a.get("start_time", 0)), float(a.get("end_time", 0))),
+        )
+
+
 def infer_closest_approaches(
     df: pd.DataFrame,
     meta_agents: Sequence[dict],

@@ -46,9 +46,35 @@ def main() -> None:
         help="Write stub YAML without calling the LLM",
     )
 
+    # cross-cluster-eval: run Phase 6b + rescore for one run directory
+    cce = sub.add_parser("cross-cluster-eval")
+    cce.add_argument("--run-dir", required=True,
+                     help="results/batch<id>/<k>_cluster_s=.../ directory to evaluate")
+    cce.add_argument("--model", default="gemini-2.5-flash",
+                     help="LLM model (default gemini-2.5-flash)")
+    cce.add_argument("--api-key", default=None)
+    cce.add_argument("--temperature", type=float, default=0.1)
+    cce.add_argument("--dry-run", action="store_true")
+
     args = parser.parse_args()
     source = _source_path()
-    if args.cmd == "cluster-interpret":
+    if args.cmd == "cross-cluster-eval":
+        from .cross_cluster_evaluator import run_cross_cluster_eval
+        from .clustering_quality_scorer import score_run_dir
+
+        result_path = run_cross_cluster_eval(
+            run_dir=Path(args.run_dir),
+            model=getattr(args, "model", "gemini-2.5-flash"),
+            temperature=getattr(args, "temperature", 0.1),
+            api_key=getattr(args, "api_key", None),
+            dry_run=getattr(args, "dry_run", False),
+        )
+        if result_path:
+            score_run_dir(Path(args.run_dir))
+            out = f"cross_cluster_eval written to {result_path}"
+        else:
+            out = "cross-cluster-eval failed"
+    elif args.cmd == "cluster-interpret":
         import json as _json
         model = " ".join(getattr(args, "model", ["gemini-2.5-flash"]))
         dataset = getattr(args, "dataset", None)
@@ -94,7 +120,7 @@ def main() -> None:
         )
         out = f"Wrote {len(outputs)} interpretation(s): {sorted(outputs.keys())}"
     else:
-        parser.error(f"unknown command: {args.cmd}")
+        parser.error(f"unknown command: {args.cmd}")  # type: ignore[unreachable]
     print(out)
 
 

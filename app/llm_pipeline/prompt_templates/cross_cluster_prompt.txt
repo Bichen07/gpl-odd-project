@@ -1,0 +1,83 @@
+<Your Task>
+You are a traffic safety expert evaluating whether a set of driving-scenario clusters forms a *good* behavioral partition.
+
+You will receive:
+1. A summary of each cluster (archetype label, collision rate, intra-cluster consistency score, and a behavior description).
+2. Boundary trial descriptions — pairs of trials that sit right at the border between two adjacent clusters, showing the most similar-yet-different behaviors found.
+3. A question: **Are the clusters behaviorally distinct and well-separated?**
+
+Your task is to:
+1. Rate the **overall behavioral separation** between clusters (1–10).
+2. Rate the **boundary clarity** — how easy it is for a domain expert to tell the clusters apart (1–10).
+3. For every cluster, state its **behavioral archetype** in ≤5 words.
+4. Identify any clusters that are **too similar** and might be candidates for merging.
+5. Identify any cluster whose **intra-cluster consistency is too low** (inconsistent members).
+6. Provide a short overall **inter_notes** paragraph summarizing the findings.
+</Your Task>
+
+<Scoring Guide>
+behavioral_separation_score (1–10):
+  10 = every cluster has a completely distinct driving strategy (e.g., C0=pass-first, C1=proactive-yield, C2=collision, C3=emergency-brake)
+   7 = mostly distinct, one pair shows some overlap in behavior
+   5 = two or more clusters are very similar in strategy, only differing in timing
+   1 = all clusters look like the same behavior with minor variation
+
+boundary_clarity_score (1–10):
+  10 = given only the descriptions, a domain expert could immediately separate all clusters with zero ambiguity
+   7 = mostly clear; one boundary is fuzzy
+   5 = at least two clusters require careful analysis to distinguish
+   1 = descriptions are so similar that assignment seems arbitrary
+</Scoring Guide>
+
+<Mandatory Chain Of Thought>
+### Step 1: Read each cluster archetype
+List each cluster ID, its label, collision rate, and consistency score. Note any that appear similar.
+
+### Step 2: Compare adjacent boundary pairs
+For each boundary trial pair provided:
+- Do the two trials represent qualitatively different strategies, or are they near-identical?
+- What is the smallest parameter difference that produced the behavioral divergence?
+- Does this boundary seem natural and meaningful, or arbitrary?
+
+### Step 3: Rate separation and clarity
+Using the scoring guide, assign scores with justification.
+
+### Step 4: Identify merge candidates
+If any two clusters have overlapping behavior descriptions AND their boundary trials look nearly identical, flag them as merge candidates.
+
+### Step 5: Identify low-consistency clusters
+Any cluster whose intra_consistency_score ≤ 5 should be flagged as potentially needing to be split further.
+</Mandatory Chain Of Thought>
+
+<Final Output Instructions>
+After your Chain of Thought, provide the final JSON output enclosed in ```json ... ``` fences.
+
+```json
+{
+  "behavioral_separation_score": <int 1-10>,
+  "boundary_clarity_score": <int 1-10>,
+  "inter_notes": "<1-3 sentence summary of overall separation quality>",
+  "cluster_summaries": [
+    {
+      "cluster_id": <int>,
+      "archetype": "<≤5 word label>",
+      "intra_score": <int 1-10 or null>
+    }
+  ],
+  "merge_candidates": [
+    "<e.g. 'C1 and C3 show near-identical proactive-yield timing'>"
+  ],
+  "split_candidates": [
+    "<e.g. 'C0 has intra_consistency=4; contains both pass-first and late-yield trials'>"
+  ]
+}
+```
+</Final Output Instructions>
+
+<Cluster Summaries>
+{cluster_summaries}
+</Cluster Summaries>
+
+<Boundary Trial Pairs>
+{boundary_trial_pairs}
+</Boundary Trial Pairs>

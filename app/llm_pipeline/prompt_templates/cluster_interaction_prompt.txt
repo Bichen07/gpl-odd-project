@@ -129,6 +129,21 @@ Risky boundary: Start delay < 1.0s AND oncoming speed > 65 kph (collision risk 1
 
 ### Step 6: Ego-Perspective Summary
 Provide **4-8 key events** from ego's perspective spanning the WHOLE scenario:
+
+### Step 7: Intra-Cluster Consistency
+Using the "Intra-cluster spread" statistics provided above (if available):
+- Does the medoid trajectory represent the cluster well, or is the spread large?
+- Are the most atypical trials (outliers) shown in the stats behaviorally similar to the medoid?
+  For example: if the medoid proactively yields but an outlier aggressively overtakes and collides, consistency is LOW.
+- Rate the intra-cluster behavioral consistency from 1 (highly inconsistent) to 10 (very consistent).
+- Provide a brief note explaining the rating.
+
+If intra-cluster spread data is not available, skip this step and omit the fields from the YAML.
+
+Example:
+"The spread std=0.08 is moderate. The most atypical trial collided while the medoid did not,
+suggesting occasional aggressive behavior in the cluster boundary.
+Rating: 6 — mostly consistent yielding but with edge-case failures."
 - Cover the full timeline from the first relevant maneuver to the FINAL OUTCOME.
 - The BEV snapshots are labelled with their timestamps — use the LATEST snapshots
   and the `Interactions:` section of the action log; do NOT stop at the emergency-
@@ -184,6 +199,9 @@ ego_perspective_summary:
     description: "<event description>"
   # ... (4-8 key events; the LAST event MUST be the final outcome /
   #      collision / near-miss, reaching the end of the scenario)
+# Optional — include only if intra-cluster spread data was provided:
+intra_consistency_score: <int 1-10 or omit>
+intra_notes: "<brief explanation of the score, or omit>"
 ```
 
 **Formatting rules:**
