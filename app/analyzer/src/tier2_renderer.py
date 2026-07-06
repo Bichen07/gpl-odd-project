@@ -28,6 +28,7 @@ from dataset_config import (
     trial_id_to_csv_indices,
     xodr_path_for_dataset,
 )
+from taxonomy import Thresholds
 
 # Default vehicle dimensions when esmini CSV has no width/length
 _AGENT_DEFAULTS = {
@@ -154,6 +155,14 @@ def _combine_labels(prev: str, new: str, max_parts: int = 3) -> str:
     """Join co-occurring frame labels with ``+`` but cap the count so a frame
     where many agents act at once (e.g. every parked car ``start STOPPED`` at
     t=0) does not produce an unbounded title / filename."""
+    for key in ("COLLISION", "NEAR_MISS", "DANGEROUS_CUT_IN", "CLOSEST_APPROACH"):
+        if key in new:
+            extras = [p for p in prev.split("+") if p and key not in p][: max(0, max_parts - 1)]
+            return "+".join([new] + extras) if extras else new
+        if key in prev:
+            extras = [p for p in new.split("+") if p and key not in p][: max(0, max_parts - 1)]
+            return "+".join([prev] + extras) if extras else prev
+
     parts = prev.split("+")
     if new in parts:
         return prev
@@ -226,7 +235,7 @@ def extract_action_timestamps_gpl(
     # the closest-approach moment is never skipped (independent of semantic_only).
     for inter in data.get("interactions") or []:
         name = str(inter.get("type", "interaction"))
-        partner = id_to_token.get(inter.get("with_track_id"))
+        partner = inter.get("with_name") or id_to_token.get(inter.get("with_track_id"))
         suffix = f" with {partner}" if partner else ""
         kt = inter.get("key_time")
         if kt is not None:
@@ -282,7 +291,7 @@ def merge_key_frame_times(
     min_gap: float = DEFAULT_ACTION_MIN_GAP_S,
     collision_timestep: Optional[float] = None,
     heuristic_max_frames: Optional[int] = None,
-    include_proximity_heuristics: bool = True,
+    include_proximity_heuristics: bool = False,
 ) -> List[Tuple[int, str]]:
     """
     Combine action.yaml event times with kinematic heuristics (hybrid mode).
@@ -389,7 +398,7 @@ def resolve_key_frames(
                 action_frames,
                 min_gap=min_gap,
                 collision_timestep=collision_timestep,
-                include_proximity_heuristics=collision_trial,
+                include_proximity_heuristics=False,
             )
         else:
             print("[tier2] hybrid mode: no action frames — using heuristics only")
@@ -519,68 +528,72 @@ def pick_critical_timestamps(
             for j, ci in enumerate(changes[:3]):
                 add(28 + j, idx_near(float(ego_t[ci + 1])), f"ego_road_change_{j + 1}")
 
-        # Closest-approach frames. The medoid often has many agents (one moving
-        # conflict vehicle + several parked/background cars). Snapshotting only
-        # the first agent (alphabetical) missed the actual conflict, so compute
-        # min-distance per agent and prioritise *moving* agents. These frames are
-        # always included (a crossing/oncoming pass is critical even without a
-        # collision) — only the broad "within_20m" marker stays gated.
-        approach: List[Tuple[float, float, str, bool]] = []  # (min_dist, t, name, moving)
-        for other_name in others:
-            oth = (
-                df[df["name"].astype(str).str.strip() == other_name]
-                .sort_values("time")
-                .rename(columns={"x": "x_o", "y": "y_o", "speed": "speed_o"})
-            )
-            merged = pd.merge_asof(
-                ego.sort_values("time"),
-                oth.sort_values("time"),
-                on="time",
-                direction="nearest",
-                tolerance=0.06,
-            )
-            if merged.empty or "x" not in merged.columns or "x_o" not in merged.columns:
-                continue
-            dist = np.hypot(
-                merged["x"].astype(float) - merged["x_o"].astype(float),
-                merged["y"].astype(float) - merged["y_o"].astype(float),
-            ).to_numpy()
-            if not dist.size:
-                continue
-            imin_d = int(np.argmin(dist))
-            t_ca = float(merged["time"].iloc[imin_d])
-            moving = False
-            if "speed_o" in merged.columns:
-                sp = pd.to_numeric(merged["speed_o"], errors="coerce").abs()
-                moving = float(sp.max() or 0.0) > 0.3  # m/s (Thresholds.STOPPED_SPEED)
-            approach.append((float(dist[imin_d]), t_ca, other_name, moving))
-
-        # Moving agents first, then nearest. Snapshot the closest few within 30 m.
-        approach.sort(key=lambda c: (not c[3], c[0]))
-        n_added = 0
-        for min_dist, t_ca, other_name, moving in approach:
-            if min_dist > 30.0:  # Thresholds.NEAR_GAP — beyond this, not relevant
-                break
-            if n_added >= 3:
-                break
-            add(8 + n_added, idx_near(t_ca), f"ego closest to {_other_tag(other_name)}")
-            n_added += 1
-            if include_proximity_heuristics and moving:
-                # Approach onset (first time within 20 m of this agent).
-                oth2 = (
+        # Closest-approach heuristics (legacy fallback when action.yaml lacks interactions).
+        if include_proximity_heuristics:
+            approach: List[Tuple[float, float, str, bool]] = []
+            for other_name in others:
+                oth = (
                     df[df["name"].astype(str).str.strip() == other_name]
                     .sort_values("time")
-                    .rename(columns={"x": "x_o", "y": "y_o"})
+                    .rename(columns={"x": "x_o", "y": "y_o", "speed": "speed_o"})
                 )
-                m2 = pd.merge_asof(ego.sort_values("time"), oth2.sort_values("time"),
-                                   on="time", direction="nearest", tolerance=0.06)
-                if not m2.empty and "x_o" in m2.columns:
-                    d2 = np.hypot(m2["x"].astype(float) - m2["x_o"].astype(float),
-                                  m2["y"].astype(float) - m2["y_o"].astype(float)).to_numpy()
-                    close = np.where(d2 < 20.0)[0]
-                    if len(close):
-                        add(16, idx_near(float(m2["time"].iloc[int(close[0])])),
-                            f"ego within 20m of {_other_tag(other_name)}")
+                merged = pd.merge_asof(
+                    ego.sort_values("time"),
+                    oth.sort_values("time"),
+                    on="time",
+                    direction="nearest",
+                    tolerance=0.06,
+                )
+                if merged.empty or "x" not in merged.columns or "x_o" not in merged.columns:
+                    continue
+                dist = np.hypot(
+                    merged["x"].astype(float) - merged["x_o"].astype(float),
+                    merged["y"].astype(float) - merged["y_o"].astype(float),
+                ).to_numpy()
+                if not dist.size:
+                    continue
+                imin_d = int(np.argmin(dist))
+                t_ca = float(merged["time"].iloc[imin_d])
+                moving = False
+                if "speed_o" in merged.columns:
+                    sp = pd.to_numeric(merged["speed_o"], errors="coerce").abs()
+                    moving = float(sp.max() or 0.0) > 0.3
+                approach.append((float(dist[imin_d]), t_ca, other_name, moving))
+
+            approach.sort(key=lambda c: (not c[3], c[0]))
+            n_added = 0
+            for min_dist, t_ca, other_name, moving in approach:
+                if min_dist > 30.0:
+                    break
+                if n_added >= 3:
+                    break
+                add(8 + n_added, idx_near(t_ca), f"ego closest to {_other_tag(other_name)}")
+                n_added += 1
+                if moving:
+                    oth2 = (
+                        df[df["name"].astype(str).str.strip() == other_name]
+                        .sort_values("time")
+                        .rename(columns={"x": "x_o", "y": "y_o"})
+                    )
+                    m2 = pd.merge_asof(
+                        ego.sort_values("time"),
+                        oth2.sort_values("time"),
+                        on="time",
+                        direction="nearest",
+                        tolerance=0.06,
+                    )
+                    if not m2.empty and "x_o" in m2.columns:
+                        d2 = np.hypot(
+                            m2["x"].astype(float) - m2["x_o"].astype(float),
+                            m2["y"].astype(float) - m2["y_o"].astype(float),
+                        ).to_numpy()
+                        close = np.where(d2 < 20.0)[0]
+                        if len(close):
+                            add(
+                                16,
+                                idx_near(float(m2["time"].iloc[int(close[0])])),
+                                f"ego within 20m of {_other_tag(other_name)}",
+                            )
 
     if collision_timestep is not None:
         add(5, idx_near(float(collision_timestep)), "collision")
@@ -908,56 +921,31 @@ def compose_dual_bev(
     return True
 
 
-def infer_collision_timestep(df: pd.DataFrame, threshold_m: float = 2.5) -> Optional[float]:
-    """Approximate the collision time as the moment of the **global** minimum
-    ego–NPC distance, scanning **every** NPC (not just the first alphabetical one,
-    which is usually a far parked car). This is invoked only for trials whose
-    collision KPI is already True, so the closest-approach moment across all agents
-    is the collision instant; ``threshold_m`` only gates a clearly-spurious result
-    (no agent ever comes near the ego)."""
-    names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
-    ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
-    others = sorted(nm for nm in names if nm != ego_name)
-    if not ego_name or not others:
-        return None
+def infer_collision_timestep(
+    df: pd.DataFrame,
+    threshold_m: float = 2.5,
+    *,
+    meta_agents: Optional[List[dict]] = None,
+    trial_events: Optional[List[dict]] = None,
+    collided: bool = True,
+) -> Optional[float]:
+    """Return collision key time from GT events or polygon clearance."""
+    from collision_partner import resolve_collision_partner
 
-    ego = df[df["name"].astype(str).str.strip() == ego_name].sort_values("time")
-    best_t: Optional[float] = None
-    best_d = float("inf")
-    for nm in others:
-        oth = (
-            df[df["name"].astype(str).str.strip() == nm]
-            .sort_values("time")
-            .rename(columns={"x": "x_o", "y": "y_o"})
-        )
-        merged = pd.merge_asof(
-            ego.sort_values("time"),
-            oth.sort_values("time"),
-            on="time",
-            direction="nearest",
-            tolerance=0.06,
-        )
-        if merged.empty or "x_o" not in merged.columns:
-            continue
-        dist = np.hypot(
-            merged["x"].astype(float) - merged["x_o"].astype(float),
-            merged["y"].astype(float) - merged["y_o"].astype(float),
-        )
-        if not len(dist):
-            continue
-        imin = int(np.argmin(dist))
-        d = float(dist.iloc[imin])
-        if d < best_d:
-            best_d = d
-            best_t = float(merged["time"].iloc[imin])
-
-    if best_t is None:
-        return None
-    # A genuine collision should bring some agent very close; if nothing comes
-    # within ~3x the threshold, treat it as un-inferable rather than mislabel.
-    if best_d > threshold_m * 3.0:
-        return None
-    return best_t
+    agents = meta_agents or []
+    if not agents:
+        registry = build_agent_registry(df)
+        agents = [
+            {"track_id": a["track_id"], "name": a["name"]}
+            for a in registry
+        ]
+    partner = resolve_collision_partner(
+        df,
+        agents,
+        trial_events=trial_events,
+        collided=collided,
+    )
+    return partner.key_time if partner else None
 
 
 def df_to_trajectory_dict(df: pd.DataFrame) -> Tuple[Dict[str, List[dict]], List[float]]:
@@ -990,6 +978,15 @@ def df_to_trajectory_dict(df: pd.DataFrame) -> Tuple[Dict[str, List[dict]], List
 
 
 MAP_OVERVIEW_FILENAME = "map_overview.jpg"
+
+
+def clear_snapshot_dir(output_dir: str | Path) -> None:
+    """Remove all files in a snapshot output folder before a fresh BEV run."""
+    d = Path(output_dir)
+    d.mkdir(parents=True, exist_ok=True)
+    for stale in d.iterdir():
+        if stale.is_file():
+            stale.unlink(missing_ok=True)
 
 
 class Tier2BevRenderer:
@@ -1071,7 +1068,7 @@ class Tier2BevRenderer:
             raise RuntimeError(f"Empty esmini CSV for batch {batch_id} trial {trial_index}")
 
         prefix = file_prefix or f"trial_{trial_index}"
-        os.makedirs(output_dir, exist_ok=True)
+        clear_snapshot_dir(output_dir)
         work = Path(tempfile.mkdtemp(prefix="bev_tier2_"))
         try:
             traj_csv = work / "trajectory.csv"

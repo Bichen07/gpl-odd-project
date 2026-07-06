@@ -75,13 +75,9 @@ from graphql import batch_query, trials_query
 from timer import Timer
 from env import PAYLOAD_API, PAYLOAD_GRAPHQL_API, PAYLOAD_API_KEY
 import analysis_progress
-from predict import calculate_gradients, train_surrogate_model, predict
+from predict import train_surrogate_model
 from TwoDimTTC import getpoints, getpoints_np
-from gradient import train_surrogate_nn_model
 from collections import defaultdict
-from third_party.ts2vec.ts2vec import TS2Vec
-from train import LearningShapeletsCL
-from utils import z_normalize
 import numpy as np
 from PIL import Image
 import matplotlib.cm as cm

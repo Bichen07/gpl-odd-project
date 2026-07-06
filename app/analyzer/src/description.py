@@ -40,9 +40,14 @@ _INTENT_PHRASES = {
 }
 
 _INTERACTION_PHRASES = {
+    "COLLISION": "collision",
     "NEAR_MISS": "near miss",
     "DANGEROUS_CUT_IN": "dangerous cut-in",
+    "CLOSEST_APPROACH": "closest approach",
 }
+
+_CRITICAL_TIER_A = frozenset({"COLLISION", "NEAR_MISS", "DANGEROUS_CUT_IN"})
+_CRITICAL_TIER_B = frozenset({"CLOSEST_APPROACH"})
 
 _RELATION_PHRASES = {
     "FOLLOWING_EGO": "follows the ego vehicle",
@@ -90,6 +95,57 @@ def _narrate_agent(agent: Dict) -> List[str]:
     return lines
 
 
+def _partner_label(iv: Dict) -> str:
+    if iv.get("with_name"):
+        return str(iv["with_name"])
+    tid = iv.get("with_track_id")
+    return f"track {tid}" if tid is not None else "unknown agent"
+
+
+def _format_interaction_detail(iv: Dict) -> str:
+    det = []
+    if iv.get("min_clearance_m") is not None:
+        det.append(f"min clearance {iv['min_clearance_m']} m")
+    if iv.get("min_distance_m") is not None:
+        det.append(f"min distance {iv['min_distance_m']} m")
+    if iv.get("min_ttc_s") is not None:
+        det.append(f"min TTC {iv['min_ttc_s']} s")
+    if iv.get("ego_reaction_accel") is not None:
+        det.append(f"ego braking {iv['ego_reaction_accel']} m/s²")
+    if iv.get("source"):
+        det.append(f"source {iv['source']}")
+    return f" ({', '.join(det)})" if det else ""
+
+
+def _format_collision_structured(iv: Dict) -> List[str]:
+    """Structured collision block for description.txt / LLM prompts."""
+    lines = ["Collision event:"]
+    lines.append(f"  when: t={float(iv.get('key_time', 0)):.1f}s")
+    ego = iv.get("ego_at_collision") or {}
+    partner = iv.get("partner_at_collision") or {}
+    pname = _partner_label(iv)
+    if ego:
+        lines.append(
+            f"  where (ego): road {ego.get('road_id')}, lane {ego.get('lane_id')} "
+            f"(x={ego.get('x')}, y={ego.get('y')})"
+        )
+        lines.append(
+            f"  ego: {ego.get('name', 'Ego')} — speed {ego.get('speed_mps')} m/s"
+        )
+    if partner:
+        lines.append(
+            f"  partner: {pname} (track {iv.get('with_track_id')}) — "
+            f"speed {partner.get('speed_mps')} m/s, "
+            f"road {partner.get('road_id')}, lane {partner.get('lane_id')} "
+            f"(x={partner.get('x')}, y={partner.get('y')})"
+        )
+    if iv.get("min_clearance_m") is not None:
+        lines.append(f"  contact: min clearance {iv['min_clearance_m']} m")
+    if iv.get("source"):
+        lines.append(f"  partner source: {iv['source']}")
+    return lines
+
+
 def build_description(action_data: Dict) -> str:
     parts: List[str] = []
     loc = action_data.get("location", "unknown")
@@ -111,20 +167,34 @@ def build_description(action_data: Dict) -> str:
     # Multi-agent interactions (ego-relative conflicts).
     interactions = action_data.get("interactions") or []
     if interactions:
+        collisions = [
+            iv for iv in interactions if iv.get("type") == "COLLISION"
+        ]
+        if collisions:
+            parts.append("Collision:")
+            for iv in collisions:
+                parts.extend(_format_collision_structured(iv))
+            parts.append("")
+
+        critical = [iv for iv in interactions if iv.get("type") in _CRITICAL_TIER_A | _CRITICAL_TIER_B]
+        if critical:
+            parts.append("Critical moments:")
+            for iv in critical:
+                phrase = _INTERACTION_PHRASES.get(iv.get("type"), str(iv.get("type")).lower())
+                kt = iv.get("key_time")
+                partner = _partner_label(iv)
+                parts.append(
+                    f"  t={kt:.1f}s: {phrase} with {partner}{_format_interaction_detail(iv)}"
+                )
+            parts.append("")
+
         parts.append("Interactions:")
         for iv in interactions:
             phrase = _INTERACTION_PHRASES.get(iv.get("type"), str(iv.get("type")).lower())
             kt = iv.get("key_time")
-            det = []
-            if iv.get("min_distance_m") is not None:
-                det.append(f"min distance {iv['min_distance_m']} m")
-            if iv.get("min_ttc_s") is not None:
-                det.append(f"min TTC {iv['min_ttc_s']} s")
-            if iv.get("ego_reaction_accel") is not None:
-                det.append(f"ego braking {iv['ego_reaction_accel']} m/s²")
-            tail = f" ({', '.join(det)})" if det else ""
+            partner = _partner_label(iv)
             parts.append(
-                f"  t={kt:.1f}s: {phrase} with track {iv.get('with_track_id')}{tail}"
+                f"  t={kt:.1f}s: {phrase} with {partner}{_format_interaction_detail(iv)}"
             )
         parts.append("")
 

@@ -454,6 +454,50 @@ def _cluster_members_from_result(
     return out
 
 
+def _parse_silhouette_from_dirname(dirname: str) -> Optional[float]:
+    m = re.search(r"_s=([\d.]+)", dirname)
+    if not m:
+        return None
+    try:
+        return float(m.group(1))
+    except ValueError:
+        return None
+
+
+def load_from_reference_run(
+    run_dir: Path,
+) -> Optional[Tuple[Dict[str, Any], List[Dict[str, Any]], Optional[float]]]:
+    """Load clustering assignments + medoid list from a prior ``results/`` run."""
+    run_dir = Path(run_dir)
+    clustering_path = run_dir / "clustering" / "selectedClusteringResult.json"
+    manifest_path = run_dir / "manifest.json"
+    if not clustering_path.is_file() or not manifest_path.is_file():
+        print(f"❌ ERROR: --from-run needs clustering/selectedClusteringResult.json "
+              f"and manifest.json under {run_dir}")
+        return None
+    with clustering_path.open() as f:
+        result_data = json.load(f)
+    with manifest_path.open() as f:
+        manifest = json.load(f)
+    medoids: List[Dict[str, Any]] = []
+    for c in manifest.get("clusters") or []:
+        medoids.append({
+            "cluster_label": str(c["label"]),
+            "trial_id": str(c["trial_id"]),
+            "batch_id": int(c["batch_id"]),
+            "trial_index": int(c["trial_index"]),
+            "size": int(c.get("size", 1)),
+        })
+    silhouette = _parse_silhouette_from_dirname(run_dir.name)
+    if silhouette is None:
+        sv = (result_data.get("scores") or {}).get("silhouetteScore")
+        if isinstance(sv, (int, float)):
+            silhouette = float(sv)
+    print(f"  Loaded reference run: {len(medoids)} medoids, "
+          f"k={manifest.get('n_clusters')}, silhouette={silhouette}")
+    return result_data, medoids, silhouette
+
+
 def backfill_cluster_stats_in_dir(
     results_dir: str,
     batch_id: int,
@@ -487,7 +531,7 @@ def backfill_cluster_stats_in_dir(
     )
     if not clustering_data:
         return False
-    _emb, result_data, trial_index_map, collision_flags, metric_stats = clustering_data
+    _emb, result_data, trial_index_map, collision_flags, metric_stats, _trials = clustering_data
 
     from pipeline_imports import ensure_llm_pipeline
 
@@ -722,7 +766,7 @@ def load_clustering_from_payload_save(
     print(f"  Computed per-cluster metric stats for {len(metric_stats)} clusters "
           f"({n_with_ttc} with TTC).")
 
-    return embeddings_data, result_data, trial_index_map, collision_flags, metric_stats
+    return embeddings_data, result_data, trial_index_map, collision_flags, metric_stats, ego_data.get("trials", {})
 
 
 def compute_medoids(
@@ -1021,13 +1065,15 @@ def write_context_md(
             det = []
             if iv.get("min_distance_m") is not None:
                 det.append(f"min dist {iv['min_distance_m']}m")
+            if iv.get("min_clearance_m") is not None:
+                det.append(f"min clearance {iv['min_clearance_m']}m")
             if iv.get("min_ttc_s") is not None:
                 det.append(f"min TTC {iv['min_ttc_s']}s")
             if iv.get("ego_reaction_accel") is not None:
                 det.append(f"ego accel {iv['ego_reaction_accel']}m/s²")
             lines.append(
                 f"| {iv.get('key_time')}s | {iv.get('type')} | "
-                f"track {iv.get('with_track_id')} | {', '.join(det)} |"
+                f"{iv.get('with_name') or ('track ' + str(iv.get('with_track_id')))} | {', '.join(det)} |"
             )
         lines.append("")
 
@@ -1055,7 +1101,7 @@ def process_medoid(
     snapshot_output_px: int = 1024,
     snapshot_border_frac: float = 0.10,
     typography=None,
-    key_frame_mode: str = "hybrid",
+    key_frame_mode: str = "action",
     max_snapshots: Optional[int] = None,
     semantic_only: bool = False,
     collision_flags: Optional[Dict[str, bool]] = None,
@@ -1063,6 +1109,9 @@ def process_medoid(
     n_clusters: Optional[int] = None,
     silhouette: Optional[float] = None,
     ego_zoom_radius: float = 30.0,
+    trials_meta: Optional[Dict[str, Any]] = None,
+    contact_clearance_m: float = 0.5,
+    conflict_relevance_m: float = 5.0,
 ) -> bool:
     """Process a single medoid trial: generate all required files.
     
@@ -1133,15 +1182,32 @@ def process_medoid(
     
     # 6. Action labelling (Step 2) + scenario description (Step 3)
     #    Rule-based, map-agnostic (taxonomy.py / labeller.py / description.py).
+    from pipeline_imports import ensure_llm_pipeline
+
+    ensure_llm_pipeline()
+    from llm_pipeline.cluster_stats import trial_collision_flag
+
     action_data_for_ctx: Optional[Dict[str, Any]] = None
+    trial_id = str(medoid.get("trial_id") or "")
+    medoid_collided = trial_collision_flag(collision_flags or {}, trial_id) or bool(
+        medoid.get("collided")
+    )
+    trial_info = (trials_meta or {}).get(trial_id) if trials_meta else None
+    trial_events = trial_info.get("events") if isinstance(trial_info, dict) else None
     try:
         from labeller import label_trajectory, save_action_yaml
         from description import build_description, save_description_txt
 
         map_yaml = RESULTS_DIR / "map" / f"{Path(xodr_path).stem}.yaml"
         action_data = label_trajectory(
-            trajectory_path, meta_path,
+            trajectory_path,
+            meta_path,
             map_yaml if map_yaml.is_file() else None,
+            esmini_df=df,
+            trial_events=trial_events,
+            collided=medoid_collided,
+            contact_clearance_m=contact_clearance_m,
+            conflict_relevance_m=conflict_relevance_m,
         )
         action_data_for_ctx = action_data
         save_action_yaml(action_data, cluster_dir / "action.yaml")
@@ -1154,19 +1220,8 @@ def process_medoid(
     except Exception as e:
         print(f"  ⚠️  Action/description generation failed: {e}")
 
-    from pipeline_imports import ensure_llm_pipeline
-
-    ensure_llm_pipeline()
-    from llm_pipeline.cluster_stats import trial_collision_flag
-
-    trial_id = str(medoid.get("trial_id") or "")
-    medoid_collided = trial_collision_flag(collision_flags or {}, trial_id)
-
     # 7. Generate BEV snapshots (Step 4 — MapPlotter + odrplot tracks)
     snapshots_dir = cluster_dir / "snapshots"
-    snapshots_dir.mkdir(exist_ok=True)
-    for stale in list(snapshots_dir.glob("*.jpg")) + list(snapshots_dir.glob("*.png")):
-        stale.unlink(missing_ok=True)
     try:
         from tier2_renderer import (
             Tier2BevRenderer,
@@ -1179,9 +1234,16 @@ def process_medoid(
             action_yaml = cluster_dir / "action.yaml"
             collision_ts = None
             if medoid_collided:
-                collision_ts = infer_collision_timestep(df)
+                with open(meta_path) as mf:
+                    meta_for_collision = yaml.safe_load(mf) or {}
+                collision_ts = infer_collision_timestep(
+                    df,
+                    meta_agents=meta_for_collision.get("agents", []),
+                    trial_events=trial_events,
+                    collided=True,
+                )
                 if collision_ts is not None:
-                    print(f"  ✓ Inferred collision timestep {collision_ts:.2f}s")
+                    print(f"  ✓ Collision key time {collision_ts:.2f}s")
 
             tier2 = Tier2BevRenderer(
                 str(map_tracks),
@@ -1215,9 +1277,28 @@ def process_medoid(
     # 8. Consolidated cluster.json (merges old meta.yaml + medoid.json + stats.json).
     #    observations.json is no longer written — trajectory.csv is the single raw timeline.
     try:
+        from collision_partner import collision_interaction_to_medoid_doc
+
         duration = (observations[-1]["time"] - observations[0]["time"]) if observations else 0
         agent_names = [ag.name for ag in registry if ag.name != "Ego"]
         cc = cluster_collision_stats or {}
+        collision_iv = None
+        if action_data_for_ctx:
+            for iv in action_data_for_ctx.get("interactions") or []:
+                if iv.get("type") == "COLLISION":
+                    collision_iv = iv
+                    break
+        collision_doc = collision_interaction_to_medoid_doc(collision_iv)
+        medoid_block = {
+            "trial_id": medoid.get("trial_id"),
+            "batch_id": batch_id,
+            "trial_index": trial_index,
+            "medoid_rank": medoid.get("medoid_rank", 0),
+            "is_exact_medoid": medoid.get("is_exact_medoid", True),
+            "collided": medoid_collided,
+        }
+        if collision_doc:
+            medoid_block["collision"] = collision_doc
         cluster_doc = {
             "cluster": {
                 "label": label,
@@ -1232,14 +1313,7 @@ def process_medoid(
                 "mean_spret": cc.get("mean_spret"),
                 "parameter_ranges": cc.get("parameter_ranges") or {},
             },
-            "medoid": {
-                "trial_id": medoid.get("trial_id"),
-                "batch_id": batch_id,
-                "trial_index": trial_index,
-                "medoid_rank": medoid.get("medoid_rank", 0),
-                "is_exact_medoid": medoid.get("is_exact_medoid", True),
-                "collided": medoid_collided if collision_flags else None,
-            },
+            "medoid": medoid_block,
             "scene": {
                 "dataset": "gpl-odd-simulated",
                 "location": location_for_meta,
@@ -1448,10 +1522,31 @@ def main():
         help="Font size (pt) for map_overview title (default: 7.0)",
     )
     parser.add_argument(
+        "--from-run",
+        type=str,
+        default=None,
+        metavar="PATH",
+        help="Rebuild from an existing results run (reads manifest.json + "
+             "clustering/selectedClusteringResult.json). Use with --batch-id to "
+             "reload collision KPI / trial events from Payload.",
+    )
+    parser.add_argument(
         "--key-frame-mode",
         choices=("action", "hybrid", "heuristic"),
-        default="hybrid",
-        help="BEV key frames: action.yaml events, hybrid (+ heuristics), or heuristic only",
+        default="action",
+        help="BEV key frames: action.yaml events (default), hybrid (+ heuristics), or heuristic only",
+    )
+    parser.add_argument(
+        "--contact-clearance-m",
+        type=float,
+        default=0.5,
+        help="Polygon gap (m) treated as vehicle contact for collision partner",
+    )
+    parser.add_argument(
+        "--conflict-relevance-m",
+        type=float,
+        default=5.0,
+        help="Max polygon gap (m) for moving-agent CLOSEST_APPROACH",
     )
     parser.add_argument(
         "--max-snapshots",
@@ -1553,13 +1648,50 @@ def main():
     trial_index_map: Optional[Dict[str, Tuple[int, int]]] = None
     payload_collision_flags: Optional[Dict[str, bool]] = None
     payload_metric_stats: Dict[str, Dict[str, Any]] = {}
+    trials_meta: Dict[str, Any] = {}
 
     # --- Step 1: Load clustering data ---
-    if args.trials:
+    ref_silhouette: Optional[float] = None
+    if args.from_run:
+        ref_path = Path(args.from_run)
+        if not ref_path.is_absolute():
+            candidates = [RESULTS_DIR / ref_path, PROJECT_ROOT / ref_path]
+            ref_path = next((p for p in candidates if p.is_dir()), ref_path)
+        print(f"\n📂 Rebuilding from reference run: {ref_path}")
+        loaded = load_from_reference_run(ref_path)
+        if not loaded:
+            sys.exit(1)
+        result_data, medoids, ref_silhouette = loaded
+        real_labels = {v["label"] for v in result_data.get("data", {}).values()} - {"-1"}
+        n_clusters = len(real_labels)
+        if args.batch_id is None and medoids:
+            args.batch_id = medoids[0].get("batch_id")
+            print(f"  Inferred --batch-id {args.batch_id} from manifest")
+        if args.batch_id is not None:
+            fetched = _fetch_payload_analysis(
+                batch_id=args.batch_id,
+                save_doc_id=args.save_doc_id,
+                duration_mode=args.duration_mode,
+                ego_name=args.ego_name,
+            )
+            if fetched:
+                _scores, _clist, ego_data, _sel = fetched
+                payload_collision_flags = _collision_flags_from_ego(ego_data)
+                trials_meta = ego_data.get("trials") or {}
+                payload_metric_stats = _cluster_metric_stats_from_ego(ego_data, result_data)
+                n_coll = sum(1 for v in payload_collision_flags.values() if v)
+                print(f"  Loaded collision KPI for {len(payload_collision_flags)} trials "
+                      f"({n_coll} collided)")
+            else:
+                print("  ⚠️  Could not fetch Payload analysis — cluster collision stats may be incomplete")
+
+    elif args.trials:
         print(f"\n📝 Using manually specified trials: {args.trials}")
         medoids = []
         for i, trial_spec in enumerate(args.trials.split(",")):
-            batch_id_t, trial_index_t = map(int, trial_spec.strip().split(":"))
+            parts = trial_spec.strip().split(":")
+            batch_id_t, trial_index_t = int(parts[0]), int(parts[1])
+            collided_flag = len(parts) > 2 and parts[2].lower() in ("1", "true", "collision", "collided")
             if not csv_exists(batch_id_t, trial_index_t):
                 print(f"  ⚠️  WARNING: CSV not found for batch {batch_id_t} trial {trial_index_t}")
                 continue
@@ -1569,6 +1701,7 @@ def main():
                 "batch_id": batch_id_t,
                 "trial_index": trial_index_t,
                 "size": 1,
+                "collided": collided_flag,
             })
         if not medoids:
             print("❌ ERROR: None of the specified trials have available CSVs")
@@ -1588,7 +1721,7 @@ def main():
         if not clustering_data:
             sys.exit(1)
 
-        embeddings_data, result_data, trial_index_map, payload_collision_flags, payload_metric_stats = clustering_data
+        embeddings_data, result_data, trial_index_map, payload_collision_flags, payload_metric_stats, trials_meta = clustering_data
         # Update n_clusters from the actual selection (real label count)
         real_labels = {v["label"] for v in result_data.get("data", {}).values()} - {"-1"}
         n_clusters = len(real_labels)
@@ -1650,8 +1783,8 @@ def main():
     #   results/batch<id>/<k>_cluster_s=<silhouette>/cluster<N>/...
     # The silhouette suffix keeps multiple results with the same k (but different
     # clustering params) in separate folders.
-    silhouette: Optional[float] = None
-    if result_data is not None:
+    silhouette: Optional[float] = args.silhouette or ref_silhouette
+    if silhouette is None and result_data is not None:
         sv = (result_data.get("scores", {}) or {}).get("silhouetteScore")
         if isinstance(sv, (int, float)):
             silhouette = float(sv)
@@ -1697,7 +1830,7 @@ def main():
     clustering_dir = run_dir / "clustering"
     clustering_dir.mkdir(exist_ok=True)
 
-    if is_payload_save:
+    if is_payload_save or args.from_run:
         # Write the selected result directly (no alldatasets file to copy)
         if result_data is not None:
             with (clustering_dir / "selectedClusteringResult.json").open("w") as f:
@@ -1786,6 +1919,9 @@ def main():
             n_clusters=n_clusters,
             silhouette=silhouette,
             ego_zoom_radius=args.ego_zoom_radius,
+            trials_meta=trials_meta,
+            contact_clearance_m=args.contact_clearance_m,
+            conflict_relevance_m=args.conflict_relevance_m,
         ):
             success_count += 1
 

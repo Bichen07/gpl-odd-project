@@ -63,7 +63,7 @@ class BevTypography:
     road_label_size: float = 5.6
     lane_label_size: float = 5.6
     road_label_plain_size: float = 4.8
-    agent_id_fontsize: float = 4.0
+    agent_id_fontsize: float = 6.0
     info_fontsize: float = 8.0
     scope_fontsize: float = 7.0
     title_fontsize: float = 7.0

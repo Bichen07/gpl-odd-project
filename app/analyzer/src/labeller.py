@@ -477,7 +477,15 @@ def detect_interactions(df: pd.DataFrame) -> List[Dict]:
 
 
 def label_trajectory(
-    traj_path: Path, meta_path: Path, map_path: Optional[Path] = None
+    traj_path: Path,
+    meta_path: Path,
+    map_path: Optional[Path] = None,
+    *,
+    esmini_df: Optional[pd.DataFrame] = None,
+    trial_events: Optional[List[dict]] = None,
+    collided: bool = False,
+    contact_clearance_m: float = Thresholds.CONTACT_CLEARANCE_M,
+    conflict_relevance_m: float = Thresholds.CONFLICT_RELEVANCE_M,
 ) -> Dict:
     """Return the action.yaml dict for a medoid trajectory."""
     df = _normalize_columns(pd.read_csv(traj_path))
@@ -514,6 +522,30 @@ def label_trajectory(
         agents_out.append(entry)
 
     interactions = detect_interactions(df)
+
+    if esmini_df is not None and not esmini_df.empty:
+        from collision_partner import augment_interactions
+
+        interactions = augment_interactions(
+            interactions,
+            esmini_df,
+            meta.get("agents", []),
+            trial_events=trial_events,
+            collided=collided,
+            contact_clearance_m=contact_clearance_m,
+            conflict_relevance_m=conflict_relevance_m,
+        )
+    else:
+        track_to_name = {
+            int(ag["track_id"]): str(ag.get("name", f"agent_{ag['track_id']}"))
+            for ag in meta.get("agents", [])
+        }
+        interactions = [
+            {**iv, "with_name": track_to_name.get(int(iv["with_track_id"]), f"track {iv['with_track_id']}")}
+            if iv.get("with_track_id") is not None
+            else iv
+            for iv in interactions
+        ]
 
     return {
         "dataset": meta.get("dataset"),
