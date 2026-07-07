@@ -1,4 +1,4 @@
-import { LayoutData } from "rc-dock";
+import { LayoutData, PanelData, DockContext } from "rc-dock";
 import Heatmap from "./panels/Heatmap";
 import Replayer from "./panels/Replayer";
 import ClusteringSelection from "./panels/ClusteringSelection";
@@ -7,6 +7,41 @@ import ProjectionSpace from "./panels/ProjectionSpace";
 import ParameterSpace from "./panels/ParameterSpace";
 import Legends from "./panels/Legends";
 import MissionControl from "./panels/MissionControl";
+import ScatterplotControlsHelp from "@/app/_shared/components/ScatterplotControlsHelp";
+
+// Renders the tab-bar extra content for the scatterplot panels: the shared "?"
+// controls-help button followed by the native maximize/restore button.
+//
+// rc-dock renders the default maximize button only when a panel has NO custom
+// `panelExtra`. Because we set `panelLock.panelExtra`, that default button is
+// suppressed, so we have to render it ourselves (identical markup + behaviour)
+// right after the help button — keeping the fullscreen toggle every other panel
+// has. `context` is always supplied by rc-dock at call time; it's typed
+// optional only so the function stays assignable to `PanelLock.panelExtra`.
+const renderScatterplotHelp = (
+  panel: PanelData,
+  context?: DockContext,
+): React.ReactElement => {
+  const title =
+    panel.activeId === "parameterSpace"
+      ? "Parameter Space controls"
+      : panel.activeId === "projectionSpace"
+        ? "Trajectory Projection controls"
+        : null;
+  if (title == null) {
+    return <span />;
+  }
+  const isMaximized = panel.parent?.mode === "maximize";
+  return (
+    <>
+      <ScatterplotControlsHelp title={title} />
+      <div
+        className={isMaximized ? "dock-panel-min-btn" : "dock-panel-max-btn"}
+        onClick={() => context?.dockMove(panel, null, "maximize")}
+      />
+    </>
+  );
+};
 
 const layout: LayoutData = {
   dockbox: {
@@ -16,7 +51,7 @@ const layout: LayoutData = {
       {
         id: "miscDock",
         mode: "vertical",
-        size: 50,
+        size: 120,
         children: [
           {
             id: "1-misc-top",
@@ -51,7 +86,7 @@ const layout: LayoutData = {
       {
         id: "parameterSpaceDock",
         mode: "vertical",
-        size: 90,
+        size: 200,
         children: [
           {
             id: "2-space-top",
@@ -62,6 +97,7 @@ const layout: LayoutData = {
                 content: <ParameterSpace />,
               },
             ],
+            panelLock: { panelExtra: renderScatterplotHelp },
           },
           {
             id: "2-space-down",
@@ -77,6 +113,7 @@ const layout: LayoutData = {
                 content: <ProjectionSpace />,
               },
             ],
+            panelLock: { panelExtra: renderScatterplotHelp },
           },
         ],
       },
@@ -100,7 +137,7 @@ const layout: LayoutData = {
       {
         id: "replayDock",
         mode: "vertical",
-        size: 40,
+        size: 250,
         children: [
           {
             id: "4-middle-panel",

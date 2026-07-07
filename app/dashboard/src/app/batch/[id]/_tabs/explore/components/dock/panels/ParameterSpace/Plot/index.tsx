@@ -197,6 +197,13 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   const selectedTrialIds = useAppSelector(
     (state) => state.batch.selectedTrialIds,
   );
+  const clusterAnalysis = useAppSelector(
+    (state) => state.batch.clusterAnalysisByEgo?.[egoName] ?? null,
+  );
+  const medoidTrialIds = useMemo(
+    () => new Set(Object.values(clusterAnalysis?.medoids ?? {})),
+    [clusterAnalysis],
+  );
   const gridMode = useAppSelector((state) => state.batch.gridMode);
 
   // useEffect(() => {
@@ -246,6 +253,12 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   > | null>(null);
 
   const [points, setPoints] = useState<number[][]>([]);
+  const medoidPointIndices = useMemo(() => {
+    const order = globalStorage.trialOrder[egoName] ?? [];
+    return order
+      .map((tid, i) => (medoidTrialIds.has(tid) ? i : -1))
+      .filter((i) => i >= 0);
+  }, [medoidTrialIds, points, egoName]);
   const [scales, setScales] = useState<{
     x: ReturnType<typeof scaleLinear<number>>;
     y: ReturnType<typeof scaleLinear<number>>;
@@ -325,6 +338,37 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     });
   }, [svgParentSize.width, svgParentSize.height]);
 
+  // Keep the scatterplot's data aspect ratio equal to the canvas aspect ratio.
+  // regl-scatterplot otherwise forces the data into a centered SQUARE region
+  // (letterboxing), so widening/narrowing the panel leaves the points fixed in
+  // a square while the axes span the full panel — the points end up on the
+  // wrong horizontal position. Syncing aspectRatio = width / height makes the
+  // points + background image stretch to fill the panel and stay aligned with
+  // the axes. The two parameter axes are independent physical quantities, so
+  // stretching each axis to fill is correct here (unlike the distance-preserving
+  // projection plot, which is intentionally left square).
+  //
+  // We measure the canvas element directly (getBoundingClientRect) rather than
+  // reusing svgParentSize, because regl-scatterplot computes its own
+  // viewAspectRatio from `canvas.getBoundingClientRect()`. If our aspectRatio is
+  // taken from a slightly different measurement (svgParentSize is debounced and
+  // reports the content-box, which can lag), the X data domain no longer maps
+  // exactly onto [xMin, xMax] and the horizontal axis labels drift (e.g. showing
+  // ~-0.3..9 instead of 1..8). Reading the same element regl reads keeps them in
+  // lockstep.
+  useEffect(() => {
+    if (scatterplot == null || canvasRef.current == null) {
+      return;
+    }
+    const rect = canvasRef.current.getBoundingClientRect();
+    if (!rect.width || !rect.height) {
+      return;
+    }
+    (scatterplot as { set: (props: Record<string, unknown>) => void }).set({
+      aspectRatio: rect.width / rect.height,
+    });
+  }, [scatterplot, svgParentSize.width, svgParentSize.height]);
+
   useEffect(() => {
     if (
       globalStorage.camera != null &&
@@ -400,8 +444,21 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
 
       lassoMinDelay: 10,
       lassoMinDist: 2,
-      lassoOnLongPress: true,
-      lassoInitiator: true,
+      lassoInitiator: false,
+      // Left button is dedicated to selection: a plain left-drag draws a
+      // selection range directly, a single left-click selects one point, and
+      // ctrl+left-click adds to the current selection. Panning the background
+      // is handled separately with the middle mouse button (see the pan
+      // handler below), so the left button never pans.
+      mouseMode: "lasso",
+      ...({
+        actionKeyMap: {
+          lasso: "shift",
+          rotate: "alt",
+          merge: "ctrl",
+          remove: "alt",
+        },
+      } as any),
 
       sizeBy: "value2",
       colorBy: "value1",
@@ -490,8 +547,55 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     console.log("SET NEW SCATTER PLOT");
     setScatterPlot(plot);
 
+    // --- Middle-mouse-button panning ---------------------------------------
+    // The left mouse button is reserved for selection (mouseMode "lasso"), so
+    // we disable the camera's built-in left-drag pan and instead pan when the
+    // user drags with the middle mouse button (the scroll wheel button).
+    const anyPlot = plot as any;
+    const cameraController = anyPlot.get("camera");
+    cameraController?.config?.({ isPan: false });
+
+    const panCanvas = canvasRef.current;
+    let midPanning = false;
+    let lastPanX = 0;
+    let lastPanY = 0;
+    const onPanMouseDown = (event: globalThis.MouseEvent) => {
+      if (event.button !== 1) return; // middle mouse button only
+      event.preventDefault();
+      midPanning = true;
+      lastPanX = event.clientX;
+      lastPanY = event.clientY;
+    };
+    const onPanMouseMove = (event: globalThis.MouseEvent) => {
+      if (!midPanning || panCanvas == null) return;
+      const rect = panCanvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const aspect = rect.width / rect.height;
+      const panX = ((event.clientX - lastPanX) / rect.width) * 2 * aspect;
+      const panY = ((lastPanY - event.clientY) / rect.height) * 2;
+      lastPanX = event.clientX;
+      lastPanY = event.clientY;
+      cameraController?.pan?.([panX, panY]);
+      anyPlot.redraw?.();
+    };
+    const onPanMouseUp = (event: globalThis.MouseEvent) => {
+      if (event.button === 1) midPanning = false;
+    };
+    // Prevent the browser's middle-click autoscroll cursor on the canvas.
+    const onAuxClick = (event: globalThis.MouseEvent) => {
+      if (event.button === 1) event.preventDefault();
+    };
+    panCanvas?.addEventListener("mousedown", onPanMouseDown, { passive: false });
+    window.addEventListener("mousemove", onPanMouseMove, { passive: true });
+    window.addEventListener("mouseup", onPanMouseUp, { passive: true });
+    panCanvas?.addEventListener("auxclick", onAuxClick);
+
     return () => {
       console.log("plot destoryed");
+      panCanvas?.removeEventListener("mousedown", onPanMouseDown);
+      window.removeEventListener("mousemove", onPanMouseMove);
+      window.removeEventListener("mouseup", onPanMouseUp);
+      panCanvas?.removeEventListener("auxclick", onAuxClick);
       plot.destroy();
     };
   }, [
@@ -663,11 +767,13 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         selectedMetric?: CriticalityMetric | null,
         selectedSafetyBoundaryMetric?: CriticalityMetric | null,
         showPoints: boolean = true,
+        medoidTrialIds: Set<string> = new Set(),
       ) => {
         console.log("DRAW POINTS PARAMERTER SPACE");
 
         const newPoints = points;
         const selectedIndices = [];
+        const medoidIndices: number[] = [];
         const filteredIndices = [];
         for (const [i, trial] of trials.entries()) {
           const trialId = String(trial?.id) ?? "";
@@ -676,6 +782,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             if (selected) {
               selectedIndices.push(i);
             }
+          }
+          if (medoidTrialIds.has(trialId)) {
+            medoidIndices.push(i);
           }
 
           const filtered =
@@ -768,6 +877,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         scatterplot.draw(points, {
           spatialIndex,
           filter: filteredIndices,
+          // Medoids are marked with their own SVG circle overlay, so they must
+          // NOT be part of the scatterplot's selection state — otherwise a
+          // ctrl+click (merge) would drag the medoids into the user's selection.
           select: selectedIndices,
         });
         setPointsDrawn(true);
@@ -822,6 +934,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       undefined,
       selectedMetric,
       selectedSafetyBoundaryMetric,
+      true,
+      medoidTrialIds,
     );
 
     globalStorage.points[egoName] = points;
@@ -925,6 +1039,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         selectedMetric,
         selectedSafetyBoundaryMetric,
         showPoints,
+        medoidTrialIds,
       );
 
       globalStorage.points[egoName] = newPoints;
@@ -937,6 +1052,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     colorMode,
     selectedTrialIds,
     showPoints,
+    medoidTrialIds,
   ]);
 
   useEffect(() => {
@@ -1177,6 +1293,28 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
                     </Box>
                   );
                 })}
+              {!pointsDrawn || medoidPointIndices.length === 0
+                ? null
+                : medoidPointIndices.map((pointIdx) => {
+                    try {
+                      const point = scatterplot?.getScreenPosition(pointIdx);
+                      if (!point) return null;
+                      return (
+                        <circle
+                          key={`medoid-${pointIdx}`}
+                          cx={point[0]}
+                          cy={point[1]}
+                          r={10}
+                          fill="none"
+                          stroke="#fff"
+                          strokeWidth={3}
+                          style={{ pointerEvents: "none" }}
+                        />
+                      );
+                    } catch {
+                      return null;
+                    }
+                  })}
           </Group>
         </svg>
 

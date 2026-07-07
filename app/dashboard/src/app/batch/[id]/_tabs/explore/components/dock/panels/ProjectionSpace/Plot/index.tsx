@@ -3,7 +3,6 @@
 import chroma from "chroma-js";
 import _ from "lodash";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
-import CloseIcon from "@mui/icons-material/Close";
 
 import { AxisLeft, AxisBottom } from "@visx/axis";
 import { Group } from "@visx/group";
@@ -16,8 +15,6 @@ import {
   Typography,
   ToggleButton,
   ToggleButtonGroup,
-  IconButton,
-  Drawer,
   Select,
   Button,
 } from "@mui/material";
@@ -39,7 +36,6 @@ import {
 import { colorModes, ColorMode } from "../../../../../redux/slices/batch";
 import { useAppDispatch, useAppSelector } from "../../../../../redux/hooks";
 import createScatterplot from "regl-scatterplot";
-// import FunctionalCurves from "./FunctionalCurves";
 import { noiseColor } from "@/app/_shared/utils";
 import { Settings } from "@mui/icons-material";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
@@ -160,6 +156,13 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   const selectedTrialIds = useAppSelector(
     (state) => state.batch.selectedTrialIds
   );
+  const clusterAnalysis = useAppSelector(
+    (state) => state.batch.clusterAnalysisByEgo?.[egoName] ?? null,
+  );
+  const medoidTrialIds = useMemo(
+    () => new Set(Object.values(clusterAnalysis?.medoids ?? {})),
+    [clusterAnalysis],
+  );
   const shapeStrings = useAppSelector((state) => state.batch.shapeStrings);
   const selectedMetric = useAppSelector((state) => state.batch.selectedMetric);
 
@@ -181,6 +184,12 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     typeof createScatterplot
   > | null>(null);
   const [points, setPoints] = useState<number[][]>([]);
+  const medoidPointIndices = useMemo(() => {
+    const order = globalStorage.trialOrder[egoName] ?? [];
+    return order
+      .map((tid, i) => (medoidTrialIds.has(tid) ? i : -1))
+      .filter((i) => i >= 0);
+  }, [medoidTrialIds, points, egoName]);
   const [mfpcaScores, setMfpcaScores] = useState<[string, number[]][]>([]);
 
   const [isReady, setIsReady] = useState(false);
@@ -322,8 +331,21 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
 
       lassoMinDelay: 10,
       lassoMinDist: 2,
-      lassoOnLongPress: true,
-      lassoInitiator: true,
+      lassoInitiator: false,
+      // Left button is dedicated to selection: a plain left-drag draws a
+      // selection range directly, a single left-click selects one point, and
+      // ctrl+left-click adds to the current selection. Panning the background
+      // is handled separately with the middle mouse button (see the pan
+      // handler below), so the left button never pans.
+      mouseMode: "lasso",
+      ...({
+        actionKeyMap: {
+          lasso: "shift",
+          rotate: "alt",
+          merge: "ctrl",
+          remove: "alt",
+        },
+      } as any),
 
       sizeBy: "value1",
       colorBy: "value1",
@@ -397,7 +419,54 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
 
     setScatterPlot(plot);
 
+    // --- Middle-mouse-button panning ---------------------------------------
+    // The left mouse button is reserved for selection (mouseMode "lasso"), so
+    // we disable the camera's built-in left-drag pan and instead pan when the
+    // user drags with the middle mouse button (the scroll wheel button).
+    const anyPlot = plot as any;
+    const cameraController = anyPlot.get("camera");
+    cameraController?.config?.({ isPan: false });
+
+    const panCanvas = canvasRef.current;
+    let midPanning = false;
+    let lastPanX = 0;
+    let lastPanY = 0;
+    const onPanMouseDown = (event: globalThis.MouseEvent) => {
+      if (event.button !== 1) return; // middle mouse button only
+      event.preventDefault();
+      midPanning = true;
+      lastPanX = event.clientX;
+      lastPanY = event.clientY;
+    };
+    const onPanMouseMove = (event: globalThis.MouseEvent) => {
+      if (!midPanning || panCanvas == null) return;
+      const rect = panCanvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const aspect = rect.width / rect.height;
+      const panX = ((event.clientX - lastPanX) / rect.width) * 2 * aspect;
+      const panY = ((lastPanY - event.clientY) / rect.height) * 2;
+      lastPanX = event.clientX;
+      lastPanY = event.clientY;
+      cameraController?.pan?.([panX, panY]);
+      anyPlot.redraw?.();
+    };
+    const onPanMouseUp = (event: globalThis.MouseEvent) => {
+      if (event.button === 1) midPanning = false;
+    };
+    // Prevent the browser's middle-click autoscroll cursor on the canvas.
+    const onAuxClick = (event: globalThis.MouseEvent) => {
+      if (event.button === 1) event.preventDefault();
+    };
+    panCanvas?.addEventListener("mousedown", onPanMouseDown, { passive: false });
+    window.addEventListener("mousemove", onPanMouseMove, { passive: true });
+    window.addEventListener("mouseup", onPanMouseUp, { passive: true });
+    panCanvas?.addEventListener("auxclick", onAuxClick);
+
     return () => {
+      panCanvas?.removeEventListener("mousedown", onPanMouseDown);
+      window.removeEventListener("mousemove", onPanMouseMove);
+      window.removeEventListener("mouseup", onPanMouseUp);
+      panCanvas?.removeEventListener("auxclick", onAuxClick);
       plot.destroy();
     };
   }, [isReady, canvasRef.current, trajectoryAnalysis]);
@@ -489,11 +558,13 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         clusterInfo: ClusterInfo | null,
         spatialIndex?: ArrayBuffer,
         selectedMetric?: CriticalityMetric | null,
-        selectedSafetyBoundaryMetric?: CriticalityMetric | null
+        selectedSafetyBoundaryMetric?: CriticalityMetric | null,
+        medoidTrialIds: Set<string> = new Set(),
       ) => {
         const newPoints = points;
         const filteredIndices = [];
         const selectedIndices = [];
+        const medoidIndices: number[] = [];
         for (let i = 0; i < newPoints.length; i++) {
           const trialId = globalStorage.trialOrder[egoName][i];
           const trial = trajectoryAnalysis?.trials[trialId];
@@ -503,6 +574,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             if (selected) {
               selectedIndices.push(i);
             }
+          }
+          if (medoidTrialIds.has(trialId)) {
+            medoidIndices.push(i);
           }
 
           const filtered =
@@ -576,6 +650,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         scatterplot.draw(newPoints, {
           spatialIndex,
           filter: filteredIndices,
+          // Medoids are marked with their own SVG circle overlay, so they must
+          // NOT be part of the scatterplot's selection state — otherwise a
+          // ctrl+click (merge) would drag the medoids into the user's selection.
           select: selectedIndices,
         });
       },
@@ -656,7 +733,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       clusterInfo,
       undefined,
       selectedMetric,
-      selectedSafetyBoundaryMetric
+      selectedSafetyBoundaryMetric,
+      medoidTrialIds,
     );
 
     setPoints(points);
@@ -685,7 +763,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         clusterInfo,
         scatterplot.get("spatialIndex"),
         selectedMetric,
-        selectedSafetyBoundaryMetric
+        selectedSafetyBoundaryMetric,
+        medoidTrialIds,
       );
       return newPoints;
     });
@@ -696,6 +775,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     selectedTrialIds,
     selectedMetric,
     selectedSafetyBoundaryMetric,
+    medoidTrialIds,
   ]);
 
   const margin = {
@@ -818,6 +898,33 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         }}
       >
         {trajectoryAnalysis == null ? null : <canvas ref={canvasRef} />}
+        {trajectoryAnalysis != null && medoidPointIndices.length > 0 && (
+          <svg
+            style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
+            width={svgParentSize.width}
+            height={svgParentSize.height}
+          >
+            {medoidPointIndices.map((pointIdx) => {
+              try {
+                const point = scatterplot?.getScreenPosition(pointIdx);
+                if (!point) return null;
+                return (
+                  <circle
+                    key={`medoid-${pointIdx}`}
+                    cx={point[0]}
+                    cy={point[1]}
+                    r={10}
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth={3}
+                  />
+                );
+              } catch {
+                return null;
+              }
+            })}
+          </svg>
+        )}
       </Box>
 
       <Stack
@@ -969,23 +1076,6 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
           {/* </ToggleButton> */}
         </StyledToggleButtonGroup>
       </Stack>
-
-      <Drawer
-        hideBackdrop
-        anchor="bottom"
-        open={anchorEl?.id === "show-functional-button"}
-        onClose={() => {
-          setAnchorEl(null);
-        }}
-        sx={{ height: 0, p: 1 }}
-      >
-        <Stack direction="row" justifyContent="flex-end" alignItems="center">
-          <IconButton onClick={() => setAnchorEl(null)}>
-            <CloseIcon />
-          </IconButton>
-        </Stack>
-        {/* <FunctionalCurves /> */}
-      </Drawer>
 
       <Menu
         // hideBackdrop

@@ -25,11 +25,12 @@ import {
   ClusteringResult,
   TrialClusterItem,
 } from "@/app/_shared/graphql/queries/clustering";
-import { batchSlice, ClusterInfo } from "../../../../../redux/slices/batch";
+import { batchSlice, ClusterInfo, ClusterAnalysisContext } from "../../../../../redux/slices/batch";
 import _ from "lodash";
 import { getClusterInfos } from "@/app/_shared/utils";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
-import { ExpandMore } from "@mui/icons-material";
+import { ExpandMore, CheckCircle, Cancel } from "@mui/icons-material";
+import { clusteringMatchesManifestMedoids } from "@/app/_shared/utils/clusterAnalysisMatch";
 
 const SORT_LABELS: Record<string, string> = {
   default: "Default (task order)",
@@ -46,6 +47,12 @@ interface CompositeScoreEntry {
   rank: number;
   has_llm_eval: boolean;
   folder: string;
+}
+
+interface AnalysisStatusEntry {
+  has_analysis: boolean;
+  medoids: Record<string, string>;
+  interpretations: Record<string, { cluster_label?: string; ego_perspective_summary?: unknown }>;
 }
 
 function clusterCountFromInfo(info: ClusterInfo | undefined): number {
@@ -110,6 +117,9 @@ export default function PerEgoSelection({
   const selectedClusterInfos = useAppSelector((state) => {
     return state.batch.selectedClusterInfos;
   });
+  const clusterAnalysisByEgo = useAppSelector(
+    (state) => state.batch.clusterAnalysisByEgo,
+  );
 
   const clusterInfos = useAppSelector((state) => {
     return state.batch.clusterInfos;
@@ -134,6 +144,11 @@ export default function PerEgoSelection({
     Record<string, CompositeScoreEntry>
   >({});
 
+  // LLM analysis availability + medoids from /api/cluster-analysis-status
+  const [analysisStatus, setAnalysisStatus] = useState<
+    Record<string, AnalysisStatusEntry>
+  >({});
+
   const batchId = Array.isArray(routeParams?.id)
     ? routeParams?.id[0]
     : routeParams?.id;
@@ -148,6 +163,12 @@ export default function PerEgoSelection({
           map[c.folder] = c as CompositeScoreEntry;
         }
         setCompositeScores(map);
+      })
+      .catch(() => {/* best-effort */});
+    fetch(`/api/cluster-analysis-status?batchId=${batchId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setAnalysisStatus((data.folders ?? {}) as Record<string, AnalysisStatusEntry>);
       })
       .catch(() => {/* best-effort */});
   }, [batchId]);
@@ -165,6 +186,82 @@ export default function PerEgoSelection({
       return `${k}_cluster_s=${sil.toFixed(4)}`;
     },
     [infos]
+  );
+
+  const buildAnalysisContext = useCallback(
+    (result: ClusteringResult, index: number): ClusterAnalysisContext | null => {
+      const key = resultFolderKey(result, index);
+      if (!key || !analysisStatus[key]) return null;
+      const st = analysisStatus[key];
+      if (!st.has_analysis) return null;
+      if (!clusteringMatchesManifestMedoids(result, st.medoids)) return null;
+      return {
+        folder: key,
+        hasAnalysis: true,
+        medoids: st.medoids,
+        interpretations: st.interpretations,
+      };
+    },
+    [analysisStatus, resultFolderKey],
+  );
+
+  const resultHasVerifiedAnalysis = useCallback(
+    (result: ClusteringResult, index: number): boolean => {
+      const key = resultFolderKey(result, index);
+      if (!key || !analysisStatus[key]?.has_analysis) return false;
+      return clusteringMatchesManifestMedoids(result, analysisStatus[key].medoids);
+    },
+    [analysisStatus, resultFolderKey],
+  );
+
+  const currentAnalysis = useMemo(() => {
+    if (clusteringResult == null || results == null) return null;
+    const index = results.findIndex((v) => v === clusteringResult);
+    if (index < 0) return null;
+    return buildAnalysisContext(clusteringResult, index);
+  }, [clusteringResult, results, buildAnalysisContext]);
+
+  const selectMedoidTrial = useCallback(
+    (trialId: string, clusterLabel: string) => {
+      const current = new Set(selectedTrialIds.value);
+      if (current.has(trialId)) {
+        current.delete(trialId);
+      } else {
+        current.add(trialId);
+      }
+      const next = [...current];
+      dispatch(batchSlice.actions.setSelectedTrialId(next[0] ?? null));
+      dispatch(
+        batchSlice.actions.setSelectedTrialIds({
+          by: next.length > 0 ? "medoid" : "",
+          value: next,
+        }),
+      );
+      dispatch(
+        interactionSlice.actions.record("clustering_result_list.select_medoid"),
+      );
+    },
+    [dispatch, selectedTrialIds],
+  );
+
+  const selectAllMedoids = useCallback(() => {
+    if (!currentAnalysis?.medoids) return;
+    const ids = Object.values(currentAnalysis.medoids);
+    dispatch(batchSlice.actions.setSelectedTrialId(ids[0] ?? null));
+    dispatch(
+      batchSlice.actions.setSelectedTrialIds({
+        by: "medoid_all",
+        value: ids,
+      }),
+    );
+    dispatch(
+      interactionSlice.actions.record("clustering_result_list.select_all_medoids"),
+    );
+  }, [currentAnalysis, dispatch]);
+
+  const selectedMedoidSet = useMemo(
+    () => new Set(selectedTrialIds.value),
+    [selectedTrialIds],
   );
 
   const scoreKeys = useMemo(() => {
@@ -240,6 +337,7 @@ export default function PerEgoSelection({
           : 0;
 
       let foundDuplicated = false;
+      let duplicateOf: number | null = null;
       for (const [uniqueIndex, unique] of Object.entries(uniqueMappings)) {
         let differentCounts = 0;
         const visited = new Set<string>();
@@ -266,10 +364,26 @@ export default function PerEgoSelection({
           trajectoryAnalysis.mfpca[durationMode].trialOrder.length;
         if (differentRatio < duplicatedFilterRatio) {
           foundDuplicated = true;
+          duplicateOf = Number(uniqueIndex);
         }
         if (foundDuplicated) {
           break;
         }
+      }
+      if (foundDuplicated && duplicateOf != null) {
+        const curKey = resultFolderKey(result, i);
+        const dupKey = resultFolderKey(results[duplicateOf], duplicateOf);
+        const curHas = curKey
+          ? resultHasVerifiedAnalysis(result, i)
+          : false;
+        const dupHas = dupKey
+          ? resultHasVerifiedAnalysis(results[duplicateOf], duplicateOf)
+          : false;
+        if (curHas && !dupHas) {
+          delete uniqueMappings[duplicateOf];
+          uniqueMappings[i] = mapping;
+        }
+        continue;
       }
       if (foundDuplicated) {
         continue;
@@ -283,7 +397,7 @@ export default function PerEgoSelection({
     );
 
     setLoading(false);
-  }, [results, duplicatedFilterRatio]);
+  }, [results, duplicatedFilterRatio, analysisStatus, resultFolderKey, resultHasVerifiedAnalysis, trajectoryAnalysis, durationMode]);
 
   useEffect(() => {
     if (!Object.keys(clusterInfos).includes(egoName)) {
@@ -318,6 +432,14 @@ export default function PerEgoSelection({
         return true;
       })
       .sort((a, b) => {
+        const idxA = results?.findIndex((v) => v === a) ?? -1;
+        const idxB = results?.findIndex((v) => v === b) ?? -1;
+        const keyA = idxA >= 0 ? resultFolderKey(a, idxA) : "";
+        const keyB = idxB >= 0 ? resultFolderKey(b, idxB) : "";
+        const analA = idxA >= 0 && resultHasVerifiedAnalysis(a, idxA) ? 1 : 0;
+        const analB = idxB >= 0 && resultHasVerifiedAnalysis(b, idxB) ? 1 : 0;
+        if (analB !== analA) return analB - analA;
+
         if (sortBy == null || a == null || b == null) {
           return -Infinity;
         }
@@ -325,10 +447,6 @@ export default function PerEgoSelection({
           return 0;
         }
         if (sortBy === "compositeScore") {
-          const idxA = results?.findIndex((v) => v === a) ?? -1;
-          const idxB = results?.findIndex((v) => v === b) ?? -1;
-          const keyA = idxA >= 0 ? resultFolderKey(a, idxA) : "";
-          const keyB = idxB >= 0 ? resultFolderKey(b, idxB) : "";
           const scoreA = compositeScores[keyA]?.final_score ?? -Infinity;
           const scoreB = compositeScores[keyB]?.final_score ?? -Infinity;
           return scoreB - scoreA;
@@ -356,6 +474,8 @@ export default function PerEgoSelection({
     infos,
     compositeScores,
     resultFolderKey,
+    analysisStatus,
+    resultHasVerifiedAnalysis,
   ]);
 
   useEffect(() => {
@@ -366,29 +486,29 @@ export default function PerEgoSelection({
           [egoName]: sortedResults[0],
         })
       );
-      // dispatch(
-      //   egoName === "ITRI"
-      //     ? batchSlice.actions.setSelectedClusteringResult(sortedResults[0])
-      //     : batchSlice.actions.setSelectedClusteringResult2(sortedResults[0]),
-      // );
       const index = results?.findIndex((v) => v === sortedResults[0]);
-      const info = infos != null && index < infos.length ? infos[index] : null;
+      const info = infos != null && index != null && index < infos.length ? infos[index] : null;
       dispatch(
         batchSlice.actions.setSelectedClusterInfos({
           ...selectedClusterInfos,
           [egoName]: info,
         })
       );
+      const analysisCtx =
+        index != null && index >= 0 && sortedResults[0]
+          ? buildAnalysisContext(sortedResults[0], index)
+          : null;
+      dispatch(
+        batchSlice.actions.setClusterAnalysisByEgo({
+          ...(clusterAnalysisByEgo ?? {}),
+          [egoName]: analysisCtx,
+        }),
+      );
       dispatch(
         interactionSlice.actions.record(
           "clustering_result_list" + ".select_clustering_result"
         )
       );
-      // dispatch(
-      //   batchSlice.actions.setFilteredTrialIds(
-      //     trajectoryAnalysis.mfpca["full"].trialOrder,
-      //   ),
-      // );
     } else {
       dispatch(
         batchSlice.actions.setSelectedClusteringResults({
@@ -401,6 +521,12 @@ export default function PerEgoSelection({
           ...selectedClusterInfos,
           [egoName]: null,
         })
+      );
+      dispatch(
+        batchSlice.actions.setClusterAnalysisByEgo({
+          ...(clusterAnalysisByEgo ?? {}),
+          [egoName]: null,
+        }),
       );
     }
   }, [sortedResults]);
@@ -473,6 +599,40 @@ export default function PerEgoSelection({
           </Button>
         </span>
       </Tooltip>
+      {currentAnalysis?.hasAnalysis && (
+        <Stack gap={0.5} sx={{ mb: 1 }}>
+          <Stack direction="row" alignItems="center" justifyContent="space-between">
+            <Typography fontSize={12} color="text.secondary">
+              Medoid trials (toggle to replay — multi-select)
+            </Typography>
+            <Button size="small" onClick={selectAllMedoids} sx={{ fontSize: "11px" }}>
+              All
+            </Button>
+          </Stack>
+          <Stack direction="row" flexWrap="wrap" gap={0.5}>
+            {Object.entries(currentAnalysis.medoids)
+              .sort(([a], [b]) => Number(a) - Number(b))
+              .map(([label, trialId]) => {
+                const interp = currentAnalysis.interpretations[label];
+                const chipLabel = interp?.cluster_label
+                  ? `C${label}: ${interp.cluster_label}`
+                  : `C${label} medoid`;
+                const isSelected = selectedMedoidSet.has(trialId);
+                return (
+                  <Button
+                    key={label}
+                    size="small"
+                    variant={isSelected ? "contained" : "outlined"}
+                    onClick={() => selectMedoidTrial(trialId, label)}
+                    sx={{ fontSize: "11px", py: 0.25 }}
+                  >
+                    {chipLabel}
+                  </Button>
+                );
+              })}
+          </Stack>
+        </Stack>
+      )}
       <Accordion elevation={0} disableGutters square defaultExpanded>
         <AccordionSummary expandIcon={<ExpandMore />}>
           <Typography component="span" fontSize="14px">
@@ -739,6 +899,9 @@ export default function PerEgoSelection({
               return null;
             }
 
+            const folderKey = resultFolderKey(result, index);
+            const hasAnalysis = resultHasVerifiedAnalysis(result, index);
+
             return (
               <Stack
                 key={i}
@@ -758,6 +921,12 @@ export default function PerEgoSelection({
                           ? infos[index]
                           : null,
                     })
+                  );
+                  dispatch(
+                    batchSlice.actions.setClusterAnalysisByEgo({
+                      ...(clusterAnalysisByEgo ?? {}),
+                      [egoName]: buildAnalysisContext(result, index),
+                    }),
                   );
                   dispatch(
                     interactionSlice.actions.record(
@@ -799,6 +968,16 @@ export default function PerEgoSelection({
                   followCursor
                   title={
                     <Box component="div">
+                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
+                        {hasAnalysis ? (
+                          <CheckCircle sx={{ fontSize: 16, color: "success.light" }} />
+                        ) : (
+                          <Cancel sx={{ fontSize: 16, color: "text.disabled" }} />
+                        )}
+                        <Typography fontWeight="bold">
+                          {`Analysis: ${hasAnalysis ? "yes" : "no"}`}
+                        </Typography>
+                      </Stack>
                       <Typography fontWeight="bold">
                         {`${trajectoryAnalysis.request.tasks[index].method}`}
                       </Typography>
@@ -842,8 +1021,37 @@ export default function PerEgoSelection({
                   <Stack
                     direction="row"
                     flexWrap="wrap"
-                    sx={{ flex: 1, height: "30px" }}
+                    sx={{ flex: 1, height: "30px", position: "relative" }}
                   >
+                    {hasAnalysis && (
+                      <Box
+                        component="div"
+                        sx={{
+                          position: "absolute",
+                          right: 2,
+                          top: -3,
+                          zIndex: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 16,
+                          height: 16,
+                          borderRadius: "50%",
+                          backgroundColor: "#fff",
+                          border: "1.5px solid",
+                          borderColor: "success.dark",
+                          boxShadow: "0 0 2px rgba(0,0,0,0.6)",
+                        }}
+                      >
+                        <CheckCircle
+                          sx={{
+                            fontSize: 12,
+                            color: "success.main",
+                            display: "block",
+                          }}
+                        />
+                      </Box>
+                    )}
                     {Object.entries(
                       infos != null && index < infos.length ? infos[index] : {}
                       // clusterInfos && durationMode in clusterInfos

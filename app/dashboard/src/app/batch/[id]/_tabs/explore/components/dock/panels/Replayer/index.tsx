@@ -34,8 +34,10 @@ import {
   useState,
   MouseEvent,
   ReactNode,
+  useCallback,
 } from "react";
 import { Viewport } from "pixi-viewport";
+import { useParams } from "next/navigation";
 import { toast } from "react-toastify";
 import {
   TrajectoryResponseData,
@@ -54,6 +56,7 @@ import JSZip from "jszip";
 import axios from "axios";
 import { interactionSlice } from "../../../../redux/slices/interaction";
 import { ClusteringResult } from "@/app/_shared/graphql/queries/clustering";
+import EgoTimelineBox from "@/app/_shared/components/EgoTimelineBox";
 
 const clusteringDuration = 5;
 const afterClusteringDuration = 3;
@@ -103,6 +106,10 @@ const panelName = "replayer";
 const Replayer = () => {
   const theme = useTheme();
   const dispatch = useAppDispatch();
+  const routeParams = useParams();
+  const batchId = Array.isArray(routeParams?.id)
+    ? routeParams?.id[0]
+    : routeParams?.id;
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const timeTypographyRef = useRef<HTMLDivElement>(null);
@@ -199,6 +206,9 @@ const Replayer = () => {
   const clusteringResult = useAppSelector(
     (state) => state.batch.selectedClusteringResults,
   );
+  const clusterAnalysisByEgo = useAppSelector(
+    (state) => state.batch.clusterAnalysisByEgo,
+  );
 
   const clipTimeManualOverride = useAppSelector(
     (state) => state.batch.clipTimeManualOverride,
@@ -229,6 +239,69 @@ const Replayer = () => {
   const [criticalityViewAverage, setCriticalityViewAverage] = useState<{
     [name: string]: number;
   } | null>(null);
+
+  const replayTimeSec = clipTimeManualOverride ?? 0;
+  const [displayTimeSec, setDisplayTimeSec] = useState(replayTimeSec);
+
+  const getClusterInterpretation = useCallback(
+    (egoName: string, clusterLabel: string) => {
+      if (!clusterAnalysisByEgo || selectedTrialIds.value.length === 0) {
+        return null;
+      }
+      const ctx = clusterAnalysisByEgo[egoName];
+      if (!ctx?.hasAnalysis) return null;
+      const interp = ctx.interpretations[clusterLabel];
+      if (!interp?.ego_perspective_summary) return null;
+
+      const medoidId = ctx.medoids[clusterLabel];
+      const egoClustering = clusteringResult?.[egoName];
+      const hasSelectedTrial = selectedTrialIds.value.some((trialId) => {
+        if (medoidId === trialId) return true;
+        return egoClustering?.data?.[trialId]?.label === clusterLabel;
+      });
+      if (!hasSelectedTrial) return null;
+
+      return {
+        label: clusterLabel,
+        clusterLabel: interp.cluster_label,
+        summary: interp.ego_perspective_summary,
+      };
+    },
+    [clusterAnalysisByEgo, selectedTrialIds, clusteringResult],
+  );
+
+  const firstActiveInterpretation = useMemo(() => {
+    for (const egoName of egos) {
+      const ctx = clusterAnalysisByEgo?.[egoName];
+      if (!ctx?.hasAnalysis) continue;
+      for (const label of Object.keys(ctx.interpretations)) {
+        const interp = getClusterInterpretation(egoName, label);
+        if (interp) return { egoName, ...interp };
+      }
+    }
+    return null;
+  }, [egos, clusterAnalysisByEgo, getClusterInterpretation]);
+
+  useEffect(() => {
+    if (clipTimeManualOverride != null && clipTimePaused) {
+      setDisplayTimeSec(clipTimeManualOverride);
+    }
+  }, [clipTimeManualOverride, clipTimePaused]);
+
+  // Sync analysis caption time from the same clock the replayer ticker writes
+  // (timeTypographyRef). clipTimeManualOverride alone does not update during play.
+  useEffect(() => {
+    if (timeOrS !== "time") return undefined;
+    const id = window.setInterval(() => {
+      const text = timeTypographyRef.current?.innerText?.trim();
+      if (!text) return;
+      const t = parseFloat(text);
+      if (!Number.isNaN(t)) {
+        setDisplayTimeSec(t);
+      }
+    }, 50);
+    return () => window.clearInterval(id);
+  }, [timeOrS]);
 
   const [viewers, setViewers] = useState<{
     [egoName: string]: {
@@ -321,6 +394,134 @@ const Replayer = () => {
     fetchAndUnzip();
   }, [trajectoryAnalysis]);
 
+  // Replace analyzed-medoid trajectories with the FULL esmini timeline so the
+  // replayer video, the BEV snapshots and the interpretation caption all share
+  // one clock. The clustering pipeline's Payload trajectories are start-clipped
+  // and time-rebased (the near-miss shows ~17 s early and the early acceleration
+  // frames are missing), whereas the esmini CSV is the authoritative 0..end
+  // timeline the LLM analysis was built from.
+  useEffect(() => {
+    if (
+      trajectoryAnalysis == null ||
+      trajectories == null ||
+      batchId == null
+    ) {
+      return undefined;
+    }
+    let cancelled = false;
+
+    const applyEsminiMedoids = async () => {
+      const patched: NonNullable<typeof trajectories> = {};
+      for (const [egoName, egoTrajs] of Object.entries(trajectories)) {
+        patched[egoName] = { ...egoTrajs };
+      }
+
+      let changed = false;
+      for (const egoName of Object.keys(clusterAnalysisByEgo ?? {})) {
+        const ctx = clusterAnalysisByEgo?.[egoName];
+        if (!ctx?.hasAnalysis) continue;
+        const egoBucket = patched[egoName];
+        if (egoBucket == null) continue;
+
+        for (const [label, trialId] of Object.entries(ctx.medoids)) {
+          const existing = egoBucket[trialId] as
+            | (TrajectoryResponseData & { source?: string })
+            | undefined;
+          // Only replace trajectories the replayer already knows about, and
+          // skip ones already swapped to esmini (prevents an update loop).
+          if (existing == null || existing.source === "esmini") continue;
+
+          try {
+            const resp = await fetch(
+              `/api/esmini-trajectory?batchId=${encodeURIComponent(
+                String(batchId),
+              )}&folder=${encodeURIComponent(
+                ctx.folder,
+              )}&label=${encodeURIComponent(label)}`,
+            );
+            if (!resp.ok) continue;
+            const data = await resp.json();
+            if (data?.trajectory == null || !Array.isArray(data?.time)) continue;
+            egoBucket[trialId] = { ...data, trialId: Number(trialId) };
+            changed = true;
+          } catch {
+            /* best-effort: keep the Payload trajectory on failure */
+          }
+        }
+      }
+
+      // Also swap any SELECTED (non-medoid) trajectory to the full esmini
+      // timeline, so a trial the user clicks starts at the same initial frame
+      // as the CSV / BEV instead of the start-clipped Payload trajectory. The
+      // esmini CSV index is taken from the trial's esminiDat.filename
+      // (esmini_<batch>_<index>.dat) which the analysis save carries.
+      const selectedIds = selectedTrialIds.value ?? [];
+      if (selectedIds.length > 0) {
+        const patchTasks: Promise<void>[] = [];
+        for (const egoName of Object.keys(patched)) {
+          const egoBucket = patched[egoName];
+          if (egoBucket == null) continue;
+          const egoTrials = trajectoryAnalysis[egoName]?.trials as
+            | Record<string, Record<string, unknown>>
+            | undefined;
+          for (const trialId of selectedIds) {
+            const existing = egoBucket[trialId] as
+              | (TrajectoryResponseData & { source?: string })
+              | undefined;
+            if (existing == null || existing.source === "esmini") continue;
+
+            const meta = egoTrials?.[trialId] as
+              | { batchId?: string; esminiDat?: { filename?: string } }
+              | undefined;
+            const filename = meta?.esminiDat?.filename ?? "";
+            const m = /esmini_(\d+)_(\d+)\.dat/.exec(filename);
+            const csvBatch = m ? m[1] : (meta?.batchId ?? String(batchId));
+            const csvIndex = m ? m[2] : null;
+
+            let url = `/api/esmini-trajectory?batchId=${encodeURIComponent(
+              String(csvBatch),
+            )}&trialId=${encodeURIComponent(trialId)}`;
+            if (csvIndex != null) {
+              url += `&trialIndex=${encodeURIComponent(csvIndex)}`;
+            }
+
+            patchTasks.push(
+              (async () => {
+                try {
+                  const resp = await fetch(url);
+                  if (!resp.ok) return;
+                  const data = await resp.json();
+                  if (data?.trajectory == null || !Array.isArray(data?.time))
+                    return;
+                  egoBucket[trialId] = { ...data, trialId: Number(trialId) };
+                  changed = true;
+                } catch {
+                  /* best-effort: keep the Payload trajectory on failure */
+                }
+              })(),
+            );
+          }
+        }
+        await Promise.all(patchTasks);
+      }
+
+      if (!cancelled && changed) {
+        setTrajectories(patched);
+      }
+    };
+
+    applyEsminiMedoids();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    trajectoryAnalysis,
+    trajectories,
+    clusterAnalysisByEgo,
+    batchId,
+    selectedTrialIds,
+  ]);
+
   const clusterCounter = useMemo(() => {
     let trials: Trial[] = batchTrials;
     if (trajectoryAnalysis != null) {
@@ -410,6 +611,49 @@ const Replayer = () => {
     }
     return counter;
   }, [clusterInfo, filteredTrialIds, mfpca]);
+
+  // Which cluster windows to show in split mode. When the user has selected
+  // trajectories (in Parameter/Projection space), only show the windows for the
+  // clusters those trials belong to. With no selection, show every cluster.
+  const selectedClusterLabelsByEgo = useMemo(() => {
+    if (selectedTrialIds.value.length === 0) return null;
+    const result: { [egoName: string]: Set<string> } = {};
+    for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+      const data = clusteringResult?.[egoName]?.data;
+      if (data == null) continue;
+      const labels = new Set<string>();
+      for (const tid of selectedTrialIds.value) {
+        const label = data[tid]?.label;
+        if (label != null) labels.add(String(label));
+      }
+      if (labels.size > 0) result[egoName] = labels;
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  }, [selectedTrialIds, clusteringResult, trajectoryAnalysis]);
+
+  const isClusterWindowVisible = useCallback(
+    (egoName: string, label: string) => {
+      const inCounter =
+        clusterCounter != null &&
+        egoName in clusterCounter &&
+        label in clusterCounter[egoName];
+      if (!inCounter) return false;
+      const sel = selectedClusterLabelsByEgo?.[egoName];
+      if (sel == null) return true;
+      return sel.has(String(label));
+    },
+    [clusterCounter, selectedClusterLabelsByEgo],
+  );
+
+  // Re-init the Pixi viewers whenever the visible-window set changes so the
+  // remaining windows get resized correctly.
+  const visibleClusterKey = useMemo(() => {
+    if (selectedClusterLabelsByEgo == null) return "all";
+    return Object.entries(selectedClusterLabelsByEgo)
+      .map(([ego, set]) => `${ego}:${[...set].sort().join(",")}`)
+      .sort()
+      .join("|");
+  }, [selectedClusterLabelsByEgo]);
 
   useEffect(() => {
     if (redrawHandled) {
@@ -615,7 +859,7 @@ const Replayer = () => {
     //   console.log("set redrawhandled false");
     // }
     setRedrawHandled(false);
-  }, [clusterInfo, filteredTrialIds]);
+  }, [clusterInfo, filteredTrialIds, visibleClusterKey]);
 
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
@@ -1148,7 +1392,7 @@ const Replayer = () => {
         break;
       }
       for (const label in clusterInfo[egoName]) {
-        if (clusterCounter && label in clusterCounter[egoName]) {
+        if (isClusterWindowVisible(egoName, label)) {
           totalWindowsCount += 1;
         }
       }
@@ -1168,7 +1412,7 @@ const Replayer = () => {
           windowsCount += 1;
           break;
         }
-        if (clusterCounter && label in clusterCounter[egoName]) {
+        if (isClusterWindowVisible(egoName, label)) {
           windowsCount += 1;
         }
       }
@@ -1212,54 +1456,53 @@ const Replayer = () => {
                 key={label}
                 id={`replayer-${egoName}-cluster${label}-canvas-container`}
                 sx={{
-                  display:
-                    label in
-                    (clusterCounter && egoName in clusterCounter
-                      ? clusterCounter[egoName]
-                      : {})
-                      ? "inherit"
-                      : "none",
+                  display: isClusterWindowVisible(egoName, label)
+                    ? "inherit"
+                    : "none",
                   overflow: "hidden",
                   flex: 1,
                   position: "relative",
                 }}
-                alignItems="center"
-                justifyContent="center"
+                alignItems="stretch"
               >
-                {/* <Typography */}
-                {/*   sx={{ */}
-                {/*     position: "absolute", */}
-                {/*     fontWeight: 900, */}
-                {/*     top: 0, */}
-                {/*     right: "5px", */}
-                {/*     color, */}
-                {/*   }} */}
-                {/* >{`Cluster ${label}`}</Typography> */}
-                <canvas
-                  width={containerRef.current?.offsetWidth ?? 0}
-                  height={
-                    clusteringResult == null ||
-                    clusteringResult[egoName] == null
-                      ? "500px"
-                      : (containerRef.current?.offsetHeight ?? 0) /
-                        totalWindowsCount
-                  }
-                  style={{
-                    display: "block",
-                    minHeight: 0,
-                    transform: `scale(0.95, ${scaleY.toFixed(2)})`,
-                    // border: `solid 3px ${color}`,
-                    height:
+                {/* Canvas fills the entire cluster window. */}
+                <Stack
+                  sx={{
+                    flex: 1,
+                    position: "relative",
+                    minWidth: 0,
+                    width: "100%",
+                  }}
+                  alignItems="center"
+                  justifyContent="center"
+                >
+                  <canvas
+                    width={containerRef.current?.offsetWidth ?? 0}
+                    height={
                       clusteringResult == null ||
                       clusteringResult[egoName] == null
                         ? "500px"
-                        : `calc(${
-                            containerRef.current?.offsetHeight ?? 0
-                          }px / ${totalWindowsCount})`,
-                    width: "100%",
-                  }}
-                  id={`replayer-${egoName}-cluster${label}-canvas`}
-                ></canvas>
+                        : (containerRef.current?.offsetHeight ?? 0) /
+                          totalWindowsCount
+                    }
+                    style={{
+                      display: "block",
+                      minHeight: 0,
+                      transform: `scale(0.95, ${scaleY.toFixed(2)})`,
+                      height:
+                        clusteringResult == null ||
+                        clusteringResult[egoName] == null
+                          ? "500px"
+                          : `calc(${
+                              containerRef.current?.offsetHeight ?? 0
+                            }px / ${totalWindowsCount})`,
+                      width: "100%",
+                    }}
+                    id={`replayer-${egoName}-cluster${label}-canvas`}
+                  ></canvas>
+                </Stack>
+
+                {/* Colored border framing the ENTIRE cluster window. */}
                 <Stack
                   sx={{
                     boxShadow: `inset 0px 0px 0px 10px ${color}`,
@@ -1268,9 +1511,44 @@ const Replayer = () => {
                     height: "99.9%",
                     zIndex: 10,
                     top: 0,
+                    left: 0,
                     pointerEvents: "none",
                   }}
                 />
+
+                {/* Interpretation caption — inside the border, top-right,
+                    offset from the edge like a chat bubble. */}
+                {(() => {
+                  const panelInterp = getClusterInterpretation(egoName, label);
+                  if (!panelInterp || timeOrS !== "time") return null;
+                  return (
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 20,
+                        right: 20,
+                        width: 280,
+                        maxWidth: "45%",
+                        maxHeight: "calc(100% - 40px)",
+                        overflowY: "auto",
+                        zIndex: 20,
+                      }}
+                    >
+                      <EgoTimelineBox
+                        summary={panelInterp.summary}
+                        timeSec={displayTimeSec}
+                        title={
+                          panelInterp.clusterLabel
+                            ? `Cluster ${panelInterp.label}: ${panelInterp.clusterLabel}`
+                            : `Cluster ${panelInterp.label}`
+                        }
+                        variant="chat"
+                        borderColor={color}
+                        compact
+                      />
+                    </Box>
+                  );
+                })()}
               </Stack>
             );
           })}
@@ -1278,7 +1556,40 @@ const Replayer = () => {
       );
     });
   } else {
-    canvases = <canvas id="replayer-main-main-canvas" ref={canvasRef}></canvas>;
+    canvases = (
+      <Stack sx={{ width: "100%", height: "100%", position: "relative" }}>
+        <Box sx={{ flex: 1, minWidth: 0, width: "100%", position: "relative" }}>
+          <canvas id="replayer-main-main-canvas" ref={canvasRef}></canvas>
+        </Box>
+        {firstActiveInterpretation && timeOrS === "time" && (
+          <Box
+            sx={{
+              position: "absolute",
+              top: 20,
+              right: 20,
+              width: 280,
+              maxWidth: "45%",
+              maxHeight: "calc(100% - 40px)",
+              overflowY: "auto",
+              zIndex: 20,
+            }}
+          >
+            <EgoTimelineBox
+              summary={firstActiveInterpretation.summary}
+              timeSec={displayTimeSec}
+              title={
+                firstActiveInterpretation.clusterLabel
+                  ? `Cluster ${firstActiveInterpretation.label}: ${firstActiveInterpretation.clusterLabel}`
+                  : `Cluster ${firstActiveInterpretation.label}`
+              }
+              variant="chat"
+              borderColor="#888"
+              compact
+            />
+          </Box>
+        )}
+      </Stack>
+    );
   }
 
   return (

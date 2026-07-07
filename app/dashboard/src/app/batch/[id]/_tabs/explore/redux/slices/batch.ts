@@ -103,6 +103,18 @@ export function generateColors(numColors: number) {
   return colors;
 }
 
+export interface ClusterInterpretationSummary {
+  cluster_label?: string;
+  ego_perspective_summary?: unknown;
+}
+
+export interface ClusterAnalysisContext {
+  folder: string;
+  hasAnalysis: boolean;
+  medoids: Record<string, string>;
+  interpretations: Record<string, ClusterInterpretationSummary>;
+}
+
 export interface BatchState {
   batch: Batch;
   egos: string[];
@@ -143,6 +155,11 @@ export interface BatchState {
     [egoName: string]: ClusteringResult | null;
   } | null;
   selectedClusterInfos: { [egoName: string]: ClusterInfo | null } | null;
+
+  /** LLM analysis + medoids for the currently selected clustering config per ego */
+  clusterAnalysisByEgo: {
+    [egoName: string]: ClusterAnalysisContext | null;
+  } | null;
 
   selectedClusteringResult: ClusteringResult | null;
   selectedClusterInfo: ClusterInfo | null;
@@ -210,6 +227,7 @@ const initialState: BatchState = {
   selectedClusterInfo: null,
   selectedClusteringResults: null,
   selectedClusterInfos: null,
+  clusterAnalysisByEgo: null,
 
   selectedClusteringResult2: null,
   selectedClusterInfo2: null,
@@ -707,6 +725,12 @@ export const batchSlice = createSlice({
       action: PayloadAction<typeof initialState.selectedClusterInfos>
     ) => {
       state.selectedClusterInfos = action.payload;
+    },
+    setClusterAnalysisByEgo: (
+      state: BatchState,
+      action: PayloadAction<typeof initialState.clusterAnalysisByEgo>
+    ) => {
+      state.clusterAnalysisByEgo = action.payload;
     },
     setSelectedClusteringResult: (
       state: BatchState,

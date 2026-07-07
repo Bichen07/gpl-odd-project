@@ -284,6 +284,50 @@ export default function TrajectoryHeatmap() {
     return () => clearInterval(interval);
   }, []);
 
+  // Which cluster labels (per ego) are represented by the currently selected
+  // trials. Mirrors the Replayer so the heatmap only shows the cluster(s) that
+  // contain selected trajectories. `null` => nothing selected => show all.
+  const selectedClusterLabelsByEgo = useMemo(() => {
+    const ids = selectedTrialIds?.value ?? [];
+    if (ids.length === 0 || clusteringResult == null) {
+      return null;
+    }
+    const result: { [egoName: string]: Set<string> } = {};
+    for (const egoName of Object.keys(clusteringResult)) {
+      const data = clusteringResult[egoName]?.data;
+      if (data == null) {
+        continue;
+      }
+      const set = new Set<string>();
+      for (const trialId of ids) {
+        const label = data[trialId]?.label;
+        if (label != null) {
+          set.add(String(label));
+        }
+      }
+      if (set.size > 0) {
+        result[egoName] = set;
+      }
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  }, [selectedTrialIds, clusteringResult]);
+
+  const isClusterVisible = (egoName: string, label: string) => {
+    // Only filter in interaction-cluster mode (pass/fail & baseline use
+    // non-cluster labels that would never match the selected cluster set).
+    if (viewerMode !== "interaction-cluster") {
+      return true;
+    }
+    if (selectedClusterLabelsByEgo == null) {
+      return true;
+    }
+    const set = selectedClusterLabelsByEgo[egoName];
+    if (set == null) {
+      return true;
+    }
+    return set.has(String(label));
+  };
+
   const clusterCounter = useMemo(() => {
     let trials: Trial[] = batchTrials;
     if (trajectoryAnalysis != null) {
@@ -618,13 +662,21 @@ export default function TrajectoryHeatmap() {
         ?.attributes ?? [];
 
     dispatch(batchSlice.actions.setAttributes(attributes));
-    let filteredAttributes = [...attributes].filter(
-      (v) => !v.includes("Spret") && !v.includes("Ttc")
-    );
+    const preferred = [
+      "EgoSpeed",
+      "EgoAcceleration",
+      "OppositeRelativeDistance",
+    ];
+    const preferredFiltered = preferred.filter((name) => attributes.includes(name));
+    let filteredAttributes =
+      preferredFiltered.length > 0
+        ? preferredFiltered
+        : [...attributes].filter(
+            (v) => !v.includes("Spret") && !v.includes("Ttc"),
+          );
     const i = filteredAttributes.findIndex((v) => v === "EgoYawRate");
-    if (i != null && trajectoryAnalysis != null) {
-      filteredAttributes.splice(i, 1);
-      // filteredAttributes.push("EgoYawRate");
+    if (i != null && i >= 0 && trajectoryAnalysis != null) {
+      filteredAttributes = filteredAttributes.filter((v) => v !== "EgoYawRate");
     }
     dispatch(batchSlice.actions.setFilteredAttributes(filteredAttributes));
   }, [trajectoryAnalysis]);
@@ -1141,7 +1193,8 @@ export default function TrajectoryHeatmap() {
                                 (!isBaseline &&
                                   counter != null &&
                                   counter[egoName] != null &&
-                                  label in (counter[egoName] ?? {}))
+                                  label in (counter[egoName] ?? {}) &&
+                                  isClusterVisible(egoName, label))
                                 ? "inherit"
                                 : "none",
                             flex: 1,
