@@ -37,6 +37,10 @@ import { colorModes, ColorMode } from "../../../../../redux/slices/batch";
 import { useAppDispatch, useAppSelector } from "../../../../../redux/hooks";
 import createScatterplot from "regl-scatterplot";
 import { noiseColor } from "@/app/_shared/utils";
+import {
+  CLUSTER_HIGHLIGHT_STYLE,
+  primaryRoleForTrial,
+} from "@/app/_shared/utils/clusterHighlightRoles";
 import { Settings } from "@mui/icons-material";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
 
@@ -184,12 +188,22 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     typeof createScatterplot
   > | null>(null);
   const [points, setPoints] = useState<number[][]>([]);
-  const medoidPointIndices = useMemo(() => {
+  const highlightMarkers = useMemo(() => {
     const order = globalStorage.trialOrder[egoName] ?? [];
-    return order
-      .map((tid, i) => (medoidTrialIds.has(tid) ? i : -1))
-      .filter((i) => i >= 0);
-  }, [medoidTrialIds, points, egoName]);
+    const selected = new Set(selectedTrialIds.value.map(String));
+    const markers: Array<{
+      index: number;
+      role: "medoid" | "boundary" | "outlier";
+    }> = [];
+    if (!clusterAnalysis || selected.size === 0) return markers;
+    for (let i = 0; i < order.length; i++) {
+      const tid = String(order[i]);
+      if (!selected.has(tid)) continue;
+      const role = primaryRoleForTrial(clusterAnalysis, tid);
+      if (role) markers.push({ index: i, role });
+    }
+    return markers;
+  }, [clusterAnalysis, points, egoName, selectedTrialIds]);
   const [mfpcaScores, setMfpcaScores] = useState<[string, number[]][]>([]);
 
   const [isReady, setIsReady] = useState(false);
@@ -898,25 +912,51 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         }}
       >
         {trajectoryAnalysis == null ? null : <canvas ref={canvasRef} />}
-        {trajectoryAnalysis != null && medoidPointIndices.length > 0 && (
+        {trajectoryAnalysis != null && highlightMarkers.length > 0 && (
           <svg
             style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
             width={svgParentSize.width}
             height={svgParentSize.height}
           >
-            {medoidPointIndices.map((pointIdx) => {
+            {highlightMarkers.map(({ index: pointIdx, role }) => {
               try {
                 const point = scatterplot?.getScreenPosition(pointIdx);
                 if (!point) return null;
+                const style = CLUSTER_HIGHLIGHT_STYLE[role];
+                const [cx, cy] = point;
+                if (role === "medoid") {
+                  return (
+                    <circle
+                      key={`hl-${role}-${pointIdx}`}
+                      cx={cx}
+                      cy={cy}
+                      r={10}
+                      fill="none"
+                      stroke={style.color}
+                      strokeWidth={3}
+                    />
+                  );
+                }
+                if (role === "boundary") {
+                  const s = 9;
+                  return (
+                    <polygon
+                      key={`hl-${role}-${pointIdx}`}
+                      points={`${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`}
+                      fill="none"
+                      stroke={style.color}
+                      strokeWidth={2.5}
+                    />
+                  );
+                }
+                const s = 10;
                 return (
-                  <circle
-                    key={`medoid-${pointIdx}`}
-                    cx={point[0]}
-                    cy={point[1]}
-                    r={10}
+                  <polygon
+                    key={`hl-${role}-${pointIdx}`}
+                    points={`${cx},${cy - s} ${cx + s},${cy + s * 0.7} ${cx - s},${cy + s * 0.7}`}
                     fill="none"
-                    stroke="#fff"
-                    strokeWidth={3}
+                    stroke={style.color}
+                    strokeWidth={2.5}
                   />
                 );
               } catch {

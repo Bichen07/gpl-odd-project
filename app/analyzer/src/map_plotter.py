@@ -67,14 +67,26 @@ class BevTypography:
     info_fontsize: float = 8.0
     scope_fontsize: float = 7.0
     title_fontsize: float = 7.0
+    # Scale-bar tick labels; falls back to scope_fontsize when None.
+    scale_bar_fontsize: Optional[float] = None
+    # Bottom-left scale bar vertical position in figure coords (0=bottom, 1=top).
+    scale_bar_y: float = 0.055
+    # Cap scale-bar width as a fraction of figure width (prevents overlaying chips).
+    scale_bar_max_width_frac: float = 0.40
+    # Floor scale-bar width as a fraction of figure width.
+    scale_bar_min_width_frac: float = 0.22
+    # Bottom-right ``d=… TTC=…`` chip on conflict BEVs.
+    metric_chip_fontsize: float = 10.0
+    # Top-right panel captions: "pair zoom" / "ego ±25m" / "whole scene".
+    panel_label_fontsize: float = 9.0
+    # Nudge road/lane labels away from agents when closer than this (metres).
+    road_label_avoid_m: float = 4.0
 
 
 DEFAULT_BEV_TYPOGRAPHY = BevTypography()
 
-_SCALE_BAR_N_TICKS = 6
-# Scale bar must be wider than 1/6 of the full output image (figure width).
-_SCALE_BAR_MIN_WIDTH_FRAC = 1.0 / 6.0
-_SCALE_TIERS_M = (5.0, 10.0, 25.0, 50.0, 100.0, 200.0)
+_SCALE_BAR_N_TICKS = 3
+_SCALE_TIERS_M = (5.0, 10.0, 25.0, 50.0, 100.0, 200.0, 400.0)
 
 
 def _map_length_real(scope_bounds: Tuple[float, float, float, float]) -> float:
@@ -101,26 +113,31 @@ def _scale_bar_layout(
     map_length_real: float,
     target_real: float,
     content_frac: float,
+    min_width_frac: float = 0.22,
+    max_width_frac: float = 0.40,
 ) -> Tuple[float, float]:
-    """Return (target_real, bar_width_fig) with bar wider than 1/6 of image."""
+    """Return (target_real_m, bar_width_fig) clamped to [min, max] figure width."""
     if map_length_real <= 0:
-        return target_real, _SCALE_BAR_MIN_WIDTH_FRAC
+        return target_real, min(max_width_frac, max(min_width_frac, 0.25))
 
-    tiers = _SCALE_TIERS_M
-    try:
-        tier_idx = tiers.index(target_real)
-    except ValueError:
-        tier_idx = 0
+    candidates: List[Tuple[float, float]] = []
+    for tier in _SCALE_TIERS_M:
+        w = (tier / map_length_real) * content_frac
+        candidates.append((tier, w))
 
-    while tier_idx < len(tiers):
-        target_real = tiers[tier_idx]
-        bar_width_fig = (target_real / map_length_real) * content_frac
-        if bar_width_fig >= _SCALE_BAR_MIN_WIDTH_FRAC:
-            return target_real, bar_width_fig
-        tier_idx += 1
+    # Prefer tiers whose drawn width is within [min, max].
+    in_band = [(t, w) for t, w in candidates if min_width_frac <= w <= max_width_frac]
+    if in_band:
+        # Closest to the auto target, else largest in band.
+        best = min(in_band, key=lambda tw: abs(tw[0] - target_real))
+        return best
 
-    # Fallback: span the full map content width.
-    return map_length_real, content_frac
+    under_max = [(t, w) for t, w in candidates if w <= max_width_frac]
+    if under_max:
+        return under_max[-1]  # largest that still fits
+
+    # Everything too wide (tiny map span): clamp visual width, keep smallest tier.
+    return candidates[0][0], max_width_frac
 
 
 def _format_meters_label(value: float) -> str:
@@ -193,16 +210,30 @@ class MapPlotter:
         map_length_real = _map_length_real(scope_bounds)
         content_frac = self._content_frac(white_border_frac)
         target_real = _target_scale_meters(map_length_real)
+        min_w = float(getattr(typography, "scale_bar_min_width_frac", 0.22) or 0.22)
+        max_w = float(getattr(typography, "scale_bar_max_width_frac", 0.40) or 0.40)
+        if max_w < min_w:
+            max_w = min_w
         target_real, bar_width_fig = _scale_bar_layout(
-            map_length_real, target_real, content_frac
+            map_length_real,
+            target_real,
+            content_frac,
+            min_width_frac=min_w,
+            max_width_frac=max_w,
         )
 
         n_ticks = _SCALE_BAR_N_TICKS
         n_intervals = n_ticks - 1
         step_m = target_real / n_intervals
 
-        x0, y0 = 0.02, 0.028
-        bar_h = 0.010
+        x0 = 0.02
+        y0 = float(getattr(typography, "scale_bar_y", 0.055) or 0.055)
+        bar_h = 0.014
+        tick_fs = (
+            typography.scale_bar_fontsize
+            if typography.scale_bar_fontsize is not None
+            else max(typography.scope_fontsize, 9.0)
+        )
 
         for i in range(n_intervals):
             seg_x0 = x0 + (i / n_intervals) * bar_width_fig
@@ -222,7 +253,7 @@ class MapPlotter:
                 )
             )
 
-        label_y = y0 - 0.006
+        label_y = y0 - 0.010
         for i in range(n_ticks):
             tx = x0 + (i / n_intervals) * bar_width_fig
             value_m = step_m * i
@@ -231,7 +262,7 @@ class MapPlotter:
                 label_y,
                 _format_meters_label(value_m),
                 transform=fig.transFigure,
-                fontsize=typography.scope_fontsize,
+                fontsize=tick_fs,
                 ha="center",
                 va="top",
                 color="#222222",
@@ -244,7 +275,7 @@ class MapPlotter:
             y0 + bar_h * 0.15,
             "m",
             transform=fig.transFigure,
-            fontsize=typography.scope_fontsize,
+            fontsize=tick_fs,
             ha="left",
             va="bottom",
             color="#222222",
@@ -261,6 +292,7 @@ class MapPlotter:
         output_px: int,
         white_border_frac: float = 0.0,
         typography: BevTypography = DEFAULT_BEV_TYPOGRAPHY,
+        metric_chip: Optional[str] = None,
     ) -> None:
         """Corner annotations for LLM snapshots (figure coords, white margin)."""
         overlay_bbox = dict(
@@ -283,16 +315,43 @@ class MapPlotter:
                 zorder=30,
             )
         if time_label:
+            panel_fs = float(
+                getattr(typography, "panel_label_fontsize", None)
+                or typography.info_fontsize
+            )
             fig.text(
                 0.99,
                 0.99,
                 time_label,
                 transform=fig.transFigure,
-                fontsize=typography.info_fontsize,
+                fontsize=panel_fs,
                 va="top",
                 ha="right",
                 color="#222222",
                 bbox=overlay_bbox,
+                zorder=30,
+            )
+        if metric_chip:
+            chip_fs = float(
+                getattr(typography, "metric_chip_fontsize", None)
+                or max(6.0, typography.info_fontsize)
+            )
+            fig.text(
+                0.99,
+                0.01,
+                metric_chip,
+                transform=fig.transFigure,
+                fontsize=chip_fs,
+                va="bottom",
+                ha="right",
+                color="#111111",
+                family="monospace",
+                bbox=dict(
+                    boxstyle="round,pad=0.2",
+                    facecolor="#FFF8E7",
+                    edgecolor="#AA8800",
+                    alpha=0.92,
+                ),
                 zorder=30,
             )
         if scope_bounds is not None:
@@ -387,8 +446,18 @@ class MapPlotter:
         scope_bounds: Optional[Tuple[float, float, float, float]] = None,
         output_px: Optional[int] = None,
         white_border_frac: float = 0.0,
+        label_anchors: Optional[List[Tuple[float, float]]] = None,
+        label_radius_m: float = 25.0,
+        metric_chip: Optional[str] = None,
+        label_avoid_xy: Optional[List[Tuple[float, float]]] = None,
     ) -> None:
-        """Single render path for empty-map overviews and agent snapshots."""
+        """Single render path for empty-map overviews and agent snapshots.
+
+        ``label_anchors`` + ``label_radius_m`` restrict road/lane ID text to
+        labels near ego/partner (conflict BEV overlays). ``metric_chip`` draws
+        a short ``d=… TTC=…`` badge in the bottom-right corner.
+        ``label_avoid_xy`` nudges labels away from agent centers.
+        """
         fig = self._begin_figure(output_px, white_border_frac)
         (
             all_lanes_info,
@@ -415,6 +484,9 @@ class MapPlotter:
                 highlighting_active,
                 highlight_road_ids,
                 typography=typography,
+                label_anchors=label_anchors,
+                label_radius_m=label_radius_m,
+                label_avoid_xy=label_avoid_xy,
             )
         if (
             draw_trajectory_trails
@@ -456,9 +528,21 @@ class MapPlotter:
                 output_px,
                 white_border_frac=white_border_frac,
                 typography=typography,
+                metric_chip=metric_chip,
             )
         elif legend_lines:
             self._plot_agent_id_legend(legend_lines, typography=typography)
+        elif metric_chip:
+            self._plot_snapshot_overlays(
+                fig,
+                [],
+                None,
+                None,
+                output_px or 512,
+                white_border_frac=white_border_frac,
+                typography=typography,
+                metric_chip=metric_chip,
+            )
 
         if figure_title and not time_label:
             if output_px and white_border_frac > 0:
@@ -737,6 +821,9 @@ class MapPlotter:
         highlighting_active,
         highlight_road_ids: Set[str],
         typography: BevTypography = DEFAULT_BEV_TYPOGRAPHY,
+        label_anchors: Optional[List[Tuple[float, float]]] = None,
+        label_radius_m: float = 25.0,
+        label_avoid_xy: Optional[List[Tuple[float, float]]] = None,
     ) -> None:
         lane_pad = 0.15 * (typography.lane_label_size / 7.0)
         road_pad = 0.3 * (typography.road_label_size / 7.0)
@@ -752,26 +839,62 @@ class MapPlotter:
             ec="darkred",
             alpha=0.7,
         )
+        avoid_r = float(getattr(typography, "road_label_avoid_m", 4.0) or 0.0)
+
+        def _near_anchor(x: float, y: float) -> bool:
+            if not label_anchors:
+                return True
+            r2 = label_radius_m * label_radius_m
+            for ax, ay in label_anchors:
+                dx, dy = float(x) - float(ax), float(y) - float(ay)
+                if dx * dx + dy * dy <= r2:
+                    return True
+            return False
+
+        def _nudge(x: float, y: float) -> Tuple[float, float]:
+            """Push label away from nearby agents so boxes are not covered."""
+            if not label_avoid_xy or avoid_r <= 0:
+                return x, y
+            nx, ny = float(x), float(y)
+            for ax, ay in label_avoid_xy:
+                dx, dy = nx - float(ax), ny - float(ay)
+                dist = math.hypot(dx, dy)
+                if dist < 1e-3:
+                    # Exactly on agent — nudge along +y.
+                    nx, ny = nx, ny + avoid_r
+                elif dist < avoid_r:
+                    scale = avoid_r / dist
+                    nx = float(ax) + dx * scale
+                    ny = float(ay) + dy * scale
+            return nx, ny
+
         for info in lane_id_text_plot_info:
             if highlighting_active and info["road_id"] not in highlight_road_ids:
                 continue
+            if not _near_anchor(info["x"], info["y"]):
+                continue
+            lx, ly = _nudge(info["x"], info["y"])
             plt.text(
-                info["x"],
-                info["y"],
+                lx,
+                ly,
                 info["text"],
                 size=typography.lane_label_size,
                 color="white",
                 ha="center",
                 va="center",
                 bbox=lane_bbox,
+                zorder=25,
             )
         for info in road_id_text_plot_info:
             road_id_str = info["text"]
+            if not _near_anchor(info["x"], info["y"]):
+                continue
+            lx, ly = _nudge(info["x"], info["y"])
             if highlighting_active:
                 if road_id_str in highlight_road_ids:
                     plt.text(
-                        info["x"],
-                        info["y"],
+                        lx,
+                        ly,
                         road_id_str,
                         size=typography.road_label_size,
                         color="white",
@@ -779,16 +902,18 @@ class MapPlotter:
                         ha="center",
                         va="center",
                         bbox=road_bbox,
+                        zorder=25,
                     )
             else:
                 plt.text(
-                    info["x"],
-                    info["y"],
+                    lx,
+                    ly,
                     road_id_str,
                     size=typography.road_label_plain_size,
                     color="#222222",
                     ha="center",
                     va="center",
+                    zorder=25,
                 )
 
     def _plot_trajectory_trails(

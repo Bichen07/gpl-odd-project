@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import yaml
 
@@ -183,7 +183,10 @@ def _format_collision_structured(iv: Dict) -> List[str]:
     return lines
 
 
-def build_description(action_data: Dict) -> str:
+def build_description(
+    action_data: Dict,
+    snapshot_evidence: Optional[str] = None,
+) -> str:
     parts: List[str] = []
     loc = action_data.get("location", "unknown")
     dur = action_data.get("duration", "?")
@@ -191,9 +194,13 @@ def build_description(action_data: Dict) -> str:
     if not action_data.get("junction_aware", False):
         parts.append(
             "(Map junction info unavailable — junction transitions omitted; "
-            "run scripts/map_preprocess.py to enable.)"
+            "run app/analyzer/src/dataset_builder.py --map-only to enable.)"
         )
     parts.append("")
+
+    if snapshot_evidence:
+        parts.append(snapshot_evidence.rstrip())
+        parts.append("")
 
     # Ego first, then NPCs.
     agents = sorted(action_data.get("agents", []), key=lambda a: a["track_id"])

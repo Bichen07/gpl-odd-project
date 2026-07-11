@@ -2,9 +2,37 @@
 
 const CONFLICT_FILENAME_RE = /NEAR_MISS|COLLISION|CLOSEST_APPROACH/i;
 
+export type LlmSnapshotEntry = {
+  file?: string;
+  t?: number;
+  label?: string;
+  role?: string;
+};
+
+export type LlmSnapshotsDoc = {
+  snapshots?: LlmSnapshotEntry[];
+};
+
 export function snapshotTimestamp(name: string): number {
   const m = name.match(/_t_(\d+(?:\.\d+)?)/i);
   return m ? parseFloat(m[1]) : 0;
+}
+
+/** Ordered filenames from ``llm_snapshots.json`` that still exist on disk. */
+export function snapshotsFromLlmJson(
+  doc: LlmSnapshotsDoc | null | undefined,
+  available: string[],
+): string[] {
+  if (!doc?.snapshots?.length) return [];
+  const avail = new Set(available);
+  const out: string[] = [];
+  for (const row of doc.snapshots) {
+    const f = row?.file;
+    if (typeof f === "string" && avail.has(f) && !out.includes(f)) {
+      out.push(f);
+    }
+  }
+  return out;
 }
 
 export function evenlySpacedSnapshots(items: string[], n: number): string[] {
@@ -106,16 +134,25 @@ function buildConflictWindowSelection(
 }
 
 /**
- * Pick ``total`` snapshots for the LLM: windows around NEAR_MISS / COLLISION
- * frames (±``neighborsEachSide``), then fill the rest evenly across the timeline.
+ * Pick ``total`` snapshots for the LLM.
+ * Prefer ordered ``llm_snapshots.json`` when present; else windows around
+ * NEAR_MISS / COLLISION filenames (±``neighborsEachSide``), then fill evenly.
  */
 export function selectDefaultSnapshots(
   snapshots: string[],
   total: number = 10,
   medoid?: Record<string, unknown> | null,
   neighborsEachSide: number = 2,
+  llmSnapshots?: LlmSnapshotsDoc | null,
 ): string[] {
   if (total <= 0 || snapshots.length === 0) return [];
+
+  const fromLlm = snapshotsFromLlmJson(llmSnapshots, snapshots);
+  if (fromLlm.length > 0) {
+    if (fromLlm.length <= total) return fromLlm;
+    return fromLlm.slice(0, total);
+  }
+
   const sorted = [...snapshots].sort(
     (a, b) => snapshotTimestamp(a) - snapshotTimestamp(b),
   );

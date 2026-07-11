@@ -19,7 +19,7 @@
 1. **Trajectory ground truth:** local esmini CSV (`records/esmini_<batch>_<index>.csv`)
 2. **Clustering computation path:** Payload observations -> Analyzer `/trajectory_analysis` (MFPCA + UMAP + HDBSCAN)
 3. **Selection path:** Dashboard Explore / Clustering Selection
-4. **Offline interpretation path:** `build_llm_dataset.sh` + `run_cluster_interpretation.sh`
+4. **Offline interpretation path:** `dataset_builder.py` + `run_cluster_interpretation.sh`
 5. `**alldatasets/<dataset>/` role:** exported clustering artifacts for reproducibility (not replacement for raw CSV)
 
 ---
@@ -46,7 +46,7 @@ Question: do we keep the old transform method from `old_alldatasets`, and which 
 | Upload trial/observations | Sampler + Payload API    | `scenario_sampler.py`, Payload collections                                    |
 | Compute MFPCA/HDBSCAN     | Analyzer service         | `app/analyzer/src/controller.py` (`/trajectory_analysis`)                     |
 | Select cluster config     | Dashboard Explore UI     | `app/dashboard`                                                               |
-| Build medoid artifacts    | Analyzer dataset builder | `scripts/build_llm_dataset.sh`, `dataset_builder.py`                          |
+| Build medoid artifacts    | Analyzer dataset builder | `app/analyzer/src/dataset_builder.py`                                        |
 | LLM interpretation        | LLM pipeline wrapper     | `scripts/run_cluster_interpretation.sh`, `cluster_interpretation_pipeline.py` |
 
 
@@ -71,7 +71,7 @@ MFPCA + UMAP + HDBSCAN outputs
     ->
 chosen clustering result (selectedClusteringResult_<k>Clusters.json)
     ->
-build_llm_dataset.sh (uses clustering + local CSV)
+dataset_builder.py (uses clustering + local CSV)
     ->
 results/batch<id>/<k>_cluster_s=<silhouette>/cluster<N>/{context.md,cluster.json,action,description,trajectory,BEV}
     ->
@@ -109,7 +109,7 @@ Required for reproducible offline interpretation:
 
 ## 3) Interpretation build contract
 
-`build_llm_dataset.sh` requires:
+`dataset_builder.py` requires:
 
 - clustering artifacts above
 - shared map assets (`results/map/` — xodr + tracks + yaml/jpg/description)
@@ -308,7 +308,7 @@ How to get result for next-step processing:
   1. load saved analysis in Saves panel,
   2. pick clustering in ClusteringSelection,
   3. export/create `selectedClusteringResult_<k>Clusters.json` + `clustering.json`,
-  4. run `build_llm_dataset.sh`.
+  4. run `dataset_builder.py`.
 - Option B (future redesign):
   - make `dataset_builder.py` read from `Batch.savedTrajectoryAnalysis` document directly (skip `alldatasets/` export).
 
@@ -362,14 +362,14 @@ Important limitation:
   - medoid selection,
   - `trajectory.csv`, `action.yaml`, BEV snapshots, prompt input generation.
 
-#### 4) Detailed modification plan for `build_llm_dataset.sh`
+#### 4) Detailed modification plan for `dataset_builder.py`
 
-File: `[scripts/build_llm_dataset.sh](scripts/build_llm_dataset.sh)`
+File: `[app/analyzer/src/dataset_builder.py](app/analyzer/src/dataset_builder.py)`
 
 Add new CLI options and pass-through:
 
 1. Keep existing mode:
-  - `build_llm_dataset.sh <dataset> <k>`
+  - `dataset_builder.py <dataset> <k>`
 2. Add Option B mode flags:
   - `--source payload-save`
   - `--batch-id <id>`
@@ -380,9 +380,7 @@ Add new CLI options and pass-through:
     - `--min-cluster-size ...`
     - `--min-samples ...`
     - `--cluster-selection-epsilon ...`
-3. Forward all these flags to `dataset_builder.py`.
-
-No heavy logic should be added in shell script; only argument parsing and forwarding.
+3. These flags are handled directly in `dataset_builder.py` (no shell wrapper).
 
 #### 5) Detailed modification plan for `dataset_builder.py` (required)
 
@@ -416,7 +414,7 @@ or save a dedicated document for selected clustering.
 
 #### 7) Validation checklist for Option B
 
-1. `build_llm_dataset.sh --source payload-save ...` runs without `alldatasets/<dataset>/`.
+1. `dataset_builder.py --source payload-save ...` runs without `alldatasets/<dataset>/`.
 2. Selected clustering trial ids map to existing local `esmini_<batch>_<index>.csv`.
 3. Medoid files and BEV snapshots are generated as before.
 4. Output equivalence test:
@@ -431,7 +429,7 @@ or save a dedicated document for selected clustering.
 ## What you can do without `alldatasets/`
 
 - Dashboard visualization, filtering, cluster selection, and interactive review
-- `build_llm_dataset.sh --source payload-save` — full pipeline without any `alldatasets/` export
+- `dataset_builder.py --source payload-save` — full pipeline without any `alldatasets/` export
 
 ## Status of `alldatasets/` (removed 2026-06)
 
@@ -465,7 +463,7 @@ the canonical dataset (`dataset1` / `dataset2` / `dataset3`) from `--batch-id` v
 `results/batch<id>/<k>_cluster_s=<silhouette>/`.
 - If no dataset config maps to the batch id, it falls back to `batch<id>` and prints a
 warning that BEV/map assets may be unavailable.
-- `scripts/build_llm_dataset.sh` only forwards `--dataset` when you explicitly pass it.
+- `--dataset` is optional in payload-save mode (resolved from `--batch-id` when omitted).
 
 ### Output folder layout (2026-06 — single source of truth under `results/`)
 
@@ -616,57 +614,67 @@ Steps 0–2.5.
 - `cluster_interpretation_pipeline.py`: `interpret_cluster_dir()` reads `cluster.json` (falls
   back to `stats.json`/`medoid.json`); new `action_log_from_description()` supplies the LLM
   text from `context.md`/`description.txt`/`action.yaml` (falls back to observations).
-- `build_llm_dataset.sh`: summary updated to list the new per-cluster files.
+- `dataset_builder.py`: summary updated to list the new per-cluster files.
 
-### One-time map asset prerequisite (per map)
+### Map assets (`results/map/`)
 
-BEV rendering needs the map track + metadata assets in `results/map/`. If that folder is
-empty (fresh checkout), run once per map before the build:
+BEV + labeller need tracks/yaml under `results/map/`. These are **auto-ensured** by
+`dataset_builder.py` (via `map_assets.ensure_map_assets`). Manual-only:
 
 ```bash
-python3 scripts/generate_map_tracks.py --batch-id 1   # writes results/map/hct_6.xodr + hct_6_tracks.csv
-python3 scripts/map_preprocess.py     --batch-id 1    # writes results/map/hct_6.{yaml,jpg,_description.txt}
-# batch 2 uses a different map (hct_6_no_930): repeat with --batch-id 2
+python3 app/analyzer/src/dataset_builder.py --batch-id 1 --map-only
+python3 app/analyzer/src/dataset_builder.py --batch-id 1 --map-only --force-map
+# batch 2 uses hct_6_no_930:
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only
 ```
 
-Both map scripts are now **batch-centric** (`--batch-id <n>`), matching `build_llm_dataset.sh`.
-The batch id resolves to a map through `dataset_config.DATASETS` (see below). Alternatives:
-`--map-id hct_6` (map_preprocess, explicit), `--dataset dataset1` (internal alias, still
-accepted), `--all` (generate_map_tracks, every map variant).
-
-How the `dataset1/2/3` labels relate to batches: `dataset_config.DATASETS` is just an internal
-table keyed by canonical name, each row carrying `batch_id`, `xodr`, `tracks`, and `location`.
-`--batch-id` is reverse-looked-up to that row via `dataset_for_batch_id()`. Today: batch 1 →
-`hct_6`, batch 2 → `hct_6_no_930`, batch 3 → `hct_6`. The label is never required from the CLI;
-it only namespaces the config. (A future cleanup could re-key `DATASETS` by `batch_id` directly.)
-
-`generate_map_tracks.py` now copies the source xodr into `results/map/` automatically, so
-no manual `cp` is needed. Without these assets the build still completes but logs
+Batch id resolves to a map through `dataset_config.DATASETS` (batch 1/3 → `hct_6`,
+batch 2 → `hct_6_no_930`). Alternatives: `--dataset dataset1`, `--all-maps` with
+`--map-only`. `map_assets` copies the source xodr into `results/map/` automatically.
+Without these assets the build still completes but logs
 `BEV skipped` / `action built WITHOUT junction info`.
 
 ---
 
 ## Phase C — Build cluster medoid artifacts from CSV
 
+## Happy path — create a complete LLM dataset
+
+You do **not** need `--from-run` to create a folder. One command builds everything
+the LLM needs (clustering JSON, manifest, action/description, BEV, context):
+
 ```bash
 cd gpl-odd-project
 conda activate analyzer
 
-# One-time map assets per map (skip if results/map already populated)
-python3 scripts/generate_map_tracks.py --batch-id <batch>
-python3 scripts/map_preprocess.py     --batch-id <batch>
+# See which (k, silhouette) results exist in the Payload save:
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --list-clusterings
 
-# payload-save build — the supported path. --dataset is NOT needed (resolved from --batch-id).
-# Pick the result with --k (best silhouette), --clustering-index <i>, or a saved selected.json:
-bash scripts/build_llm_dataset.sh --source payload-save --batch-id <batch> --k <k>
-bash scripts/build_llm_dataset.sh --source payload-save --batch-id <batch> --clustering-index <i>
-
-# List candidates for a given k (index, silhouette, HDBSCAN params) before picking:
-bash scripts/build_llm_dataset.sh --source payload-save --batch-id <batch> --k <k> --list-clusterings
+# CREATE a complete run (auto-ensures results/map/, then builds cluster pack):
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --k 4
+# → results/batch2/4_cluster_s=<silhouette>/  (manifest + clustering + cluster*/)
 ```
 
-> The legacy positional form `build_llm_dataset.sh <dataset> <k>` (`--source alldatasets`)
-> still exists but has no local input data after the `alldatasets/` removal. Use payload-save.
+| Goal | Command |
+|------|---------|
+| **Create** new pack from Payload | `python3 app/analyzer/src/dataset_builder.py --batch-id N --k K` |
+| **Rebuild** BEV/labels in existing pack | `… --batch-id N --from-run results/batchN/K_cluster` |
+| List Payload clustering candidates | `… --batch-id N --list-clusterings` |
+| Map assets only | `… --batch-id N --map-only` |
+
+`--from-run` only works on folders that already have `manifest.json` +
+`clustering/selectedClusteringResult.json`. Incomplete leftovers (e.g.
+`4_cluster/` without clustering JSON) or paths that were never built
+(`2_cluster_s=0.4683` when no k=2 run exists) will fail — use **Create** above.
+
+```bash
+# Rebuild without typing the silhouette:
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --from-run results/batch2/4_cluster
+# or:
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --from-run results/batch2 --k 4
+```
+
+---
 
 This stage generates (under `results/batch<id>/<k>_cluster_s=<silhouette>/cluster<N>/`):
 
@@ -775,12 +783,12 @@ traffic-signal metadata required):
 Deferred (need data we don't have yet): `yield`/`aggressive_pass` (requires right-of-way at a
 junction) and traffic-light transitions (requires signal-phase metadata in the map).
 
-### D.5 Keyframe selection (peak-intensity)
+### D.5 Keyframe selection (conflict-centered)
 
-`tier2_renderer.pick_critical_timestamps` already snapshots **max deceleration**
-(`ego_max_deceleration`) and **closest approach / min distance** (`closest_approach`). Added in
-V1-5: **turn apex** = `ego_turn_apex`, the moment of maximum heading-rate (|dθ/dt|), so turns
-are captured at their sharpest point.
+Production BEV times come from `conflict_frame_selector.select_conflict_frames`
+(see **Conflict-centered BEV selection** below). That path already includes the
+useful kinematic extrema (hard-brake onset, dist/TTC min, max closing) plus
+gated `action.yaml` boundaries — not a separate heuristic-only mode.
 
 ### D.6 Dual-panel BEV snapshots
 
@@ -806,8 +814,8 @@ silently falls back to whole-scene only.
 | Dataset trial-id mapping     | `app/analyzer/src/dataset_config.py`                                    |
 | Build Steps 1-4              | `app/analyzer/src/dataset_builder.py`                                   |
 | BEV rendering                | `app/analyzer/src/tier2_renderer.py`, `app/analyzer/src/map_plotter.py` |
+| BEV frame selection          | `app/analyzer/src/conflict_frame_selector.py`                           |
 | Action labelling             | `app/analyzer/src/sim_labeller.py`, `app/analyzer/src/labeller.py`      |
-| Build wrapper                | `scripts/build_llm_dataset.sh`                                          |
 | Interpretation wrapper       | `scripts/run_cluster_interpretation.sh`                                 |
 | Interpretation pipeline      | `app/analyzer/src/cluster_interpretation_pipeline.py`                   |
 | Cluster interpreter logic    | `app/llm_pipeline/python/llm_pipeline/cluster_interpreter.py`           |
@@ -869,14 +877,13 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000
 cd /home/carlos11/Downloads/code/LAB/gpl-odd-project
 
 # A) Ensure shared map assets in results/map/ (one-time per map)
-python3 scripts/generate_map_tracks.py --batch-id 1
-python3 scripts/map_preprocess.py     --batch-id 1
+python3 app/analyzer/src/dataset_builder.py --batch-id 1 --map-only
+python3 app/analyzer/src/dataset_builder.py --batch-id 1 --map-only
 
 # B) Build medoid artifacts directly from Payload saved analysis (no alldatasets/ needed)
 #   --dataset not needed; the map is resolved from --batch-id.
 #   → output: results/batch1/<k>_cluster_s=<silhouette>/
-bash scripts/build_llm_dataset.sh \
-  --source payload-save \
+python3 app/analyzer/src/dataset_builder.py \
   --batch-id 1 \
   --k 4
 # Options: --save-doc-id 46       (specific save, default: latest)
@@ -908,6 +915,155 @@ For reproducibility:
 
 ---
 
+## Conflict-centered BEV selection (single path)
+
+Medoid BEV packs use **one** selector: `conflict_frame_selector.select_conflict_frames`.
+There is no legacy `action` / `hybrid` / `heuristic` CLI mode and no dense
+`--archive-all-action-frames` dump. Labelling always writes `action.yaml` first;
+BEV times are then chosen from that file plus conflict / kinematic rules.
+
+### Pipeline (per cluster / aux trial)
+
+1. Labeller → `action.yaml` (semantic events + interactions: COLLISION / NEAR_MISS / …).
+2. `select_conflict_frames(action.yaml, trajectory CSV)` → ordered times + metrics.
+3. `Tier2BevRenderer` → `snapshots/*.jpg` + `llm_snapshots.json` + `map_overview.jpg`.
+4. `description.py` embeds a **Snapshot evidence** table from the same selection.
+
+### What gets kept (merge rules)
+
+Raw candidates are collected, then merged with `min_gap` (prefer peak / burst /
+relevance over lower-priority action labels):
+
+| Source | Frames |
+|--------|--------|
+| Conflict anchors | `COLLISION` / `NEAR_MISS` / `CLOSEST_APPROACH` peak `t*` (fallback: global min clearance to a moving partner) |
+| Burst | Discrete offsets around `t*`: `-2,-1,-0.5,-0.2,0,+0.2,+0.5,+1` s (optional densify via `--conflict-burst-step-s > 0`) |
+| Relevance | First time partner enters distance gate `D` while moving |
+| Criticality (in ±W) | Global dist/TTC min, max closing, hard-brake onset, optional PET |
+| Action events | Boundaries from `action.yaml` **only if** inside ±W of a conflict **or** ego–partner distance `< D` (partner moving). Junction-only noise is demoted |
+
+So: **action-based + conflict gates**, not “every action boundary” and not a
+separate heuristic-only picker. Kinematic extras (hard brake, dist/TTC extrema)
+are the useful part of the old heuristic pack, already folded into this selector.
+
+### Road / lane IDs on BEV frames
+
+Controlled by `SelectedFrame.draw_agent_road_labels` in `conflict_frame_selector.py`
+(passed through to MapPlotter `draw_labels`).
+
+| Frame role | Road + lane IDs? | Notes |
+|------------|------------------|-------|
+| `peak` | **yes** | COLLISION / NEAR_MISS / CLOSEST_APPROACH |
+| `burst` | **yes** | approach / post offsets around peak |
+| `brake` / `dist_min` / `ttc_min` / `closing` / `pet` | **yes** | criticality extrema |
+| `relevance` | **yes** | partner enters distance gate D |
+| `action` | **yes** | gated action.yaml boundaries kept in the pack |
+| `map_overview.jpg` | **yes** | whole-map overview (highlighted roads) |
+
+Today **every** conflict-selected snapshot role draws road/lane IDs. Labels are
+**anchored near ego/partner** (`label_anchors` + radius), not a dense full-map
+overlay on the zoom panel. There is no role that currently skips them; if a
+future role sets `draw_agent_road_labels=False`, that frame would omit IDs.
+
+### CLI knobs (`dataset_builder.py`)
+
+| Flag | Default | Meaning |
+|------|---------|---------|
+| `--conflict-window-s` | `6.0` | ±W seconds around peak |
+| `--conflict-distance-m` | `40.0` | distance gate D (m) |
+| `--conflict-burst-step-s` | `0.0` | `0` = discrete burst only; `>0` densifies |
+| `--hard-brake-accel` | `-2.5` | ego hard-brake onset (m/s²) |
+| `--road-label-size` / `--lane-label-size` | `5` / `6` | road/lane ID font (pt) on BEV |
+| `--scale-bar-font-size` | `12` | scale-bar tick labels (pt) |
+| `--panel-label-font-size` / `--metric-chip-font-size` | (tuned) | dual-panel captions / d=/TTC= chip |
+| `--agent-id-size` / `--ego-zoom-radius` / `--snapshot-size` | (tuned) | agent IDs, ego zoom, output px |
+
+Example rebuild:
+
+```bash
+conda activate analyzer
+export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
+# Exact run folder:
+python3 app/analyzer/src/dataset_builder.py \
+  --source payload-save --batch-id 2 \
+  --from-run results/batch2/4_cluster_s=0.6945 \
+  --conflict-window-s 6 --conflict-distance-m 40
+
+# Or omit silhouette — auto-picks highest-_s= complete sibling for that k:
+python3 app/analyzer/src/dataset_builder.py \
+  --source payload-save --batch-id 2 \
+  --from-run results/batch2/4_cluster
+```
+
+`--from-run` requires `manifest.json` + `clustering/selectedClusteringResult.json`.
+If the path is missing or incomplete, the builder searches sibling
+`N_cluster*` folders and uses the complete run with the **highest** `_s=` value.
+If no k=N run exists (e.g. there is no `2_cluster*` under batch2), it lists the
+available complete runs and exits.
+
+`--from-run` with `--batch-id` also reloads Payload embeddings so
+`outlier_trials/` and `boundary_c*/` are regenerated when requested.
+
+### Outputs per cluster
+
+- `snapshots/*.jpg` — concise names, e.g. `t_33.20_NEAR_MISS_Opposite.jpg`,
+  `t_32.20_0p2s_before_APPROACH_Opposite.jpg`
+- `snapshots/llm_snapshots.json` — ordered pack + metrics for dashboard defaults
+- `description.txt` — **Snapshot evidence** table (`d`, `TTC`, `az`, speeds, road/lane)
+  before per-agent prose
+
+---
+
+## What is fed to the LLM (order)
+
+Primary path: `cluster_interpretation_pipeline.run_one_cluster()` reads one cluster folder.
+
+**Text (in prompt order):**
+
+1. System / task prompt (`cluster_interaction_prompt.txt`) — includes `d` / `TTC` / `az` glossary
+2. Cluster stats from `cluster.json` (size, collision rate, silhouette, medoid outcome, TTC/SPrET if present)
+3. `context.md` (preferred) or assembled equivalent:
+   - header (k, size, silhouette, medoid id)
+   - `description.txt` body (**Snapshot evidence table first**, then agent timelines, then interactions)
+   - structured action table (from `action.yaml`)
+   - ordered BEV filename index
+4. Optional: trajectory overlay / MFPCA heatmap image if present
+
+**Images (chronological, conflict-centered):**
+
+1. `map_overview.jpg` (whole-map context)
+2. Selected `snapshots/*.jpg` in time order — prefer `llm_snapshots.json` list
+   (dashboard `selectDefaultSnapshots` does the same). Peak / latest frames are the
+   primary grounding for safety claims; burst frames show approach/post dynamics.
+
+**Not fed as tokens:** raw `trajectory.csv` (used only to render BEV).
+
+```text
+Payload save / clustering result
+        │
+        ▼
+dataset_builder.py  (--source payload-save | --from-run)
+        │
+        ├─ labeller → action.yaml
+        ├─ conflict_frame_selector → selected times + metrics
+        ├─ Tier2BevRenderer → snapshots/*.jpg + llm_snapshots.json + map_overview.jpg
+        ├─ description.py → description.txt (Snapshot evidence + prose)
+        ├─ write_context_md → context.md
+        └─ (optional) outlier_trials/ + boundary_c*/  [needs embeddings]
+        │
+        ▼
+run_cluster_interpretation.sh / cluster_interpretation_pipeline
+        │
+        ├─ prompt templates
+        ├─ context.md + cluster.json stats
+        └─ map_overview + ordered BEV images
+        │
+        ▼
+cluster_interpretation.yaml (+ interpretation_meta.json)
+```
+
+---
+
 ## Non-Goals (Removed from this plan)
 
 - Historical bug timelines and old root-cause narratives
@@ -926,10 +1082,10 @@ The new canonical workflow skips `alldatasets/` export entirely.
 2. Re-run Dashboard Analysis on that batch (Analyzer `:9010`)
 3. In Dashboard → Saves panel, click **save** to persist analysis to Payload
   (`selected.json` is now included in the zip automatically)
-4. Run `build_llm_dataset.sh --source payload-save --batch-id <n> --k <k>`
+4. Run `python3 app/analyzer/src/dataset_builder.py --batch-id <n> --k <k>`
   (`--dataset` optional — resolved from batch id) and verify
    `results/batch<n>/<k>_cluster_s=<silhouette>/cluster*/` folders are complete
 5. Run `run_cluster_interpretation.sh` and review YAML outputs
 
-**Legacy alldatasets path** (`bash scripts/build_llm_dataset.sh dataset1 4`) remains in code but
+**Legacy alldatasets path** (`--source alldatasets --dataset dataset1 --n-clusters 4`) remains in code but
 has no local input data after the `alldatasets/` removal.

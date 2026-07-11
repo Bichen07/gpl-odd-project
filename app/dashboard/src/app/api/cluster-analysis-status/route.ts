@@ -5,8 +5,10 @@ import path from "path";
 /**
  * GET /api/cluster-analysis-status?batchId=2
  *
- * Scans all clustering result folders and reports which have LLM analysis,
- * medoid trial IDs (from manifest.json), and per-cluster interpretation summaries.
+ * Scans clustering result folders for:
+ * - preprocess artifacts (medoid + closest-pair + outlier)
+ * - LLM analysis
+ * - trial IDs for medoids / outliers / boundary (closest-pair) highlights
  */
 
 function findProjectRoot(start: string): string {
@@ -28,6 +30,94 @@ function readJsonSafe(p: string): Record<string, unknown> | null {
   }
 }
 
+function hasTrialSubdirs(dir: string): boolean {
+  if (!fs.existsSync(dir)) return false;
+  try {
+    return fs
+      .readdirSync(dir, { withFileTypes: true })
+      .some((e) => e.isDirectory() && /^trial_/.test(e.name));
+  } catch {
+    return false;
+  }
+}
+
+type BoundaryPair = {
+  cluster_a: number | string;
+  trial_a: string;
+  cluster_b: number | string;
+  trial_b: string;
+  embedding_dist?: number;
+};
+
+type FolderStatus = {
+  has_analysis: boolean;
+  has_preprocess: boolean;
+  medoids: Record<string, string>;
+  /** Primary (materialized) outlier trial per cluster */
+  outliers: Record<string, string>;
+  boundary_trials: Record<string, string[]>;
+  boundary_pairs: BoundaryPair[];
+  /** HDBSCAN task from clustering/selectedClusteringResult.json */
+  task: Record<string, unknown> | null;
+  interpretations: Record<
+    string,
+    {
+      cluster_label?: string;
+      ego_perspective_summary?: unknown;
+    }
+  >;
+};
+
+function scanClusterDirs(runDir: string): string[] {
+  return fs
+    .readdirSync(runDir, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && /^cluster\d+$/.test(e.name))
+    .map((e) => e.name)
+    .sort((a, b) => Number(a.replace("cluster", "")) - Number(b.replace("cluster", "")));
+}
+
+function checkPreprocessComplete(
+  runDir: string,
+  clusterNames: string[],
+  boundaryPairs: BoundaryPair[],
+): boolean {
+  if (clusterNames.length === 0) return false;
+
+  for (const name of clusterNames) {
+    const clusterDir = path.join(runDir, name);
+    const cj = readJsonSafe(path.join(clusterDir, "cluster.json"));
+    const medoid = cj?.medoid as Record<string, unknown> | undefined;
+    if (medoid?.trial_id == null) return false;
+    if (!fs.existsSync(path.join(clusterDir, "action.yaml"))) return false;
+
+    const clusterMeta = (cj?.cluster ?? {}) as Record<string, unknown>;
+    const intra = (clusterMeta.intra_variance ?? {}) as Record<string, unknown>;
+    const outlierIds = (intra.outlier_trial_ids ?? []) as unknown[];
+    if (outlierIds.length > 0) {
+      if (!hasTrialSubdirs(path.join(clusterDir, "outlier_trials"))) return false;
+    }
+
+    const neighbors = (intra.boundary_neighbors ?? {}) as Record<string, string>;
+    for (const tgt of Object.keys(neighbors)) {
+      if (!hasTrialSubdirs(path.join(clusterDir, `boundary_c${tgt}`))) return false;
+    }
+  }
+
+  // Every declared closest-pair must have both side folders on disk.
+  for (const bp of boundaryPairs) {
+    const a = String(bp.cluster_a);
+    const b = String(bp.cluster_b);
+    if (!hasTrialSubdirs(path.join(runDir, `cluster${a}`, `boundary_c${b}`))) {
+      return false;
+    }
+    if (!hasTrialSubdirs(path.join(runDir, `cluster${b}`, `boundary_c${a}`))) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export async function GET(req: NextRequest) {
   const batchId = req.nextUrl.searchParams.get("batchId");
   if (!batchId || !/^\d+$/.test(batchId)) {
@@ -40,14 +130,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ folders: {} });
   }
 
-  const folders: Record<string, {
-    has_analysis: boolean;
-    medoids: Record<string, string>;
-    interpretations: Record<string, {
-      cluster_label?: string;
-      ego_perspective_summary?: unknown;
-    }>;
-  }> = {};
+  const folders: Record<string, FolderStatus> = {};
 
   for (const entry of fs.readdirSync(batchDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
@@ -64,17 +147,74 @@ export async function GET(req: NextRequest) {
       if (label && trialId) medoids[label] = trialId;
     }
 
-    const interpretations: Record<string, {
-      cluster_label?: string;
-      ego_perspective_summary?: unknown;
-    }> = {};
+    const boundaryPairs = (
+      (manifest?.boundary_pairs ?? []) as BoundaryPair[]
+    ).map((bp) => ({
+      cluster_a: bp.cluster_a,
+      trial_a: String(bp.trial_a),
+      cluster_b: bp.cluster_b,
+      trial_b: String(bp.trial_b),
+      embedding_dist:
+        typeof bp.embedding_dist === "number" ? bp.embedding_dist : undefined,
+    }));
+
+    const outliers: Record<string, string> = {};
+    const boundaryTrials: Record<string, string[]> = {};
+    const interpretations: FolderStatus["interpretations"] = {};
     let hasAnalysis = false;
 
-    for (const sub of fs.readdirSync(runDir, { withFileTypes: true })) {
-      if (!sub.isDirectory() || !/^cluster\d+$/.test(sub.name)) continue;
-      const label = sub.name.replace("cluster", "");
-      const metaPath = path.join(runDir, sub.name, "interpretation_meta.json");
-      const yamlPath = path.join(runDir, sub.name, "cluster_interpretation.yaml");
+    const savedClustering = readJsonSafe(
+      path.join(runDir, "clustering", "selectedClusteringResult.json"),
+    );
+    const savedTask =
+      (savedClustering?.task as Record<string, unknown> | undefined) ?? null;
+
+    const clusterNames = scanClusterDirs(runDir);
+
+    for (const name of clusterNames) {
+      const label = name.replace("cluster", "");
+      const clusterDir = path.join(runDir, name);
+      const cj = readJsonSafe(path.join(clusterDir, "cluster.json"));
+
+      if (!medoids[label]) {
+        const medoid = cj?.medoid as Record<string, unknown> | undefined;
+        if (medoid?.trial_id != null) {
+          medoids[label] = String(medoid.trial_id);
+        }
+      }
+
+      const clusterMeta = (cj?.cluster ?? {}) as Record<string, unknown>;
+      const intra = (clusterMeta.intra_variance ?? {}) as Record<string, unknown>;
+      const outlierIds = ((intra.outlier_trial_ids ?? []) as unknown[])
+        .map((id) => String(id))
+        .filter(Boolean);
+      // Only the top outlier is materialized under outlier_trials/trial_*.
+      if (outlierIds.length > 0) {
+        outliers[label] = outlierIds[0];
+      }
+
+      const neighborMap = (intra.boundary_neighbors ?? {}) as Record<
+        string,
+        string
+      >;
+      const fromNeighbors = Object.values(neighborMap)
+        .map((id) => String(id))
+        .filter(Boolean);
+
+      // Also collect this cluster's side of each closest pair.
+      const fromPairs: string[] = [];
+      for (const bp of boundaryPairs) {
+        if (String(bp.cluster_a) === label) fromPairs.push(String(bp.trial_a));
+        if (String(bp.cluster_b) === label) fromPairs.push(String(bp.trial_b));
+      }
+
+      const uniq = [...new Set([...fromNeighbors, ...fromPairs])];
+      if (uniq.length > 0) {
+        boundaryTrials[label] = uniq;
+      }
+
+      const metaPath = path.join(clusterDir, "interpretation_meta.json");
+      const yamlPath = path.join(clusterDir, "cluster_interpretation.yaml");
       const meta = readJsonSafe(metaPath);
       if (!meta && !fs.existsSync(yamlPath)) continue;
 
@@ -83,17 +223,24 @@ export async function GET(req: NextRequest) {
         cluster_label: meta?.cluster_label as string | undefined,
         ego_perspective_summary: meta?.ego_perspective_summary,
       };
-
-      if (!medoids[label]) {
-        const cj = readJsonSafe(path.join(runDir, sub.name, "cluster.json"));
-        const medoid = cj?.medoid as Record<string, unknown> | undefined;
-        if (medoid?.trial_id != null) {
-          medoids[label] = String(medoid.trial_id);
-        }
-      }
     }
 
-    folders[entry.name] = { has_analysis: hasAnalysis, medoids, interpretations };
+    const hasPreprocess = checkPreprocessComplete(
+      runDir,
+      clusterNames,
+      boundaryPairs,
+    );
+
+    folders[entry.name] = {
+      has_analysis: hasAnalysis,
+      has_preprocess: hasPreprocess,
+      medoids,
+      outliers,
+      boundary_trials: boundaryTrials,
+      boundary_pairs: boundaryPairs,
+      task: savedTask,
+      interpretations,
+    };
   }
 
   return NextResponse.json({ folders });

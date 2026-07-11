@@ -419,7 +419,7 @@ const Replayer = () => {
       let changed = false;
       for (const egoName of Object.keys(clusterAnalysisByEgo ?? {})) {
         const ctx = clusterAnalysisByEgo?.[egoName];
-        if (!ctx?.hasAnalysis) continue;
+        if (!ctx?.hasAnalysis && !ctx?.hasPreprocess) continue;
         const egoBucket = patched[egoName];
         if (egoBucket == null) continue;
 

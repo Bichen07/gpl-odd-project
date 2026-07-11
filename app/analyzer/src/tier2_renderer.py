@@ -1,7 +1,7 @@
 """
 bev_tier2_renderer.py — Phase 3b: xosc_gen-style BEV using esmini odrplot map + MapPlotter.
 
-Map:   ``hct_6_tracks.csv`` from ``scripts/generate_map_tracks.py`` (esmini odrplot).
+Map:   ``hct_6_tracks.csv`` from ``map_assets / dataset_builder --map-only`` (esmini odrplot).
 Agents: local ``esmini_<batch>_<trial>.csv`` (authoritative sim ground truth).
 """
 from __future__ import annotations
@@ -813,6 +813,55 @@ def _ego_position_lookup(df: pd.DataFrame):
     return _at
 
 
+def _agent_position_lookup(df: pd.DataFrame, name: Optional[str] = None, track_id: Optional[int] = None):
+    """Return f(t) → (x, y) for a named agent or trackId, or None."""
+    sub = df
+    if name:
+        sub = df[df["name"].astype(str).str.strip() == str(name).strip()]
+    elif track_id is not None and "trackId" in df.columns:
+        sub = df[df["trackId"] == int(track_id)]
+    elif track_id is not None and "name" in df.columns:
+        # esmini CSV: map track via name order is unreliable — try name match later
+        return lambda _t: None
+    sub = sub.sort_values("time").reset_index(drop=True)
+    if sub.empty:
+        return lambda _t: None
+    et = sub["time"].to_numpy(dtype=float)
+    ex = sub["x"].to_numpy(dtype=float)
+    ey = sub["y"].to_numpy(dtype=float)
+
+    def _at(t: float):
+        i = int(np.argmin(np.abs(et - t)))
+        return float(ex[i]), float(ey[i])
+
+    return _at
+
+
+def _metric_chip_text(d_m, ttc_s) -> Optional[str]:
+    parts = []
+    if d_m is not None:
+        parts.append(f"d={d_m:.1f}m")
+    if ttc_s is not None:
+        parts.append(f"TTC={ttc_s:.1f}s")
+    return "  ".join(parts) if parts else None
+
+
+def _selection_to_key_indices(selection, time_steps: List[float]):
+    """Map SelectedFrame list → (index, label, frame) for rendering."""
+    if not time_steps:
+        return []
+    t_arr = np.asarray(time_steps, dtype=float)
+    picks = []
+    seen = set()
+    for fr in selection.frames:
+        idx = int(np.argmin(np.abs(t_arr - fr.t)))
+        if idx in seen:
+            continue
+        seen.add(idx)
+        picks.append((idx, fr.label, fr))
+    return picks
+
+
 def _autocrop_white(im, pad: int = 8):
     """Trim surrounding pure-white margin, leaving a small uniform padding."""
     from PIL import Image, ImageChops
@@ -1022,7 +1071,7 @@ class Tier2BevRenderer:
         if not Path(map_tracks_csv).is_file():
             raise FileNotFoundError(
                 f"Map tracks CSV not found: {map_tracks_csv}\n"
-                "Run: python3 scripts/generate_map_tracks.py"
+                "Run: python3 app/analyzer/src/dataset_builder.py --batch-id <n> --map-only"
             )
         self._plotter = MapPlotter()
 
@@ -1056,14 +1105,15 @@ class Tier2BevRenderer:
         trial_index: int,
         output_dir: str,
         n_snapshots: Optional[int] = None,
-        collision_timestep: Optional[float] = None,
         file_prefix: Optional[str] = None,
-        min_frame_gap_s: float = DEFAULT_ACTION_MIN_GAP_S,
         overview_dir: Optional[str] = None,
         action_yaml_path: Optional[str] = None,
-        key_frame_mode: str = "hybrid",
-        semantic_only: bool = False,
-        collision_trial: bool = False,
+        *,
+        conflict_window_s: float = 6.0,
+        conflict_distance_m: float = 40.0,
+        conflict_burst_step_s: float = 0.0,
+        hard_brake_accel: float = -2.5,
+        selection_out: Optional[list] = None,
     ) -> List[BevSnapshot]:
         if not csv_exists(batch_id, trial_index):
             raise FileNotFoundError(
@@ -1089,17 +1139,28 @@ class Tier2BevRenderer:
             )
 
             time_steps = unique_time_steps(df)
-            key_indices = resolve_key_frames(
+            from conflict_frame_selector import select_conflict_frames
+
+            selection = select_conflict_frames(
                 df,
-                time_steps,
                 action_yaml_path=action_yaml_path,
-                key_frame_mode=key_frame_mode,
-                min_gap=min_frame_gap_s,
-                n_snapshots=n_snapshots,
-                collision_timestep=collision_timestep,
-                semantic_only=semantic_only,
-                collision_trial=collision_trial,
+                time_steps=time_steps,
+                conflict_window_s=conflict_window_s,
+                conflict_distance_m=conflict_distance_m,
+                conflict_burst_step_s=conflict_burst_step_s,
+                hard_brake_accel=hard_brake_accel,
             )
+            key_with_frames = _selection_to_key_indices(selection, time_steps)
+            key_indices = [(i, lab) for i, lab, _ in key_with_frames]
+            print(
+                f"[Tier2BevRenderer] conflict selection: {len(key_indices)} frames "
+                f"(partner={selection.partner_name or '?'}, peak_t={selection.peak_t})"
+            )
+
+            if n_snapshots is not None and len(key_with_frames) > n_snapshots:
+                key_with_frames = key_with_frames[:n_snapshots]
+                key_indices = [(i, lab) for i, lab, _ in key_with_frames]
+
             highlight = highlight_road_ids_from_df(df)
             vbounds = view_bounds_from_df(df)
             snapshots: List[BevSnapshot] = []
@@ -1114,27 +1175,78 @@ class Tier2BevRenderer:
             )
 
             ego_xy_at = _ego_position_lookup(df)
+            partner_name = selection.partner_name if selection else None
+            partner_xy_at = (
+                _agent_position_lookup(df, name=partner_name)
+                if partner_name
+                else (lambda _t: None)
+            )
+            ctx_name = selection.context_partner_name if selection else None
+            ctx_xy_at = (
+                _agent_position_lookup(df, name=ctx_name)
+                if ctx_name
+                else (lambda _t: None)
+            )
 
-            for rank, (idx, label) in enumerate(key_indices):
-                t = time_steps[idx]
-                slug = _slug_label(label)[:80]  # filesystem name-length safety
-                out_path = os.path.join(
-                    output_dir,
-                    f"{prefix}_t_{t:05.2f}_{slug}.jpg",
-                )
+            filenames: List[str] = []
+            selected_frames_ordered = []
+
+            for rank, (idx, label, fr) in enumerate(key_with_frames):
+                t = float(time_steps[idx])
+                # Snap SelectedFrame.t to the rendered timestep.
+                if fr is not None:
+                    fr.t = round(t, 3)
+                    slug = fr.concise_slug()
+                    use_whole = bool(fr.use_whole_scene)
+                    draw_road = bool(fr.draw_agent_road_labels)
+                    chip = _metric_chip_text(fr.d_m, fr.ttc_s)
+                    label_for_title = fr.label
+                else:
+                    slug = _slug_label(label)[:60]
+                    use_whole = True
+                    draw_road = False
+                    chip = None
+                    label_for_title = label
+
+                out_name = f"{prefix}_t_{t:05.2f}_{slug}.jpg"
+                out_path = os.path.join(output_dir, out_name)
+                partner_xy = partner_xy_at(t) if partner_name else None
+                ctx_xy = ctx_xy_at(t) if ctx_name else None
+                extra = [ctx_xy] if ctx_xy is not None else None
                 self._render_snapshot(
                     out_path=out_path,
                     traj_csv=traj_csv,
                     meta_yaml=meta_yaml,
                     highlight=highlight,
                     vbounds=vbounds,
-                    t=float(t),
-                    label=label,
-                    ego_xy=ego_xy_at(float(t)),
+                    t=t,
+                    label=label_for_title,
+                    ego_xy=ego_xy_at(t),
+                    partner_xy=partner_xy,
                     work=work,
+                    use_whole_scene=use_whole,
+                    draw_agent_road_labels=draw_road,
+                    metric_chip=chip,
+                    extra_pair_xy=extra,
                 )
-                snapshots.append(BevSnapshot(timestep=t, label=label, path=out_path))
+                snapshots.append(BevSnapshot(timestep=t, label=label_for_title, path=out_path))
+                filenames.append(out_name)
+                if fr is not None:
+                    selected_frames_ordered.append(fr)
                 print(f"[Tier2BevRenderer] Saved {out_path}")
+
+            if selection is not None:
+                if selected_frames_ordered:
+                    selection.frames = selected_frames_ordered
+                llm_doc = selection.to_llm_json(prefix, filenames[: len(selection.frames)])
+                llm_path = Path(output_dir) / "llm_snapshots.json"
+                llm_path.write_text(json.dumps(llm_doc, indent=2), encoding="utf-8")
+                print(f"[Tier2BevRenderer] Wrote {llm_path}")
+                if selection_out is not None:
+                    selection_out.clear()
+                    selection_out.append(selection)
+                    selection_out.append(filenames[: len(selection.frames)])
+
             return snapshots
         finally:
             import shutil
@@ -1151,13 +1263,17 @@ class Tier2BevRenderer:
         view_bounds: Tuple[float, float, float, float],
         t: float,
         time_label: str,
+        draw_labels: bool = False,
+        label_anchors: Optional[List[Tuple[float, float]]] = None,
+        metric_chip: Optional[str] = None,
+        label_avoid_xy: Optional[List[Tuple[float, float]]] = None,
     ) -> None:
         self._plotter.render_scene(
             self.map_tracks_csv,
             out_path,
             highlight_road_ids_list=highlight,
             view_bounds=view_bounds,
-            draw_labels=False,
+            draw_labels=draw_labels,
             typography=self.typography,
             tracks_csv_path=str(traj_csv),
             metadata_yaml_path=str(meta_yaml),
@@ -1169,6 +1285,9 @@ class Tier2BevRenderer:
             scope_bounds=view_bounds,
             output_px=self.snapshot_output_px,
             white_border_frac=self.snapshot_border_frac,
+            label_anchors=label_anchors,
+            metric_chip=metric_chip,
+            label_avoid_xy=label_avoid_xy,
         )
 
     def _render_snapshot(
@@ -1183,38 +1302,84 @@ class Tier2BevRenderer:
         label: str,
         ego_xy: Optional[Tuple[float, float]],
         work: Path,
+        partner_xy: Optional[Tuple[float, float]] = None,
+        use_whole_scene: bool = True,
+        draw_agent_road_labels: bool = False,
+        metric_chip: Optional[str] = None,
+        extra_pair_xy: Optional[List[Tuple[float, float]]] = None,
     ) -> None:
-        """Render a snapshot — dual-panel (whole + ego zoom) when enabled."""
+        """Render dual-panel BEV: whole|ego or pair|ego depending on frame role."""
+        from conflict_frame_selector import pair_zoom_bounds
+
         radius = self.ego_zoom_radius or 0.0
+        anchors: Optional[List[Tuple[float, float]]] = None
+        avoid: Optional[List[Tuple[float, float]]] = None
+        if ego_xy is not None:
+            avoid = [ego_xy]
+            if partner_xy is not None:
+                avoid.append(partner_xy)
+            if extra_pair_xy:
+                avoid.extend(extra_pair_xy)
+        if draw_agent_road_labels and ego_xy is not None:
+            anchors = list(avoid) if avoid else [ego_xy]
+
         if radius <= 0 or ego_xy is None:
             self._render_one_panel(
                 out_path, traj_csv=traj_csv, meta_yaml=meta_yaml,
                 highlight=highlight, view_bounds=vbounds, t=t,
                 time_label=f"t = {t:.2f}s — {label}",
+                draw_labels=draw_agent_road_labels,
+                label_anchors=anchors,
+                metric_chip=metric_chip,
+                label_avoid_xy=avoid,
             )
             return
 
         ex, ey = ego_xy
         zoom_bounds = (ex - radius, ex + radius, ey - radius, ey + radius)
-        full_tmp = str(work / "panel_full.jpg")
+        if use_whole_scene:
+            left_bounds = vbounds
+            left_label = "whole scene"
+        else:
+            left_bounds = pair_zoom_bounds(
+                ego_xy, partner_xy, extra_xy=extra_pair_xy
+            )
+            left_label = "pair zoom"
+
+        left_tmp = str(work / "panel_left.jpg")
         zoom_tmp = str(work / "panel_zoom.jpg")
         self._render_one_panel(
-            full_tmp, traj_csv=traj_csv, meta_yaml=meta_yaml,
-            highlight=highlight, view_bounds=vbounds, t=t,
-            time_label="whole scene",
+            left_tmp, traj_csv=traj_csv, meta_yaml=meta_yaml,
+            highlight=highlight, view_bounds=left_bounds, t=t,
+            time_label=left_label,
+            draw_labels=draw_agent_road_labels,
+            label_anchors=anchors,
+            metric_chip=metric_chip,
+            label_avoid_xy=avoid,
         )
         self._render_one_panel(
             zoom_tmp, traj_csv=traj_csv, meta_yaml=meta_yaml,
             highlight=highlight, view_bounds=zoom_bounds, t=t,
             time_label=f"ego \u00b1{radius:.0f}m",
+            draw_labels=draw_agent_road_labels,
+            label_anchors=anchors,
+            metric_chip=None,
+            label_avoid_xy=avoid,
         )
-        title = f"t = {t:.2f}s  \u2014  {label}"
-        if not compose_dual_bev(full_tmp, zoom_tmp, out_path, title=title):
-            # Pillow missing / panel failed → fall back to whole-scene only.
+        # Concise dual title — event name only (metrics live in description / chip).
+        short = label.split("+")[0] if label else ""
+        if len(short) > 48:
+            short = short[:45] + "…"
+        title = f"t = {t:.2f}s  —  {short}" if short else f"t = {t:.2f}s"
+        if not compose_dual_bev(left_tmp, zoom_tmp, out_path, title=title):
             self._render_one_panel(
                 out_path, traj_csv=traj_csv, meta_yaml=meta_yaml,
                 highlight=highlight, view_bounds=vbounds, t=t,
                 time_label=f"t = {t:.2f}s — {label}",
+                draw_labels=draw_agent_road_labels,
+                label_anchors=anchors,
+                metric_chip=metric_chip,
+                label_avoid_xy=avoid,
             )
 
     def render_cluster_medoids(
@@ -1224,7 +1389,6 @@ class Tier2BevRenderer:
         n_snapshots: Optional[int] = None,
         dataset: Optional[str] = None,
         n_clusters: Optional[int] = None,
-        key_frame_mode: str = "hybrid",
         action_yaml_dir: Optional[str] = None,
     ) -> Dict[int, List[BevSnapshot]]:
         results: Dict[int, List[BevSnapshot]] = {}
@@ -1253,7 +1417,6 @@ class Tier2BevRenderer:
                     n_snapshots=n_snapshots,
                     file_prefix=f"trial_{trial_label}",
                     action_yaml_path=action_yaml,
-                    key_frame_mode=key_frame_mode,
                 )
                 results[label] = snaps
             except FileNotFoundError as e:

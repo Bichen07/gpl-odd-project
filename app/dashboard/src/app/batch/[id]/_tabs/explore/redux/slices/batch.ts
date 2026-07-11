@@ -108,10 +108,36 @@ export interface ClusterInterpretationSummary {
   ego_perspective_summary?: unknown;
 }
 
+export type ClusterHighlightRole = "medoid" | "boundary" | "outlier";
+
+export interface ClusterBoundaryPair {
+  cluster_a: number | string;
+  trial_a: string;
+  cluster_b: number | string;
+  trial_b: string;
+  embedding_dist?: number;
+}
+
 export interface ClusterAnalysisContext {
   folder: string;
   hasAnalysis: boolean;
+  /** Medoid + closest-pair + outlier artifacts present under results/ */
+  hasPreprocess: boolean;
   medoids: Record<string, string>;
+  /** Primary (materialized) outlier trial_id per cluster label */
+  outliers: Record<string, string>;
+  /** Per-cluster closest-pair (boundary) trial IDs */
+  boundaryTrials: Record<string, string[]>;
+  boundaryPairs: ClusterBoundaryPair[];
+  /** Saved HDBSCAN task params for exact config matching */
+  task: {
+    method?: string;
+    nClusters?: number;
+    minClusterSize?: number;
+    minSamples?: number;
+    clusterSelectionEpsilon?: number;
+    clusterSelectionMethod?: string;
+  } | null;
   interpretations: Record<string, ClusterInterpretationSummary>;
 }
 

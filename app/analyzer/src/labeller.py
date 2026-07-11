@@ -5,7 +5,7 @@ Reads a medoid `trajectory.csv` + `meta.yaml` (+ optional map YAML) and writes
 `action.yaml`: per-agent sequences of ActionEvents from the gpl-odd taxonomy.
 
 Map-agnostic: junction membership comes from the map YAML's `JunctionRoads`
-list (produced by scripts/map_preprocess.py), so it works on the full hct_6
+list (produced by map_assets / app/analyzer/src/dataset_builder.py --map-only), so it works on the full hct_6
 network rather than a single 4-way intersection.
 
 Column compatibility: accepts both gpl-odd (`x`,`y`) and xosc_gen

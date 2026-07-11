@@ -703,113 +703,131 @@ Research tooling for bird's-eye views and LLM-based cluster interpretation. Code
 
 | Path                                    | Role                                                                                  |
 | --------------------------------------- | ------------------------------------------------------------------------------------- |
-| `app/analyzer/src/`                     | Senior clustering stack + BEV (`map_plotter`, `renderer`, `dataset_builder`, …)       |
+| `app/analyzer/src/dataset_builder.py`   | **Single CLI:** auto map ensure + medoid BEV / labels / context                       |
+| `app/analyzer/src/map_assets.py`        | Library: odrplot tracks + map yaml/jpg (imported by dataset_builder)                  |
+| `app/analyzer/src/`                     | Clustering stack + BEV (`map_plotter`, `tier2_renderer`, labeller, …)                 |
 | `app/llm_pipeline/python/llm_pipeline/` | LLM package: stages 1–5 CLI, `cluster_interpreter`, `cluster_interpretation_pipeline` |
 | `app/llm_pipeline/prompt_templates/`    | Prompt files for cluster interpretation                                               |
-| `app/llm_pipeline/artifacts/`           | Captured stage outputs                                                                |
 
-
-Set `PYTHONPATH` once per shell (from the **repository root**):
 
 ```bash
 conda activate analyzer
 cd /path/to/gpl-odd-project
-
 export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
 ```
 
-Scripts such as `scripts/build_llm_dataset.sh` and `scripts/run_cluster_analyze.sh` set this automatically.
+### Build LLM dataset (map + medoid BEV + labels)
 
-### BEV renderer
+**One command** creates a complete pack. Map assets under `results/map/` are checked
+automatically and generated only when missing.
 
-Generates top-down Bird's Eye View images of the most representative trial per cluster. Used as visual input for LLM cluster interpretation.
+**Prerequisites**
+
+1. Simulations finished and trials uploaded to Payload for the batch.
+2. Dashboard **Analyze** + **Save** completed (saved analysis zip in Payload).
+3. Analyzer conda env (`conda activate analyzer`).
+4. esmini `odrplot` available if tracks are not yet in `results/map/` (first run only).
 
 ```bash
 conda activate analyzer
-cd /path/to/gpl-odd-project   # repository root
+cd /path/to/gpl-odd-project
+export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
 
-bash scripts/run_bev.sh <dataset_name> <n_clusters>
-# Example:
-bash scripts/run_bev.sh dataset1 3
+# List clustering candidates (index / k / silhouette):
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --list-clusterings
+
+# CREATE best-silhouette k=4 (auto map ensure + full cluster pack):
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --k 4
+
+# Pin silhouette when several k=4 results exist:
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --k 4 --silhouette 0.6945
+
+# REBUILD BEV/labels only (existing folder; map still auto-checked):
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --from-run results/batch2/4_cluster
+
+# Map assets only (optional; normally done automatically):
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only
+python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only --force-map
 ```
 
-Required input files (place under `alldatasets/<dataset_name>/`):
+| Job | Command |
+| --- | ------- |
+| **Create** complete folder | `python3 app/analyzer/src/dataset_builder.py --batch-id 2 --k 4` |
+| **Rebuild** BEV/labels | `… --batch-id 2 --from-run results/batch2/4_cluster` |
+| **Map only** | `… --batch-id 2 --map-only` |
+
+> `--from-run` does **not** create a missing k. If `2_cluster_s=…` was never built,
+> use CREATE with `--k 2` instead.
+
+**Output layout**
 
 ```
-alldatasets/dataset1/
-├── trajectories.json
-├── selectedClusteringResult_3Clusters.json
-└── resources/xodr/hct_6.xodr
+results/map/                         # shared (auto-ensured)
+  hct_6_no_930.xodr / _tracks.csv / .yaml / .jpg …
+results/batch2/4_cluster_s=0.6945/
+├── clustering/selectedClusteringResult.json
+├── manifest.json
+└── cluster0/   (also cluster1, …)
+    ├── action.yaml
+    ├── description.txt
+    ├── cluster.json
+    ├── context.md
+    ├── trajectory.csv
+    ├── map_overview.jpg
+    ├── trajectory_overlay.png
+    └── snapshots/
+        └── trial_*_t_*.jpg
 ```
 
-Output images go to `bev_output/<dataset_name>/<n>clusters/cluster_N/trial_XXXX_frame_NNN.jpg`.
+**BEV rendering knobs** (same CLI — see `python3 app/analyzer/src/dataset_builder.py -h`):
 
-> `alldatasets/` is in `.gitignore` — these are large data files not tracked by git.
+| Flag | Default | What it controls |
+| ---- | ------- | ---------------- |
+| `--snapshot-size` | `1024` | Square BEV image resolution |
+| `--agent-id-size` | `10` | On-car agent ID font (pt) |
+| `--ego-zoom-radius` | `30` | Right-panel ego zoom (m); `0` = single panel |
+| `--road-label-size` / `--lane-label-size` | tuned | Road / lane ID fonts on snapshots |
+| `--max-snapshots` | uncapped | Cap BEV frames per medoid |
+| `--force-map` / `--skip-map` | off | Force / skip auto map ensure |
+
+```bash
+python3 app/analyzer/src/dataset_builder.py \
+  --batch-id 2 --k 4 --silhouette 0.6945 \
+  --agent-id-size 18 --snapshot-size 1536
+```
+
+Code: `dataset_builder.py` → `map_assets.py` + `tier2_renderer` / `map_plotter`.
 
 ### LLM pipeline — cluster interpretation
 
-After BEV snapshots and cluster stats exist under `results/<dataset>/<k>/` or `llm_artifacts/<run_id>/`:
-
-**Build dataset artifacts (Phase 4):**
-
-```bash
-# Legacy mode — reads exported clustering files from alldatasets/<dataset>/
-bash scripts/build_llm_dataset.sh dataset1 3
-# Optional run id and trial override:
-# bash scripts/build_llm_dataset.sh dataset1 3 my_run_001 --trials "1:100,1:200"
-
-# Payload-save mode — reads a saved Dashboard analysis straight from Payload,
-# no alldatasets/ export needed. --dataset is optional (resolved from --batch-id).
-bash scripts/build_llm_dataset.sh --source payload-save --batch-id 1 --k 4
-#   --save-doc-id <id>       pick a specific saved analysis (default: latest)
-#   --clustering-index <n>   pick exact result instead of best-silhouette --k
-#   --dataset <name>         override the batch→dataset resolution
-```
-
-> One-time map assets per dataset (only if `alldatasets/resources/xodr/` is empty):
-> ```bash
-> python3 scripts/generate_map_tracks.py --dataset dataset1
-> cp simulation/ros/.cache/scenario_search/hct_6.xodr alldatasets/resources/xodr/hct_6.xodr
-> python3 scripts/map_preprocess.py --dataset dataset1
-> ```
-> Without them the build still runs but logs `BEV skipped`.
-
-**Step 5 — offline interpretation on `results/<dataset>/<k>/`:**
-
-```bash
-python3 -m llm_pipeline.cluster_interpretation_pipeline \
-  --dataset dataset1 --n-clusters 3 --dry-run
-```
-
-Remove `--dry-run` and set `GOOGLE_API_KEY` (Gemini, default) or `OPENAI_API_KEY` (gpt-*) for live LLM output.
-
-**Cluster-interpret CLI — interpret a builder results folder:**
+After the preprocess step above has produced `results/batch<id>/<k>_cluster_s=…/`:
 
 ```bash
 python3 -m llm_pipeline.cli cluster-interpret \
   --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2
-# Stub only (no API call):
+
 python3 -m llm_pipeline.cli cluster-interpret \
   --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2 --dry-run
 ```
 
-Or use the wrapper script (this is what the Dashboard "Select and analyze" page calls):
+Or:
 
 ```bash
-bash scripts/run_cluster_analyze.sh --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2
+bash scripts/run_cluster_analyze.sh \
+  --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2
 ```
+
+Remove `--dry-run` and set `GOOGLE_API_KEY` (Gemini, default) or `OPENAI_API_KEY` (gpt-*) for live LLM output.
 
 **Optional — run interpretation automatically after Dashboard Analyze:**
 
 ```bash
 export GPL_ODD_CLUSTER_INTERPRETATION=1
-# optional: export GPL_ODD_DATASET=dataset1
-# optional: export GPL_ODD_CLUSTER_INTERPRET_DRY_RUN=1
 ```
 
-Then restart the Analyzer (`litestar run …`) and click **Analyze** in the Dashboard.
+Then restart the Analyzer and click **Analyze** in the Dashboard.
 
-More detail: `app/llm_pipeline/README.md` and `cluster_interpreter_integration_plan.md`.
+More detail: `app/llm_pipeline/README.md`.
 
 ---
 

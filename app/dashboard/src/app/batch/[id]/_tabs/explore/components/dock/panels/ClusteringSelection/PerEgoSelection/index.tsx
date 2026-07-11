@@ -29,8 +29,19 @@ import { batchSlice, ClusterInfo, ClusterAnalysisContext } from "../../../../../
 import _ from "lodash";
 import { getClusterInfos } from "@/app/_shared/utils";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
-import { ExpandMore, CheckCircle, Cancel } from "@mui/icons-material";
-import { clusteringMatchesManifestMedoids } from "@/app/_shared/utils/clusterAnalysisMatch";
+import { ExpandMore, CheckCircle, Science } from "@mui/icons-material";
+import {
+  boundaryPairKey,
+  clusteringMatchesSavedResult,
+  formatBoundaryPairLabel,
+} from "@/app/_shared/utils/clusterAnalysisMatch";
+import {
+  CLUSTER_HIGHLIGHT_STYLE,
+  roleCount,
+  trialsFromHighlightSelection,
+} from "@/app/_shared/utils/clusterHighlightRoles";
+import type { ClusterHighlightRole } from "../../../../../redux/slices/batch";
+import type { ClusteringTask } from "@/app/_shared/graphql/queries/clustering";
 
 const SORT_LABELS: Record<string, string> = {
   default: "Default (task order)",
@@ -51,8 +62,22 @@ interface CompositeScoreEntry {
 
 interface AnalysisStatusEntry {
   has_analysis: boolean;
+  has_preprocess: boolean;
   medoids: Record<string, string>;
-  interpretations: Record<string, { cluster_label?: string; ego_perspective_summary?: unknown }>;
+  outliers: Record<string, string>;
+  boundary_trials: Record<string, string[]>;
+  boundary_pairs: Array<{
+    cluster_a: number | string;
+    trial_a: string;
+    cluster_b: number | string;
+    trial_b: string;
+    embedding_dist?: number;
+  }>;
+  task: ClusteringTask | null;
+  interpretations: Record<
+    string,
+    { cluster_label?: string; ego_perspective_summary?: unknown }
+  >;
 }
 
 function clusterCountFromInfo(info: ClusterInfo | undefined): number {
@@ -188,30 +213,81 @@ export default function PerEgoSelection({
     [infos]
   );
 
+  const requestTaskForIndex = useCallback(
+    (index: number): ClusteringTask | null => {
+      return trajectoryAnalysis?.request?.tasks?.[index] ?? null;
+    },
+    [trajectoryAnalysis],
+  );
+
   const buildAnalysisContext = useCallback(
     (result: ClusteringResult, index: number): ClusterAnalysisContext | null => {
       const key = resultFolderKey(result, index);
       if (!key || !analysisStatus[key]) return null;
       const st = analysisStatus[key];
-      if (!st.has_analysis) return null;
-      if (!clusteringMatchesManifestMedoids(result, st.medoids)) return null;
+      if (!st.has_analysis && !st.has_preprocess) return null;
+      if (
+        !clusteringMatchesSavedResult(
+          result,
+          st.medoids,
+          st.task,
+          result.task ?? requestTaskForIndex(index),
+        )
+      ) {
+        return null;
+      }
       return {
         folder: key,
-        hasAnalysis: true,
-        medoids: st.medoids,
-        interpretations: st.interpretations,
+        hasAnalysis: Boolean(st.has_analysis),
+        hasPreprocess: Boolean(st.has_preprocess),
+        medoids: st.medoids ?? {},
+        outliers: st.outliers ?? {},
+        boundaryTrials: st.boundary_trials ?? {},
+        boundaryPairs: st.boundary_pairs ?? [],
+        task: st.task ?? null,
+        interpretations: st.interpretations ?? {},
       };
     },
-    [analysisStatus, resultFolderKey],
+    [analysisStatus, resultFolderKey, requestTaskForIndex],
   );
 
   const resultHasVerifiedAnalysis = useCallback(
     (result: ClusteringResult, index: number): boolean => {
       const key = resultFolderKey(result, index);
       if (!key || !analysisStatus[key]?.has_analysis) return false;
-      return clusteringMatchesManifestMedoids(result, analysisStatus[key].medoids);
+      const st = analysisStatus[key];
+      return clusteringMatchesSavedResult(
+        result,
+        st.medoids,
+        st.task,
+        result.task ?? requestTaskForIndex(index),
+      );
     },
-    [analysisStatus, resultFolderKey],
+    [analysisStatus, resultFolderKey, requestTaskForIndex],
+  );
+
+  const resultHasVerifiedPreprocess = useCallback(
+    (result: ClusteringResult, index: number): boolean => {
+      const key = resultFolderKey(result, index);
+      if (!key || !analysisStatus[key]?.has_preprocess) return false;
+      const st = analysisStatus[key];
+      return clusteringMatchesSavedResult(
+        result,
+        st.medoids,
+        st.task,
+        result.task ?? requestTaskForIndex(index),
+      );
+    },
+    [analysisStatus, resultFolderKey, requestTaskForIndex],
+  );
+
+  const resultLabelRank = useCallback(
+    (result: ClusteringResult, index: number): number => {
+      if (resultHasVerifiedAnalysis(result, index)) return 2;
+      if (resultHasVerifiedPreprocess(result, index)) return 1;
+      return 0;
+    },
+    [resultHasVerifiedAnalysis, resultHasVerifiedPreprocess],
   );
 
   const currentAnalysis = useMemo(() => {
@@ -221,48 +297,189 @@ export default function PerEgoSelection({
     return buildAnalysisContext(clusteringResult, index);
   }, [clusteringResult, results, buildAnalysisContext]);
 
-  const selectMedoidTrial = useCallback(
-    (trialId: string, clusterLabel: string) => {
-      const current = new Set(selectedTrialIds.value);
-      if (current.has(trialId)) {
-        current.delete(trialId);
-      } else {
-        current.add(trialId);
-      }
-      const next = [...current];
+  const [selectedMedoidLabels, setSelectedMedoidLabels] = useState<Set<string>>(
+    new Set(),
+  );
+  const [selectedPairKeys, setSelectedPairKeys] = useState<Set<string>>(
+    new Set(),
+  );
+  const [selectedOutlierLabels, setSelectedOutlierLabels] = useState<
+    Set<string>
+  >(new Set());
+
+  const syncHighlightSelection = useCallback(
+    (
+      medoidLabels: Set<string>,
+      pairKeys: Set<string>,
+      outlierLabels: Set<string>,
+      recordKey: string,
+    ) => {
+      const next = trialsFromHighlightSelection(
+        currentAnalysis,
+        medoidLabels,
+        pairKeys,
+        outlierLabels,
+      );
       dispatch(batchSlice.actions.setSelectedTrialId(next[0] ?? null));
       dispatch(
         batchSlice.actions.setSelectedTrialIds({
-          by: next.length > 0 ? "medoid" : "",
+          by: next.length > 0 ? "highlight" : "",
           value: next,
         }),
       );
-      dispatch(
-        interactionSlice.actions.record("clustering_result_list.select_medoid"),
+      dispatch(interactionSlice.actions.record(recordKey));
+    },
+    [currentAnalysis, dispatch],
+  );
+
+  // Reset highlight picks when the clustering / analysis context changes.
+  useEffect(() => {
+    setSelectedMedoidLabels(new Set());
+    setSelectedPairKeys(new Set());
+    setSelectedOutlierLabels(new Set());
+  }, [currentAnalysis?.folder]);
+
+  const toggleMedoidLabel = useCallback(
+    (label: string) => {
+      const next = new Set(selectedMedoidLabels);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      setSelectedMedoidLabels(next);
+      syncHighlightSelection(
+        next,
+        selectedPairKeys,
+        selectedOutlierLabels,
+        "clustering_result_list.select_medoid",
       );
     },
-    [dispatch, selectedTrialIds],
+    [
+      selectedMedoidLabels,
+      selectedOutlierLabels,
+      selectedPairKeys,
+      syncHighlightSelection,
+    ],
   );
 
   const selectAllMedoids = useCallback(() => {
     if (!currentAnalysis?.medoids) return;
-    const ids = Object.values(currentAnalysis.medoids);
-    dispatch(batchSlice.actions.setSelectedTrialId(ids[0] ?? null));
-    dispatch(
-      batchSlice.actions.setSelectedTrialIds({
-        by: "medoid_all",
-        value: ids,
-      }),
+    const all = new Set(Object.keys(currentAnalysis.medoids));
+    const next =
+      selectedMedoidLabels.size === all.size ? new Set<string>() : all;
+    setSelectedMedoidLabels(next);
+    syncHighlightSelection(
+      next,
+      selectedPairKeys,
+      selectedOutlierLabels,
+      "clustering_result_list.select_all_medoids",
     );
-    dispatch(
-      interactionSlice.actions.record("clustering_result_list.select_all_medoids"),
-    );
-  }, [currentAnalysis, dispatch]);
+  }, [
+    currentAnalysis,
+    selectedMedoidLabels.size,
+    selectedOutlierLabels,
+    selectedPairKeys,
+    syncHighlightSelection,
+  ]);
 
-  const selectedMedoidSet = useMemo(
-    () => new Set(selectedTrialIds.value),
-    [selectedTrialIds],
+  const togglePairKey = useCallback(
+    (key: string) => {
+      const next = new Set(selectedPairKeys);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      setSelectedPairKeys(next);
+      syncHighlightSelection(
+        selectedMedoidLabels,
+        next,
+        selectedOutlierLabels,
+        "clustering_result_list.toggle_boundary_pair",
+      );
+    },
+    [
+      selectedMedoidLabels,
+      selectedOutlierLabels,
+      selectedPairKeys,
+      syncHighlightSelection,
+    ],
   );
+
+  const selectAllPairs = useCallback(() => {
+    if (!currentAnalysis?.boundaryPairs?.length) return;
+    const all = new Set(
+      currentAnalysis.boundaryPairs.map((bp) =>
+        boundaryPairKey(bp.cluster_a, bp.cluster_b),
+      ),
+    );
+    const next = selectedPairKeys.size === all.size ? new Set<string>() : all;
+    setSelectedPairKeys(next);
+    syncHighlightSelection(
+      selectedMedoidLabels,
+      next,
+      selectedOutlierLabels,
+      "clustering_result_list.select_all_boundary_pairs",
+    );
+  }, [
+    currentAnalysis,
+    selectedMedoidLabels,
+    selectedOutlierLabels,
+    selectedPairKeys.size,
+    syncHighlightSelection,
+  ]);
+
+  const toggleOutlierLabel = useCallback(
+    (label: string) => {
+      const next = new Set(selectedOutlierLabels);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      setSelectedOutlierLabels(next);
+      syncHighlightSelection(
+        selectedMedoidLabels,
+        selectedPairKeys,
+        next,
+        "clustering_result_list.toggle_outlier",
+      );
+    },
+    [
+      selectedMedoidLabels,
+      selectedOutlierLabels,
+      selectedPairKeys,
+      syncHighlightSelection,
+    ],
+  );
+
+  const selectAllOutliers = useCallback(() => {
+    if (!currentAnalysis?.outliers) return;
+    const all = new Set(Object.keys(currentAnalysis.outliers));
+    const next =
+      selectedOutlierLabels.size === all.size ? new Set<string>() : all;
+    setSelectedOutlierLabels(next);
+    syncHighlightSelection(
+      selectedMedoidLabels,
+      selectedPairKeys,
+      next,
+      "clustering_result_list.select_all_outliers",
+    );
+  }, [
+    currentAnalysis,
+    selectedMedoidLabels,
+    selectedOutlierLabels.size,
+    selectedPairKeys,
+    syncHighlightSelection,
+  ]);
+
+  const hasHighlightData = Boolean(
+    currentAnalysis &&
+      (Object.keys(currentAnalysis.medoids).length > 0 ||
+        Object.keys(currentAnalysis.outliers).length > 0 ||
+        (currentAnalysis.boundaryPairs?.length ?? 0) > 0),
+  );
+
+  const sortedBoundaryPairs = useMemo(() => {
+    const pairs = currentAnalysis?.boundaryPairs ?? [];
+    return [...pairs].sort((a, b) => {
+      const ka = boundaryPairKey(a.cluster_a, a.cluster_b);
+      const kb = boundaryPairKey(b.cluster_a, b.cluster_b);
+      return ka.localeCompare(kb, undefined, { numeric: true });
+    });
+  }, [currentAnalysis?.boundaryPairs]);
 
   const scoreKeys = useMemo(() => {
     const fromScores = Object.keys(
@@ -371,15 +588,9 @@ export default function PerEgoSelection({
         }
       }
       if (foundDuplicated && duplicateOf != null) {
-        const curKey = resultFolderKey(result, i);
-        const dupKey = resultFolderKey(results[duplicateOf], duplicateOf);
-        const curHas = curKey
-          ? resultHasVerifiedAnalysis(result, i)
-          : false;
-        const dupHas = dupKey
-          ? resultHasVerifiedAnalysis(results[duplicateOf], duplicateOf)
-          : false;
-        if (curHas && !dupHas) {
+        const curRank = resultLabelRank(result, i);
+        const dupRank = resultLabelRank(results[duplicateOf], duplicateOf);
+        if (curRank > dupRank) {
           delete uniqueMappings[duplicateOf];
           uniqueMappings[i] = mapping;
         }
@@ -397,7 +608,7 @@ export default function PerEgoSelection({
     );
 
     setLoading(false);
-  }, [results, duplicatedFilterRatio, analysisStatus, resultFolderKey, resultHasVerifiedAnalysis, trajectoryAnalysis, durationMode]);
+  }, [results, duplicatedFilterRatio, analysisStatus, resultFolderKey, resultLabelRank, trajectoryAnalysis, durationMode]);
 
   useEffect(() => {
     if (!Object.keys(clusterInfos).includes(egoName)) {
@@ -415,17 +626,34 @@ export default function PerEgoSelection({
       .filter((result) => {
         const index = results?.findIndex((v) => v === result);
 
-        const noiseRatio = noiseRatioMapping[index];
         if (
           index == null ||
           result == null ||
-          results == null ||
-          !uniqueResultIndices.has(index) ||
-          noiseRatio > noiseFilterRatio ||
-          (clusterCounts !== -1 &&
-            clusterCounts !== 1 &&
-            Object.keys(infos[index]).length !==
-              ("-1" in infos[index] ? clusterCounts + 1 : clusterCounts))
+          results == null
+        ) {
+          return false;
+        }
+
+        const labeled = resultLabelRank(result, index) > 0;
+
+        // Preprocess / analysis results bypass Noise Under + Unique Over filters.
+        if (!labeled) {
+          const noiseRatio = noiseRatioMapping[index];
+          if (
+            !uniqueResultIndices.has(index) ||
+            noiseRatio > noiseFilterRatio
+          ) {
+            return false;
+          }
+        }
+
+        if (
+          clusterCounts !== -1 &&
+          clusterCounts !== 1 &&
+          Object.keys(infos[index] ?? {}).length !==
+            ("-1" in (infos[index] ?? {})
+              ? clusterCounts + 1
+              : clusterCounts)
         ) {
           return false;
         }
@@ -436,9 +664,9 @@ export default function PerEgoSelection({
         const idxB = results?.findIndex((v) => v === b) ?? -1;
         const keyA = idxA >= 0 ? resultFolderKey(a, idxA) : "";
         const keyB = idxB >= 0 ? resultFolderKey(b, idxB) : "";
-        const analA = idxA >= 0 && resultHasVerifiedAnalysis(a, idxA) ? 1 : 0;
-        const analB = idxB >= 0 && resultHasVerifiedAnalysis(b, idxB) ? 1 : 0;
-        if (analB !== analA) return analB - analA;
+        const rankA = idxA >= 0 ? resultLabelRank(a, idxA) : 0;
+        const rankB = idxB >= 0 ? resultLabelRank(b, idxB) : 0;
+        if (rankB !== rankA) return rankB - rankA;
 
         if (sortBy == null || a == null || b == null) {
           return -Infinity;
@@ -475,7 +703,7 @@ export default function PerEgoSelection({
     compositeScores,
     resultFolderKey,
     analysisStatus,
-    resultHasVerifiedAnalysis,
+    resultLabelRank,
   ]);
 
   useEffect(() => {
@@ -599,39 +827,272 @@ export default function PerEgoSelection({
           </Button>
         </span>
       </Tooltip>
-      {currentAnalysis?.hasAnalysis && (
-        <Stack gap={0.5} sx={{ mb: 1 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Typography fontSize={12} color="text.secondary">
-              Medoid trials (toggle to replay — multi-select)
+      {hasHighlightData && currentAnalysis && (
+        <Accordion elevation={0} disableGutters square defaultExpanded>
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography component="span" fontSize="14px">
+              Highlight trials
             </Typography>
-            <Button size="small" onClick={selectAllMedoids} sx={{ fontSize: "11px" }}>
-              All
-            </Button>
-          </Stack>
-          <Stack direction="row" flexWrap="wrap" gap={0.5}>
-            {Object.entries(currentAnalysis.medoids)
-              .sort(([a], [b]) => Number(a) - Number(b))
-              .map(([label, trialId]) => {
-                const interp = currentAnalysis.interpretations[label];
-                const chipLabel = interp?.cluster_label
-                  ? `C${label}: ${interp.cluster_label}`
-                  : `C${label} medoid`;
-                const isSelected = selectedMedoidSet.has(trialId);
-                return (
-                  <Button
-                    key={label}
-                    size="small"
-                    variant={isSelected ? "contained" : "outlined"}
-                    onClick={() => selectMedoidTrial(trialId, label)}
-                    sx={{ fontSize: "11px", py: 0.25 }}
+          </AccordionSummary>
+          <AccordionDetails>
+            <Stack gap={1.25}>
+              <Stack
+                direction="row"
+                flexWrap="wrap"
+                gap={1.5}
+                alignItems="center"
+                sx={{ px: 0.5 }}
+              >
+                <Typography fontSize={11} color="text.secondary">
+                  Legend:
+                </Typography>
+                {(
+                  ["medoid", "boundary", "outlier"] as ClusterHighlightRole[]
+                ).map((role) => {
+                  if (roleCount(currentAnalysis, role) === 0) return null;
+                  const style = CLUSTER_HIGHLIGHT_STYLE[role];
+                  return (
+                    <Stack
+                      key={`legend-${role}`}
+                      direction="row"
+                      alignItems="center"
+                      gap={0.5}
+                    >
+                      <Box
+                        component="svg"
+                        width={14}
+                        height={14}
+                        viewBox="0 0 14 14"
+                        sx={{ display: "block" }}
+                      >
+                        {style.shape === "circle" && (
+                          <circle
+                            cx={7}
+                            cy={7}
+                            r={5}
+                            fill="none"
+                            stroke={style.color}
+                            strokeWidth={2}
+                          />
+                        )}
+                        {style.shape === "diamond" && (
+                          <polygon
+                            points="7,1 13,7 7,13 1,7"
+                            fill="none"
+                            stroke={style.color}
+                            strokeWidth={2}
+                          />
+                        )}
+                        {style.shape === "triangle" && (
+                          <polygon
+                            points="7,1.5 13,12.5 1,12.5"
+                            fill="none"
+                            stroke={style.color}
+                            strokeWidth={2}
+                          />
+                        )}
+                      </Box>
+                      <Typography fontSize={11} color="text.secondary">
+                        {style.label}
+                      </Typography>
+                    </Stack>
+                  );
+                })}
+              </Stack>
+
+              {Object.keys(currentAnalysis.medoids).length > 0 && (
+                <Stack gap={0.5}>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
                   >
-                    {chipLabel}
-                  </Button>
-                );
-              })}
-          </Stack>
-        </Stack>
+                    <Typography fontSize={12} color="text.secondary">
+                      Medoid ({roleCount(currentAnalysis, "medoid")})
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={selectAllMedoids}
+                      sx={{ fontSize: "11px" }}
+                    >
+                      All
+                    </Button>
+                  </Stack>
+                  <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                    {Object.entries(currentAnalysis.medoids)
+                      .sort(([a], [b]) => Number(a) - Number(b))
+                      .map(([label, trialId]) => {
+                        const interp = currentAnalysis.interpretations[label];
+                        const chipLabel = interp?.cluster_label
+                          ? `C${label}: ${interp.cluster_label}`
+                          : `C${label}`;
+                        const isSelected = selectedMedoidLabels.has(label);
+                        const c = CLUSTER_HIGHLIGHT_STYLE.medoid.color;
+                        return (
+                          <Button
+                            key={`medoid-${label}`}
+                            size="small"
+                            variant={isSelected ? "contained" : "outlined"}
+                            onClick={() => toggleMedoidLabel(label)}
+                            title={`trial ${trialId}`}
+                            sx={{
+                              fontSize: "11px",
+                              py: 0.25,
+                              borderColor: c,
+                              color: isSelected ? "#111" : c,
+                              backgroundColor: isSelected ? c : "transparent",
+                              "&.MuiButton-contained": {
+                                backgroundColor: c,
+                                color: "#111",
+                                "&:hover": { backgroundColor: c, filter: "brightness(0.92)" },
+                              },
+                              "&.MuiButton-outlined": {
+                                borderColor: c,
+                                color: c,
+                              },
+                            }}
+                          >
+                            {chipLabel}
+                          </Button>
+                        );
+                      })}
+                  </Stack>
+                </Stack>
+              )}
+
+              {sortedBoundaryPairs.length > 0 && (
+                <Stack gap={0.5}>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                  >
+                    <Typography fontSize={12} color="text.secondary">
+                      Closest pair ({roleCount(currentAnalysis, "boundary")})
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={selectAllPairs}
+                      sx={{ fontSize: "11px" }}
+                    >
+                      All
+                    </Button>
+                  </Stack>
+                  <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                    {sortedBoundaryPairs.map((bp) => {
+                      const key = boundaryPairKey(bp.cluster_a, bp.cluster_b);
+                      const isSelected = selectedPairKeys.has(key);
+                      const c = CLUSTER_HIGHLIGHT_STYLE.boundary.color;
+                      return (
+                        <Button
+                          key={`pair-${key}`}
+                          size="small"
+                          variant={isSelected ? "contained" : "outlined"}
+                          onClick={() => togglePairKey(key)}
+                          title={`trials ${bp.trial_a} ↔ ${bp.trial_b}`}
+                          sx={{
+                            fontSize: "11px",
+                            py: 0.25,
+                            borderColor: c,
+                            color: isSelected ? "#111" : c,
+                            backgroundColor: isSelected ? c : "transparent",
+                            "&.MuiButton-contained": {
+                              backgroundColor: c,
+                              color: "#111",
+                              "&:hover": { backgroundColor: c, filter: "brightness(0.92)" },
+                            },
+                            "&.MuiButton-outlined": {
+                              borderColor: c,
+                              color: c,
+                            },
+                          }}
+                        >
+                          {formatBoundaryPairLabel(key)}
+                        </Button>
+                      );
+                    })}
+                  </Stack>
+                </Stack>
+              )}
+
+              {Object.keys(currentAnalysis.outliers).length > 0 && (
+                <Stack gap={0.5}>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                  >
+                    <Typography fontSize={12} color="text.secondary">
+                      Outlier ({roleCount(currentAnalysis, "outlier")})
+                    </Typography>
+                    <Button
+                      size="small"
+                      onClick={selectAllOutliers}
+                      sx={{ fontSize: "11px" }}
+                    >
+                      All
+                    </Button>
+                  </Stack>
+                  <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                    {Object.entries(currentAnalysis.outliers)
+                      .sort(([a], [b]) => Number(a) - Number(b))
+                      .map(([label, trialId]) => {
+                        const isSelected = selectedOutlierLabels.has(label);
+                        const c = CLUSTER_HIGHLIGHT_STYLE.outlier.color;
+                        return (
+                          <Button
+                            key={`outlier-${label}`}
+                            size="small"
+                            variant={isSelected ? "contained" : "outlined"}
+                            onClick={() => toggleOutlierLabel(label)}
+                            title={`trial ${trialId}`}
+                            startIcon={
+                              <Box
+                                component="svg"
+                                width={10}
+                                height={10}
+                                viewBox="0 0 14 14"
+                                sx={{ display: "block" }}
+                              >
+                                <polygon
+                                  points="7,1.5 13,12.5 1,12.5"
+                                  fill={isSelected ? "#111" : "none"}
+                                  stroke={isSelected ? "#111" : c}
+                                  strokeWidth={2}
+                                />
+                              </Box>
+                            }
+                            sx={{
+                              fontSize: "11px",
+                              py: 0.25,
+                              borderColor: c,
+                              color: isSelected ? "#111" : c,
+                              backgroundColor: isSelected ? c : "transparent",
+                              "& .MuiButton-startIcon": { mr: 0.5 },
+                              "&.MuiButton-contained": {
+                                backgroundColor: `${c} !important`,
+                                color: "#111",
+                                "&:hover": {
+                                  backgroundColor: `${c} !important`,
+                                  filter: "brightness(0.92)",
+                                },
+                              },
+                              "&.MuiButton-outlined": {
+                                borderColor: `${c} !important`,
+                                color: `${c} !important`,
+                              },
+                            }}
+                          >
+                            {`C${label}`}
+                          </Button>
+                        );
+                      })}
+                  </Stack>
+                </Stack>
+              )}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
       )}
       <Accordion elevation={0} disableGutters square defaultExpanded>
         <AccordionSummary expandIcon={<ExpandMore />}>
@@ -899,8 +1360,13 @@ export default function PerEgoSelection({
               return null;
             }
 
-            const folderKey = resultFolderKey(result, index);
             const hasAnalysis = resultHasVerifiedAnalysis(result, index);
+            const hasPreprocess = resultHasVerifiedPreprocess(result, index);
+            const statusLabel = hasAnalysis
+              ? "Analysis done"
+              : hasPreprocess
+                ? "Preprocess done"
+                : "Nothing";
 
             return (
               <Stack
@@ -971,11 +1437,11 @@ export default function PerEgoSelection({
                       <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
                         {hasAnalysis ? (
                           <CheckCircle sx={{ fontSize: 16, color: "success.light" }} />
-                        ) : (
-                          <Cancel sx={{ fontSize: 16, color: "text.disabled" }} />
-                        )}
+                        ) : hasPreprocess ? (
+                          <Science sx={{ fontSize: 16, color: "info.light" }} />
+                        ) : null}
                         <Typography fontWeight="bold">
-                          {`Analysis: ${hasAnalysis ? "yes" : "no"}`}
+                          {statusLabel}
                         </Typography>
                       </Stack>
                       <Typography fontWeight="bold">
@@ -1023,7 +1489,7 @@ export default function PerEgoSelection({
                     flexWrap="wrap"
                     sx={{ flex: 1, height: "30px", position: "relative" }}
                   >
-                    {hasAnalysis && (
+                    {hasAnalysis ? (
                       <Box
                         component="div"
                         sx={{
@@ -1051,7 +1517,35 @@ export default function PerEgoSelection({
                           }}
                         />
                       </Box>
-                    )}
+                    ) : hasPreprocess ? (
+                      <Box
+                        component="div"
+                        sx={{
+                          position: "absolute",
+                          right: 2,
+                          top: -3,
+                          zIndex: 2,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          width: 16,
+                          height: 16,
+                          borderRadius: "50%",
+                          backgroundColor: "#fff",
+                          border: "1.5px solid",
+                          borderColor: "info.dark",
+                          boxShadow: "0 0 2px rgba(0,0,0,0.6)",
+                        }}
+                      >
+                        <Science
+                          sx={{
+                            fontSize: 12,
+                            color: "info.main",
+                            display: "block",
+                          }}
+                        />
+                      </Box>
+                    ) : null}
                     {Object.entries(
                       infos != null && index < infos.length ? infos[index] : {}
                       // clusterInfos && durationMode in clusterInfos

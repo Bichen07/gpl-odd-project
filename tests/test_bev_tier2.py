@@ -271,7 +271,7 @@ def test_map_tracks_csv_border_lanes_parsed():
 def test_map_tracks_csv_parses():
     tracks = REPO / "alldatasets/resources/xodr/hct_6_tracks.csv"
     if not tracks.is_file():
-        pytest.skip("hct_6_tracks.csv not generated — run scripts/generate_map_tracks.py")
+        pytest.skip("hct_6_tracks.csv not generated — run map_assets / dataset_builder --map-only")
     plotter = MapPlotter()
     lanes, *_ = plotter._parse_and_process_map_data(str(tracks))
     assert len(lanes) > 100
@@ -290,7 +290,7 @@ def test_dataset1_cluster0_action_times_in_snapshots():
     action_path = REPO / "results/dataset1/4/cluster0/action.yaml"
     snap_dir = REPO / "results/dataset1/4/cluster0/snapshots"
     if not snap_dir.is_dir():
-        pytest.skip("snapshots not generated — run build_llm_dataset.sh")
+        pytest.skip("snapshots not generated — run dataset_builder.py")
 
     data = yaml.safe_load(action_path.read_text())
     semantic_times = []
@@ -315,7 +315,7 @@ def test_dataset1_cluster0_action_times_in_snapshots():
     ):
         pytest.skip(
             "snapshots use legacy heuristic labels — "
-            "re-run: bash scripts/build_llm_dataset.sh dataset1 4"
+            "re-run: python3 app/analyzer/src/dataset_builder.py dataset1 4"
         )
     for t, name in semantic_times:
         assert f"_t_{t:05.2f}_" in snap_names or f"_t_{t:.2f}_" in snap_names, (

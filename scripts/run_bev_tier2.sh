@@ -11,7 +11,7 @@
 #   ./scripts/run_bev_tier2.sh dataset1 3 --trial 5951 # single trial
 #
 # Prerequisite (once per map variant):
-#   python3 scripts/generate_map_tracks.py --dataset dataset1
+#   python3 app/analyzer/src/dataset_builder.py --dataset dataset1 --map-only
 
 set -e
 
@@ -30,7 +30,7 @@ if [[ ! -f "$CLUSTER" ]]; then
 fi
 
 # Ensure odrplot tracks exist for this dataset's map variant
-python3 "${REPO_ROOT}/scripts/generate_map_tracks.py" --dataset "$DATASET" 2>/dev/null || true
+python3 "${REPO_ROOT}/app/analyzer/src/dataset_builder.py" --dataset "$DATASET" --map-only 2>/dev/null || true
 
 echo "=== BEV Tier2 (MapPlotter + esmini CSV) ==="
 echo "Dataset:  $DATASET"

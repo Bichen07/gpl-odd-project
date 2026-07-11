@@ -86,7 +86,7 @@ const layout: LayoutData = {
       {
         id: "parameterSpaceDock",
         mode: "vertical",
-        size: 200,
+        size: 180,
         children: [
           {
             id: "2-space-top",

@@ -970,7 +970,7 @@ def run_stage2b_for_dataset_k(
     if not run_dir.is_dir():
         raise FileNotFoundError(
             f"No results dir: {run_dir}\n"
-            f"Run: bash scripts/build_llm_dataset.sh {dataset} {n_clusters}"
+            f"Run: python3 app/analyzer/src/dataset_builder.py {dataset} {n_clusters}"
         )
 
     outputs: Dict[str, str] = {}

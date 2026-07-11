@@ -43,6 +43,10 @@ import {
 import createScatterplot from "regl-scatterplot";
 import Contour from "../Contour";
 import { noiseColor } from "@/app/_shared/utils";
+import {
+  CLUSTER_HIGHLIGHT_STYLE,
+  primaryRoleForTrial,
+} from "@/app/_shared/utils/clusterHighlightRoles";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
 import { Trial } from "@/app/_shared/graphql/queries/trials";
 
@@ -253,12 +257,22 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   > | null>(null);
 
   const [points, setPoints] = useState<number[][]>([]);
-  const medoidPointIndices = useMemo(() => {
+  const highlightMarkers = useMemo(() => {
     const order = globalStorage.trialOrder[egoName] ?? [];
-    return order
-      .map((tid, i) => (medoidTrialIds.has(tid) ? i : -1))
-      .filter((i) => i >= 0);
-  }, [medoidTrialIds, points, egoName]);
+    const selected = new Set(selectedTrialIds.value.map(String));
+    const markers: Array<{
+      index: number;
+      role: "medoid" | "boundary" | "outlier";
+    }> = [];
+    if (!clusterAnalysis || selected.size === 0) return markers;
+    for (let i = 0; i < order.length; i++) {
+      const tid = String(order[i]);
+      if (!selected.has(tid)) continue;
+      const role = primaryRoleForTrial(clusterAnalysis, tid);
+      if (role) markers.push({ index: i, role });
+    }
+    return markers;
+  }, [clusterAnalysis, points, egoName, selectedTrialIds]);
   const [scales, setScales] = useState<{
     x: ReturnType<typeof scaleLinear<number>>;
     y: ReturnType<typeof scaleLinear<number>>;
@@ -1293,21 +1307,49 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
                     </Box>
                   );
                 })}
-              {!pointsDrawn || medoidPointIndices.length === 0
+              {!pointsDrawn || highlightMarkers.length === 0
                 ? null
-                : medoidPointIndices.map((pointIdx) => {
+                : highlightMarkers.map(({ index: pointIdx, role }) => {
                     try {
                       const point = scatterplot?.getScreenPosition(pointIdx);
                       if (!point) return null;
+                      const style = CLUSTER_HIGHLIGHT_STYLE[role];
+                      const [cx, cy] = point;
+                      if (role === "medoid") {
+                        return (
+                          <circle
+                            key={`hl-${role}-${pointIdx}`}
+                            cx={cx}
+                            cy={cy}
+                            r={10}
+                            fill="none"
+                            stroke={style.color}
+                            strokeWidth={3}
+                            style={{ pointerEvents: "none" }}
+                          />
+                        );
+                      }
+                      if (role === "boundary") {
+                        const s = 9;
+                        return (
+                          <polygon
+                            key={`hl-${role}-${pointIdx}`}
+                            points={`${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`}
+                            fill="none"
+                            stroke={style.color}
+                            strokeWidth={2.5}
+                            style={{ pointerEvents: "none" }}
+                          />
+                        );
+                      }
+                      const s = 10;
                       return (
-                        <circle
-                          key={`medoid-${pointIdx}`}
-                          cx={point[0]}
-                          cy={point[1]}
-                          r={10}
+                        <polygon
+                          key={`hl-${role}-${pointIdx}`}
+                          points={`${cx},${cy - s} ${cx + s},${cy + s * 0.7} ${cx - s},${cy + s * 0.7}`}
                           fill="none"
-                          stroke="#fff"
-                          strokeWidth={3}
+                          stroke={style.color}
+                          strokeWidth={2.5}
                           style={{ pointerEvents: "none" }}
                         />
                       );

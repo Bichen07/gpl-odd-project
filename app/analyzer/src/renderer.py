@@ -360,12 +360,6 @@ def main():
         default=None,
         help="Optional cap on BEV frames (default: uncapped, all key times)",
     )
-    parser.add_argument(
-        "--key-frame-mode",
-        choices=("action", "hybrid", "heuristic"),
-        default="hybrid",
-        help="Key-frame source: action.yaml, hybrid, or heuristic only",
-    )
     parser.add_argument("--dataset", default="dataset1",
                         help="Dataset name (determines default xodr + tracks + output path)")
     parser.add_argument("--n-clusters", type=int, default=None,
@@ -421,7 +415,7 @@ def main():
     if not tracks_p.is_file():
         print(
             f"ERROR: map tracks missing: {tracks_p}\n"
-            f"Run: python3 scripts/generate_map_tracks.py --dataset {args.dataset}"
+            f"Run: python3 app/analyzer/src/dataset_builder.py --dataset {args.dataset} --map-only"
         )
         return
 
@@ -456,7 +450,6 @@ def main():
             batch_id, tidx, str(trial_out),
             n_snapshots=args.n_snapshots,
             file_prefix=f"trial_{args.trial}",
-            key_frame_mode=args.key_frame_mode,
         )
     elif args.cluster:
         medoids = load_medoids_from_clustering(
@@ -472,7 +465,6 @@ def main():
             n_snapshots=args.n_snapshots,
             dataset=args.dataset,
             n_clusters=n_cl,
-            key_frame_mode=args.key_frame_mode,
         )
         snaps = [s for lst in results.values() for s in lst]
     else:

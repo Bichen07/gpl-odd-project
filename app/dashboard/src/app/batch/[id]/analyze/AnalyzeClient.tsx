@@ -317,6 +317,20 @@ export default function AnalyzeClient({
 
   const [config, setConfig] = useState<Config | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [needsBuild, setNeedsBuild] = useState(false);
+  const [availableFolders, setAvailableFolders] = useState<string[]>([]);
+  const [requestedFolder, setRequestedFolder] = useState(
+    s ? `${k}_cluster_s=${s}` : `${k}_cluster`,
+  );
+
+  // --- build-dataset state (when preprocess folder is missing) ---
+  const [building, setBuilding] = useState(false);
+  const [buildJobId, setBuildJobId] = useState<string | null>(null);
+  const [buildPct, setBuildPct] = useState(0);
+  const [buildStage, setBuildStage] = useState("");
+  const [buildLogs, setBuildLogs] = useState("");
+  const [buildError, setBuildError] = useState<string | null>(null);
+  const buildLogRef = useRef<HTMLPreElement>(null);
 
   // --- model setup ---
   const [model, setModel] = useState<string>("gemini-2.5-flash");
@@ -331,6 +345,67 @@ export default function AnalyzeClient({
   const [evalLoading, setEvalLoading] = useState(false);
   const [evalRunning, setEvalRunning] = useState(false);
   const [evalError, setEvalError] = useState<string | null>(null);
+
+  // --- prompts (editable) ---
+  const [prompts, setPrompts] = useState<Record<string, string>>({});
+  const [models, setModels] = useState<ModelOption[]>([]);
+
+  // --- per-cluster image selection + which clusters to run ---
+  const [selected, setSelected] = useState<Record<number, string[]>>({});
+  const [runClusters, setRunClusters] = useState<Set<number>>(new Set());
+  const [autoCount, setAutoCount] = useState<number>(10);
+
+  // --- run state ---
+  const [running, setRunning] = useState<boolean>(false);
+  const [activeClusters, setActiveClusters] = useState<number[]>([]);
+  const [results, setResults] = useState<ResultEntry[]>([]);
+  const [logs, setLogs] = useState<string>("");
+  const [logFile, setLogFile] = useState<string>("");
+  const [runError, setRunError] = useState<string | null>(null);
+  const logBoxRef = useRef<HTMLPreElement>(null);
+
+  const applyConfig = useCallback(
+    (cfg: Config) => {
+      setConfig(cfg);
+      setNeedsBuild(false);
+      setPrompts(cfg.prompts ?? {});
+      if (cfg.models?.length) {
+        setModels(cfg.models);
+        setModel(cfg.models[0].id);
+      }
+      const sel: Record<number, string[]> = {};
+      for (const c of cfg.clusters) {
+        sel[c.cluster] = selectDefaultSnapshots(c.snapshots, autoCount, c.medoid);
+      }
+      setSelected(sel);
+      setRunClusters(new Set(cfg.clusters.map((c) => c.cluster)));
+      if (cfg.results?.length) setResults(cfg.results);
+    },
+    [autoCount],
+  );
+
+  const reloadConfig = useCallback(async () => {
+    const res = await fetch(
+      `/api/cluster-analyze?batchId=${encodeURIComponent(batchId)}&k=${encodeURIComponent(k)}&s=${encodeURIComponent(s)}`,
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      if (data?.missing) {
+        setNeedsBuild(true);
+        setConfig(null);
+        setAvailableFolders(data.availableFolders ?? []);
+        setRequestedFolder(data.requestedFolder ?? `${k}_cluster_s=${s}`);
+        setPrompts(data.prompts ?? {});
+        if (data.models?.length) {
+          setModels(data.models);
+          setModel(data.models[0].id);
+        }
+        return;
+      }
+      throw new Error(data.error ?? `HTTP ${res.status}`);
+    }
+    applyConfig(data as Config);
+  }, [applyConfig, batchId, k, s]);
 
   // Load evaluation configs
   useEffect(() => {
@@ -364,45 +439,32 @@ export default function AnalyzeClient({
     }
   };
 
-  // --- prompts (editable) ---
-  const [prompts, setPrompts] = useState<Record<string, string>>({});
-
-  // --- per-cluster image selection + which clusters to run ---
-  const [selected, setSelected] = useState<Record<number, string[]>>({});
-  const [runClusters, setRunClusters] = useState<Set<number>>(new Set());
-  const [autoCount, setAutoCount] = useState<number>(10);
-
-  // --- run state ---
-  const [running, setRunning] = useState<boolean>(false);
-  const [activeClusters, setActiveClusters] = useState<number[]>([]);
-  const [results, setResults] = useState<ResultEntry[]>([]);
-  const [logs, setLogs] = useState<string>("");
-  const [logFile, setLogFile] = useState<string>("");
-  const [runError, setRunError] = useState<string | null>(null);
-  const logBoxRef = useRef<HTMLPreElement>(null);
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
+        setLoadError(null);
         const res = await fetch(
           `/api/cluster-analyze?batchId=${encodeURIComponent(batchId)}&k=${encodeURIComponent(k)}&s=${encodeURIComponent(s)}`,
         );
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
         if (cancelled) return;
-        const cfg = data as Config;
-        setConfig(cfg);
-        setPrompts(cfg.prompts ?? {});
-        if (cfg.models?.length) setModel(cfg.models[0].id);
-        const sel: Record<number, string[]> = {};
-        for (const c of cfg.clusters) {
-          sel[c.cluster] = selectDefaultSnapshots(c.snapshots, autoCount, c.medoid);
+        if (!res.ok) {
+          if (data?.missing) {
+            setNeedsBuild(true);
+            setConfig(null);
+            setAvailableFolders(data.availableFolders ?? []);
+            setRequestedFolder(data.requestedFolder ?? `${k}_cluster_s=${s}`);
+            setPrompts(data.prompts ?? {});
+            if (data.models?.length) {
+              setModels(data.models);
+              setModel(data.models[0].id);
+            }
+            return;
+          }
+          throw new Error(data.error ?? `HTTP ${res.status}`);
         }
-        setSelected(sel);
-        setRunClusters(new Set(cfg.clusters.map((c) => c.cluster)));
-        // Show previously-saved interpretations so a re-run isn't required.
-        if (cfg.results?.length) setResults(cfg.results);
+        applyConfig(data as Config);
       } catch (err) {
         if (!cancelled) setLoadError(String(err));
       }
@@ -412,6 +474,86 @@ export default function AnalyzeClient({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchId, k, s]);
+
+  useEffect(() => {
+    const el = buildLogRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [buildLogs]);
+
+  const stopBuild = useCallback(async () => {
+    if (!buildJobId) return;
+    try {
+      await fetch("/api/cluster-build/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop", jobId: buildJobId }),
+      });
+    } catch {
+      /* best-effort */
+    }
+  }, [buildJobId]);
+
+  const startBuild = useCallback(async () => {
+    if (building) return;
+    setBuilding(true);
+    setBuildError(null);
+    setBuildLogs("");
+    setBuildPct(0);
+    setBuildStage("starting");
+    setBuildJobId(null);
+    try {
+      const res = await fetch("/api/cluster-build/run", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId, k, s }),
+      });
+      if (!res.ok || !res.body) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error ?? `HTTP ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let msg: Record<string, unknown>;
+          try {
+            msg = JSON.parse(line);
+          } catch {
+            continue;
+          }
+          if (msg.type === "start" && msg.jobId) {
+            setBuildJobId(String(msg.jobId));
+          } else if (msg.type === "log" && typeof msg.data === "string") {
+            setBuildLogs((prev) => prev + msg.data);
+          } else if (msg.type === "progress") {
+            if (typeof msg.pct === "number") setBuildPct(msg.pct);
+            if (typeof msg.stage === "string") setBuildStage(msg.stage);
+          } else if (msg.type === "done") {
+            if (msg.stopped) {
+              setBuildError("Build stopped by user.");
+            } else if (!msg.ok) {
+              setBuildError(`Build exited with code ${msg.exitCode}. Check the log below.`);
+            } else {
+              // Reload the exact folder now that preprocess exists.
+              await reloadConfig();
+            }
+          }
+        }
+      }
+    } catch (err) {
+      setBuildError(String(err));
+    } finally {
+      setBuilding(false);
+      setBuildJobId(null);
+    }
+  }, [batchId, building, k, reloadConfig, s]);
 
   const imgUrl = useCallback(
     (cluster: number, file: string) =>
@@ -581,6 +723,100 @@ export default function AnalyzeClient({
         <Alert severity="error" sx={{ mt: 2 }}>
           Failed to load analysis config: {loadError}
         </Alert>
+      </Container>
+    );
+  }
+
+  // Preprocess folder missing for this exact k + silhouette — offer Build dataset.
+  // Do NOT fall back to another silhouette's BEV / interpretation.
+  if (needsBuild && !config) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4 }}>
+        <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
+          <IconButton onClick={() => router.push(`/batch/${batchId}`)} aria-label="back">
+            <ArrowBack />
+          </IconButton>
+          <Box>
+            <Typography variant="h5">LLM Cluster Analysis</Typography>
+            <Typography variant="body2" color="text.secondary">
+              batch {batchId} · ego {ego} · {requestedFolder}
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Alert severity="info" sx={{ mb: 2 }}>
+          No preprocess dataset for <strong>{requestedFolder}</strong>. Build
+          snapshots / action.yaml / cluster.json first before LLM analysis.
+          {availableFolders.length > 0 && (
+            <>
+              <br />
+              Other k={k} folders on disk:{" "}
+              <code>{availableFolders.join(", ")}</code> — these are different
+              silhouette results and will not be shown here.
+            </>
+          )}
+        </Alert>
+
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Runs{" "}
+            <Box component="code" sx={{ fontSize: 12 }}>
+              {`python3 app/analyzer/src/dataset_builder.py --batch-id ${batchId} --k ${k} --silhouette ${s}`}
+            </Box>
+          </Typography>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+            <Button
+              variant="contained"
+              disabled={building}
+              onClick={startBuild}
+              startIcon={building ? <CircularProgress size={16} color="inherit" /> : undefined}
+            >
+              {building ? "Building dataset…" : "Build dataset"}
+            </Button>
+            {building && (
+              <Button variant="outlined" color="error" onClick={stopBuild}>
+                Stop
+              </Button>
+            )}
+          </Stack>
+          {(building || buildPct > 0) && (
+            <Box sx={{ mb: 1.5 }}>
+              <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.5 }}>
+                <Typography variant="caption" color="text.secondary">
+                  {buildStage || "working…"}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {Math.round(buildPct)}%
+                </Typography>
+              </Stack>
+              <LinearProgress variant="determinate" value={buildPct} />
+            </Box>
+          )}
+          {buildError && (
+            <Alert severity="error" sx={{ mb: 1.5 }}>
+              {buildError}
+            </Alert>
+          )}
+          {buildLogs && (
+            <Box
+              component="pre"
+              ref={buildLogRef}
+              sx={{
+                m: 0,
+                p: 1.5,
+                maxHeight: 320,
+                overflow: "auto",
+                bgcolor: "grey.900",
+                color: "grey.100",
+                borderRadius: 1,
+                fontSize: 11,
+                whiteSpace: "pre-wrap",
+              }}
+            >
+              {buildLogs}
+            </Box>
+          )}
+        </Paper>
       </Container>
     );
   }

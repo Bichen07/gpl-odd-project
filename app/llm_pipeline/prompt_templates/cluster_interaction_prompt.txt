@@ -30,6 +30,20 @@ You have been provided with:
      order events and to make sure you describe the final/latest snapshots.
    - Each agent is shown as a colored bounding box with velocity arrow
    - Ego vehicle is **orange**, other agents are **blue**
+   - Conflict frames use a dual view: pair zoom (ego+partner) | ego zoom; relevance
+     start and conflict peak also include a whole-scene left panel.
+
+2b. **Snapshot evidence table (primary numeric grounding):**
+   - Prefer the **Snapshot evidence (LLM pack)** table in the scenario description
+     for distances, TTC, speeds, and azimuth — BEV images support spatial layout.
+   - Metric glossary:
+     - **d** — center-to-center distance between ego and the conflict partner (metres)
+     - **TTC** — time-to-collision (seconds); lower = more critical
+     - **az** — azimuth: bearing of the conflict partner relative to ego heading,
+       degrees in [-180, 180]; 0=ahead, +left, -right, ±180=behind
+     - **v_ego** / **v_opp** — ego and partner speeds (m/s)
+   - Prefer latest / conflict-peak frames (NEAR_MISS, COLLISION, DIST_MIN, TTC_MIN)
+     when making safety claims.
 
 3. **Agent Action Log:**
    - Timestamped list of maneuvers for each agent (slow down, speed up, lane change)

@@ -1,14 +1,20 @@
 #!/usr/bin/env python3
-"""Build structured LLM dataset from medoid trials.
+"""Build structured LLM dataset from medoid trials (single CLI entry point).
 
-This script orchestrates Phase 4: for each cluster's medoid trial, it generates:
-- trajectory.csv (xosc_gen format with roadId/laneId; raw timeline for BEV)
-- action.yaml (structured semantic events) + description.txt (prose)
-- BEV images (key timesteps) + map_overview.jpg
-- cluster.json (merged cluster + medoid + scene metadata)
-- context.md (consolidated LLM card: header + description + actions + snapshot index)
+Auto-ensures shared map assets under ``results/map/`` (via ``map_assets``), then
+for each cluster medoid generates:
+- trajectory.csv, action.yaml, description.txt
+- conflict-centered BEV snapshots + map_overview.jpg
+- cluster.json, context.md, manifest.json
 
-Output structure: results/batch<id>/<k>_cluster_s=<silhouette>/cluster<label>/
+Examples::
+
+  export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
+  python3 app/analyzer/src/dataset_builder.py --batch-id 2 --k 4
+  python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only
+  python3 app/analyzer/src/dataset_builder.py --batch-id 2 --from-run results/batch2/4_cluster
+
+Output: results/batch<id>/<k>_cluster_s=<silhouette>/cluster<label>/
 """
 
 import argparse
@@ -22,7 +28,7 @@ import sys
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
 
 import yaml
@@ -462,6 +468,203 @@ def _parse_silhouette_from_dirname(dirname: str) -> Optional[float]:
         return float(m.group(1))
     except ValueError:
         return None
+
+
+def _parse_k_from_run_dirname(dirname: str) -> Optional[int]:
+    m = re.match(r"^(\d+)_cluster", dirname)
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
+
+
+def _run_has_from_run_artifacts(run_dir: Path) -> bool:
+    return (
+        (run_dir / "clustering" / "selectedClusteringResult.json").is_file()
+        and (run_dir / "manifest.json").is_file()
+    )
+
+
+def _list_complete_runs(parent: Path, k: Optional[int] = None) -> List[Path]:
+    """Complete ``--from-run`` candidates under *parent* (optionally filtered by k)."""
+    if not parent.is_dir():
+        return []
+    scored: List[Tuple[float, Path]] = []
+    for p in parent.iterdir():
+        if not p.is_dir():
+            continue
+        pk = _parse_k_from_run_dirname(p.name)
+        if pk is None:
+            continue
+        if k is not None and pk != k:
+            continue
+        if not _run_has_from_run_artifacts(p):
+            continue
+        s = _parse_silhouette_from_dirname(p.name)
+        scored.append((s if s is not None else -1.0, p))
+    scored.sort(key=lambda x: (-x[0], x[1].name))
+    return [p for _, p in scored]
+
+
+def _print_available_runs(parent: Path, k: Optional[int] = None) -> None:
+    avail = _list_complete_runs(parent, k=k)
+    if not avail and k is not None:
+        avail = _list_complete_runs(parent, k=None)
+    if avail:
+        print(f"   Available complete runs under {parent}:")
+        for p in avail:
+            print(f"     - {p}")
+    else:
+        print(
+            f"   No complete runs (manifest.json + clustering/"
+            f"selectedClusteringResult.json) under {parent}"
+        )
+
+
+def _batch_id_from_path(path: Path) -> Optional[int]:
+    for part in path.parts:
+        m = re.match(r"^batch(\d+)$", part)
+        if m:
+            return int(m.group(1))
+    return None
+
+
+def _print_fresh_build_hint(path: Path, k: Optional[int] = None) -> None:
+    """Tell the user how to CREATE a run (not rebuild) when --from-run can't find one."""
+    batch = _batch_id_from_path(path)
+    k_arg = k if k is not None else _parse_k_from_run_dirname(path.name)
+    print("   --from-run only REBUILDS an existing folder.")
+    print("   To CREATE a complete LLM dataset from Payload (recommended):")
+    if batch is not None and k_arg is not None:
+        print(
+            f"     python3 app/analyzer/src/dataset_builder.py "
+            f"--batch-id {batch} --k {k_arg}"
+        )
+    elif batch is not None:
+        print(
+            f"     python3 app/analyzer/src/dataset_builder.py "
+            f"--batch-id {batch} --k <k>"
+        )
+        print(
+            f"     python3 app/analyzer/src/dataset_builder.py "
+            f"--batch-id {batch} --list-clusterings"
+        )
+    else:
+        print(
+            "     python3 app/analyzer/src/dataset_builder.py "
+            "--batch-id <id> --k <k>"
+        )
+
+
+def locate_from_run_spec(spec: str) -> Path:
+    """Map a user ``--from-run`` string to an absolute path (may not exist yet)."""
+    raw = Path(spec)
+    if raw.is_absolute():
+        return raw
+    # ``results/batch2/...`` is relative to repo root, not to RESULTS_DIR itself.
+    candidates = [PROJECT_ROOT / raw, Path.cwd() / raw]
+    if raw.parts and raw.parts[0] != "results":
+        candidates.insert(0, RESULTS_DIR / raw)
+    for c in candidates:
+        if c.is_dir():
+            return c
+    for c in candidates:
+        if c.parent.is_dir():
+            return c
+    return candidates[0]
+
+
+def resolve_from_run_path(
+    spec: str,
+    k: Optional[int] = None,
+) -> Optional[Path]:
+    """Resolve ``--from-run`` to a complete results folder.
+
+    Accepts:
+    - Exact path with ``manifest.json`` + ``clustering/selectedClusteringResult.json``
+    - Prefix without silhouette, e.g. ``results/batch2/4_cluster`` → best
+      ``4_cluster_s=*`` sibling (highest ``_s=``)
+    - Batch folder + ``--k``, e.g. ``results/batch2`` with ``k=4`` → best k=4 run
+    - Missing / incomplete ``…/N_cluster_s=…`` → best complete ``N_cluster*`` sibling
+
+    If nothing matches, prints available runs and the fresh-build command
+    (``python3 app/analyzer/src/dataset_builder.py --batch-id … --k …``).
+    """
+    path = locate_from_run_spec(str(spec))
+
+    if path.is_dir() and _run_has_from_run_artifacts(path):
+        return path
+
+    # Batch root: results/batch2  → need --k (or infer from path name)
+    batch_m = re.match(r"^batch(\d+)$", path.name)
+    dirname_k = _parse_k_from_run_dirname(path.name)
+    effective_k = k if k is not None else dirname_k
+
+    if path.is_dir() and batch_m and effective_k is not None:
+        complete = _list_complete_runs(path, k=effective_k)
+        if complete:
+            best = complete[0]
+            print(
+                f"  Resolved --from-run {path.name} --k {effective_k} → {best.name} "
+                f"(highest silhouette among complete k={effective_k} runs)"
+            )
+            return best
+        print(f"❌ ERROR: no complete k={effective_k} run under {path}")
+        _print_available_runs(path, k=None)
+        _print_fresh_build_hint(path, k=effective_k)
+        return None
+
+    if path.is_dir() and batch_m and effective_k is None:
+        print(
+            f"❌ ERROR: --from-run {path} is a batch folder; pass --k <n> "
+            f"to pick the best complete run, or a full …/N_cluster_s=… path"
+        )
+        _print_available_runs(path, k=None)
+        _print_fresh_build_hint(path, k=None)
+        return None
+
+    parent = path.parent
+    if parent.is_dir() and effective_k is not None:
+        complete = _list_complete_runs(parent, k=effective_k)
+        if complete:
+            best = complete[0]
+            if path.is_dir() and not _run_has_from_run_artifacts(path):
+                print(
+                    f"  ⚠️  {path.name} is missing rebuild artifacts; "
+                    f"using best complete k={effective_k} run: {best.name}"
+                )
+            elif not path.exists():
+                print(
+                    f"  ⚠️  {path} not found; "
+                    f"using best complete k={effective_k} run: {best.name}"
+                )
+            elif path.resolve() != best.resolve():
+                print(
+                    f"  Resolved --from-run {path.name} → {best.name} "
+                    f"(highest silhouette among complete k={effective_k} runs)"
+                )
+            return best
+        print(f"❌ ERROR: no complete k={effective_k} run under {parent}")
+        _print_available_runs(parent, k=None)
+        _print_fresh_build_hint(path, k=effective_k)
+        return None
+
+    if path.is_dir():
+        print(
+            f"❌ ERROR: --from-run needs clustering/selectedClusteringResult.json "
+            f"and manifest.json under {path}"
+        )
+        _print_available_runs(path.parent)
+        _print_fresh_build_hint(path, k=effective_k)
+        return None
+
+    print(f"❌ ERROR: --from-run path not found: {path}")
+    if parent.is_dir():
+        _print_available_runs(parent, k=effective_k)
+    _print_fresh_build_hint(path, k=effective_k)
+    return None
 
 
 def load_from_reference_run(
@@ -1098,9 +1301,38 @@ def build_bev_typography(args: argparse.Namespace):
         road_label_plain_size=args.road_label_plain_size,
         agent_id_fontsize=args.agent_id_size,
         info_fontsize=args.info_font_size,
-        scope_fontsize=args.scope_font_size,
         title_fontsize=args.title_font_size,
+        scale_bar_fontsize=args.scale_bar_font_size,
+        scale_bar_y=args.scale_bar_y,
+        scale_bar_max_width_frac=args.scale_bar_max_width_frac,
+        scale_bar_min_width_frac=args.scale_bar_min_width_frac,
+        metric_chip_fontsize=args.metric_chip_font_size,
+        panel_label_fontsize=args.panel_label_font_size,
+        road_label_avoid_m=args.road_label_avoid_m,
     )
+
+
+def parse_cluster_scope(spec: str) -> Optional[Set[str]]:
+    """Parse ``all`` / ``none`` / ``0,2`` cluster scope.
+
+    Returns:
+      None  → all clusters
+      set() → none
+      {.. } → only those cluster label strings
+    """
+    s = (spec or "all").strip().lower()
+    if s in ("all", "*", "yes"):
+        return None
+    if s in ("none", "off", "no", "-"):
+        return set()
+    out = {p.strip() for p in s.replace(" ", "").split(",") if p.strip() != ""}
+    return out
+
+
+def cluster_in_scope(label: Any, scope: Optional[Set[str]]) -> bool:
+    if scope is None:
+        return True
+    return str(label) in scope
 
 
 def write_context_md(
@@ -1229,9 +1461,7 @@ def process_medoid(
     snapshot_output_px: int = 1024,
     snapshot_border_frac: float = 0.10,
     typography=None,
-    key_frame_mode: str = "action",
     max_snapshots: Optional[int] = None,
-    semantic_only: bool = False,
     collision_flags: Optional[Dict[str, bool]] = None,
     cluster_collision_stats: Optional[Dict[str, Any]] = None,
     n_clusters: Optional[int] = None,
@@ -1241,6 +1471,10 @@ def process_medoid(
     contact_clearance_m: float = 0.5,
     conflict_relevance_m: float = 5.0,
     intra_variance: Optional[Dict[str, Any]] = None,
+    conflict_window_s: float = 6.0,
+    conflict_distance_m: float = 40.0,
+    conflict_burst_step_s: float = 0.0,
+    hard_brake_accel: float = -2.5,
 ) -> bool:
     """Process a single medoid trial: generate all required files.
     
@@ -1340,40 +1574,26 @@ def process_medoid(
         )
         action_data_for_ctx = action_data
         save_action_yaml(action_data, cluster_dir / "action.yaml")
-        save_description_txt(build_description(action_data),
-                            cluster_dir / "description.txt")
+        # description.txt written after BEV so Snapshot evidence can include filenames
         if not map_yaml.is_file():
             print("  ⚠️  action/description built WITHOUT junction info — run "
-                  "scripts/map_preprocess.py first")
-        print(f"  ✓ Generated action.yaml + description.txt")
+                  "map assets first (--map-only)")
+        print(f"  ✓ Generated action.yaml")
     except Exception as e:
         print(f"  ⚠️  Action/description generation failed: {e}")
 
     # 7. Generate BEV snapshots (Step 4 — MapPlotter + odrplot tracks)
     snapshots_dir = cluster_dir / "snapshots"
+    selection_bundle: list = []
     try:
         from tier2_renderer import (
             Tier2BevRenderer,
-            infer_collision_timestep,
             resolve_tier2_paths,
         )
 
         _xodr, map_tracks, location = resolve_tier2_paths(dataset_name)
         if map_tracks.is_file():
             action_yaml = cluster_dir / "action.yaml"
-            collision_ts = None
-            if medoid_collided:
-                with open(meta_path) as mf:
-                    meta_for_collision = yaml.safe_load(mf) or {}
-                collision_ts = infer_collision_timestep(
-                    df,
-                    meta_agents=meta_for_collision.get("agents", []),
-                    trial_events=trial_events,
-                    collided=True,
-                )
-                if collision_ts is not None:
-                    print(f"  ✓ Collision key time {collision_ts:.2f}s")
-
             tier2 = Tier2BevRenderer(
                 str(map_tracks),
                 str(xodr_path if xodr_path.is_file() else _xodr),
@@ -1384,6 +1604,7 @@ def process_medoid(
                 typography=typography,
                 ego_zoom_radius=ego_zoom_radius,
             )
+            snapshots_dir.mkdir(parents=True, exist_ok=True)
             snaps = tier2.render_trial_from_esmini_csv(
                 batch_id,
                 trial_index,
@@ -1392,16 +1613,38 @@ def process_medoid(
                 file_prefix=f"trial_{trial_index}",
                 overview_dir=str(cluster_dir),
                 action_yaml_path=str(action_yaml) if action_yaml.is_file() else None,
-                key_frame_mode=key_frame_mode,
-                semantic_only=semantic_only,
-                collision_timestep=collision_ts,
-                collision_trial=medoid_collided,
+                conflict_window_s=conflict_window_s,
+                conflict_distance_m=conflict_distance_m,
+                conflict_burst_step_s=conflict_burst_step_s,
+                hard_brake_accel=hard_brake_accel,
+                selection_out=selection_bundle,
             )
-            print(f"  ✓ Generated {len(snaps)} BEV snapshots + map_overview.jpg")
+            print(f"  ✓ Generated {len(snaps)} conflict-centered BEV snapshots")
+            print(f"  ✓ map_overview.jpg")
         else:
-            print(f"  ⚠️  BEV skipped — run: python3 scripts/generate_map_tracks.py")
+            print("  ⚠️  BEV skipped — run dataset_builder.py --batch-id <n> --map-only")
     except Exception as e:
         print(f"  ⚠️  BEV generation failed: {e}")
+
+    # 7b. description.txt with Snapshot evidence table (after BEV filenames known)
+    if action_data_for_ctx is not None:
+        try:
+            from description import build_description, save_description_txt
+            from conflict_frame_selector import format_snapshot_evidence_block
+
+            evidence = None
+            if len(selection_bundle) >= 2:
+                evidence = format_snapshot_evidence_block(
+                    selection_bundle[0], selection_bundle[1]
+                )
+            save_description_txt(
+                build_description(action_data_for_ctx, snapshot_evidence=evidence),
+                cluster_dir / "description.txt",
+            )
+            print(f"  ✓ Generated description.txt"
+                  + (" (with Snapshot evidence)" if evidence else ""))
+        except Exception as e:
+            print(f"  ⚠️  description.txt failed: {e}")
     
     # 8. Consolidated cluster.json (merges old meta.yaml + medoid.json + stats.json).
     #    observations.json is no longer written — trajectory.csv is the single raw timeline.
@@ -1501,14 +1744,16 @@ def process_trial_to_dir(
     snapshot_output_px: int = 1024,
     snapshot_border_frac: float = 0.10,
     typography=None,
-    key_frame_mode: str = "action",
     max_snapshots: Optional[int] = None,
-    semantic_only: bool = False,
     collided: bool = False,
     trial_events: Optional[Any] = None,
     ego_zoom_radius: float = 30.0,
     contact_clearance_m: float = 0.5,
     conflict_relevance_m: float = 5.0,
+    conflict_window_s: float = 6.0,
+    conflict_distance_m: float = 40.0,
+    conflict_burst_step_s: float = 0.0,
+    hard_brake_accel: float = -2.5,
 ) -> bool:
     """Generate action.yaml + description.txt + BEV snapshots for one trial.
 
@@ -1559,7 +1804,6 @@ def process_trial_to_dir(
     action_data = None
     try:
         from labeller import label_trajectory, save_action_yaml
-        from description import build_description, save_description_txt
 
         map_yaml = (
             Path(xodr_path).parent.parent / "map" / f"{location_for_meta}.yaml"
@@ -1574,30 +1818,19 @@ def process_trial_to_dir(
             conflict_relevance_m=conflict_relevance_m,
         )
         save_action_yaml(action_data, out_dir / "action.yaml")
-        save_description_txt(build_description(action_data), out_dir / "description.txt")
     except Exception as e:
         print(f"    ⚠️  Action/description failed: {e}")
 
     snapshots_dir = out_dir / "snapshots"
+    selection_bundle: list = []
     try:
         from tier2_renderer import (
             Tier2BevRenderer,
-            infer_collision_timestep,
             resolve_tier2_paths,
         )
-        import yaml as _yaml
 
         _xodr, map_tracks, location = resolve_tier2_paths(dataset_name)
         if map_tracks.is_file():
-            collision_ts = None
-            if collided:
-                with open(meta_path) as mf:
-                    meta_for_col = _yaml.safe_load(mf) or {}
-                collision_ts = infer_collision_timestep(
-                    df, meta_agents=meta_for_col.get("agents", []),
-                    trial_events=trial_events, collided=True,
-                )
-
             tier2 = Tier2BevRenderer(
                 str(map_tracks),
                 str(xodr_path if xodr_path.is_file() else _xodr),
@@ -1616,14 +1849,32 @@ def process_trial_to_dir(
                 file_prefix=f"trial_{trial_index}",
                 overview_dir=None,
                 action_yaml_path=str(action_yaml_path) if action_yaml_path.is_file() else None,
-                key_frame_mode=key_frame_mode,
-                semantic_only=semantic_only,
-                collision_timestep=collision_ts,
-                collision_trial=collided,
+                conflict_window_s=conflict_window_s,
+                conflict_distance_m=conflict_distance_m,
+                conflict_burst_step_s=conflict_burst_step_s,
+                hard_brake_accel=hard_brake_accel,
+                selection_out=selection_bundle,
             )
             print(f"    ✓ {len(snaps)} BEV snapshots")
     except Exception as e:
         print(f"    ⚠️  BEV generation failed: {e}")
+
+    if action_data is not None:
+        try:
+            from description import build_description, save_description_txt
+            from conflict_frame_selector import format_snapshot_evidence_block
+
+            evidence = None
+            if len(selection_bundle) >= 2:
+                evidence = format_snapshot_evidence_block(
+                    selection_bundle[0], selection_bundle[1]
+                )
+            save_description_txt(
+                build_description(action_data, snapshot_evidence=evidence),
+                out_dir / "description.txt",
+            )
+        except Exception as e:
+            print(f"    ⚠️  description.txt failed: {e}")
 
     try:
         meta_path.unlink(missing_ok=True)
@@ -1647,17 +1898,23 @@ def process_auxiliary_trials(
     snapshot_output_px: int = 1024,
     snapshot_border_frac: float = 0.10,
     typography=None,
-    key_frame_mode: str = "action",
     max_snapshots: Optional[int] = None,
-    semantic_only: bool = False,
     ego_zoom_radius: float = 30.0,
     contact_clearance_m: float = 0.5,
     conflict_relevance_m: float = 5.0,
+    conflict_window_s: float = 6.0,
+    conflict_distance_m: float = 40.0,
+    conflict_burst_step_s: float = 0.0,
+    hard_brake_accel: float = -2.5,
+    outlier_scope: Optional[Set[str]] = None,
+    boundary_scope: Optional[Set[str]] = None,
 ) -> None:
     """Build full trial artifacts for outlier and boundary trials.
 
     Outlier → ``cluster<N>/outlier_trials/trial_<id>/``
     Boundary → ``cluster<N>/boundary_c<M>/trial_<id>/``
+
+    ``outlier_scope`` / ``boundary_scope``: None=all, empty=skip, else cluster labels.
     """
     def _resolve(tid: str) -> Tuple[Optional[int], Optional[int]]:
         bi = trial_index_map.get(str(tid))
@@ -1668,42 +1925,55 @@ def process_auxiliary_trials(
         return info.get("events") if isinstance(info, dict) else None
 
     # --- outlier trials ---
-    for label_str, iv in intra_by_cluster.items():
-        outlier_ids = iv.get("outlier_trial_ids", [])
-        if not outlier_ids:
-            continue
-        top_tid = str(outlier_ids[0])
-        b, ti = _resolve(top_tid)
-        if b is None:
-            print(f"  ⚠️  Outlier trial {top_tid} not in index map — skipped")
-            continue
-        collided = bool((collision_flags or {}).get(top_tid, False))
-        out_dir = run_dir / f"cluster{label_str}" / "outlier_trials" / f"trial_{ti}"
-        print(f"  🔸 Outlier cluster {label_str}: trial {top_tid} (batch {b}, idx {ti})"
-              f"{' COLLISION' if collided else ''}")
-        process_trial_to_dir(
-            b, ti, top_tid, out_dir, xodr_path, parser_xodr,
-            dataset_name=dataset_name,
-            snapshot_output_px=snapshot_output_px,
-            snapshot_border_frac=snapshot_border_frac,
-            typography=typography,
-            key_frame_mode=key_frame_mode,
-            max_snapshots=max_snapshots,
-            semantic_only=semantic_only,
-            collided=collided,
-            trial_events=_trial_events(top_tid),
-            ego_zoom_radius=ego_zoom_radius,
-            contact_clearance_m=contact_clearance_m,
-            conflict_relevance_m=conflict_relevance_m,
-        )
+    if outlier_scope is not None and len(outlier_scope) == 0:
+        print("  ⏭  Outliers skipped (--outliers none)")
+    else:
+        for label_str, iv in intra_by_cluster.items():
+            if not cluster_in_scope(label_str, outlier_scope):
+                continue
+            outlier_ids = iv.get("outlier_trial_ids", [])
+            if not outlier_ids:
+                continue
+            top_tid = str(outlier_ids[0])
+            b, ti = _resolve(top_tid)
+            if b is None:
+                print(f"  ⚠️  Outlier trial {top_tid} not in index map — skipped")
+                continue
+            collided = bool((collision_flags or {}).get(top_tid, False))
+            out_dir = run_dir / f"cluster{label_str}" / "outlier_trials" / f"trial_{ti}"
+            print(f"  🔸 Outlier cluster {label_str}: trial {top_tid} (batch {b}, idx {ti})"
+                  f"{' COLLISION' if collided else ''}")
+            process_trial_to_dir(
+                b, ti, top_tid, out_dir, xodr_path, parser_xodr,
+                dataset_name=dataset_name,
+                snapshot_output_px=snapshot_output_px,
+                snapshot_border_frac=snapshot_border_frac,
+                typography=typography,
+                max_snapshots=max_snapshots,
+                collided=collided,
+                trial_events=_trial_events(top_tid),
+                ego_zoom_radius=ego_zoom_radius,
+                contact_clearance_m=contact_clearance_m,
+                conflict_relevance_m=conflict_relevance_m,
+                conflict_window_s=conflict_window_s,
+                conflict_distance_m=conflict_distance_m,
+                conflict_burst_step_s=conflict_burst_step_s,
+                hard_brake_accel=hard_brake_accel,
+            )
 
     # --- boundary trials ---
+    if boundary_scope is not None and len(boundary_scope) == 0:
+        print("  ⏭  Boundaries skipped (--boundaries none)")
+        return
+
     processed_boundary: set = set()
     for bp in boundary_pairs:
         ca, ta = bp["cluster_a"], bp["trial_a"]
         cb, tb = bp["cluster_b"], bp["trial_b"]
 
         for (src_label, tgt_label, tid) in [(ca, cb, ta), (cb, ca, tb)]:
+            if not cluster_in_scope(src_label, boundary_scope):
+                continue
             key = (src_label, tgt_label, str(tid))
             if key in processed_boundary:
                 continue
@@ -1730,14 +2000,16 @@ def process_auxiliary_trials(
                 snapshot_output_px=snapshot_output_px,
                 snapshot_border_frac=snapshot_border_frac,
                 typography=typography,
-                key_frame_mode=key_frame_mode,
                 max_snapshots=max_snapshots,
-                semantic_only=semantic_only,
                 collided=collided,
                 trial_events=_trial_events(str(tid)),
                 ego_zoom_radius=ego_zoom_radius,
                 contact_clearance_m=contact_clearance_m,
                 conflict_relevance_m=conflict_relevance_m,
+                conflict_window_s=conflict_window_s,
+                conflict_distance_m=conflict_distance_m,
+                conflict_burst_step_s=conflict_burst_step_s,
+                hard_brake_accel=hard_brake_accel,
             )
 
 
@@ -1750,8 +2022,10 @@ def main():
     parser.add_argument(
         "--source",
         choices=("alldatasets", "payload-save"),
-        default="alldatasets",
-        help="Where to load clustering data from (default: alldatasets)",
+        default="payload-save",
+        help="Where clustering comes from (default: payload-save). "
+             "payload-save = create/rebuild from Payload saved analysis; "
+             "alldatasets = legacy local export.",
     )
 
     # --- alldatasets mode (legacy) ---
@@ -1784,7 +2058,7 @@ def main():
         help="Specific Payload document ID for the saved analysis zip (default: latest)",
     )
     parser.add_argument(
-        "--k",
+        "-k", "--k_clusters",
         type=int,
         default=None,
         dest="k_clusters",
@@ -1846,7 +2120,7 @@ def main():
     parser.add_argument(
         "--snapshot-size",
         type=int,
-        default=1024,
+        default=512,
         help="Square BEV snapshot output size in pixels (default: 1024)",
     )
     parser.add_argument(
@@ -1858,7 +2132,7 @@ def main():
     parser.add_argument(
         "--ego-zoom-radius",
         type=float,
-        default=30.0,
+        default=25.0,
         help="Right BEV panel zooms to ±this many metres around the ego "
              "(default: 30). Set 0 to disable the dual-panel composite.",
     )
@@ -1866,42 +2140,87 @@ def main():
         "--road-label-size",
         type=float,
         default=10,
-        help="Font size (pt) for red road ID boxes on map_overview.jpg (default: 5.6)",
+        help="Font size (pt) for red road ID boxes on map_overview AND conflict "
+             "snapshot overlays (default: 5). Raise e.g. 8–10 if too small.",
     )
     parser.add_argument(
         "--lane-label-size",
         type=float,
-        default=12,
-        help="Font size (pt) for black lane ID boxes on map_overview.jpg (default: 5.6)",
+        default=10,
+        help="Font size (pt) for black lane ID boxes on map_overview AND conflict "
+             "snapshot overlays (default: 6). Raise e.g. 8–10 if too small.",
     )
     parser.add_argument(
         "--road-label-plain-size",
         type=float,
-        default=10,
+        default=5,
         help="Font size (pt) for unhighlighted road IDs on full-network hct_6.jpg (default: 4.8)",
     )
     parser.add_argument(
         "--agent-id-size",
         type=float,
-        default=10,
+        default=11,
         help="Font size (pt) for on-car agent ID circles in snapshots (default: 4.0)",
     )
     parser.add_argument(
         "--info-font-size",
         type=float,
-        default=15.0,
-        help="Font size (pt) for top-left agent list and top-right time label (default: 8.0)",
+        default=8.0,
+        help="Font size (pt) for top-left agent legend list (default: 8.0)",
     )
     parser.add_argument(
-        "--scope-font-size",
+        "--panel-label-font-size",
         type=float,
-        default=15.0,
-        help="Font size (pt) for bottom-left scope text in snapshots (default: 7.0)",
+        default=12.0,
+        help="Font size (pt) for dual-panel captions 'pair zoom' / 'ego ±Nm' / "
+             "'whole scene' (default: 9)",
+    )
+    parser.add_argument(
+        "--scale-bar-font-size",
+        type=float,
+        default=12.0,
+        help="Font size (pt) for scale-bar tick numbers 0/50/100… (default: 12)",
+    )
+    parser.add_argument(
+        "--scale-bar-y",
+        type=float,
+        default=0.06,
+        help="Vertical position of the scale bar in figure coords "
+             "(0=bottom edge, 1=top). Raise if the bar sits too low "
+             "(default: 0.06; try 0.07–0.09).",
+    )
+    parser.add_argument(
+        "--scale-bar-max-width-frac",
+        type=float,
+        default=0.4,
+        help="Max scale-bar width as fraction of image width (default: 0.40). "
+             "Lower if the bar overlays the d=/TTC= chip (try 0.28–0.35).",
+    )
+    parser.add_argument(
+        "--scale-bar-min-width-frac",
+        type=float,
+        default=0.22,
+        help="Min scale-bar width as fraction of image width (default: 0.22).",
+    )
+    parser.add_argument(
+        "--metric-chip-font-size",
+        type=float,
+        default=12.0,
+        help="Font size (pt) for bottom-right d=/TTC= chip on conflict BEVs "
+             "(default: 12).",
+    )
+    parser.add_argument(
+        "--road-label-avoid-m",
+        type=float,
+        default=4.0,
+        help="Nudge road/lane ID labels at least this many metres away from "
+             "ego/partner centers so agents do not cover them (default: 4). "
+             "Set 0 to disable.",
     )
     parser.add_argument(
         "--title-font-size",
         type=float,
-        default=15.0,
+        default=8.0,
         help="Font size (pt) for map_overview title (default: 7.0)",
     )
     parser.add_argument(
@@ -1909,15 +2228,57 @@ def main():
         type=str,
         default=None,
         metavar="PATH",
-        help="Rebuild from an existing results run (reads manifest.json + "
-             "clustering/selectedClusteringResult.json). Use with --batch-id to "
-             "reload collision KPI / trial events from Payload.",
+        help="Rebuild BEV/labels into an EXISTING results folder "
+             "(needs manifest.json + clustering/selectedClusteringResult.json). "
+             "Do NOT use this to create a new k — for that omit --from-run and use "
+             "--batch-id + --k. Accepts exact …/4_cluster_s=0.6945, prefix …/4_cluster, "
+             "or …/batch2 with --k 4 (auto-picks highest silhouette).",
     )
     parser.add_argument(
-        "--key-frame-mode",
-        choices=("action", "hybrid", "heuristic"),
-        default="action",
-        help="BEV key frames: action.yaml events (default), hybrid (+ heuristics), or heuristic only",
+        "--force-map",
+        action="store_true",
+        help="Regenerate results/map/ assets (xodr copy, tracks, yaml, jpg) "
+             "even if they already exist.",
+    )
+    parser.add_argument(
+        "--skip-map",
+        action="store_true",
+        help="Do not auto-ensure results/map/ assets (assume already present).",
+    )
+    parser.add_argument(
+        "--map-only",
+        action="store_true",
+        help="Only ensure/regenerate results/map/ assets, then exit "
+             "(needs --batch-id, --dataset, or --all-maps).",
+    )
+    parser.add_argument(
+        "--all-maps",
+        action="store_true",
+        help="With --map-only: generate assets for every map variant.",
+    )
+    parser.add_argument(
+        "--medoids",
+        type=str,
+        default="all",
+        metavar="SCOPE",
+        help="Which cluster medoids to build: 'all' (default), 'none', or "
+             "comma list of labels e.g. '1' or '0,2'.",
+    )
+    parser.add_argument(
+        "--boundaries",
+        type=str,
+        default="all",
+        metavar="SCOPE",
+        help="Which clusters get boundary_c* trials: 'all' (default), 'none', "
+             "or labels e.g. '1' (builds boundary trials under cluster1/).",
+    )
+    parser.add_argument(
+        "--outliers",
+        type=str,
+        default="all",
+        metavar="SCOPE",
+        help="Which clusters get outlier_trials: 'all' (default), 'none', "
+             "or labels e.g. '1'.",
     )
     parser.add_argument(
         "--contact-clearance-m",
@@ -1939,12 +2300,51 @@ def main():
         help="Optional cap on BEV frames rendered (default: uncapped, all key times)",
     )
     parser.add_argument(
-        "--semantic-only",
-        action="store_true",
-        help="Only use semantic maneuver events from action.yaml (skip speed segments)",
+        "--conflict-window-s",
+        type=float,
+        default=8.0,
+        help="Keep BEV frames within ±W seconds of conflict peak (default: 6)",
+    )
+    parser.add_argument(
+        "--conflict-distance-m",
+        type=float,
+        default=50.0,
+        help="Also keep frames where ego–partner distance < D metres (default: 40)",
+    )
+    parser.add_argument(
+        "--conflict-burst-step-s",
+        type=float,
+        default=0.0,
+        help="If >0, densify burst sampling with this step in [-2,+1]s around peak. "
+             "Default 0 = discrete offsets only (-2,-1,-0.5,-0.2,0,+0.2,+0.5,+1).",
+    )
+    parser.add_argument(
+        "--hard-brake-accel",
+        type=float,
+        default=-2.5,
+        help="Ego accel threshold (m/s²) for hard-brake onset frame (default: -2.5)",
     )
 
     args = parser.parse_args()
+
+    # --- Map-only mode: ensure results/map/ then exit ---
+    if args.map_only:
+        from map_assets import ensure_map_assets, resolve_datasets
+
+        try:
+            datasets = resolve_datasets(
+                batch_id=args.batch_id,
+                dataset=args.dataset,
+                all_datasets=bool(args.all_maps),
+            )
+        except ValueError as exc:
+            parser.error(f"--map-only: {exc}")
+        for ds in datasets:
+            ensure_map_assets(
+                dataset=ds,
+                force=bool(args.force_map),
+            )
+        sys.exit(0)
 
     # --- Validate arg combinations ---
     is_payload_save = args.source == "payload-save"
@@ -2026,6 +2426,7 @@ def main():
     print(f"🚀 Building LLM dataset for {dataset_name} (k={n_clusters})")
     print(f"   Source: {args.source}")
     print(f"   Run ID: {run_id}")
+    print("   BEV: conflict-centered (action.yaml + W/D gates)")
 
     result_data: Optional[Dict[str, Any]] = None
     embeddings_data: Optional[Dict[str, Any]] = None
@@ -2037,10 +2438,12 @@ def main():
     # --- Step 1: Load clustering data ---
     ref_silhouette: Optional[float] = None
     if args.from_run:
-        ref_path = Path(args.from_run)
-        if not ref_path.is_absolute():
-            candidates = [RESULTS_DIR / ref_path, PROJECT_ROOT / ref_path]
-            ref_path = next((p for p in candidates if p.is_dir()), ref_path)
+        ref_path = resolve_from_run_path(
+            args.from_run,
+            k=args.k_clusters,
+        )
+        if not ref_path:
+            sys.exit(1)
         print(f"\n📂 Rebuilding from reference run: {ref_path}")
         loaded = load_from_reference_run(ref_path)
         if not loaded:
@@ -2059,15 +2462,32 @@ def main():
                 ego_name=args.ego_name,
             )
             if fetched:
-                _scores, _clist, ego_data, _sel = fetched
+                scores, _clist, ego_data, _sel = fetched
                 payload_collision_flags = _collision_flags_from_ego(ego_data)
                 trials_meta = ego_data.get("trials") or {}
                 payload_metric_stats = _cluster_metric_stats_from_ego(ego_data, result_data)
                 n_coll = sum(1 for v in payload_collision_flags.values() if v)
                 print(f"  Loaded collision KPI for {len(payload_collision_flags)} trials "
                       f"({n_coll} collided)")
+                # Enable outlier / boundary aux trials (same as fresh payload-save).
+                embeddings_data = {"embeddings": scores}
+                _DAT_PAT = re.compile(r"esmini_(\d+)_(\d+)\.dat")
+                trial_index_map = {}
+                for tid, t_info in trials_meta.items():
+                    if not isinstance(t_info, dict):
+                        continue
+                    edat = t_info.get("esminiDat")
+                    if not isinstance(edat, dict):
+                        continue
+                    fname = edat.get("filename", "")
+                    m = _DAT_PAT.match(fname)
+                    if m:
+                        trial_index_map[str(tid)] = (int(m.group(1)), int(m.group(2)))
+                print(f"  Built trial→CSV map for {len(trial_index_map)} trials "
+                      f"(enables outlier_trials / boundary_c*)")
             else:
                 print("  ⚠️  Could not fetch Payload analysis — cluster collision stats may be incomplete")
+                print("  ⚠️  Without embeddings, outlier/boundary aux trials will be skipped")
 
     elif args.trials:
         print(f"\n📝 Using manually specified trials: {args.trials}")
@@ -2135,7 +2555,7 @@ def main():
             print("❌ ERROR: No medoids computed")
             print("\n💡 TIP: The clustering result contains Payload trial IDs that don't")
             print("   exist in your local database. You can specify trials manually:")
-            print(f"   bash scripts/build_llm_dataset.sh {dataset_name} {n_clusters} --trials '1:100,1:200,1:300'")
+            print(f"   python3 app/analyzer/src/dataset_builder.py {dataset_name} {n_clusters} --trials '1:100,1:200,1:300'")
             sys.exit(1)
 
     print(f"\n📊 Found {len(medoids)} medoid clusters")
@@ -2167,11 +2587,16 @@ def main():
     #   results/batch<id>/<k>_cluster_s=<silhouette>/cluster<N>/...
     # The silhouette suffix keeps multiple results with the same k (but different
     # clustering params) in separate folders.
-    silhouette: Optional[float] = args.silhouette or ref_silhouette
-    if silhouette is None and result_data is not None:
+    # Folder name must use the SELECTED result's real silhouette, not the
+    # --silhouette search hint. Otherwise a nearest-match pick (e.g. request
+    # 0.6988 → select 0.7036) would write under the wrong folder name.
+    silhouette: Optional[float] = None
+    if result_data is not None:
         sv = (result_data.get("scores", {}) or {}).get("silhouetteScore")
         if isinstance(sv, (int, float)):
             silhouette = float(sv)
+    if silhouette is None:
+        silhouette = args.silhouette or ref_silhouette
     cluster_dirname = f"{n_clusters}_cluster"
     if silhouette is not None:
         cluster_dirname += f"_s={silhouette:.4f}"
@@ -2179,9 +2604,20 @@ def main():
     run_dir.mkdir(parents=True, exist_ok=True)
     print(f"📁 Output dir: {run_dir.relative_to(RESULTS_DIR.parent)}")
 
-    # --- Shared map assets (results/map/), generated once by
-    #     generate_map_tracks.py + map_preprocess.py. No per-run copy. ---
+    # --- Shared map assets (results/map/) — auto-generate if missing ---
     shared_map_dir = RESULTS_DIR / "map"
+    if not args.skip_map:
+        try:
+            from map_assets import ensure_map_assets
+
+            ensure_map_assets(
+                batch_id=batch_id_out if isinstance(batch_id_out, int) else args.batch_id,
+                dataset=dataset_name if dataset_name not in ("", "unknown") else None,
+                force=bool(args.force_map),
+            )
+        except Exception as exc:
+            print(f"  ⚠️  Map asset ensure failed: {exc}")
+
     try:
         from dataset_config import xodr_path_for_dataset
         xodr_src = xodr_path_for_dataset(dataset_name)
@@ -2198,7 +2634,8 @@ def main():
             xodr_src = cache_xodr
     if not xodr_src.is_file():
         print(f"❌ ERROR: Map xodr not found in {shared_map_dir}.")
-        print(f"   Run: python3 scripts/generate_map_tracks.py --dataset {dataset_name}")
+        print("   Fix: python3 app/analyzer/src/dataset_builder.py --batch-id "
+              f"{args.batch_id or '<id>'} --map-only")
         sys.exit(1)
 
     # --- Step 4: Initialize map parser (reads shared map xodr directly) ---
@@ -2298,8 +2735,24 @@ def main():
             print(f"  ⚠️  Intra-variance/boundary computation failed: {exc}")
 
     # --- Step 6: Process each medoid ---
+    medoid_scope = parse_cluster_scope(args.medoids)
+    boundary_scope = parse_cluster_scope(args.boundaries)
+    outlier_scope = parse_cluster_scope(args.outliers)
+    print(
+        f"  Build scope: medoids={args.medoids}, "
+        f"boundaries={args.boundaries}, outliers={args.outliers}"
+    )
+
     success_count = 0
-    for medoid in medoids:
+    medoids_to_run = [
+        m for m in medoids if cluster_in_scope(m["cluster_label"], medoid_scope)
+    ]
+    if medoid_scope is not None and len(medoid_scope) == 0:
+        print("  ⏭  Medoids skipped (--medoids none)")
+    elif not medoids_to_run:
+        print(f"  ⚠️  No medoids match --medoids {args.medoids}")
+
+    for medoid in medoids_to_run:
         if process_medoid(
             medoid,
             run_dir,
@@ -2309,9 +2762,7 @@ def main():
             snapshot_output_px=args.snapshot_size,
             snapshot_border_frac=args.snapshot_border_frac,
             typography=bev_typography,
-            key_frame_mode=args.key_frame_mode,
             max_snapshots=args.max_snapshots,
-            semantic_only=args.semantic_only,
             collision_flags=collision_flags,
             cluster_collision_stats=per_cluster_collision.get(medoid["cluster_label"]),
             n_clusters=n_clusters,
@@ -2321,6 +2772,10 @@ def main():
             contact_clearance_m=args.contact_clearance_m,
             conflict_relevance_m=args.conflict_relevance_m,
             intra_variance=intra_by_cluster.get(medoid["cluster_label"]),
+            conflict_window_s=args.conflict_window_s,
+            conflict_distance_m=args.conflict_distance_m,
+            conflict_burst_step_s=args.conflict_burst_step_s,
+            hard_brake_accel=args.hard_brake_accel,
         ):
             success_count += 1
 
@@ -2340,7 +2795,15 @@ def main():
                 print(f"  ⚠️  Trajectory overlay failed: {e}")
 
     # --- Step 7a: Auxiliary trials (outlier + boundary) ---
-    if trial_index_map and (intra_by_cluster or boundary_pairs_data):
+    do_aux = (
+        trial_index_map
+        and (intra_by_cluster or boundary_pairs_data)
+        and not (
+            (outlier_scope is not None and len(outlier_scope) == 0)
+            and (boundary_scope is not None and len(boundary_scope) == 0)
+        )
+    )
+    if do_aux:
         print("\n🔸 Processing auxiliary trials (outlier + boundary)…")
         try:
             process_auxiliary_trials(
@@ -2356,15 +2819,21 @@ def main():
                 snapshot_output_px=args.snapshot_size,
                 snapshot_border_frac=args.snapshot_border_frac,
                 typography=bev_typography,
-                key_frame_mode=args.key_frame_mode,
                 max_snapshots=args.max_snapshots,
-                semantic_only=args.semantic_only,
                 ego_zoom_radius=args.ego_zoom_radius,
                 contact_clearance_m=args.contact_clearance_m,
                 conflict_relevance_m=args.conflict_relevance_m,
+                conflict_window_s=args.conflict_window_s,
+                conflict_distance_m=args.conflict_distance_m,
+                conflict_burst_step_s=args.conflict_burst_step_s,
+                hard_brake_accel=args.hard_brake_accel,
+                outlier_scope=outlier_scope,
+                boundary_scope=boundary_scope,
             )
         except Exception as exc:
             print(f"  ⚠️  Auxiliary trial processing failed: {exc}")
+    elif trial_index_map and (intra_by_cluster or boundary_pairs_data):
+        print("  ⏭  Auxiliary trials skipped (--outliers none --boundaries none)")
 
     # --- Step 7b: Create manifest ---
     manifest = build_run_manifest(

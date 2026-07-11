@@ -4,6 +4,7 @@ import path from "path";
 import {
   selectDefaultSnapshots,
   snapshotTimestamp,
+  type LlmSnapshotsDoc,
 } from "@/app/_shared/utils/snapshotSelection";
 
 /**
@@ -45,21 +46,40 @@ const MODELS = [
   { id: "gpt-4-turbo", provider: "OpenAI" },
 ];
 
-// results/batch<id>/<k>_cluster_s=<sil>/ — exact match, else closest silhouette.
+// results/batch<id>/<k>_cluster_s=<sil>/ — exact match only (tiny float
+// tolerance for toFixed(4) rounding). Do NOT fall back to a different
+// silhouette: that silently shows the wrong BEV / analysis (e.g. user picks
+// s=0.6988 but the page loads 3_cluster_s=0.7036).
 function resolveFolder(batchDir: string, k: string, s: string): string | null {
   if (!fs.existsSync(batchDir)) return null;
   const exact = `${k}_cluster_s=${s}`;
   if (fs.existsSync(path.join(batchDir, exact))) return exact;
+
   const prefix = `${k}_cluster_s=`;
   const target = parseFloat(s);
-  let best: { name: string; diff: number } | null = null;
+  if (Number.isNaN(target)) return null;
   for (const entry of fs.readdirSync(batchDir, { withFileTypes: true })) {
     if (!entry.isDirectory() || !entry.name.startsWith(prefix)) continue;
     const sil = parseFloat(entry.name.slice(prefix.length));
-    const diff = Number.isNaN(sil) || Number.isNaN(target) ? 0 : Math.abs(sil - target);
-    if (best === null || diff < best.diff) best = { name: entry.name, diff };
+    // Match within half of the last displayed digit (toFixed(4)).
+    if (!Number.isNaN(sil) && Math.abs(sil - target) < 5e-5) return entry.name;
   }
-  return best?.name ?? null;
+  return null;
+}
+
+function listAvailableFolders(batchDir: string, k?: string): string[] {
+  if (!fs.existsSync(batchDir)) return [];
+  const prefix = k && /^\d+$/.test(k) ? `${k}_cluster_s=` : null;
+  return fs
+    .readdirSync(batchDir, { withFileTypes: true })
+    .filter(
+      (e) =>
+        e.isDirectory() &&
+        /^\d+_cluster_s=[-0-9.]+$/.test(e.name) &&
+        (prefix == null || e.name.startsWith(prefix)),
+    )
+    .map((e) => e.name)
+    .sort();
 }
 
 // Reject path-traversal in user-supplied path components.
@@ -134,8 +154,27 @@ export async function GET(req: NextRequest) {
 
   const folder = resolveFolder(batchDir, k, s);
   if (!folder) {
+    const promptDir = path.join(projectRoot, "app", "llm_pipeline", "prompt_templates");
+    const prompts: Record<string, string> = {};
+    for (const [key, fname] of Object.entries(PROMPT_FILES)) {
+      const p = path.join(promptDir, fname);
+      prompts[key] = fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
+    }
+    const requestedFolder = s ? `${k}_cluster_s=${s}` : `${k}_cluster`;
     return NextResponse.json(
-      { error: `no results folder for batch${batchId} k=${k} s=${s}` },
+      {
+        missing: true,
+        error: `no preprocess dataset for batch${batchId} ${requestedFolder}`,
+        batchId,
+        k,
+        s,
+        requestedFolder,
+        availableFolders: listAvailableFolders(batchDir, k),
+        prompts,
+        models: MODELS,
+        clusters: [],
+        results: [],
+      },
       { status: 404 },
     );
   }
@@ -169,11 +208,20 @@ export async function GET(req: NextRequest) {
     }
     const snapDir = path.join(clusterDir, "snapshots");
     let snapshots: string[] = [];
+    let llmSnapshots: LlmSnapshotsDoc | null = null;
     if (fs.existsSync(snapDir)) {
       snapshots = fs
         .readdirSync(snapDir)
         .filter((f) => /\.(jpg|jpeg|png)$/i.test(f))
         .sort((a, b) => snapshotTimestamp(a) - snapshotTimestamp(b));
+      const llmPath = path.join(snapDir, "llm_snapshots.json");
+      if (fs.existsSync(llmPath)) {
+        try {
+          llmSnapshots = JSON.parse(fs.readFileSync(llmPath, "utf-8")) as LlmSnapshotsDoc;
+        } catch {
+          llmSnapshots = null;
+        }
+      }
     }
     clusters.push({
       cluster: parseInt(m[1], 10),
@@ -185,6 +233,8 @@ export async function GET(req: NextRequest) {
         snapshots,
         10,
         medoid as Record<string, unknown> | null,
+        2,
+        llmSnapshots,
       ),
     });
   }
