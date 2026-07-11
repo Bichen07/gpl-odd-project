@@ -28,16 +28,23 @@ type Props = {
 };
 export default function Dock({ batchId, saves, trials, batch }: Props) {
   const dockLayoutRef = useRef<DockLayout>(null);
+  // rc-dock mutates layout styles on the client; mount after hydration to avoid
+  // SSR/client style mismatches and React 19 element.ref warnings during SSR.
+  const [mounted, setMounted] = useState(false);
 
   const [dockLayoutRefState, setDockLayoutRefState] =
     useState<DockLayout | null>(null);
 
   useEffect(() => {
-    if (!dockLayoutRef.current) {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !dockLayoutRef.current) {
       return;
     }
     setDockLayoutRefState(dockLayoutRef.current);
-  }, [dockLayoutRef.current]);
+  }, [mounted]);
 
   useEffect(() => {
     if (dockLayoutRef.current == null) {
@@ -52,7 +59,7 @@ export default function Dock({ batchId, saves, trials, batch }: Props) {
       content: <Saves batchId={batchId} saves={saves} />,
     };
     dockLayoutRef.current?.dockMove(newTab, "1-misc-top", "middle");
-  }, [dockLayoutRefState]);
+  }, [dockLayoutRefState, batchId, saves]);
 
   return (
     <Box
@@ -71,18 +78,20 @@ export default function Dock({ batchId, saves, trials, batch }: Props) {
       <Provider store={store}>
         <DockLayoutContext.Provider value={dockLayoutRefState}>
           <DataLoader trials={trials} batch={batch} />
-          <DockLayout
-            ref={dockLayoutRef}
-            defaultLayout={layout}
-            style={{
-              position: "absolute",
-              left: 0,
-              top: 0,
-              right: 0,
-              bottom: 0,
-              fontFamily: "var(--font-roboto)",
-            }}
-          />
+          {mounted ? (
+            <DockLayout
+              ref={dockLayoutRef}
+              defaultLayout={layout}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0,
+                fontFamily: "var(--font-roboto)",
+              }}
+            />
+          ) : null}
         </DockLayoutContext.Provider>
         {/* <InteractionCount batchId={batchId} /> */}
       </Provider>

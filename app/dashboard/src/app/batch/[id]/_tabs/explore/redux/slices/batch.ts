@@ -108,7 +108,11 @@ export interface ClusterInterpretationSummary {
   ego_perspective_summary?: unknown;
 }
 
-export type ClusterHighlightRole = "medoid" | "boundary" | "outlier";
+export type ClusterHighlightRole =
+  | "medoid"
+  | "boundary"
+  | "param_boundary"
+  | "outlier";
 
 export interface ClusterBoundaryPair {
   cluster_a: number | string;
@@ -116,6 +120,15 @@ export interface ClusterBoundaryPair {
   cluster_b: number | string;
   trial_b: string;
   embedding_dist?: number;
+}
+
+export interface ClusterParamBoundaryPair {
+  cluster_a: number | string;
+  trial_a: string;
+  cluster_b: number | string;
+  trial_b: string;
+  param_dist?: number;
+  param_names?: string[];
 }
 
 export interface ClusterAnalysisContext {
@@ -126,9 +139,12 @@ export interface ClusterAnalysisContext {
   medoids: Record<string, string>;
   /** Primary (materialized) outlier trial_id per cluster label */
   outliers: Record<string, string>;
-  /** Per-cluster closest-pair (boundary) trial IDs */
+  /** Per-cluster closest-pair (embedding) trial IDs */
   boundaryTrials: Record<string, string[]>;
   boundaryPairs: ClusterBoundaryPair[];
+  /** Per-cluster parameter-space (IC) closest-pair trial IDs */
+  paramBoundaryTrials: Record<string, string[]>;
+  paramBoundaryPairs: ClusterParamBoundaryPair[];
   /** Saved HDBSCAN task params for exact config matching */
   task: {
     method?: string;
@@ -147,6 +163,8 @@ export interface BatchState {
   trials: { [ego: string]: Trial[] };
   selectedTrialId: string | null;
   selectedTrialIds: { by: string; value: string[] };
+  /** Plot marker roles from Highlight trials picks (trialId → roles). */
+  highlightRolesByTrialId: Record<string, ClusterHighlightRole[]>;
   hoveredTrialId: string | null;
   freeformTrialIds: string[];
   metrics: { [kpiName: string]: CriticalityMetric } | null;
@@ -216,6 +234,7 @@ const initialState: BatchState = {
 
   selectedTrialId: null,
   selectedTrialIds: { by: "", value: [] },
+  highlightRolesByTrialId: {},
   freeformTrialIds: [],
   hoveredTrialId: null,
   metrics: null,
@@ -804,7 +823,94 @@ export const batchSlice = createSlice({
       state: BatchState,
       action: PayloadAction<typeof state.selectedTrialIds>
     ) => {
-      state.selectedTrialIds = action.payload;
+      const prev = state.selectedTrialIds;
+      const next = action.payload;
+
+      const sameIdSet = (a: string[], b: string[]) => {
+        if (a.length !== b.length) return false;
+        const setB = new Set(b.map(String));
+        return a.every((id) => setB.has(String(id)));
+      };
+
+      if (next.by === "highlight") {
+        if (
+          prev.by === "highlight" &&
+          sameIdSet(prev.value, next.value.map(String))
+        ) {
+          return;
+        }
+        state.selectedTrialIds = {
+          by: "highlight",
+          value: next.value.map(String),
+        };
+        return;
+      }
+
+      const roleIds = Object.keys(state.highlightRolesByTrialId);
+
+      // Scatterplot.draw() fires deselect/select echoes. During Highlight-trial
+      // mode keep the full role set and avoid Redux updates that re-trigger
+      // draw → select → dispatch loops.
+      if (roleIds.length > 0) {
+        if (next.value.length === 0) {
+          return;
+        }
+        const nextSet = new Set(next.value.map(String));
+        const echoIsSubsetOfRoles = [...nextSet].every((id) =>
+          roleIds.includes(id),
+        );
+        if (
+          echoIsSubsetOfRoles &&
+          (prev.by === "highlight" || prev.value.length === 0)
+        ) {
+          if (prev.by === "highlight" && sameIdSet(prev.value, roleIds)) {
+            return;
+          }
+          state.selectedTrialIds = {
+            by: "highlight",
+            value: roleIds,
+          };
+          return;
+        }
+        state.selectedTrialIds = {
+          by: next.by,
+          value: next.value.map(String),
+        };
+        state.highlightRolesByTrialId = {};
+        return;
+      }
+
+      if (
+        prev.by === next.by &&
+        sameIdSet(prev.value, next.value.map(String))
+      ) {
+        return;
+      }
+
+      state.selectedTrialIds = {
+        by: next.by,
+        value: next.value.map(String),
+      };
+    },
+    setHighlightRolesByTrialId: (
+      state: BatchState,
+      action: PayloadAction<Record<string, ClusterHighlightRole[]>>,
+    ) => {
+      const next = action.payload;
+      const prev = state.highlightRolesByTrialId;
+      const prevKeys = Object.keys(prev);
+      const nextKeys = Object.keys(next);
+      if (prevKeys.length === nextKeys.length) {
+        const same = nextKeys.every((tid) => {
+          const a = prev[tid] ?? [];
+          const b = next[tid] ?? [];
+          return (
+            a.length === b.length && a.every((role, i) => role === b[i])
+          );
+        });
+        if (same) return;
+      }
+      state.highlightRolesByTrialId = next;
     },
     setHoveredTrialId: (
       state: BatchState,

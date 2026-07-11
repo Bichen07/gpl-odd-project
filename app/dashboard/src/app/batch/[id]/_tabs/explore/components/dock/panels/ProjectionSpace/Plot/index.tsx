@@ -39,7 +39,6 @@ import createScatterplot from "regl-scatterplot";
 import { noiseColor } from "@/app/_shared/utils";
 import {
   CLUSTER_HIGHLIGHT_STYLE,
-  primaryRoleForTrial,
 } from "@/app/_shared/utils/clusterHighlightRoles";
 import { Settings } from "@mui/icons-material";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
@@ -160,6 +159,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   const selectedTrialIds = useAppSelector(
     (state) => state.batch.selectedTrialIds
   );
+  const highlightRolesByTrialId = useAppSelector(
+    (state) => state.batch.highlightRolesByTrialId,
+  );
   const clusterAnalysis = useAppSelector(
     (state) => state.batch.clusterAnalysisByEgo?.[egoName] ?? null,
   );
@@ -193,17 +195,23 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     const selected = new Set(selectedTrialIds.value.map(String));
     const markers: Array<{
       index: number;
-      role: "medoid" | "boundary" | "outlier";
+      role: "medoid" | "boundary" | "param_boundary" | "outlier";
     }> = [];
-    if (!clusterAnalysis || selected.size === 0) return markers;
+    if (selected.size === 0) return markers;
+
+    // Only use roles from Highlight trials picks — never infer from cluster
+    // membership (outlier trials are often also closest-pair endpoints).
     for (let i = 0; i < order.length; i++) {
       const tid = String(order[i]);
       if (!selected.has(tid)) continue;
-      const role = primaryRoleForTrial(clusterAnalysis, tid);
-      if (role) markers.push({ index: i, role });
+      const roles = highlightRolesByTrialId[tid];
+      if (roles == null) continue;
+      for (const role of roles) {
+        markers.push({ index: i, role });
+      }
     }
     return markers;
-  }, [clusterAnalysis, points, egoName, selectedTrialIds]);
+  }, [points, egoName, selectedTrialIds, highlightRolesByTrialId]);
   const [mfpcaScores, setMfpcaScores] = useState<[string, number[]][]>([]);
 
   const [isReady, setIsReady] = useState(false);
@@ -664,10 +672,10 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         scatterplot.draw(newPoints, {
           spatialIndex,
           filter: filteredIndices,
-          // Medoids are marked with their own SVG circle overlay, so they must
-          // NOT be part of the scatterplot's selection state — otherwise a
-          // ctrl+click (merge) would drag the medoids into the user's selection.
-          select: selectedIndices,
+          // Highlight trials use SVG overlays. Feeding them into regl-scatterplot
+          // select causes deselect/select echoes that fight Redux and can loop.
+          select:
+            selectedTrialIds.by === "highlight" ? [] : selectedIndices,
         });
       },
       100
@@ -943,6 +951,21 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
                     <polygon
                       key={`hl-${role}-${pointIdx}`}
                       points={`${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`}
+                      fill="none"
+                      stroke={style.color}
+                      strokeWidth={2.5}
+                    />
+                  );
+                }
+                if (role === "param_boundary") {
+                  const s = 8;
+                  return (
+                    <rect
+                      key={`hl-${role}-${pointIdx}`}
+                      x={cx - s}
+                      y={cy - s}
+                      width={s * 2}
+                      height={s * 2}
                       fill="none"
                       stroke={style.color}
                       strokeWidth={2.5}

@@ -49,6 +49,15 @@ type BoundaryPair = {
   embedding_dist?: number;
 };
 
+type ParamBoundaryPair = {
+  cluster_a: number | string;
+  trial_a: string;
+  cluster_b: number | string;
+  trial_b: string;
+  param_dist?: number;
+  param_names?: string[];
+};
+
 type FolderStatus = {
   has_analysis: boolean;
   has_preprocess: boolean;
@@ -57,6 +66,8 @@ type FolderStatus = {
   outliers: Record<string, string>;
   boundary_trials: Record<string, string[]>;
   boundary_pairs: BoundaryPair[];
+  param_boundary_trials: Record<string, string[]>;
+  param_boundary_pairs: ParamBoundaryPair[];
   /** HDBSCAN task from clustering/selectedClusteringResult.json */
   task: Record<string, unknown> | null;
   interpretations: Record<
@@ -80,6 +91,7 @@ function checkPreprocessComplete(
   runDir: string,
   clusterNames: string[],
   boundaryPairs: BoundaryPair[],
+  paramBoundaryPairs: ParamBoundaryPair[],
 ): boolean {
   if (clusterNames.length === 0) return false;
 
@@ -111,6 +123,22 @@ function checkPreprocessComplete(
       return false;
     }
     if (!hasTrialSubdirs(path.join(runDir, `cluster${b}`, `boundary_c${a}`))) {
+      return false;
+    }
+  }
+
+  // IC (parameter-space) pairs are optional unless declared in the manifest.
+  for (const bp of paramBoundaryPairs) {
+    const a = String(bp.cluster_a);
+    const b = String(bp.cluster_b);
+    if (
+      !hasTrialSubdirs(path.join(runDir, `cluster${a}`, `param_boundary_c${b}`))
+    ) {
+      return false;
+    }
+    if (
+      !hasTrialSubdirs(path.join(runDir, `cluster${b}`, `param_boundary_c${a}`))
+    ) {
       return false;
     }
   }
@@ -158,8 +186,23 @@ export async function GET(req: NextRequest) {
         typeof bp.embedding_dist === "number" ? bp.embedding_dist : undefined,
     }));
 
+    const paramBoundaryPairs = (
+      (manifest?.param_boundary_pairs ?? []) as ParamBoundaryPair[]
+    ).map((bp) => ({
+      cluster_a: bp.cluster_a,
+      trial_a: String(bp.trial_a),
+      cluster_b: bp.cluster_b,
+      trial_b: String(bp.trial_b),
+      param_dist:
+        typeof bp.param_dist === "number" ? bp.param_dist : undefined,
+      param_names: Array.isArray(bp.param_names)
+        ? bp.param_names.map(String)
+        : undefined,
+    }));
+
     const outliers: Record<string, string> = {};
     const boundaryTrials: Record<string, string[]> = {};
+    const paramBoundaryTrials: Record<string, string[]> = {};
     const interpretations: FolderStatus["interpretations"] = {};
     let hasAnalysis = false;
 
@@ -213,6 +256,23 @@ export async function GET(req: NextRequest) {
         boundaryTrials[label] = uniq;
       }
 
+      const paramNeighborMap = (intra.param_boundary_neighbors ?? {}) as Record<
+        string,
+        string
+      >;
+      const fromParamNeighbors = Object.values(paramNeighborMap)
+        .map((id) => String(id))
+        .filter(Boolean);
+      const fromParamPairs: string[] = [];
+      for (const bp of paramBoundaryPairs) {
+        if (String(bp.cluster_a) === label) fromParamPairs.push(String(bp.trial_a));
+        if (String(bp.cluster_b) === label) fromParamPairs.push(String(bp.trial_b));
+      }
+      const paramUniq = [...new Set([...fromParamNeighbors, ...fromParamPairs])];
+      if (paramUniq.length > 0) {
+        paramBoundaryTrials[label] = paramUniq;
+      }
+
       const metaPath = path.join(clusterDir, "interpretation_meta.json");
       const yamlPath = path.join(clusterDir, "cluster_interpretation.yaml");
       const meta = readJsonSafe(metaPath);
@@ -229,6 +289,7 @@ export async function GET(req: NextRequest) {
       runDir,
       clusterNames,
       boundaryPairs,
+      paramBoundaryPairs,
     );
 
     folders[entry.name] = {
@@ -238,6 +299,8 @@ export async function GET(req: NextRequest) {
       outliers,
       boundary_trials: boundaryTrials,
       boundary_pairs: boundaryPairs,
+      param_boundary_trials: paramBoundaryTrials,
+      param_boundary_pairs: paramBoundaryPairs,
       task: savedTask,
       interpretations,
     };

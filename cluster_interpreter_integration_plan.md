@@ -479,18 +479,28 @@ results/
 │   └── hct_6_no_930.yaml     hct_6_no_930.jpg    hct_6_no_930_description.txt
 └── batch<id>/                              # e.g. batch1/, batch2/
     └── <k>_cluster_s=<silhouette>/         # e.g. batch1/4_cluster_s=0.7341/
-        ├── manifest.json                   # run-level: dataset, batch_id, k, medoid list
+        ├── manifest.json                   # run-level: medoids + boundary_pairs + param_boundary_pairs
         ├── clustering/
         │   └── selectedClusteringResult.json   # the exact ClusteringResult that was used
         └── cluster<N>/                     # one folder per cluster (its medoid trial)
             ├── context.md                  # consolidated LLM card: header + description + action table + snapshot index
-            ├── cluster.json                # merged cluster + medoid + scene metadata (replaces meta/medoid/stats)
+            ├── cluster.json                # merged cluster + medoid + scene + intra_variance neighbors
             ├── action.yaml                 # structured semantic events (Labeller output)
             ├── description.txt             # natural-language scenario summary (from action.yaml)
             ├── trajectory.csv              # raw per-frame state of the medoid trial (BEV + reproducibility only)
             ├── map_overview.jpg            # full-map render with the medoid trajectory
-            └── snapshots/*.jpg             # BEV key-frame images (named by time + event)
+            ├── snapshots/*.jpg             # BEV key-frame images (named by time + event)
+            ├── outlier_trials/trial_<idx>/ # top embedding-space outlier (optional)
+            ├── boundary_c<M>/trial_<idx>/  # closest cross-cluster pair in MFPCA embedding space
+            └── param_boundary_c<M>/trial_<idx>/  # closest cross-cluster pair in Parameter Space (ICs)
 ```
+
+> **2026-07:** Embedding closest pairs (`boundary_c*`, `manifest.boundary_pairs`) and
+> Parameter-Space / initial-condition closest pairs (`param_boundary_c*`,
+> `manifest.param_boundary_pairs`) are **separate**. IC distance is L2 on z-scored
+> trial parameters (e.g. `OncomingSpeed`, `OncomingStartDelay`). CLI:
+> `--emb-boundaries` / `--param-boundaries` (scopes: `all` / `none` / label list).
+> Dashboard Highlight trials exposes both as **Closest pair (emb)** and **Closest pair (IC)**.
 
 > **2026-06 consolidation applied.** `observations.json`, `meta.yaml`, `medoid.json`, and
 > `stats.json` are **no longer written**. `cluster.json` carries the merged metadata and
@@ -1001,8 +1011,32 @@ If the path is missing or incomplete, the builder searches sibling
 If no k=N run exists (e.g. there is no `2_cluster*` under batch2), it lists the
 available complete runs and exits.
 
-`--from-run` with `--batch-id` also reloads Payload embeddings so
-`outlier_trials/` and `boundary_c*/` are regenerated when requested.
+`--from-run` with `--batch-id` also reloads Payload embeddings / trial parameters so
+`outlier_trials/`, `boundary_c*/` (embedding), and `param_boundary_c*/` (IC) can be
+regenerated when requested:
+
+```bash
+# Embedding closest pairs only
+python3 app/analyzer/src/dataset_builder.py \
+  --batch-id 2 --from-run results/batch2/3_cluster_s=0.7036 \
+  --medoids none --outliers none --emb-boundaries all --param-boundaries none
+
+# Parameter-Space (IC) closest pairs only
+python3 app/analyzer/src/dataset_builder.py \
+  --batch-id 2 --from-run results/batch2/3_cluster_s=0.7036 \
+  --medoids none --outliers none --emb-boundaries none --param-boundaries all
+```
+
+| Flag | Default | Materializes |
+|------|---------|--------------|
+| `--emb-boundaries` (`--boundaries`) | `all` | `clusterN/boundary_cM/` + `manifest.boundary_pairs` |
+| `--param-boundaries` | `none` | `clusterN/param_boundary_cM/` + `manifest.param_boundary_pairs` |
+| `--outliers` | `all` | `clusterN/outlier_trials/` |
+| `--medoids` | `all` | medoid pack under `clusterN/` |
+
+Dashboard Explore → **Highlight trials** multi-selects Medoid / Closest pair (emb) /
+Closest pair (IC) / Outlier via `/api/cluster-analysis-status` (roles drawn on
+ParameterSpace + ProjectionSpace).
 
 ### Outputs per cluster
 
@@ -1049,7 +1083,7 @@ dataset_builder.py  (--source payload-save | --from-run)
         ├─ Tier2BevRenderer → snapshots/*.jpg + llm_snapshots.json + map_overview.jpg
         ├─ description.py → description.txt (Snapshot evidence + prose)
         ├─ write_context_md → context.md
-        └─ (optional) outlier_trials/ + boundary_c*/  [needs embeddings]
+        └─ (optional) outlier_trials/ + boundary_c*/ + param_boundary_c*/  [needs Payload trials]
         │
         ▼
 run_cluster_interpretation.sh / cluster_interpretation_pipeline
@@ -1085,7 +1119,14 @@ The new canonical workflow skips `alldatasets/` export entirely.
 4. Run `python3 app/analyzer/src/dataset_builder.py --batch-id <n> --k <k>`
   (`--dataset` optional — resolved from batch id) and verify
    `results/batch<n>/<k>_cluster_s=<silhouette>/cluster*/` folders are complete
-5. Run `run_cluster_interpretation.sh` and review YAML outputs
+5. Optionally build IC closest pairs:
+   `--from-run … --medoids none --emb-boundaries none --param-boundaries all`
+6. In Dashboard Explore → Highlight trials, verify emb + IC closest-pair chips
+7. Run `run_cluster_interpretation.sh` and review YAML outputs
+
+**Verified (2026-07):** batch2 `3_cluster_s=0.7036` — IC pairs over
+`OncomingSpeed` / `OncomingStartDelay` written to `param_boundary_c*` +
+`manifest.param_boundary_pairs`.
 
 **Legacy alldatasets path** (`--source alldatasets --dataset dataset1 --n-clusters 4`) remains in code but
 has no local input data after the `alldatasets/` removal.

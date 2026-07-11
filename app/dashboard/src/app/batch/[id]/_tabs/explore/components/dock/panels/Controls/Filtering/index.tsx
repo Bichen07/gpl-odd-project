@@ -171,6 +171,7 @@ export default function Filtering() {
       batchSlice.actions.setFilteredTrialIds(Object.keys(trials)),
     );
     dispatch(batchSlice.actions.setFreeformTrialIds([]));
+    dispatch(batchSlice.actions.setHighlightRolesByTrialId({}));
     dispatch(batchSlice.actions.setSelectedTrialIds({ by: "", value: [] }));
     dispatch(batchSlice.actions.setSelectedTrialId(null));
     resetClusterChecked();
@@ -544,7 +545,11 @@ export default function Filtering() {
               >
                 {Object.keys(clusterInfo[egoName] ?? {}).map((clusterLabel) => {
                   return (
-                    <Stack direction="row" alignItems="center">
+                    <Stack
+                      key={`${egoName}-${clusterLabel}`}
+                      direction="row"
+                      alignItems="center"
+                    >
                       <Checkbox
                         sx={{ p: 0.5 }}
                         checked={

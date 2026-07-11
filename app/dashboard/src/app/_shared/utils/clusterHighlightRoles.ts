@@ -7,10 +7,19 @@ import { boundaryPairKey } from "@/app/_shared/utils/clusterAnalysisMatch";
 /** Visual legend for cluster highlight roles (Parameter / Projection space). */
 export const CLUSTER_HIGHLIGHT_STYLE: Record<
   ClusterHighlightRole,
-  { label: string; color: string; shape: "circle" | "diamond" | "triangle" }
+  {
+    label: string;
+    color: string;
+    shape: "circle" | "diamond" | "square" | "triangle";
+  }
 > = {
   medoid: { label: "Medoid", color: "#FFD54F", shape: "circle" },
-  boundary: { label: "Closest pair", color: "#4DD0E1", shape: "diamond" },
+  boundary: { label: "Closest pair (emb)", color: "#4DD0E1", shape: "diamond" },
+  param_boundary: {
+    label: "Closest pair (IC)",
+    color: "#81C784",
+    shape: "square",
+  },
   outlier: { label: "Outlier", color: "#FF7043", shape: "triangle" },
 };
 
@@ -24,6 +33,13 @@ export function trialsForRole(
   }
   if (role === "outlier") {
     return [...new Set(Object.values(ctx.outliers ?? {}))];
+  }
+  if (role === "param_boundary") {
+    const ids: string[] = [];
+    for (const bp of ctx.paramBoundaryPairs ?? []) {
+      ids.push(String(bp.trial_a), String(bp.trial_b));
+    }
+    return [...new Set(ids)];
   }
   // One entry per unordered cluster pair (not unique trial count).
   const ids: string[] = [];
@@ -40,6 +56,7 @@ export function roleCount(
   if (!ctx) return 0;
   if (role === "medoid") return Object.keys(ctx.medoids ?? {}).length;
   if (role === "outlier") return Object.keys(ctx.outliers ?? {}).length;
+  if (role === "param_boundary") return (ctx.paramBoundaryPairs ?? []).length;
   return (ctx.boundaryPairs ?? []).length;
 }
 
@@ -50,44 +67,85 @@ export function primaryRoleForTrial(
   if (!ctx) return null;
   const id = String(trialId);
   if (Object.values(ctx.medoids ?? {}).includes(id)) return "medoid";
-  const boundary = new Set<string>();
+  const embBoundary = new Set<string>();
   for (const bp of ctx.boundaryPairs ?? []) {
-    boundary.add(String(bp.trial_a));
-    boundary.add(String(bp.trial_b));
+    embBoundary.add(String(bp.trial_a));
+    embBoundary.add(String(bp.trial_b));
   }
   for (const ids of Object.values(ctx.boundaryTrials ?? {})) {
-    for (const t of ids) boundary.add(String(t));
+    for (const t of ids) embBoundary.add(String(t));
   }
-  if (boundary.has(id)) return "boundary";
+  if (embBoundary.has(id)) return "boundary";
+  const paramBoundary = new Set<string>();
+  for (const bp of ctx.paramBoundaryPairs ?? []) {
+    paramBoundary.add(String(bp.trial_a));
+    paramBoundary.add(String(bp.trial_b));
+  }
+  for (const ids of Object.values(ctx.paramBoundaryTrials ?? {})) {
+    for (const t of ids) paramBoundary.add(String(t));
+  }
+  if (paramBoundary.has(id)) return "param_boundary";
   if (Object.values(ctx.outliers ?? {}).includes(id)) return "outlier";
   return null;
+}
+
+/** Roles keyed by trial from the user's highlight picks (not cluster membership). */
+export function rolesFromHighlightSelection(
+  ctx: ClusterAnalysisContext | null | undefined,
+  selectedMedoidLabels: Set<string>,
+  selectedPairKeys: Set<string>,
+  selectedParamPairKeys: Set<string>,
+  selectedOutlierLabels: Set<string>,
+): Record<string, ClusterHighlightRole[]> {
+  if (!ctx) return {};
+  const map: Record<string, ClusterHighlightRole[]> = {};
+  const add = (trialId: string, role: ClusterHighlightRole) => {
+    const id = String(trialId);
+    if (!map[id]) map[id] = [];
+    if (!map[id].includes(role)) map[id].push(role);
+  };
+
+  for (const label of selectedMedoidLabels) {
+    const tid = ctx.medoids?.[label];
+    if (tid) add(tid, "medoid");
+  }
+
+  for (const bp of ctx.boundaryPairs ?? []) {
+    const key = boundaryPairKey(bp.cluster_a, bp.cluster_b);
+    if (!selectedPairKeys.has(key)) continue;
+    add(String(bp.trial_a), "boundary");
+    add(String(bp.trial_b), "boundary");
+  }
+
+  for (const bp of ctx.paramBoundaryPairs ?? []) {
+    const key = boundaryPairKey(bp.cluster_a, bp.cluster_b);
+    if (!selectedParamPairKeys.has(key)) continue;
+    add(String(bp.trial_a), "param_boundary");
+    add(String(bp.trial_b), "param_boundary");
+  }
+
+  for (const label of selectedOutlierLabels) {
+    const tid = ctx.outliers?.[label];
+    if (tid) add(tid, "outlier");
+  }
+
+  return map;
 }
 
 export function trialsFromHighlightSelection(
   ctx: ClusterAnalysisContext | null | undefined,
   selectedMedoidLabels: Set<string>,
   selectedPairKeys: Set<string>,
+  selectedParamPairKeys: Set<string>,
   selectedOutlierLabels: Set<string>,
 ): string[] {
-  if (!ctx) return [];
-  const ids = new Set<string>();
-
-  for (const label of selectedMedoidLabels) {
-    const tid = ctx.medoids?.[label];
-    if (tid) ids.add(String(tid));
-  }
-
-  for (const bp of ctx.boundaryPairs ?? []) {
-    const key = boundaryPairKey(bp.cluster_a, bp.cluster_b);
-    if (!selectedPairKeys.has(key)) continue;
-    ids.add(String(bp.trial_a));
-    ids.add(String(bp.trial_b));
-  }
-
-  for (const label of selectedOutlierLabels) {
-    const tid = ctx.outliers?.[label];
-    if (tid) ids.add(String(tid));
-  }
-
-  return [...ids];
+  return Object.keys(
+    rolesFromHighlightSelection(
+      ctx,
+      selectedMedoidLabels,
+      selectedPairKeys,
+      selectedParamPairKeys,
+      selectedOutlierLabels,
+    ),
+  );
 }

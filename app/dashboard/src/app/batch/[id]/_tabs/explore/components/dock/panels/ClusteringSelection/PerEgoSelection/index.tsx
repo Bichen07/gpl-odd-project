@@ -38,9 +38,8 @@ import {
 import {
   CLUSTER_HIGHLIGHT_STYLE,
   roleCount,
-  trialsFromHighlightSelection,
+  rolesFromHighlightSelection,
 } from "@/app/_shared/utils/clusterHighlightRoles";
-import type { ClusterHighlightRole } from "../../../../../redux/slices/batch";
 import type { ClusteringTask } from "@/app/_shared/graphql/queries/clustering";
 
 const SORT_LABELS: Record<string, string> = {
@@ -72,6 +71,15 @@ interface AnalysisStatusEntry {
     cluster_b: number | string;
     trial_b: string;
     embedding_dist?: number;
+  }>;
+  param_boundary_trials: Record<string, string[]>;
+  param_boundary_pairs: Array<{
+    cluster_a: number | string;
+    trial_a: string;
+    cluster_b: number | string;
+    trial_b: string;
+    param_dist?: number;
+    param_names?: string[];
   }>;
   task: ClusteringTask | null;
   interpretations: Record<
@@ -244,6 +252,8 @@ export default function PerEgoSelection({
         outliers: st.outliers ?? {},
         boundaryTrials: st.boundary_trials ?? {},
         boundaryPairs: st.boundary_pairs ?? [],
+        paramBoundaryTrials: st.param_boundary_trials ?? {},
+        paramBoundaryPairs: st.param_boundary_pairs ?? [],
         task: st.task ?? null,
         interpretations: st.interpretations ?? {},
       };
@@ -303,6 +313,9 @@ export default function PerEgoSelection({
   const [selectedPairKeys, setSelectedPairKeys] = useState<Set<string>>(
     new Set(),
   );
+  const [selectedParamPairKeys, setSelectedParamPairKeys] = useState<
+    Set<string>
+  >(new Set());
   const [selectedOutlierLabels, setSelectedOutlierLabels] = useState<
     Set<string>
   >(new Set());
@@ -311,15 +324,21 @@ export default function PerEgoSelection({
     (
       medoidLabels: Set<string>,
       pairKeys: Set<string>,
+      paramPairKeys: Set<string>,
       outlierLabels: Set<string>,
       recordKey: string,
     ) => {
-      const next = trialsFromHighlightSelection(
+      const roleMap = rolesFromHighlightSelection(
         currentAnalysis,
         medoidLabels,
         pairKeys,
+        paramPairKeys,
         outlierLabels,
       );
+      const next = Object.keys(roleMap);
+      // Roles first so a scatterplot select-echo cannot briefly fall back to
+      // closest-pair markers for dual-role outlier trials.
+      dispatch(batchSlice.actions.setHighlightRolesByTrialId(roleMap));
       dispatch(batchSlice.actions.setSelectedTrialId(next[0] ?? null));
       dispatch(
         batchSlice.actions.setSelectedTrialIds({
@@ -336,8 +355,10 @@ export default function PerEgoSelection({
   useEffect(() => {
     setSelectedMedoidLabels(new Set());
     setSelectedPairKeys(new Set());
+    setSelectedParamPairKeys(new Set());
     setSelectedOutlierLabels(new Set());
-  }, [currentAnalysis?.folder]);
+    dispatch(batchSlice.actions.setHighlightRolesByTrialId({}));
+  }, [currentAnalysis?.folder, dispatch]);
 
   const toggleMedoidLabel = useCallback(
     (label: string) => {
@@ -348,6 +369,7 @@ export default function PerEgoSelection({
       syncHighlightSelection(
         next,
         selectedPairKeys,
+        selectedParamPairKeys,
         selectedOutlierLabels,
         "clustering_result_list.select_medoid",
       );
@@ -356,6 +378,7 @@ export default function PerEgoSelection({
       selectedMedoidLabels,
       selectedOutlierLabels,
       selectedPairKeys,
+      selectedParamPairKeys,
       syncHighlightSelection,
     ],
   );
@@ -369,6 +392,7 @@ export default function PerEgoSelection({
     syncHighlightSelection(
       next,
       selectedPairKeys,
+      selectedParamPairKeys,
       selectedOutlierLabels,
       "clustering_result_list.select_all_medoids",
     );
@@ -377,6 +401,7 @@ export default function PerEgoSelection({
     selectedMedoidLabels.size,
     selectedOutlierLabels,
     selectedPairKeys,
+    selectedParamPairKeys,
     syncHighlightSelection,
   ]);
 
@@ -389,6 +414,7 @@ export default function PerEgoSelection({
       syncHighlightSelection(
         selectedMedoidLabels,
         next,
+        selectedParamPairKeys,
         selectedOutlierLabels,
         "clustering_result_list.toggle_boundary_pair",
       );
@@ -397,6 +423,7 @@ export default function PerEgoSelection({
       selectedMedoidLabels,
       selectedOutlierLabels,
       selectedPairKeys,
+      selectedParamPairKeys,
       syncHighlightSelection,
     ],
   );
@@ -413,6 +440,7 @@ export default function PerEgoSelection({
     syncHighlightSelection(
       selectedMedoidLabels,
       next,
+      selectedParamPairKeys,
       selectedOutlierLabels,
       "clustering_result_list.select_all_boundary_pairs",
     );
@@ -421,6 +449,56 @@ export default function PerEgoSelection({
     selectedMedoidLabels,
     selectedOutlierLabels,
     selectedPairKeys.size,
+    selectedParamPairKeys,
+    syncHighlightSelection,
+  ]);
+
+  const toggleParamPairKey = useCallback(
+    (key: string) => {
+      const next = new Set(selectedParamPairKeys);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      setSelectedParamPairKeys(next);
+      syncHighlightSelection(
+        selectedMedoidLabels,
+        selectedPairKeys,
+        next,
+        selectedOutlierLabels,
+        "clustering_result_list.toggle_param_boundary_pair",
+      );
+    },
+    [
+      selectedMedoidLabels,
+      selectedOutlierLabels,
+      selectedPairKeys,
+      selectedParamPairKeys,
+      syncHighlightSelection,
+    ],
+  );
+
+  const selectAllParamPairs = useCallback(() => {
+    if (!currentAnalysis?.paramBoundaryPairs?.length) return;
+    const all = new Set(
+      currentAnalysis.paramBoundaryPairs.map((bp) =>
+        boundaryPairKey(bp.cluster_a, bp.cluster_b),
+      ),
+    );
+    const next =
+      selectedParamPairKeys.size === all.size ? new Set<string>() : all;
+    setSelectedParamPairKeys(next);
+    syncHighlightSelection(
+      selectedMedoidLabels,
+      selectedPairKeys,
+      next,
+      selectedOutlierLabels,
+      "clustering_result_list.select_all_param_boundary_pairs",
+    );
+  }, [
+    currentAnalysis,
+    selectedMedoidLabels,
+    selectedOutlierLabels,
+    selectedPairKeys,
+    selectedParamPairKeys.size,
     syncHighlightSelection,
   ]);
 
@@ -433,6 +511,7 @@ export default function PerEgoSelection({
       syncHighlightSelection(
         selectedMedoidLabels,
         selectedPairKeys,
+        selectedParamPairKeys,
         next,
         "clustering_result_list.toggle_outlier",
       );
@@ -441,6 +520,7 @@ export default function PerEgoSelection({
       selectedMedoidLabels,
       selectedOutlierLabels,
       selectedPairKeys,
+      selectedParamPairKeys,
       syncHighlightSelection,
     ],
   );
@@ -454,6 +534,7 @@ export default function PerEgoSelection({
     syncHighlightSelection(
       selectedMedoidLabels,
       selectedPairKeys,
+      selectedParamPairKeys,
       next,
       "clustering_result_list.select_all_outliers",
     );
@@ -462,6 +543,7 @@ export default function PerEgoSelection({
     selectedMedoidLabels,
     selectedOutlierLabels.size,
     selectedPairKeys,
+    selectedParamPairKeys,
     syncHighlightSelection,
   ]);
 
@@ -469,7 +551,8 @@ export default function PerEgoSelection({
     currentAnalysis &&
       (Object.keys(currentAnalysis.medoids).length > 0 ||
         Object.keys(currentAnalysis.outliers).length > 0 ||
-        (currentAnalysis.boundaryPairs?.length ?? 0) > 0),
+        (currentAnalysis.boundaryPairs?.length ?? 0) > 0 ||
+        (currentAnalysis.paramBoundaryPairs?.length ?? 0) > 0),
   );
 
   const sortedBoundaryPairs = useMemo(() => {
@@ -480,6 +563,15 @@ export default function PerEgoSelection({
       return ka.localeCompare(kb, undefined, { numeric: true });
     });
   }, [currentAnalysis?.boundaryPairs]);
+
+  const sortedParamBoundaryPairs = useMemo(() => {
+    const pairs = currentAnalysis?.paramBoundaryPairs ?? [];
+    return [...pairs].sort((a, b) => {
+      const ka = boundaryPairKey(a.cluster_a, a.cluster_b);
+      const kb = boundaryPairKey(b.cluster_a, b.cluster_b);
+      return ka.localeCompare(kb, undefined, { numeric: true });
+    });
+  }, [currentAnalysis?.paramBoundaryPairs]);
 
   const scoreKeys = useMemo(() => {
     const fromScores = Object.keys(
@@ -836,70 +928,6 @@ export default function PerEgoSelection({
           </AccordionSummary>
           <AccordionDetails>
             <Stack gap={1.25}>
-              <Stack
-                direction="row"
-                flexWrap="wrap"
-                gap={1.5}
-                alignItems="center"
-                sx={{ px: 0.5 }}
-              >
-                <Typography fontSize={11} color="text.secondary">
-                  Legend:
-                </Typography>
-                {(
-                  ["medoid", "boundary", "outlier"] as ClusterHighlightRole[]
-                ).map((role) => {
-                  if (roleCount(currentAnalysis, role) === 0) return null;
-                  const style = CLUSTER_HIGHLIGHT_STYLE[role];
-                  return (
-                    <Stack
-                      key={`legend-${role}`}
-                      direction="row"
-                      alignItems="center"
-                      gap={0.5}
-                    >
-                      <Box
-                        component="svg"
-                        width={14}
-                        height={14}
-                        viewBox="0 0 14 14"
-                        sx={{ display: "block" }}
-                      >
-                        {style.shape === "circle" && (
-                          <circle
-                            cx={7}
-                            cy={7}
-                            r={5}
-                            fill="none"
-                            stroke={style.color}
-                            strokeWidth={2}
-                          />
-                        )}
-                        {style.shape === "diamond" && (
-                          <polygon
-                            points="7,1 13,7 7,13 1,7"
-                            fill="none"
-                            stroke={style.color}
-                            strokeWidth={2}
-                          />
-                        )}
-                        {style.shape === "triangle" && (
-                          <polygon
-                            points="7,1.5 13,12.5 1,12.5"
-                            fill="none"
-                            stroke={style.color}
-                            strokeWidth={2}
-                          />
-                        )}
-                      </Box>
-                      <Typography fontSize={11} color="text.secondary">
-                        {style.label}
-                      </Typography>
-                    </Stack>
-                  );
-                })}
-              </Stack>
-
               {Object.keys(currentAnalysis.medoids).length > 0 && (
                 <Stack gap={0.5}>
                   <Stack
@@ -907,9 +935,27 @@ export default function PerEgoSelection({
                     alignItems="center"
                     justifyContent="space-between"
                   >
-                    <Typography fontSize={12} color="text.secondary">
-                      Medoid ({roleCount(currentAnalysis, "medoid")})
-                    </Typography>
+                    <Stack direction="row" alignItems="center" gap={0.75}>
+                      <Box
+                        component="svg"
+                        width={12}
+                        height={12}
+                        viewBox="0 0 14 14"
+                        sx={{ display: "block" }}
+                      >
+                        <circle
+                          cx={7}
+                          cy={7}
+                          r={5}
+                          fill="none"
+                          stroke={CLUSTER_HIGHLIGHT_STYLE.medoid.color}
+                          strokeWidth={2}
+                        />
+                      </Box>
+                      <Typography fontSize={12} color="text.secondary">
+                        Medoid ({roleCount(currentAnalysis, "medoid")})
+                      </Typography>
+                    </Stack>
                     <Button
                       size="small"
                       onClick={selectAllMedoids}
@@ -938,18 +984,24 @@ export default function PerEgoSelection({
                             sx={{
                               fontSize: "11px",
                               py: 0.25,
+                              minWidth: 0,
                               borderColor: c,
                               color: isSelected ? "#111" : c,
                               backgroundColor: isSelected ? c : "transparent",
                               "&.MuiButton-contained": {
                                 backgroundColor: c,
                                 color: "#111",
-                                "&:hover": { backgroundColor: c, filter: "brightness(0.92)" },
+                                "&:hover": {
+                                  backgroundColor: c,
+                                  filter: "brightness(0.92)",
+                                },
                               },
                               "&.MuiButton-outlined": {
                                 borderColor: c,
                                 color: c,
                               },
+                              "& .MuiButton-startIcon": { display: "none" },
+                              "& .MuiButton-endIcon": { display: "none" },
                             }}
                           >
                             {chipLabel}
@@ -967,9 +1019,25 @@ export default function PerEgoSelection({
                     alignItems="center"
                     justifyContent="space-between"
                   >
-                    <Typography fontSize={12} color="text.secondary">
-                      Closest pair ({roleCount(currentAnalysis, "boundary")})
-                    </Typography>
+                    <Stack direction="row" alignItems="center" gap={0.75}>
+                      <Box
+                        component="svg"
+                        width={12}
+                        height={12}
+                        viewBox="0 0 14 14"
+                        sx={{ display: "block" }}
+                      >
+                        <polygon
+                          points="7,1 13,7 7,13 1,7"
+                          fill="none"
+                          stroke={CLUSTER_HIGHLIGHT_STYLE.boundary.color}
+                          strokeWidth={2}
+                        />
+                      </Box>
+                      <Typography fontSize={12} color="text.secondary">
+                        Closest pair (emb) ({roleCount(currentAnalysis, "boundary")})
+                      </Typography>
+                    </Stack>
                     <Button
                       size="small"
                       onClick={selectAllPairs}
@@ -989,22 +1057,121 @@ export default function PerEgoSelection({
                           size="small"
                           variant={isSelected ? "contained" : "outlined"}
                           onClick={() => togglePairKey(key)}
-                          title={`trials ${bp.trial_a} ↔ ${bp.trial_b}`}
+                          title={`trials ${bp.trial_a} ↔ ${bp.trial_b}${
+                            bp.embedding_dist != null
+                              ? ` · emb dist ${bp.embedding_dist}`
+                              : ""
+                          }`}
                           sx={{
                             fontSize: "11px",
                             py: 0.25,
+                            minWidth: 0,
                             borderColor: c,
                             color: isSelected ? "#111" : c,
                             backgroundColor: isSelected ? c : "transparent",
                             "&.MuiButton-contained": {
                               backgroundColor: c,
                               color: "#111",
-                              "&:hover": { backgroundColor: c, filter: "brightness(0.92)" },
+                              "&:hover": {
+                                backgroundColor: c,
+                                filter: "brightness(0.92)",
+                              },
                             },
                             "&.MuiButton-outlined": {
                               borderColor: c,
                               color: c,
                             },
+                            "& .MuiButton-startIcon": { display: "none" },
+                            "& .MuiButton-endIcon": { display: "none" },
+                          }}
+                        >
+                          {formatBoundaryPairLabel(key)}
+                        </Button>
+                      );
+                    })}
+                  </Stack>
+                </Stack>
+              )}
+
+              {sortedParamBoundaryPairs.length > 0 && (
+                <Stack gap={0.5}>
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                  >
+                    <Stack direction="row" alignItems="center" gap={0.75}>
+                      <Box
+                        component="svg"
+                        width={12}
+                        height={12}
+                        viewBox="0 0 14 14"
+                        sx={{ display: "block" }}
+                      >
+                        <rect
+                          x={2}
+                          y={2}
+                          width={10}
+                          height={10}
+                          fill="none"
+                          stroke={CLUSTER_HIGHLIGHT_STYLE.param_boundary.color}
+                          strokeWidth={2}
+                        />
+                      </Box>
+                      <Typography fontSize={12} color="text.secondary">
+                        Closest pair (IC) (
+                        {roleCount(currentAnalysis, "param_boundary")})
+                      </Typography>
+                    </Stack>
+                    <Button
+                      size="small"
+                      onClick={selectAllParamPairs}
+                      sx={{ fontSize: "11px" }}
+                    >
+                      All
+                    </Button>
+                  </Stack>
+                  <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                    {sortedParamBoundaryPairs.map((bp) => {
+                      const key = boundaryPairKey(bp.cluster_a, bp.cluster_b);
+                      const isSelected = selectedParamPairKeys.has(key);
+                      const c = CLUSTER_HIGHLIGHT_STYLE.param_boundary.color;
+                      const paramHint =
+                        bp.param_names && bp.param_names.length > 0
+                          ? ` · ${bp.param_names.join(", ")}`
+                          : "";
+                      return (
+                        <Button
+                          key={`param-pair-${key}`}
+                          size="small"
+                          variant={isSelected ? "contained" : "outlined"}
+                          onClick={() => toggleParamPairKey(key)}
+                          title={`trials ${bp.trial_a} ↔ ${bp.trial_b}${
+                            bp.param_dist != null
+                              ? ` · IC dist ${bp.param_dist}`
+                              : ""
+                          }${paramHint}`}
+                          sx={{
+                            fontSize: "11px",
+                            py: 0.25,
+                            minWidth: 0,
+                            borderColor: c,
+                            color: isSelected ? "#111" : c,
+                            backgroundColor: isSelected ? c : "transparent",
+                            "&.MuiButton-contained": {
+                              backgroundColor: c,
+                              color: "#111",
+                              "&:hover": {
+                                backgroundColor: c,
+                                filter: "brightness(0.92)",
+                              },
+                            },
+                            "&.MuiButton-outlined": {
+                              borderColor: c,
+                              color: c,
+                            },
+                            "& .MuiButton-startIcon": { display: "none" },
+                            "& .MuiButton-endIcon": { display: "none" },
                           }}
                         >
                           {formatBoundaryPairLabel(key)}
@@ -1022,9 +1189,25 @@ export default function PerEgoSelection({
                     alignItems="center"
                     justifyContent="space-between"
                   >
-                    <Typography fontSize={12} color="text.secondary">
-                      Outlier ({roleCount(currentAnalysis, "outlier")})
-                    </Typography>
+                    <Stack direction="row" alignItems="center" gap={0.75}>
+                      <Box
+                        component="svg"
+                        width={12}
+                        height={12}
+                        viewBox="0 0 14 14"
+                        sx={{ display: "block" }}
+                      >
+                        <polygon
+                          points="7,1.5 13,12.5 1,12.5"
+                          fill="none"
+                          stroke={CLUSTER_HIGHLIGHT_STYLE.outlier.color}
+                          strokeWidth={2}
+                        />
+                      </Box>
+                      <Typography fontSize={12} color="text.secondary">
+                        Outlier ({roleCount(currentAnalysis, "outlier")})
+                      </Typography>
+                    </Stack>
                     <Button
                       size="small"
                       onClick={selectAllOutliers}
@@ -1046,29 +1229,13 @@ export default function PerEgoSelection({
                             variant={isSelected ? "contained" : "outlined"}
                             onClick={() => toggleOutlierLabel(label)}
                             title={`trial ${trialId}`}
-                            startIcon={
-                              <Box
-                                component="svg"
-                                width={10}
-                                height={10}
-                                viewBox="0 0 14 14"
-                                sx={{ display: "block" }}
-                              >
-                                <polygon
-                                  points="7,1.5 13,12.5 1,12.5"
-                                  fill={isSelected ? "#111" : "none"}
-                                  stroke={isSelected ? "#111" : c}
-                                  strokeWidth={2}
-                                />
-                              </Box>
-                            }
                             sx={{
                               fontSize: "11px",
                               py: 0.25,
+                              minWidth: 0,
                               borderColor: c,
                               color: isSelected ? "#111" : c,
                               backgroundColor: isSelected ? c : "transparent",
-                              "& .MuiButton-startIcon": { mr: 0.5 },
                               "&.MuiButton-contained": {
                                 backgroundColor: `${c} !important`,
                                 color: "#111",
@@ -1081,6 +1248,8 @@ export default function PerEgoSelection({
                                 borderColor: `${c} !important`,
                                 color: `${c} !important`,
                               },
+                              "& .MuiButton-startIcon": { display: "none" },
+                              "& .MuiButton-endIcon": { display: "none" },
                             }}
                           >
                             {`C${label}`}

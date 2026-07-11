@@ -766,7 +766,7 @@ results/map/                         # shared (auto-ensured)
   hct_6_no_930.xodr / _tracks.csv / .yaml / .jpg …
 results/batch2/4_cluster_s=0.6945/
 ├── clustering/selectedClusteringResult.json
-├── manifest.json
+├── manifest.json                    # medoids + boundary_pairs + param_boundary_pairs
 └── cluster0/   (also cluster1, …)
     ├── action.yaml
     ├── description.txt
@@ -775,9 +775,33 @@ results/batch2/4_cluster_s=0.6945/
     ├── trajectory.csv
     ├── map_overview.jpg
     ├── trajectory_overlay.png
-    └── snapshots/
-        └── trial_*_t_*.jpg
+    ├── snapshots/
+    │   └── trial_*_t_*.jpg
+    ├── outlier_trials/trial_<esmini_idx>/     # farthest-from-medoid (embedding)
+    ├── boundary_c<M>/trial_<esmini_idx>/      # closest pair in MFPCA embedding space
+    └── param_boundary_c<M>/trial_<esmini_idx>/ # closest pair in Parameter Space (ICs)
 ```
+
+**Auxiliary trial scopes** (same CLI — rebuild selectively with `--from-run`):
+
+| Flag | Default | What it builds |
+| ---- | ------- | -------------- |
+| `--medoids` | `all` | Medoid pack under `clusterN/` |
+| `--emb-boundaries` (`--boundaries`) | `all` | Embedding closest pairs → `boundary_c*` |
+| `--param-boundaries` | `none` | IC closest pairs → `param_boundary_c*` (z-scored OncomingSpeed / OncomingStartDelay) |
+| `--outliers` | `all` | Top outlier → `outlier_trials/` |
+
+```bash
+# IC (Parameter Space) closest pairs only — keep existing medoids / emb pairs:
+python3 app/analyzer/src/dataset_builder.py \
+  --batch-id 2 --from-run results/batch2/3_cluster_s=0.7036 \
+  --medoids none --outliers none \
+  --emb-boundaries none --param-boundaries all
+```
+
+**Dashboard:** Explore → ClusteringSelection → **Highlight trials** can multi-select
+Medoid / Closest pair (emb) / Closest pair (IC) / Outlier; markers appear in
+ParameterSpace (green square = IC) and ProjectionSpace (cyan diamond = emb).
 
 **BEV rendering knobs** (same CLI — see `python3 app/analyzer/src/dataset_builder.py -h`):
 

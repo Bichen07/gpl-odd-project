@@ -1205,6 +1205,198 @@ def compute_intra_variance_and_boundaries(
     return intra_by_cluster, boundary_pairs
 
 
+def _build_trial_parameter_matrix(
+    trials_meta: Dict[str, Any],
+    result_data: Dict[str, Any],
+    ego_scenario_params: Optional[List[Dict[str, Any]]] = None,
+) -> Tuple[List[str], np.ndarray, np.ndarray, List[str]]:
+    """Build per-trial initial-condition vectors from Payload trial parameters.
+
+    Returns ``(trial_ids, X, labels, param_names)`` where ``X`` is z-scored
+    (columns with zero variance stay zero). Trials missing any parameter are skipped.
+    """
+    assignments = (result_data or {}).get("data", {}) or {}
+    param_id_to_name: Dict[str, str] = {}
+    for p in ego_scenario_params or []:
+        if not isinstance(p, dict):
+            continue
+        pid = p.get("id") or p.get("parameterId")
+        if pid is not None:
+            param_id_to_name[str(pid)] = p.get("name") or str(pid)
+
+    # First pass: collect raw {tid: {name: value}} and discover names.
+    raw: Dict[str, Dict[str, float]] = {}
+    labels_map: Dict[str, int] = {}
+    name_set: set = set()
+
+    for tid, item in assignments.items():
+        raw_label = item if isinstance(item, str) else item.get("label", str(item))
+        try:
+            label_i = int(raw_label)
+        except (ValueError, TypeError):
+            label_i = -1
+        if label_i < 0:
+            continue
+        t = trials_meta.get(str(tid)) or trials_meta.get(tid)
+        if not isinstance(t, dict):
+            continue
+        vals: Dict[str, float] = {}
+        for tp in (t.get("parameters") or []):
+            if not isinstance(tp, dict):
+                continue
+            pid = str(tp.get("parameterId", tp.get("id", "")))
+            name = param_id_to_name.get(pid) or tp.get("name") or (pid or "param")
+            try:
+                vals[str(name)] = float(tp.get("value", 0))
+            except (TypeError, ValueError):
+                continue
+        if not vals:
+            continue
+        raw[str(tid)] = vals
+        labels_map[str(tid)] = label_i
+        name_set.update(vals.keys())
+
+    param_names = sorted(name_set)
+    if not param_names or not raw:
+        return [], np.zeros((0, 0)), np.zeros((0,), dtype=int), []
+
+    trial_ids: List[str] = []
+    rows: List[List[float]] = []
+    labels: List[int] = []
+    for tid, vals in raw.items():
+        if any(n not in vals for n in param_names):
+            continue
+        trial_ids.append(tid)
+        rows.append([vals[n] for n in param_names])
+        labels.append(labels_map[tid])
+
+    if not trial_ids:
+        return [], np.zeros((0, 0)), np.zeros((0,), dtype=int), param_names
+
+    X = np.asarray(rows, dtype=np.float64)
+    # Z-score each parameter so delay (s) and speed (m/s) are comparable.
+    std = X.std(axis=0)
+    mean = X.mean(axis=0)
+    std_safe = np.where(std < 1e-12, 1.0, std)
+    X = (X - mean) / std_safe
+    return trial_ids, X, np.asarray(labels, dtype=int), param_names
+
+
+def compute_parameter_space_boundaries(
+    trials_meta: Dict[str, Any],
+    result_data: Dict[str, Any],
+    collision_flags: Optional[Dict[str, bool]] = None,
+    ego_scenario_params: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Closest cross-cluster trial pairs in Parameter Space (initial conditions).
+
+    Distance is L2 on z-scored scenario parameters (e.g. OncomingStartDelay,
+    OncomingSpeed). Separate from MFPCA embedding ``boundary_pairs``.
+    """
+    trial_ids, X, labels_arr, param_names = _build_trial_parameter_matrix(
+        trials_meta, result_data, ego_scenario_params=ego_scenario_params,
+    )
+    if len(trial_ids) == 0 or X.size == 0:
+        print("  ⚠️  Parameter-space boundaries skipped (no trial parameters)")
+        return []
+
+    unique_labels = sorted(set(int(x) for x in labels_arr.tolist()) - {-1})
+    trial_ids_arr = np.asarray(trial_ids)
+    cluster_centroids: Dict[int, np.ndarray] = {}
+    for label in unique_labels:
+        mask = labels_arr == label
+        cluster_centroids[label] = X[mask].mean(axis=0)
+
+    pairs: List[Dict[str, Any]] = []
+    processed: set = set()
+    for a in unique_labels:
+        X_a = X[labels_arr == a]
+        ids_a = trial_ids_arr[labels_arr == a]
+        for b in unique_labels:
+            if b <= a or (a, b) in processed:
+                continue
+            processed.add((a, b))
+            X_b = X[labels_arr == b]
+            ids_b = trial_ids_arr[labels_arr == b]
+            diff = X_a[:, np.newaxis, :] - X_b[np.newaxis, :, :]
+            pdists = np.linalg.norm(diff, axis=2)
+            ia, ib = np.unravel_index(int(np.argmin(pdists)), pdists.shape)
+            min_dist = float(pdists[ia, ib])
+            ta, tb = str(ids_a[ia]), str(ids_b[ib])
+            pairs.append({
+                "cluster_a": a,
+                "trial_a": ta,
+                "dist_a_to_centroid": round(
+                    float(np.linalg.norm(X_a[ia] - cluster_centroids[a])), 4
+                ),
+                "collided_a": bool((collision_flags or {}).get(ta, False)),
+                "cluster_b": b,
+                "trial_b": tb,
+                "dist_b_to_centroid": round(
+                    float(np.linalg.norm(X_b[ib] - cluster_centroids[b])), 4
+                ),
+                "collided_b": bool((collision_flags or {}).get(tb, False)),
+                "param_dist": round(min_dist, 4),
+                "param_names": param_names,
+            })
+
+    pairs.sort(key=lambda p: p["param_dist"])
+    print(
+        f"  📐 Parameter-space boundaries: {len(pairs)} pair(s) "
+        f"over {param_names}"
+    )
+    return pairs
+
+
+def attach_param_boundary_neighbors(
+    intra_by_cluster: Dict[str, Dict[str, Any]],
+    param_boundary_pairs: List[Dict[str, Any]],
+) -> None:
+    """Write ``param_boundary_neighbors`` onto each cluster's intra_variance block."""
+    for iv in intra_by_cluster.values():
+        iv.setdefault("param_boundary_neighbors", {})
+    for bp in param_boundary_pairs:
+        a, b = str(bp["cluster_a"]), str(bp["cluster_b"])
+        if a in intra_by_cluster:
+            intra_by_cluster[a].setdefault("param_boundary_neighbors", {})[b] = str(
+                bp["trial_a"]
+            )
+        if b in intra_by_cluster:
+            intra_by_cluster[b].setdefault("param_boundary_neighbors", {})[a] = str(
+                bp["trial_b"]
+            )
+
+
+def patch_cluster_json_param_neighbors(
+    run_dir: Path,
+    param_boundary_pairs: List[Dict[str, Any]],
+) -> int:
+    """Update existing cluster.json files with param_boundary_neighbors (aux-only rebuilds).
+
+    Returns the number of cluster.json files patched.
+    """
+    neighbors: Dict[str, Dict[str, str]] = {}
+    for bp in param_boundary_pairs:
+        a, b = str(bp["cluster_a"]), str(bp["cluster_b"])
+        neighbors.setdefault(a, {})[b] = str(bp["trial_a"])
+        neighbors.setdefault(b, {})[a] = str(bp["trial_b"])
+    patched = 0
+    for label, neigh in neighbors.items():
+        cj_path = run_dir / f"cluster{label}" / "cluster.json"
+        if not cj_path.is_file():
+            continue
+        try:
+            doc = json.loads(cj_path.read_text(encoding="utf-8"))
+            cluster = doc.setdefault("cluster", {})
+            intra = cluster.setdefault("intra_variance", {})
+            intra["param_boundary_neighbors"] = neigh
+            cj_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+            patched += 1
+        except Exception as exc:
+            print(f"  ⚠️  Could not patch {cj_path.name}: {exc}")
+    return patched
+
+
 def build_run_manifest(
     dataset: str,
     n_clusters: int,
@@ -1212,6 +1404,7 @@ def build_run_manifest(
     run_id: str,
     batch_id: Optional[int] = None,
     boundary_pairs: Optional[List[Dict[str, Any]]] = None,
+    param_boundary_pairs: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Create the top-level manifest.json for this run."""
     manifest: Dict[str, Any] = {
@@ -1234,6 +1427,8 @@ def build_run_manifest(
     }
     if boundary_pairs is not None:
         manifest["boundary_pairs"] = boundary_pairs
+    if param_boundary_pairs is not None:
+        manifest["param_boundary_pairs"] = param_boundary_pairs
     return manifest
 
 
@@ -1908,13 +2103,17 @@ def process_auxiliary_trials(
     hard_brake_accel: float = -2.5,
     outlier_scope: Optional[Set[str]] = None,
     boundary_scope: Optional[Set[str]] = None,
+    param_boundary_pairs: Optional[List[Dict[str, Any]]] = None,
+    param_boundary_scope: Optional[Set[str]] = None,
 ) -> None:
     """Build full trial artifacts for outlier and boundary trials.
 
     Outlier → ``cluster<N>/outlier_trials/trial_<id>/``
-    Boundary → ``cluster<N>/boundary_c<M>/trial_<id>/``
+    Embedding boundary → ``cluster<N>/boundary_c<M>/trial_<id>/``
+    Param (IC) boundary → ``cluster<N>/param_boundary_c<M>/trial_<id>/``
 
-    ``outlier_scope`` / ``boundary_scope``: None=all, empty=skip, else cluster labels.
+    ``outlier_scope`` / ``boundary_scope`` / ``param_boundary_scope``:
+    None=all, empty=skip, else cluster labels.
     """
     def _resolve(tid: str) -> Tuple[Optional[int], Optional[int]]:
         bi = trial_index_map.get(str(tid))
@@ -1923,6 +2122,63 @@ def process_auxiliary_trials(
     def _trial_events(tid: str):
         info = (trials_meta or {}).get(str(tid))
         return info.get("events") if isinstance(info, dict) else None
+
+    def _build_boundary_dirs(
+        pairs: List[Dict[str, Any]],
+        scope: Optional[Set[str]],
+        folder_prefix: str,
+        dist_key: str,
+        label: str,
+    ) -> None:
+        if scope is not None and len(scope) == 0:
+            print(f"  ⏭  {label} skipped")
+            return
+        processed: set = set()
+        for bp in pairs:
+            ca, ta = bp["cluster_a"], bp["trial_a"]
+            cb, tb = bp["cluster_b"], bp["trial_b"]
+            dist = bp.get(dist_key)
+            dist_s = f"{float(dist):.3f}" if isinstance(dist, (int, float)) else "?"
+            for (src_label, tgt_label, tid) in [(ca, cb, ta), (cb, ca, tb)]:
+                if not cluster_in_scope(src_label, scope):
+                    continue
+                key = (src_label, tgt_label, str(tid))
+                if key in processed:
+                    continue
+                processed.add(key)
+                b, ti = _resolve(str(tid))
+                if b is None:
+                    print(f"  ⚠️  {label} trial {tid} not in index map — skipped")
+                    continue
+                collided = bool((collision_flags or {}).get(str(tid), False))
+                out_dir = (
+                    run_dir
+                    / f"cluster{src_label}"
+                    / f"{folder_prefix}{tgt_label}"
+                    / f"trial_{ti}"
+                )
+                print(
+                    f"  🔹 {label} c{src_label}↔c{tgt_label}: trial {tid} "
+                    f"(batch {b}, idx {ti}, {dist_key}={dist_s})"
+                    f"{' COLLISION' if collided else ''}"
+                )
+                process_trial_to_dir(
+                    b, ti, str(tid), out_dir, xodr_path, parser_xodr,
+                    dataset_name=dataset_name,
+                    snapshot_output_px=snapshot_output_px,
+                    snapshot_border_frac=snapshot_border_frac,
+                    typography=typography,
+                    max_snapshots=max_snapshots,
+                    collided=collided,
+                    trial_events=_trial_events(str(tid)),
+                    ego_zoom_radius=ego_zoom_radius,
+                    contact_clearance_m=contact_clearance_m,
+                    conflict_relevance_m=conflict_relevance_m,
+                    conflict_window_s=conflict_window_s,
+                    conflict_distance_m=conflict_distance_m,
+                    conflict_burst_step_s=conflict_burst_step_s,
+                    hard_brake_accel=hard_brake_accel,
+                )
 
     # --- outlier trials ---
     if outlier_scope is not None and len(outlier_scope) == 0:
@@ -1961,56 +2217,23 @@ def process_auxiliary_trials(
                 hard_brake_accel=hard_brake_accel,
             )
 
-    # --- boundary trials ---
-    if boundary_scope is not None and len(boundary_scope) == 0:
-        print("  ⏭  Boundaries skipped (--boundaries none)")
-        return
+    # --- embedding-space closest pairs ---
+    _build_boundary_dirs(
+        boundary_pairs,
+        boundary_scope,
+        folder_prefix="boundary_c",
+        dist_key="embedding_dist",
+        label="Emb-boundary",
+    )
 
-    processed_boundary: set = set()
-    for bp in boundary_pairs:
-        ca, ta = bp["cluster_a"], bp["trial_a"]
-        cb, tb = bp["cluster_b"], bp["trial_b"]
-
-        for (src_label, tgt_label, tid) in [(ca, cb, ta), (cb, ca, tb)]:
-            if not cluster_in_scope(src_label, boundary_scope):
-                continue
-            key = (src_label, tgt_label, str(tid))
-            if key in processed_boundary:
-                continue
-            processed_boundary.add(key)
-            b, ti = _resolve(str(tid))
-            if b is None:
-                print(f"  ⚠️  Boundary trial {tid} not in index map — skipped")
-                continue
-            collided = bool((collision_flags or {}).get(str(tid), False))
-            out_dir = (
-                run_dir
-                / f"cluster{src_label}"
-                / f"boundary_c{tgt_label}"
-                / f"trial_{ti}"
-            )
-            print(
-                f"  🔹 Boundary c{src_label}↔c{tgt_label}: trial {tid} "
-                f"(batch {b}, idx {ti}, emb_dist={bp['embedding_dist']:.3f})"
-                f"{' COLLISION' if collided else ''}"
-            )
-            process_trial_to_dir(
-                b, ti, str(tid), out_dir, xodr_path, parser_xodr,
-                dataset_name=dataset_name,
-                snapshot_output_px=snapshot_output_px,
-                snapshot_border_frac=snapshot_border_frac,
-                typography=typography,
-                max_snapshots=max_snapshots,
-                collided=collided,
-                trial_events=_trial_events(str(tid)),
-                ego_zoom_radius=ego_zoom_radius,
-                contact_clearance_m=contact_clearance_m,
-                conflict_relevance_m=conflict_relevance_m,
-                conflict_window_s=conflict_window_s,
-                conflict_distance_m=conflict_distance_m,
-                conflict_burst_step_s=conflict_burst_step_s,
-                hard_brake_accel=hard_brake_accel,
-            )
+    # --- parameter-space (initial condition) closest pairs ---
+    _build_boundary_dirs(
+        param_boundary_pairs or [],
+        param_boundary_scope,
+        folder_prefix="param_boundary_c",
+        dist_key="param_dist",
+        label="IC-boundary",
+    )
 
 
 def main():
@@ -2265,12 +2488,24 @@ def main():
              "comma list of labels e.g. '1' or '0,2'.",
     )
     parser.add_argument(
-        "--boundaries",
+        "--emb-boundaries",
+        "--boundaries",  # backward-compatible alias
         type=str,
         default="all",
+        dest="emb_boundaries",
         metavar="SCOPE",
-        help="Which clusters get boundary_c* trials: 'all' (default), 'none', "
-             "or labels e.g. '1' (builds boundary trials under cluster1/).",
+        help="Embedding-space closest pairs → clusterN/boundary_cM/: "
+             "'all' (default), 'none', or labels e.g. '1'.",
+    )
+    parser.add_argument(
+        "--param-boundaries",
+        type=str,
+        default="none",
+        metavar="SCOPE",
+        help="Parameter-space (initial condition) closest pairs → "
+             "clusterN/param_boundary_cM/: 'all', 'none' (default), "
+             "or labels e.g. '1'. Distance uses z-scored trial parameters "
+             "(e.g. OncomingStartDelay, OncomingSpeed).",
     )
     parser.add_argument(
         "--outliers",
@@ -2434,6 +2669,7 @@ def main():
     payload_collision_flags: Optional[Dict[str, bool]] = None
     payload_metric_stats: Dict[str, Dict[str, Any]] = {}
     trials_meta: Dict[str, Any] = {}
+    ego_scenario_params: List[Dict[str, Any]] = []
 
     # --- Step 1: Load clustering data ---
     ref_silhouette: Optional[float] = None
@@ -2465,6 +2701,11 @@ def main():
                 scores, _clist, ego_data, _sel = fetched
                 payload_collision_flags = _collision_flags_from_ego(ego_data)
                 trials_meta = ego_data.get("trials") or {}
+                ego_scenario_params = list(
+                    (ego_data.get("scenario") or {}).get("parameters")
+                    or ego_data.get("parameters")
+                    or []
+                )
                 payload_metric_stats = _cluster_metric_stats_from_ego(ego_data, result_data)
                 n_coll = sum(1 for v in payload_collision_flags.values() if v)
                 print(f"  Loaded collision KPI for {len(payload_collision_flags)} trials "
@@ -2484,7 +2725,7 @@ def main():
                     if m:
                         trial_index_map[str(tid)] = (int(m.group(1)), int(m.group(2)))
                 print(f"  Built trial→CSV map for {len(trial_index_map)} trials "
-                      f"(enables outlier_trials / boundary_c*)")
+                      f"(enables outlier_trials / boundary_c* / param_boundary_c*)")
             else:
                 print("  ⚠️  Could not fetch Payload analysis — cluster collision stats may be incomplete")
                 print("  ⚠️  Without embeddings, outlier/boundary aux trials will be skipped")
@@ -2734,13 +2975,43 @@ def main():
         except Exception as exc:
             print(f"  ⚠️  Intra-variance/boundary computation failed: {exc}")
 
+    # --- Parameter-space (initial condition) closest pairs ---
+    param_boundary_pairs: List[Dict[str, Any]] = []
+    if result_data is not None and trials_meta:
+        try:
+            print("\n📐 Computing parameter-space (IC) closest pairs...")
+            param_boundary_pairs = compute_parameter_space_boundaries(
+                trials_meta,
+                result_data,
+                collision_flags=collision_flags,
+                ego_scenario_params=ego_scenario_params or None,
+            )
+            for bp in param_boundary_pairs:
+                print(
+                    f"  IC-boundary c{bp['cluster_a']}↔c{bp['cluster_b']}: "
+                    f"dist={bp['param_dist']:.4f} "
+                    f"(trials {bp['trial_a']} ↔ {bp['trial_b']})"
+                )
+        except Exception as exc:
+            print(f"  ⚠️  Parameter-space boundary computation failed: {exc}")
+
     # --- Step 6: Process each medoid ---
     medoid_scope = parse_cluster_scope(args.medoids)
-    boundary_scope = parse_cluster_scope(args.boundaries)
+    boundary_scope = parse_cluster_scope(args.emb_boundaries)
+    param_boundary_scope = parse_cluster_scope(args.param_boundaries)
     outlier_scope = parse_cluster_scope(args.outliers)
+    # Only attach IC neighbors when those folders will be materialized.
+    if (
+        param_boundary_pairs
+        and intra_by_cluster
+        and not (param_boundary_scope is not None and len(param_boundary_scope) == 0)
+    ):
+        attach_param_boundary_neighbors(intra_by_cluster, param_boundary_pairs)
     print(
         f"  Build scope: medoids={args.medoids}, "
-        f"boundaries={args.boundaries}, outliers={args.outliers}"
+        f"emb-boundaries={args.emb_boundaries}, "
+        f"param-boundaries={args.param_boundaries}, "
+        f"outliers={args.outliers}"
     )
 
     success_count = 0
@@ -2794,17 +3065,31 @@ def main():
             except Exception as e:
                 print(f"  ⚠️  Trajectory overlay failed: {e}")
 
-    # --- Step 7a: Auxiliary trials (outlier + boundary) ---
+    # Medoids skipped: still patch cluster.json with IC neighbors
+    if (
+        medoid_scope is not None
+        and len(medoid_scope) == 0
+        and param_boundary_pairs
+        and not (
+            param_boundary_scope is not None and len(param_boundary_scope) == 0
+        )
+    ):
+        patched = patch_cluster_json_param_neighbors(run_dir, param_boundary_pairs)
+        if patched:
+            print(f"\n📝 Patched {patched} cluster.json file(s) with IC neighbors")
+
+    # --- Step 7a: Auxiliary trials (outlier + emb/IC boundaries) ---
     do_aux = (
         trial_index_map
-        and (intra_by_cluster or boundary_pairs_data)
+        and (intra_by_cluster or boundary_pairs_data or param_boundary_pairs)
         and not (
             (outlier_scope is not None and len(outlier_scope) == 0)
             and (boundary_scope is not None and len(boundary_scope) == 0)
+            and (param_boundary_scope is not None and len(param_boundary_scope) == 0)
         )
     )
     if do_aux:
-        print("\n🔸 Processing auxiliary trials (outlier + boundary)…")
+        print("\n🔸 Processing auxiliary trials (outlier + emb/IC boundaries)…")
         try:
             process_auxiliary_trials(
                 run_dir=run_dir,
@@ -2829,19 +3114,40 @@ def main():
                 hard_brake_accel=args.hard_brake_accel,
                 outlier_scope=outlier_scope,
                 boundary_scope=boundary_scope,
+                param_boundary_pairs=param_boundary_pairs,
+                param_boundary_scope=param_boundary_scope,
             )
         except Exception as exc:
             print(f"  ⚠️  Auxiliary trial processing failed: {exc}")
-    elif trial_index_map and (intra_by_cluster or boundary_pairs_data):
-        print("  ⏭  Auxiliary trials skipped (--outliers none --boundaries none)")
+    elif trial_index_map and (intra_by_cluster or boundary_pairs_data or param_boundary_pairs):
+        print(
+            "  ⏭  Auxiliary trials skipped "
+            "(--outliers none --emb-boundaries none --param-boundaries none)"
+        )
 
     # --- Step 7b: Create manifest ---
+    # Preserve existing IC pairs when --param-boundaries none (aux-only emb rebuilds).
+    existing_manifest: Dict[str, Any] = {}
+    manifest_path = run_dir / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            existing_manifest = json.loads(
+                manifest_path.read_text(encoding="utf-8")
+            )
+        except Exception:
+            existing_manifest = {}
+
+    if param_boundary_scope is not None and len(param_boundary_scope) == 0:
+        manifest_param_pairs = existing_manifest.get("param_boundary_pairs")
+    else:
+        manifest_param_pairs = param_boundary_pairs or None
+
     manifest = build_run_manifest(
         dataset_name, n_clusters, medoids, run_id,
         batch_id=batch_id_out,
         boundary_pairs=boundary_pairs_data or None,
+        param_boundary_pairs=manifest_param_pairs,
     )
-    manifest_path = run_dir / "manifest.json"
     with manifest_path.open("w") as f:
         json.dump(manifest, f, indent=2)
 
@@ -2856,11 +3162,11 @@ def main():
 
     print(f"\n{'='*60}")
     print(f"✅ LLM dataset build complete!")
-    print(f"   Processed: {success_count}/{len(medoids)} clusters")
+    print(f"   Processed: {success_count}/{len(medoids_to_run)} clusters")
     print(f"   Output: {run_dir}")
     print(f"{'='*60}")
 
-    if success_count < len(medoids):
+    if medoids_to_run and success_count < len(medoids_to_run):
         print("\n⚠️  Some clusters failed to process. Check logs above.")
         sys.exit(1)
 

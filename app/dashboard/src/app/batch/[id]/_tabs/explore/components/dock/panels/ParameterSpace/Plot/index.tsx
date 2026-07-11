@@ -45,7 +45,6 @@ import Contour from "../Contour";
 import { noiseColor } from "@/app/_shared/utils";
 import {
   CLUSTER_HIGHLIGHT_STYLE,
-  primaryRoleForTrial,
 } from "@/app/_shared/utils/clusterHighlightRoles";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
 import { Trial } from "@/app/_shared/graphql/queries/trials";
@@ -201,6 +200,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   const selectedTrialIds = useAppSelector(
     (state) => state.batch.selectedTrialIds,
   );
+  const highlightRolesByTrialId = useAppSelector(
+    (state) => state.batch.highlightRolesByTrialId,
+  );
   const clusterAnalysis = useAppSelector(
     (state) => state.batch.clusterAnalysisByEgo?.[egoName] ?? null,
   );
@@ -255,6 +257,19 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   const [scatterplot, setScatterPlot] = useState<ReturnType<
     typeof createScatterplot
   > | null>(null);
+  const scatterplotAliveRef = useRef(false);
+
+  const safeScatterplotSet = useCallback(
+    (props: Record<string, unknown>) => {
+      if (!scatterplotAliveRef.current || scatterplot == null) return;
+      try {
+        scatterplot.set(props);
+      } catch {
+        // regl-scatterplot throws if destroy() already ran.
+      }
+    },
+    [scatterplot],
+  );
 
   const [points, setPoints] = useState<number[][]>([]);
   const highlightMarkers = useMemo(() => {
@@ -262,17 +277,23 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     const selected = new Set(selectedTrialIds.value.map(String));
     const markers: Array<{
       index: number;
-      role: "medoid" | "boundary" | "outlier";
+      role: "medoid" | "boundary" | "param_boundary" | "outlier";
     }> = [];
-    if (!clusterAnalysis || selected.size === 0) return markers;
+    if (selected.size === 0) return markers;
+
+    // Only use roles from Highlight trials picks — never infer from cluster
+    // membership (outlier trials are often also closest-pair endpoints).
     for (let i = 0; i < order.length; i++) {
       const tid = String(order[i]);
       if (!selected.has(tid)) continue;
-      const role = primaryRoleForTrial(clusterAnalysis, tid);
-      if (role) markers.push({ index: i, role });
+      const roles = highlightRolesByTrialId[tid];
+      if (roles == null) continue;
+      for (const role of roles) {
+        markers.push({ index: i, role });
+      }
     }
     return markers;
-  }, [clusterAnalysis, points, egoName, selectedTrialIds]);
+  }, [points, egoName, selectedTrialIds, highlightRolesByTrialId]);
   const [scales, setScales] = useState<{
     x: ReturnType<typeof scaleLinear<number>>;
     y: ReturnType<typeof scaleLinear<number>>;
@@ -390,7 +411,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       globalStorage["mouseOnPanel"].split("_")[0] !== egoName
     ) {
       // scatterplot.t
-      // scatterplot.set({"lassoLongPressTime"})
+      // safeScatterplotSet({"lassoLongPressTime"})
       scatterplot.zoomToLocation(
         [globalStorage.camera.x, globalStorage.camera.y],
         globalStorage.camera.distance,
@@ -559,6 +580,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     });
 
     console.log("SET NEW SCATTER PLOT");
+    scatterplotAliveRef.current = true;
     setScatterPlot(plot);
 
     // --- Middle-mouse-button panning ---------------------------------------
@@ -606,11 +628,17 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
 
     return () => {
       console.log("plot destoryed");
+      scatterplotAliveRef.current = false;
       panCanvas?.removeEventListener("mousedown", onPanMouseDown);
       window.removeEventListener("mousemove", onPanMouseMove);
       window.removeEventListener("mouseup", onPanMouseUp);
       panCanvas?.removeEventListener("auxclick", onAuxClick);
-      plot.destroy();
+      try {
+        plot.destroy();
+      } catch {
+        /* already destroyed */
+      }
+      setScatterPlot((prev) => (prev === plot ? null : prev));
     };
   }, [
     isReady,
@@ -647,7 +675,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         if (selectedMetric && selectedMetric.kpi.rule === "greaterThan") {
           colors.reverse();
         }
-        scatterplot.set({
+        safeScatterplotSet({
           pointColor: colors,
         });
       } else if (colorMode === "criticality") {
@@ -656,11 +684,11 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         if (selectedMetric && selectedMetric.kpi.rule === "greaterThan") {
           colors.reverse();
         }
-        scatterplot.set({
+        safeScatterplotSet({
           pointColor: colors,
         });
       } else if (clusterInfo == null || isBaseline) {
-        scatterplot.set({
+        safeScatterplotSet({
           pointColor: [
             chroma("black").rgba(),
             chroma("black").rgba(),
@@ -714,7 +742,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         // console.log(clusterInfo);
         // console.log(Object.keys(clusterInfo));
         // console.log(colors);
-        scatterplot.set({
+        safeScatterplotSet({
           pointColor: colors,
         });
       }
@@ -722,7 +750,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       console.error();
     }
 
-    // scatterplot.set({
+    // safeScatterplotSet({
     //   pointColor: [
     //     chroma("black").rgba(),
     //     chroma("black").rgba(),
@@ -762,6 +790,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     colorMode,
     selectedMetric,
     isBaseline,
+    safeScatterplotSet,
     // showPoints,
   ]);
 
@@ -891,10 +920,10 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         scatterplot.draw(points, {
           spatialIndex,
           filter: filteredIndices,
-          // Medoids are marked with their own SVG circle overlay, so they must
-          // NOT be part of the scatterplot's selection state — otherwise a
-          // ctrl+click (merge) would drag the medoids into the user's selection.
-          select: selectedIndices,
+          // Highlight trials use SVG overlays. Feeding them into regl-scatterplot
+          // select causes deselect/select echoes that fight Redux and can loop.
+          select:
+            selectedTrialIds.by === "highlight" ? [] : selectedIndices,
         });
         setPointsDrawn(true);
       },
@@ -1039,22 +1068,27 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     setPoints((prev) => {
       const newPoints = [...prev];
 
-      drawPoints(
-        trajectoryAnalysis,
-        trials ?? [],
-        scatterplot,
-        newPoints,
-        colorMode,
-        filteredTrialIds,
-        selectedTrialIds,
-        clusteringResult,
-        clusterInfo,
-        scatterplot.get("spatialIndex"),
-        selectedMetric,
-        selectedSafetyBoundaryMetric,
-        showPoints,
-        medoidTrialIds,
-      );
+      try {
+        drawPoints(
+          trajectoryAnalysis,
+          trials ?? [],
+          scatterplot,
+          newPoints,
+          colorMode,
+          filteredTrialIds,
+          selectedTrialIds,
+          clusteringResult,
+          clusterInfo,
+          scatterplot.get("spatialIndex"),
+          selectedMetric,
+          selectedSafetyBoundaryMetric,
+          showPoints,
+          medoidTrialIds,
+        );
+      } catch {
+        // Scatterplot may already be destroyed during dock remount / StrictMode.
+        return prev;
+      }
 
       globalStorage.points[egoName] = newPoints;
       return newPoints;
@@ -1073,18 +1107,22 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     if (scatterplot == null || selectedMetric == null) {
       return;
     }
-    if (
-      showBg &&
-      selectedMetric.kpi.name in metricImages &&
-      metricImages[selectedMetric.kpi.name][gridMode] != null
-    ) {
-      scatterplot.set({
-        backgroundImage: metricImages[selectedMetric.kpi.name][gridMode].src,
-      });
-    } else {
-      scatterplot.set({ backgroundImage: null });
+    try {
+      if (
+        showBg &&
+        selectedMetric.kpi.name in metricImages &&
+        metricImages[selectedMetric.kpi.name][gridMode] != null
+      ) {
+        safeScatterplotSet({
+          backgroundImage: metricImages[selectedMetric.kpi.name][gridMode].src,
+        });
+      } else {
+        safeScatterplotSet({ backgroundImage: null });
+      }
+    } catch {
+      // Instance already destroyed.
     }
-  }, [scatterplot, showBg, metricImages, selectedMetric, gridMode]);
+  }, [scatterplot, showBg, metricImages, selectedMetric, gridMode, safeScatterplotSet]);
 
   return (
     <Box
@@ -1335,6 +1373,22 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
                           <polygon
                             key={`hl-${role}-${pointIdx}`}
                             points={`${cx},${cy - s} ${cx + s},${cy} ${cx},${cy + s} ${cx - s},${cy}`}
+                            fill="none"
+                            stroke={style.color}
+                            strokeWidth={2.5}
+                            style={{ pointerEvents: "none" }}
+                          />
+                        );
+                      }
+                      if (role === "param_boundary") {
+                        const s = 8;
+                        return (
+                          <rect
+                            key={`hl-${role}-${pointIdx}`}
+                            x={cx - s}
+                            y={cy - s}
+                            width={s * 2}
+                            height={s * 2}
                             fill="none"
                             stroke={style.color}
                             strokeWidth={2.5}
