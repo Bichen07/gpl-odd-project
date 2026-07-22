@@ -29,10 +29,11 @@ function findProjectRoot(start: string): string {
 }
 
 const PROMPT_FILES: Record<string, string> = {
-  system: "cluster_system_prompt.txt",
-  common_sense: "cluster_common_sense.txt",
-  interaction: "cluster_interaction_prompt.txt",
-  reviewer: "cluster_reviewer_prompt.txt",
+  system: "system_prompt.txt",
+  common_sense: "common_sense.txt",
+  medoid: "medoid_trial_prompt.txt",
+  summary: "cluster_summary_prompt.txt",
+  ic_pair: "ic_pair_prompt.txt",
 };
 
 // Keep this list to models that are currently served. gemini-2.0-flash was
@@ -246,10 +247,12 @@ export async function GET(req: NextRequest) {
     meta: Record<string, unknown> | null;
     rawYaml: string;
   }> = [];
+  const splitClusters: Array<Record<string, unknown>> = [];
   for (const entry of fs.readdirSync(runDir, { withFileTypes: true })) {
     const m = entry.isDirectory() ? entry.name.match(/^cluster(\d+)$/) : null;
     if (!m) continue;
     const clusterDir = path.join(runDir, entry.name);
+    const cid = parseInt(m[1], 10);
     const metaPath = path.join(clusterDir, "interpretation_meta.json");
     const yamlPath = path.join(clusterDir, "cluster_interpretation.yaml");
     let meta: Record<string, unknown> | null = null;
@@ -263,11 +266,44 @@ export async function GET(req: NextRequest) {
     let rawYaml = "";
     if (fs.existsSync(yamlPath)) rawYaml = fs.readFileSync(yamlPath, "utf-8");
     if (meta || rawYaml) {
-      results.push({ cluster: parseInt(m[1], 10), meta, rawYaml });
+      results.push({ cluster: cid, meta, rawYaml });
     }
+
+    const readJson = (p: string) => {
+      if (!fs.existsSync(p)) return null;
+      try {
+        return JSON.parse(fs.readFileSync(p, "utf-8"));
+      } catch {
+        return null;
+      }
+    };
+    const readText = (p: string) =>
+      fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
+    splitClusters.push({
+      cluster: cid,
+      aggregate: readJson(path.join(clusterDir, "cluster_aggregate.json")),
+      summaryYaml: readText(path.join(clusterDir, "cluster_summary.yaml")),
+      summaryMeta: readJson(path.join(clusterDir, "cluster_summary_meta.json")),
+      medoidYaml: readText(path.join(clusterDir, "medoid_trial.yaml")),
+      medoidMeta: readJson(path.join(clusterDir, "medoid_trial_meta.json")),
+    });
   }
   results.sort((a, b) => a.cluster - b.cluster);
+  splitClusters.sort(
+    (a, b) => Number(a.cluster) - Number(b.cluster),
+  );
 
+  const icPairsDir = path.join(runDir, "ic_pairs");
+  const icPairs: Array<{ name: string; yaml: string }> = [];
+  if (fs.existsSync(icPairsDir)) {
+    for (const f of fs.readdirSync(icPairsDir).sort()) {
+      if (!f.endsWith(".yaml")) continue;
+      icPairs.push({
+        name: f,
+        yaml: fs.readFileSync(path.join(icPairsDir, f), "utf-8"),
+      });
+    }
+  }
   const promptDir = path.join(projectRoot, "app", "llm_pipeline", "prompt_templates");
   const prompts: Record<string, string> = {};
   for (const [key, fname] of Object.entries(PROMPT_FILES)) {
@@ -275,5 +311,16 @@ export async function GET(req: NextRequest) {
     prompts[key] = fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : "";
   }
 
-  return NextResponse.json({ batchId, folder, clusters, prompts, models: MODELS, results });
+  return NextResponse.json({
+    batchId,
+    folder,
+    clusters,
+    prompts,
+    models: MODELS,
+    results,
+    splitAnalysis: {
+      clusters: splitClusters,
+      icPairs,
+    },
+  });
 }

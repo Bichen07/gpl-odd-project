@@ -77,6 +77,20 @@ type ResultEntry = {
   rawYaml: string;
 };
 
+type SplitClusterCard = {
+  cluster: number;
+  aggregate: Record<string, unknown> | null;
+  summaryYaml: string;
+  summaryMeta?: Record<string, unknown> | null;
+  medoidYaml: string;
+  medoidMeta?: Record<string, unknown> | null;
+};
+
+type SplitAnalysis = {
+  clusters: SplitClusterCard[];
+  icPairs: Array<{ name: string; yaml: string }>;
+};
+
 type Config = {
   batchId: string;
   folder: string;
@@ -84,13 +98,15 @@ type Config = {
   prompts: Record<string, string>;
   models: ModelOption[];
   results?: ResultEntry[];
+  splitAnalysis?: SplitAnalysis | null;
 };
 
 const PROMPT_LABELS: Array<{ key: string; label: string; help: string }> = [
-  { key: "system", label: "System Prompt (Analyzer)", help: "Persona + output contract for Pass 1." },
-  { key: "common_sense", label: "Common-Sense / Domain Rules", help: "Right-of-way, TTC thresholds, behavior taxonomy." },
-  { key: "interaction", label: "Interaction Task Prompt", help: "Main task. Placeholders: {cluster_stats} {agent_actions_log} {map_description}" },
-  { key: "reviewer", label: "Reviewer Prompt (Pass 2)", help: "Skeptical audit. Placeholders: {cluster_stats} {agent_actions_log} {preliminary_yaml}" },
+  { key: "system", label: "System prompt", help: "Persona + CoT/YAML output contract for all products." },
+  { key: "common_sense", label: "Domain rules / glossary", help: "Metrics glossary + motive labels shared by all products." },
+  { key: "medoid", label: "Medoid trial prompt", help: "Motive / decision timeline for one medoid trial." },
+  { key: "summary", label: "Cluster summary prompt", help: "Caption over enriched TTC/IC digests." },
+  { key: "ic_pair", label: "IC closest-pair prompt", help: "Contrast two near-IC trials across clusters." },
 ];
 
 function snapshotLabel(name: string): string {
@@ -359,6 +375,13 @@ export default function AnalyzeClient({
   const [running, setRunning] = useState<boolean>(false);
   const [activeClusters, setActiveClusters] = useState<number[]>([]);
   const [results, setResults] = useState<ResultEntry[]>([]);
+  const [splitAnalysis, setSplitAnalysis] = useState<SplitAnalysis | null>(null);
+  const [splitSubTab, setSplitSubTab] = useState(0);
+  const [products, setProducts] = useState({
+    medoid: true,
+    summary: true,
+    "ic-pairs": true,
+  });
   const [logs, setLogs] = useState<string>("");
   const [logFile, setLogFile] = useState<string>("");
   const [runError, setRunError] = useState<string | null>(null);
@@ -380,6 +403,7 @@ export default function AnalyzeClient({
       setSelected(sel);
       setRunClusters(new Set(cfg.clusters.map((c) => c.cluster)));
       if (cfg.results?.length) setResults(cfg.results);
+      setSplitAnalysis(cfg.splitAnalysis ?? null);
     },
     [autoCount],
   );
@@ -651,6 +675,10 @@ export default function AnalyzeClient({
           temperature,
           review,
           dryRun,
+          products: Object.entries(products)
+            .filter(([, on]) => on)
+            .map(([k]) => k)
+            .join(","),
           prompts,
           selectedImages,
         }),
@@ -662,6 +690,11 @@ export default function AnalyzeClient({
         if (Array.isArray(data.results)) mergeResults(data.results);
         setLogs(data.logs ?? data.error ?? "");
         if (!data.ok) setRunError(`Run failed (code ${data.exitCode ?? "?"}).`);
+        try {
+          await reloadConfig();
+        } catch {
+          /* ignore */
+        }
         return;
       }
 
@@ -692,6 +725,11 @@ export default function AnalyzeClient({
             if (msg.logFile) setLogFile(String(msg.logFile));
             if (!msg.ok) {
               setRunError(`Run exited with code ${msg.exitCode}. Check the live log below.`);
+            }
+            try {
+              await reloadConfig();
+            } catch {
+              /* keep in-memory results if refresh fails */
             }
           }
         }
@@ -853,6 +891,13 @@ export default function AnalyzeClient({
       <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
         <Tab label="Analysis" />
         <Tab label={`Evaluation${currentQuality ? ` (score ${currentQuality.final_score?.toFixed(1)})` : ""}`} />
+        <Tab
+          label={`Split cards${
+            splitAnalysis?.clusters?.length
+              ? ` (${splitAnalysis.clusters.length})`
+              : ""
+          }`}
+        />
       </Tabs>
 
       {/* ===== EVALUATION TAB ===== */}
@@ -1061,7 +1106,7 @@ export default function AnalyzeClient({
                   onChange={(_, v) => setTemperature(v as number)}
                 />
               </Box>
-              <Stack direction="row" spacing={2}>
+              <Stack direction="row" spacing={2} flexWrap="wrap">
                 <FormControlLabel
                   control={<Switch checked={review} onChange={(e) => setReview(e.target.checked)} />}
                   label="Reviewer pass"
@@ -1071,6 +1116,34 @@ export default function AnalyzeClient({
                   label="Dry run (stub)"
                 />
               </Stack>
+              <Box>
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  Products
+                </Typography>
+                <Stack direction="row" spacing={1} flexWrap="wrap">
+                  {(
+                    [
+                      ["medoid", "Medoid"],
+                      ["summary", "Summary"],
+                      ["ic-pairs", "IC pairs"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <FormControlLabel
+                      key={key}
+                      control={
+                        <Checkbox
+                          size="small"
+                          checked={products[key]}
+                          onChange={(e) =>
+                            setProducts((p) => ({ ...p, [key]: e.target.checked }))
+                          }
+                        />
+                      }
+                      label={label}
+                    />
+                  ))}
+                </Stack>
+              </Box>
             </Stack>
           </Paper>
 
@@ -1330,7 +1403,328 @@ export default function AnalyzeClient({
         </Stack>
       </Stack>
       )}
+
+      {activeTab === 2 && (
+        <SplitCardsPanel
+          split={splitAnalysis}
+          folder={config?.folder ?? ""}
+          batchId={batchId}
+          subTab={splitSubTab}
+          onSubTab={setSplitSubTab}
+        />
+      )}
     </Container>
+  );
+}
+
+function fmtNum(v: unknown, digits = 3): string {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+  return v.toFixed(digits);
+}
+
+function DigestTable({
+  title,
+  digest,
+}: {
+  title: string;
+  digest: Record<string, unknown> | null | undefined;
+}) {
+  if (!digest) return null;
+  const keys = ["n", "mean", "std", "min", "p10", "p50", "p90"] as const;
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Typography variant="subtitle2" gutterBottom>
+        {title}
+      </Typography>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            {keys.map((k) => (
+              <TableCell key={k}>{k}</TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          <TableRow>
+            {keys.map((k) => (
+              <TableCell key={k}>
+                {k === "n" ? String(digest[k] ?? "—") : fmtNum(digest[k])}
+              </TableCell>
+            ))}
+          </TableRow>
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
+
+function SplitCardsPanel({
+  split,
+  folder,
+  batchId,
+  subTab,
+  onSubTab,
+}: {
+  split: SplitAnalysis | null;
+  folder: string;
+  batchId: string;
+  subTab: number;
+  onSubTab: (v: number) => void;
+}) {
+  const clusters = split?.clusters ?? [];
+  const [clusterIdx, setClusterIdx] = useState(0);
+  const [pairIdx, setPairIdx] = useState(0);
+  const card = clusters[Math.min(clusterIdx, Math.max(0, clusters.length - 1))] ?? null;
+  const agg = (card?.aggregate ?? null) as Record<string, unknown> | null;
+  const summaryParsed = ((card?.summaryMeta as Record<string, unknown> | null | undefined)
+    ?.parsed ?? null) as Record<string, unknown> | null;
+  const medoidParsed = ((card?.medoidMeta as Record<string, unknown> | null | undefined)
+    ?.parsed ?? null) as Record<string, unknown> | null;
+  const icPairs = split?.icPairs ?? [];
+  const pair = icPairs[Math.min(pairIdx, Math.max(0, icPairs.length - 1))] ?? null;
+
+  if (!split || (clusters.length === 0 && icPairs.length === 0)) {
+    return (
+      <Alert severity="info">
+        No split-analysis artifacts yet for this folder. Run with products Medoid / Summary / IC
+        pairs, then open this tab.
+      </Alert>
+    );
+  }
+
+  return (
+    <Stack spacing={2}>
+      <Typography variant="body2" color="text.secondary">
+        Numbers-first report for batch {batchId} · {folder}. Explore Highlight stays the trial
+        picker; this tab is the saved card viewer.
+      </Typography>
+
+      <Tabs value={subTab} onChange={(_, v) => onSubTab(v)}>
+        <Tab label="Summary" />
+        <Tab label="Medoid" />
+        <Tab label={`IC pairs${icPairs.length ? ` (${icPairs.length})` : ""}`} />
+      </Tabs>
+
+      {(subTab === 0 || subTab === 1) && clusters.length > 0 && (
+        <Stack direction="row" spacing={1} flexWrap="wrap">
+          {clusters.map((c, i) => (
+            <Chip
+              key={c.cluster}
+              label={`cluster ${c.cluster}`}
+              color={i === clusterIdx ? "primary" : "default"}
+              onClick={() => setClusterIdx(i)}
+              size="small"
+            />
+          ))}
+        </Stack>
+      )}
+
+      {subTab === 0 && card && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap">
+            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+              Cluster {card.cluster}
+              {summaryParsed?.label ? ` — ${String(summaryParsed.label)}` : ""}
+            </Typography>
+            {summaryParsed?.risk_level != null && (
+              <Chip size="small" label={`risk: ${String(summaryParsed.risk_level)}`} />
+            )}
+            {agg?.collision_rate != null && (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`collision rate ${fmtNum(agg.collision_rate, 3)} (n=${String(agg.n_trials ?? "—")})`}
+              />
+            )}
+          </Stack>
+          <DigestTable title="TTC (all)" digest={agg?.ttc as Record<string, unknown>} />
+          <DigestTable
+            title="TTC (collide)"
+            digest={agg?.ttc_collide as Record<string, unknown>}
+          />
+          <DigestTable
+            title="TTC (survive)"
+            digest={agg?.ttc_survive as Record<string, unknown>}
+          />
+          {agg?.ic && typeof agg.ic === "object" && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Initial conditions
+              </Typography>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>param</TableCell>
+                    <TableCell>mean</TableCell>
+                    <TableCell>std</TableCell>
+                    <TableCell>p10</TableCell>
+                    <TableCell>p90</TableCell>
+                    <TableCell>range</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {Object.entries(agg.ic as Record<string, Record<string, unknown>>).map(
+                    ([name, d]) => (
+                      <TableRow key={name}>
+                        <TableCell>{name}</TableCell>
+                        <TableCell>{fmtNum(d.mean)}</TableCell>
+                        <TableCell>{fmtNum(d.std)}</TableCell>
+                        <TableCell>{fmtNum(d.p10)}</TableCell>
+                        <TableCell>{fmtNum(d.p90)}</TableCell>
+                        <TableCell>
+                          {Array.isArray(d.range)
+                            ? `[${fmtNum(d.range[0])}, ${fmtNum(d.range[1])}]`
+                            : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ),
+                  )}
+                </TableBody>
+              </Table>
+            </Box>
+          )}
+          {summaryParsed?.caption != null && (
+            <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", mb: 1 }}>
+              {String(summaryParsed.caption)}
+            </Typography>
+          )}
+          {summaryParsed?.consistency_note != null && (
+            <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
+              {String(summaryParsed.consistency_note)}
+            </Typography>
+          )}
+          {!summaryParsed && card.summaryYaml && (
+            <Box
+              component="pre"
+              sx={{ m: 0, p: 1.5, bgcolor: "grey.50", borderRadius: 1, fontSize: 12, overflow: "auto" }}
+            >
+              {card.summaryYaml}
+            </Box>
+          )}
+        </Paper>
+      )}
+
+      {subTab === 1 && card && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Medoid trial
+            {medoidParsed?.trial_id != null ? ` ${String(medoidParsed.trial_id)}` : ""}
+          </Typography>
+          {(medoidParsed?.conflict_metrics || medoidParsed?.outcome) && (
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
+              {medoidParsed.outcome != null && (
+                <Chip size="small" label={`outcome: ${String(medoidParsed.outcome)}`} />
+              )}
+              {medoidParsed.conflict_metrics &&
+                typeof medoidParsed.conflict_metrics === "object" &&
+                Object.entries(medoidParsed.conflict_metrics as Record<string, unknown>).map(
+                  ([k, v]) => (
+                    <Chip
+                      key={k}
+                      size="small"
+                      variant="outlined"
+                      label={`${k}=${typeof v === "number" ? fmtNum(v) : String(v)}`}
+                    />
+                  ),
+                )}
+            </Stack>
+          )}
+          {medoidParsed?.motive_summary != null &&
+            String(medoidParsed.motive_summary) !== "parse_failed" && (
+            <Typography variant="body1" sx={{ whiteSpace: "pre-wrap", mb: 2 }}>
+              {String(medoidParsed.motive_summary)}
+            </Typography>
+          )}
+          {Array.isArray(medoidParsed?.decision_timeline) &&
+            (medoidParsed.decision_timeline as unknown[]).length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Decision timeline
+              </Typography>
+              <Stack spacing={1}>
+                {(medoidParsed.decision_timeline as Array<Record<string, unknown>>).map(
+                  (ev, i) => (
+                    <Box key={i} sx={{ pl: 1, borderLeft: "2px solid", borderColor: "divider" }}>
+                      <Typography variant="caption" color="text.secondary">
+                        t={fmtNum(ev.timestamp ?? ev.t, 2)}s
+                      </Typography>
+                      <Typography variant="body2">{String(ev.description ?? "")}</Typography>
+                    </Box>
+                  ),
+                )}
+              </Stack>
+            </Box>
+          )}
+          {(!medoidParsed ||
+            String(medoidParsed.motive_summary ?? "") === "parse_failed" ||
+            !(Array.isArray(medoidParsed.decision_timeline) &&
+              (medoidParsed.decision_timeline as unknown[]).length)) &&
+            card.medoidYaml && (
+            <Box
+              component="pre"
+              sx={{ m: 0, p: 1.5, bgcolor: "grey.50", borderRadius: 1, fontSize: 12, overflow: "auto", whiteSpace: "pre-wrap" }}
+            >
+              {card.medoidYaml}
+            </Box>
+          )}
+          {medoidParsed &&
+            String(medoidParsed.motive_summary ?? "") !== "parse_failed" &&
+            Array.isArray(medoidParsed.decision_timeline) &&
+            (medoidParsed.decision_timeline as unknown[]).length > 0 &&
+            card.medoidYaml && (
+            <Accordion disableGutters elevation={0}>
+              <AccordionSummary expandIcon={<ExpandMore />}>
+                <Typography fontSize={13}>Raw medoid_trial.yaml</Typography>
+              </AccordionSummary>
+              <AccordionDetails>
+                <Box component="pre" sx={{ m: 0, fontSize: 11, overflow: "auto" }}>
+                  {card.medoidYaml}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          )}
+        </Paper>
+      )}
+
+      {subTab === 2 && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          {icPairs.length === 0 ? (
+            <Alert severity="info">No IC pair YAMLs under ic_pairs/ yet.</Alert>
+          ) : (
+            <>
+              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
+                {icPairs.map((p, i) => (
+                  <Chip
+                    key={p.name}
+                    label={p.name.replace(/\.yaml$/, "")}
+                    color={i === pairIdx ? "primary" : "default"}
+                    onClick={() => setPairIdx(i)}
+                    size="small"
+                  />
+                ))}
+              </Stack>
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                Trial ids in the YAML can be highlighted from Explore → Highlight.
+              </Typography>
+              <Box
+                component="pre"
+                sx={{
+                  m: 0,
+                  p: 1.5,
+                  bgcolor: "grey.50",
+                  borderRadius: 1,
+                  fontSize: 12,
+                  overflow: "auto",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {pair?.yaml ?? ""}
+              </Box>
+            </>
+          )}
+        </Paper>
+      )}
+    </Stack>
   );
 }
 

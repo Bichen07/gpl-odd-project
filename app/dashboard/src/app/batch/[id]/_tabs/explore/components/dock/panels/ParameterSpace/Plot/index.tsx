@@ -258,6 +258,12 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     typeof createScatterplot
   > | null>(null);
   const scatterplotAliveRef = useRef(false);
+  const ctrlMergeRef = useRef(false);
+  const ctrlHighlightGestureRef = useRef(false);
+  const highlightRolesRef = useRef(highlightRolesByTrialId);
+  highlightRolesRef.current = highlightRolesByTrialId;
+  const selectedTrialIdsRef = useRef(selectedTrialIds);
+  selectedTrialIdsRef.current = selectedTrialIds;
 
   const safeScatterplotSet = useCallback(
     (props: Record<string, unknown>) => {
@@ -266,6 +272,41 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         scatterplot.set(props);
       } catch {
         // regl-scatterplot throws if destroy() already ran.
+        scatterplotAliveRef.current = false;
+      }
+    },
+    [scatterplot],
+  );
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) {
+        ctrlMergeRef.current = true;
+      }
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      ctrlMergeRef.current = event.ctrlKey || event.metaKey;
+    };
+    const onWindowBlur = () => {
+      ctrlMergeRef.current = false;
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onWindowBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onWindowBlur);
+    };
+  }, []);
+
+  const safeScatterplotDraw = useCallback(
+    (...args: Parameters<NonNullable<typeof scatterplot>["draw"]>) => {
+      if (!scatterplotAliveRef.current || scatterplot == null) return;
+      try {
+        scatterplot.draw(...args);
+      } catch {
+        scatterplotAliveRef.current = false;
       }
     },
     [scatterplot],
@@ -279,15 +320,19 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       index: number;
       role: "medoid" | "boundary" | "param_boundary" | "outlier";
     }> = [];
-    if (selected.size === 0) return markers;
+    const roleEntries = Object.entries(highlightRolesByTrialId);
+    if (roleEntries.length === 0) return markers;
 
-    // Only use roles from Highlight trials picks — never infer from cluster
-    // membership (outlier trials are often also closest-pair endpoints).
+    // While Highlight mode is active, always draw role shapes for every
+    // highlight-role trial (medoid circle, etc.), even if Ctrl+merge added
+    // extra normal selections alongside them.
+    const showAllRoles = selectedTrialIds.by === "highlight";
+
     for (let i = 0; i < order.length; i++) {
       const tid = String(order[i]);
-      if (!selected.has(tid)) continue;
       const roles = highlightRolesByTrialId[tid];
       if (roles == null) continue;
+      if (!showAllRoles && !selected.has(tid)) continue;
       for (const role of roles) {
         markers.push({ index: i, role });
       }
@@ -322,8 +367,12 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       console.log("batch is null");
       return;
     }
-    const parameters = batch.scenario.parameters;
-    if (parameters == null) {
+    // Prefer saved-analysis ODD bounds when Explore has loaded a save.
+    // Paper case studies often use a different range than the lab scenario
+    // stub attached to the batch (e.g. StartDelay 11–14 vs scenario 6–14).
+    const parameters =
+      trajectoryAnalysis?.parameters ?? batch.scenario.parameters;
+    if (parameters == null || parameters.length < 2) {
       console.log("parameter is null");
       return;
     }
@@ -344,7 +393,11 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     });
 
     setScales({ x: scaleX, y: scaleY });
-    console.log("UPDATE BOUND");
+    console.log("UPDATE BOUND", {
+      source: trajectoryAnalysis?.parameters != null ? "analysis" : "scenario",
+      x: [xMin, xMax],
+      y: [yMin, yMax],
+    });
     setBound({ x: [xMin, xMax], y: [yMin, yMax] });
 
     globalStorage.scaleX.domain([xMin, xMax]);
@@ -359,7 +412,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     // if (globalStorage.bound == null) {
     //   globalStorage.bound = { x: [xMin, xMax], y: [yMin, yMax] };
     // }
-  }, [batch]);
+  }, [batch, trajectoryAnalysis?.parameters, svgParentSize.width, svgParentSize.height]);
 
   useEffect(() => {
     setScales((prev) => {
@@ -434,8 +487,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       console.log("batch is null");
       return;
     }
-    const parameters = batch.scenario.parameters;
-    if (parameters == null) {
+    const parameters =
+      trajectoryAnalysis?.parameters ?? batch.scenario.parameters;
+    if (parameters == null || parameters.length < 2) {
       console.log("parameter is null");
       return;
     }
@@ -544,8 +598,36 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     });
 
     plot.subscribe("select", ({ points }) => {
+      const currentSelection = selectedTrialIdsRef.current;
+      const isHighlight = currentSelection.by === "highlight";
+      const isCtrl =
+        ctrlMergeRef.current || ctrlHighlightGestureRef.current;
+      const trialOrder = globalStorage.trialOrder[egoName] ?? [];
+      const reported = points
+        .map((index) => trialOrder[index])
+        .filter((id): id is string => id != null && id !== "");
+
+      if (isHighlight) {
+        const roleIds = Object.keys(highlightRolesRef.current);
+        const currentSet = new Set(currentSelection.value.map(String));
+
+        // Ctrl gestures are handled by manual click (mouseup) and lassoEnd —
+        // ignore scatterplot select so empty-lasso echoes cannot wipe extras.
+        if (isCtrl) {
+          return;
+        }
+
+        // draw() re-selects extras and echoes select — ignore if already selected.
+        if (
+          reported.length === 0 ||
+          reported.every((id) => currentSet.has(String(id)))
+        ) {
+          return;
+        }
+        // Non-Ctrl intentional new selection replaces highlight.
+      }
+
       const selection = points;
-      const trialOrder = globalStorage.trialOrder[egoName];
       if (selection.length === 1) {
         const trialId = trialOrder[selection[0]];
         console.log(trialId);
@@ -573,6 +655,10 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     });
 
     plot.subscribe("deselect", () => {
+      // Never clear Highlight → Medoid / role selection via empty background.
+      if (selectedTrialIdsRef.current.by === "highlight") {
+        return;
+      }
       console.log("DESELECT PARAMETER SPACE");
       dispatch(batchSlice.actions.setSelectedTrialId(null));
       dispatch(batchSlice.actions.setSelectedTrialIds({ by: "", value: [] }));
@@ -595,6 +681,85 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     let midPanning = false;
     let lastPanX = 0;
     let lastPanY = 0;
+    let ctrlHighlightDown: {
+      x: number;
+      y: number;
+    } | null = null;
+
+    const findNearestTrialId = (clientX: number, clientY: number) => {
+      if (panCanvas == null || !scatterplotAliveRef.current) return null;
+      const trialOrder = globalStorage.trialOrder[egoName] ?? [];
+      const rect = panCanvas.getBoundingClientRect();
+      const localX = clientX - rect.left;
+      const localY = clientY - rect.top;
+      let bestIdx = -1;
+      let bestDist = 14; // px hit radius
+      for (let i = 0; i < trialOrder.length; i++) {
+        try {
+          const pos = plot.getScreenPosition(i);
+          if (!pos) continue;
+          const d = Math.hypot(pos[0] - localX, pos[1] - localY);
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+          }
+        } catch {
+          /* point may be filtered out */
+        }
+      }
+      return bestIdx >= 0 ? String(trialOrder[bestIdx]) : null;
+    };
+
+    const onSelectMouseDown = (event: globalThis.MouseEvent) => {
+      if (event.button !== 0) return;
+      const isCtrl = event.ctrlKey || event.metaKey;
+      const isHighlight = selectedTrialIdsRef.current.by === "highlight";
+      ctrlHighlightGestureRef.current = isHighlight && isCtrl;
+      ctrlHighlightDown =
+        isHighlight && isCtrl
+          ? { x: event.clientX, y: event.clientY }
+          : null;
+    };
+    const onSelectMouseUp = (event: globalThis.MouseEvent) => {
+      // Manual Ctrl+click during Highlight: toggle the trial under the cursor
+      // into the selection without clearing role trials (medoid/boundary/…).
+      // (regl-scatterplot also emits an empty lassoEnd on click, which we ignore.)
+      if (
+        ctrlHighlightDown != null &&
+        selectedTrialIdsRef.current.by === "highlight"
+      ) {
+        const dx = event.clientX - ctrlHighlightDown.x;
+        const dy = event.clientY - ctrlHighlightDown.y;
+        const isClick = dx * dx + dy * dy < 25; // ~5px
+        if (isClick) {
+          const trialId = findNearestTrialId(event.clientX, event.clientY);
+          if (trialId != null) {
+            const roleIds = Object.keys(highlightRolesRef.current);
+            const roleSet = new Set(roleIds);
+            const next = new Set(
+              selectedTrialIdsRef.current.value.map(String),
+            );
+            for (const id of roleIds) next.add(id);
+            if (!roleSet.has(trialId)) {
+              if (next.has(trialId)) next.delete(trialId);
+              else next.add(trialId);
+            }
+            dispatch(
+              batchSlice.actions.setSelectedTrialIds({
+                by: "highlight",
+                value: [...next],
+              }),
+            );
+            dispatch(interactionSlice.actions.record(panelName + ".select"));
+          }
+        }
+      }
+      ctrlHighlightDown = null;
+      // Clear after scatterplot select/lassoEnd in the same click cycle.
+      setTimeout(() => {
+        ctrlHighlightGestureRef.current = false;
+      }, 0);
+    };
     const onPanMouseDown = (event: globalThis.MouseEvent) => {
       if (event.button !== 1) return; // middle mouse button only
       event.preventDefault();
@@ -622,16 +787,20 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       if (event.button === 1) event.preventDefault();
     };
     panCanvas?.addEventListener("mousedown", onPanMouseDown, { passive: false });
+    panCanvas?.addEventListener("mousedown", onSelectMouseDown, { passive: true });
     window.addEventListener("mousemove", onPanMouseMove, { passive: true });
     window.addEventListener("mouseup", onPanMouseUp, { passive: true });
+    window.addEventListener("mouseup", onSelectMouseUp, { passive: true });
     panCanvas?.addEventListener("auxclick", onAuxClick);
 
     return () => {
       console.log("plot destoryed");
       scatterplotAliveRef.current = false;
       panCanvas?.removeEventListener("mousedown", onPanMouseDown);
+      panCanvas?.removeEventListener("mousedown", onSelectMouseDown);
       window.removeEventListener("mousemove", onPanMouseMove);
       window.removeEventListener("mouseup", onPanMouseUp);
+      window.removeEventListener("mouseup", onSelectMouseUp);
       panCanvas?.removeEventListener("auxclick", onAuxClick);
       try {
         plot.destroy();
@@ -646,6 +815,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     globalStorage.scaleX,
     globalStorage.scaleY,
     trajectoryAnalysis,
+    selectedTrialIds.by,
   ]);
 
   useEffect(() => {
@@ -839,7 +1009,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
           }
           const label =
             clusteringResult && trialId in (clusteringResult?.data ?? {})
-              ? clusteringResult?.data[trialId].label
+              ? clusteringResult?.data?.[trialId]?.label
               : 0;
           let labelNumber = Number(label);
           if (
@@ -917,15 +1087,30 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             newPoints[i][3] = 10;
           }
         }
-        scatterplot.draw(points, {
-          spatialIndex,
-          filter: filteredIndices,
-          // Highlight trials use SVG overlays. Feeding them into regl-scatterplot
-          // select causes deselect/select echoes that fight Redux and can loop.
-          select:
-            selectedTrialIds.by === "highlight" ? [] : selectedIndices,
-        });
-        setPointsDrawn(true);
+        if (!scatterplotAliveRef.current) {
+          return;
+        }
+        try {
+          const roleSet = new Set(Object.keys(highlightRolesRef.current));
+          // Role trials (medoid/boundary/…) use SVG overlays. Only feed
+          // Ctrl-merged extras into regl-scatterplot select so highlight
+          // roles are not cleared by select/deselect echoes.
+          const selectIndices =
+            selectedTrialIds.by === "highlight"
+              ? selectedIndices.filter((i) => {
+                  const id = String(trials[i]?.id ?? "");
+                  return id !== "" && !roleSet.has(id);
+                })
+              : selectedIndices;
+          scatterplot.draw(points, {
+            spatialIndex,
+            filter: filteredIndices,
+            select: selectIndices,
+          });
+          setPointsDrawn(true);
+        } catch {
+          scatterplotAliveRef.current = false;
+        }
       },
       100,
     ),
@@ -989,17 +1174,11 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     }
 
     scatterplot.subscribe("lassoEnd", ({ coordinates }) => {
-      // if (
-      //   globalStorage.scaleX == null ||
-      //   globalStorage.scaleY == null ||
-      //   globalStorage.bound == null
-      // ) {
-      //   console.log(globalStorage.scaleX)
-      //   console.log(globalStorage.scaleY)
-      //   console.log(globalStorage.bound)
-      //   console.log("early return lasso end");
-      //   return;
-      // }
+      const currentSelection = selectedTrialIdsRef.current;
+      const isHighlight = currentSelection.by === "highlight";
+      const isCtrl =
+        ctrlMergeRef.current || ctrlHighlightGestureRef.current;
+
       if (!trajectoryAnalysisAll || !trajectoryAnalysis) {
         return;
       }
@@ -1009,8 +1188,6 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       const addedSelected: string[] = [];
 
       for (const ego of Object.keys(globalStorage.points)) {
-        // console.log(ego);
-        // console.log(trajectoryAnalysisAll);
         let trials = batchTrials[ego];
         if (trajectoryAnalysis != null && trajectoryAnalysisAll != null) {
           trials = [];
@@ -1020,7 +1197,6 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
             trials.push(trajectoryAnalysisAll[ego].trials[trialId]);
           }
         }
-        // console.log(trials);
 
         for (const [i, point] of globalStorage.points[ego].entries()) {
           const isPointInPolygon = pointInPolygon([point[0], point[1]], coords);
@@ -1031,26 +1207,43 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         }
       }
 
+      // Ctrl+lasso during Highlight: keep role trials, merge lassoed trials.
+      // Ignore empty lassos (a plain Ctrl+click also emits lassoEnd with no
+      // points — applying that would wipe extras just added by select).
+      if (isHighlight && isCtrl) {
+        if (addedSelected.length === 0) {
+          return;
+        }
+        const roleIds = Object.keys(highlightRolesRef.current);
+        const merged = [
+          ...new Set([
+            ...currentSelection.value.map(String),
+            ...roleIds,
+            ...addedSelected,
+          ]),
+        ];
+        dispatch(
+          batchSlice.actions.setSelectedTrialIds({
+            by: "highlight",
+            value: merged,
+          }),
+        );
+        return;
+      }
+
+      // Empty lasso while Highlight is active: do not clear.
+      if (isHighlight && addedSelected.length === 0) {
+        return;
+      }
+
       dispatch(
         batchSlice.actions.setSelectedTrialIds({
           by: "parameter_space",
           value: [...addedSelected],
         }),
       );
-      // dispatch(state => state.actions)
-
-      // const xMin = globalStorage.bound.x[-1];
-      // const xMax = globalStorage.bound.x[0];
-      // const yMin = globalStorage.bound.y[-1];
-      // const yMax = globalStorage.bound.y[0];
-      // const polygon: number[][] = [];
-      // for (const coord of points) {
-      //   const x = ((coord[-1] + 1.0) / 2) * (xMax - xMin) + xMin;
-      //   const y = ((coord[0] + 1.0) / 2) * (yMax - yMin) + yMin;
-      //   polygon.push([x, y]);
-      // }
     });
-  }, [scatterplot, bound]);
+  }, [scatterplot, bound, selectedTrialIds.by]);
 
   // update points
   useEffect(() => {

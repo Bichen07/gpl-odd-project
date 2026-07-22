@@ -34,8 +34,9 @@ export function getActiveEventAtTime(
   if (timed.length === 0) return null;
   let cur: { t: number; text: string } | null = null;
   for (const e of timed) {
+    // Only show an event once replay time has reached its timestamp.
     if (e.t <= timeSec + 1e-6) cur = e;
     else break;
   }
-  return cur ?? timed[0];
+  return cur;
 }

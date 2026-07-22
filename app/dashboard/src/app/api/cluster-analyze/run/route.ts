@@ -102,6 +102,10 @@ export async function POST(req: NextRequest) {
   const clusters = Array.isArray(body.clusters) ? body.clusters.map((c) => Number(c)) : null;
   const prompts = (body.prompts ?? {}) as Record<string, string>;
   const selectedImages = (body.selectedImages ?? {}) as Record<string, string[]>;
+  const products =
+    typeof body.products === "string" && body.products.trim()
+      ? body.products.trim()
+      : "medoid,summary,ic-pairs";
 
   if (!/^\d+$/.test(batchId) || !/^\d+_cluster_s=[-0-9.]+$/.test(folder)) {
     return Response.json({ error: "invalid batchId or folder" }, { status: 400 });
@@ -134,6 +138,8 @@ export async function POST(req: NextRequest) {
     promptsPath,
     "--images-json",
     imagesPath,
+    "--products",
+    products,
   ];
   if (!review) args.push("--no-review");
   if (dryRun) args.push("--dry-run");

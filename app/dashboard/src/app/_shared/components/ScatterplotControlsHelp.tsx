@@ -20,7 +20,8 @@ export const SCATTERPLOT_CONTROL_HELP: ReadonlyArray<{
   { action: "Left click", description: "Select one trajectory trial" },
   {
     action: "Ctrl + left click",
-    description: "Add or remove a trial from the current selection",
+    description:
+      "Add or remove a trial from the current selection (does not clear Highlight → Medoid selection)",
   },
   {
     action: "Left drag",
@@ -29,17 +30,13 @@ export const SCATTERPLOT_CONTROL_HELP: ReadonlyArray<{
   {
     action: "Ctrl + left drag",
     description:
-      "Draw a selection range (lasso) and add/remove those trials to the current selection",
+      "Draw a selection range (lasso) and add/remove those trials to the current selection (does not clear Highlight → Medoid selection)",
   },
   {
     action: "Middle mouse button drag",
     description: "Pan / move the plot background",
   },
   { action: "Mouse wheel", description: "Zoom in and out" },
-  {
-    action: "Left drag on empty background",
-    description: "Clear selection",
-  },
   {
     action: "White circle marker",
     description:

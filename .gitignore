@@ -16,12 +16,12 @@ bev_output/**/*.png
 results/
 !results/README.md
 
-# Legacy name kept for backwards compat during transition
-llm_artifacts/**
-!llm_artifacts/.gitkeep
-!llm_artifacts/README.md
+# Paper casestudy media mirror (large zips; scripts stay tracked)
+data/paper_casestudies/**
+!data/paper_casestudies/README.md
+!data/paper_casestudies/manifest.json
 
-# LLM pipeline run captures — auto-generated, not committed
+# LLM pipeline run captures — auto-generated at runtime (capture.py), not committed
 app/llm_pipeline/artifacts/
 
 # Mission Control per-run logs and generated launch scripts

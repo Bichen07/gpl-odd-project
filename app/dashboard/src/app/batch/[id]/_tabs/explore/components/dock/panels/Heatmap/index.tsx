@@ -802,25 +802,30 @@ export default function TrajectoryHeatmap() {
 
             newHeatmapImages[egoName][attribute] = [];
 
-            const imageUrl = trajectoryAnalysis[egoName].fullHeatmaps.find(
-              (i) =>
-                i.url?.includes(attribute) &&
-                i.url?.includes("_" + timeOrS + "_")
-            )?.url;
+            const imageUrl =
+              trajectoryAnalysis[egoName].fullHeatmaps.find(
+                (i) =>
+                  (i.filename?.includes(attribute) ||
+                    i.url?.includes(attribute)) &&
+                  (i.filename?.includes("_" + timeOrS + "_") ||
+                    i.url?.includes("_" + timeOrS + "_")),
+              )?.url;
 
             console.log(imageUrl);
             if (imageUrl) {
               console.log(
                 `Batch images already have this fullimage ${imageName}`
               );
-              const img = document.createElement("img");
-              img.src = imageUrl;
-              img.crossOrigin = "anonymous";
-              newHeatmapImages[egoName][attribute].push(img);
+              try {
+                const img = await loadImageAsync(imageUrl);
+                newHeatmapImages[egoName][attribute].push(img);
 
-              if (attrIndex === 0) {
-                setFullImageWidth(img.width);
-                console.log(img.width);
+                if (attrIndex === 0) {
+                  setFullImageWidth(img.width);
+                  console.log(img.width);
+                }
+              } catch (err) {
+                console.warn(`failed to load fullHeatmap ${imageUrl}`, err);
               }
               continue;
             }
@@ -964,7 +969,7 @@ export default function TrajectoryHeatmap() {
         //   return;
         // }
 
-        const fullImage = fullHeatmapImages[egoName][attr][0];
+        const fullImage = fullHeatmapImages[egoName]?.[attr]?.[0];
         if (!fullImage) return;
 
         return cropRows(fullImage, newHeatmapImages, key).then((_res) => {

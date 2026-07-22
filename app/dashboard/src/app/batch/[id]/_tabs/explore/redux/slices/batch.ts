@@ -106,6 +106,7 @@ export function generateColors(numColors: number) {
 export interface ClusterInterpretationSummary {
   cluster_label?: string;
   ego_perspective_summary?: unknown;
+  motive_summary?: string;
 }
 
 export type ClusterHighlightRole =
@@ -732,16 +733,12 @@ export const batchSlice = createSlice({
         (key) => key === "ttc_min"
       );
 
-      if (spretMinIndex >= 0) {
-        state.selectedMetric =
-          spretMinIndex === -1
-            ? Object.values(state.metrics)[1]
-            : Object.values(state.metrics)[spretMinIndex];
+      if (ttcMinIndex >= 0) {
+        state.selectedMetric = Object.values(state.metrics)[ttcMinIndex];
+      } else if (spretMinIndex >= 0) {
+        state.selectedMetric = Object.values(state.metrics)[spretMinIndex];
       } else {
-        state.selectedMetric =
-          ttcMinIndex === -1
-            ? Object.values(state.metrics)[1]
-            : Object.values(state.metrics)[ttcMinIndex];
+        state.selectedMetric = Object.values(state.metrics)[1];
       }
       state.selectedSafetyBoundaryMetric =
         collisionIndex === -1
@@ -856,6 +853,22 @@ export const batchSlice = createSlice({
           return;
         }
         const nextSet = new Set(next.value.map(String));
+        const nextHasAllRoles = roleIds.every((id) => nextSet.has(id));
+
+        // Ctrl+merge / select echoes often arrive as by:"parameterSpace" with
+        // role trials + extras. Keep highlight roles + markers whenever every
+        // role trial is still present in the new selection.
+        if (prev.by === "highlight" && nextHasAllRoles) {
+          if (sameIdSet(prev.value, next.value.map(String))) {
+            return;
+          }
+          state.selectedTrialIds = {
+            by: "highlight",
+            value: next.value.map(String),
+          };
+          return;
+        }
+
         const echoIsSubsetOfRoles = [...nextSet].every((id) =>
           roleIds.includes(id),
         );

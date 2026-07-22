@@ -14,10 +14,10 @@ export const CLUSTER_HIGHLIGHT_STYLE: Record<
   }
 > = {
   medoid: { label: "Medoid", color: "#FFD54F", shape: "circle" },
-  boundary: { label: "Closest pair (emb)", color: "#4DD0E1", shape: "diamond" },
+  boundary: { label: "Closest pair (emb)", color: "#0659cc", shape: "diamond" },
   param_boundary: {
     label: "Closest pair (IC)",
-    color: "#81C784",
+    color: "#186b1b",
     shape: "square",
   },
   outlier: { label: "Outlier", color: "#FF7043", shape: "triangle" },

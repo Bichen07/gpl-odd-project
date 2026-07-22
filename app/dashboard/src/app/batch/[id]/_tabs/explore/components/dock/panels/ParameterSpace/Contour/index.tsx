@@ -142,6 +142,9 @@ export default function Contour({
           }
 
           const zData = gridPreds ? gridPreds.z : [];
+          if (!zData.length) {
+            continue;
+          }
 
           const zFlattened: number[] = [];
           const zCorrected: number[][] = [];
@@ -160,6 +163,11 @@ export default function Contour({
           }
           const zMin = Math.min(...zFlattened);
           const zMax = Math.max(...zFlattened);
+          // Flat / near-flat GP surfaces (e.g. spret_min capped at 9 for CS2)
+          // make Plotly contour emit speckled noise. Skip those backgrounds.
+          if (!(zMax > zMin + 1e-9)) {
+            continue;
+          }
 
           const getMetricValue = (t: number) => {
             let min = metric?.min ?? 0;

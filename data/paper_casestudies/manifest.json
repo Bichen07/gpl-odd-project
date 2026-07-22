@@ -1,0 +1,46 @@
+{
+  "description": "IEEE ITS 2026 paper case studies mirrored from senior Payload",
+  "source": "https://gpl-odd-payloadcms.chiu41.com",
+  "cases": [
+    {
+      "paper": "Case Study 1",
+      "session_hint": 1,
+      "batch_id": 7,
+      "scenario": "Intersection + motorbike from right (two AV systems)",
+      "analysis_zip": "case1/casestudy1_twoAVs.zip",
+      "egos": [
+        {"name": "ITRI", "paper_system": "A", "k": 4},
+        {"name": "ITRILatest", "paper_system": "B", "k": 3}
+      ],
+      "heatmap_zips": ["case1/heatmap-272.zip", "case1/heatmap-273.zip"],
+      "trajectory_zips": ["case1/trajectories-270.zip", "case1/trajectories-271.zip"],
+      "opendrive": "case1/hct_6-2.xodr",
+      "openscenario": "case1/scenario1_obstacle_start_oldvehicle-3.xosc"
+    },
+    {
+      "paper": "Case Study 2",
+      "session_hint": 3,
+      "batch_id": 9,
+      "scenario": "Overtake parked + opposite oncoming",
+      "analysis_zip": "case2/casestudy2.zip",
+      "alias_zips": ["case2/analysis-3.zip"],
+      "egos": [{"name": "ITRI", "paper_system": "A", "k": 4}],
+      "heatmap_zips": ["case2/heatmap-261.zip"],
+      "trajectory_zips": ["case2/trajectories-259.zip"],
+      "opendrive": "case2/hct_6-1.xodr",
+      "openscenario": "case2/scenario3.xosc"
+    },
+    {
+      "paper": "Case Study 3",
+      "session_hint": 2,
+      "batch_id": 8,
+      "scenario": "Overtake / cut-in from left",
+      "analysis_zip": "case3/casestudy3.zip",
+      "egos": [{"name": "ITRI", "paper_system": "A", "k": 6}],
+      "heatmap_zips": ["case3/heatmap-251.zip"],
+      "trajectory_zips": ["case3/trajectories-249.zip"],
+      "opendrive": "case3/hct_6-1.xodr",
+      "openscenario": "case3/scenario3.xosc"
+    }
+  ]
+}

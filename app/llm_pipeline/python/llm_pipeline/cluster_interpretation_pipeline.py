@@ -677,7 +677,7 @@ def interpret_cluster_dir(
     # heatmap) living next to the cluster; else fall back to alldatasets search.
     # If none exists we leave it None — we no longer reuse BEV[0] as a fake heatmap.
     heatmap = None
-    for cand in (cluster_dir / "trajectory_overlay.png", cluster_dir / "mfpca_heatmap.png"):
+    for cand in (cluster_dir / "mfpca_heatmap.png",):
         if cand.is_file():
             heatmap = cand
             break
@@ -685,65 +685,31 @@ def interpret_cluster_dir(
         heatmap = resolve_mfpca_heatmap(dataset, cluster_id, heatmap_search_dirs)
 
     model = normalize_model_name(model)
-    if dry_run or not has_llm_credentials(model, api_key):
-        if dry_run:
-            reason = "dry_run"
-        else:
-            reason = f"{api_key_env_hint(model)} not set"
-        return write_stub_interpretation(
-            cluster_dir, cluster_id, medoid_trial_id, cluster_stats, reason
-        )
+    from .split_analysis import run_split_analysis
 
-    if not bev_paths:
-        return write_stub_interpretation(
-            cluster_dir,
-            cluster_id,
-            medoid_trial_id,
-            cluster_stats,
-            "missing BEV snapshots",
-        )
-
-    from .cluster_interpreter import ClusterInterpreter
-
-    xodr = xodr_path_for_dataset(dataset)
-    from .paths import PROMPT_TEMPLATES_DIR
-
-    prompt_dir = PROMPT_TEMPLATES_DIR
-    interpreter = ClusterInterpreter(
+    results_dir = cluster_dir.parent
+    run_split_analysis(
+        results_dir,
+        batch_id=None,
+        dataset=dataset,
         model=model,
-        xodr_path=str(xodr) if xodr.is_file() else None,
-        prompt_dir=str(prompt_dir),
-        api_key=llm_api_key_for_model(model, api_key),
+        api_key=api_key,
+        products="medoid,summary",
+        clusters=[cluster_id],
+        dry_run=dry_run,
         temperature=temperature,
-        prompt_overrides=prompt_overrides,
-        do_review=do_review,
+        max_llm_snapshots=max_llm_snapshots,
     )
-
-    result = interpreter.analyze_cluster(
-        cluster_id=cluster_id,
-        cluster_stats=cluster_stats,
-        medoid_trial_id=medoid_trial_id,
-        medoid_action_log=action_log,
-        bev_snapshot_paths=bev_paths,
-        mfpca_heatmap_path=str(heatmap) if heatmap else None,
-    )
-    if result is None:
-        return write_stub_interpretation(
-            cluster_dir,
-            cluster_id,
-            medoid_trial_id,
-            cluster_stats,
-            "LLM analysis failed",
-        )
-
     out = cluster_dir / "cluster_interpretation.yaml"
-    out.write_text(result.raw_yaml, encoding="utf-8")
-    meta = cluster_dir / "interpretation_meta.json"
-    meta.write_text(
-        json.dumps(interpretation_to_dict(result), indent=2),
-        encoding="utf-8",
+    if out.is_file():
+        return out
+    return write_stub_interpretation(
+        cluster_dir,
+        cluster_id,
+        medoid_trial_id,
+        cluster_stats,
+        "split_analysis produced no shim",
     )
-    return out
 
 
 def run_stage2b_for_run_dir(

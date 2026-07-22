@@ -698,17 +698,43 @@ Optional: **Save** uploads an `analyze.zip` to Payload for faster reload later.
 
 ## 5. BEV & LLM Pipeline (Research)
 
-Research tooling for bird's-eye views and LLM-based cluster interpretation. Code layout:
+End-to-end path from **fresh simulation** → clustering → BEV pack → split LLM cards.
 
+### Workflow & dataflow
 
-| Path                                    | Role                                                                                  |
-| --------------------------------------- | ------------------------------------------------------------------------------------- |
-| `app/analyzer/src/dataset_builder.py`   | **Single CLI:** auto map ensure + medoid BEV / labels / context                       |
-| `app/analyzer/src/map_assets.py`        | Library: odrplot tracks + map yaml/jpg (imported by dataset_builder)                  |
-| `app/analyzer/src/`                     | Clustering stack + BEV (`map_plotter`, `tier2_renderer`, labeller, …)                 |
-| `app/llm_pipeline/python/llm_pipeline/` | LLM package: stages 1–5 CLI, `cluster_interpreter`, `cluster_interpretation_pipeline` |
-| `app/llm_pipeline/prompt_templates/`    | Prompt files for cluster interpretation                                               |
+```text
+Sampling (/initialize, /suggest, /register)
+  → Simulation (SPSS / esmini)
+  → records/esmini_<batch>_<index>.csv          [trajectory ground truth]
+  → sampler posts observations + KPIs to Payload
+  → Dashboard Explore → Analyzer /trajectory_analysis
+  → MFPCA + UMAP + HDBSCAN (in Payload saved analysis zip)
+  → dataset_builder.py (clustering + local CSV → results/…)
+  → llm_pipeline.cli cluster-interpret (split products)
+  → Analyze UI (Split cards) / Explore Replayer (timeline from medoid_trial)
+```
 
+| Stage | System | Primary code |
+| ----- | ------ | ------------ |
+| Simulate + record | esmini / ROS | `simulation/ros/src/scenario_search/…` |
+| Upload trials / KPIs | Sampler + Payload | `scenario_sampler.py`, Payload collections |
+| MFPCA / HDBSCAN | Analyzer `:9010` | `app/analyzer/src/controller.py` |
+| Select / save clustering | Dashboard Explore | `app/dashboard` → Payload `savedTrajectoryAnalysis` |
+| Build medoid / BEV / labels | Analyzer dataset builder | `app/analyzer/src/dataset_builder.py` |
+| LLM cards (medoid / summary / IC pairs) | LLM pipeline | `app/llm_pipeline/` → `scripts/run_cluster_analyze.sh` |
+
+**Authoritative trajectory:** local CSV `simulation/ros/.cache/scenario_search/records/esmini_<batch>_<index>.csv`.  
+**Clustering source for builds:** Payload saved analysis (not legacy `alldatasets/` / `old_alldatasets/`).
+
+Code layout:
+
+| Path | Role |
+| ---- | ---- |
+| `app/analyzer/src/dataset_builder.py` | Map ensure + medoid BEV / labels / context / closest pairs |
+| `app/analyzer/src/conflict_frame_selector.py` | Conflict keyframes; dual-panel pair-zoom \| ego-zoom |
+| `app/analyzer/src/tier2_renderer.py` | BEV rendering |
+| `app/llm_pipeline/python/llm_pipeline/` | Split-analysis products + CLI |
+| `app/llm_pipeline/prompt_templates/` | Active prompts (see `app/llm_pipeline/README.md`) |
 
 ```bash
 conda activate analyzer
@@ -764,22 +790,21 @@ python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only --force-map
 ```
 results/map/                         # shared (auto-ensured)
   hct_6_no_930.xodr / _tracks.csv / .yaml / .jpg …
-results/batch2/4_cluster_s=0.6945/
+results/batch2/3_cluster_s=0.7036/
 ├── clustering/selectedClusteringResult.json
 ├── manifest.json                    # medoids + boundary_pairs + param_boundary_pairs
-└── cluster0/   (also cluster1, …)
-    ├── action.yaml
-    ├── description.txt
-    ├── cluster.json
-    ├── context.md
-    ├── trajectory.csv
-    ├── map_overview.jpg
-    ├── trajectory_overlay.png
-    ├── snapshots/
-    │   └── trial_*_t_*.jpg
-    ├── outlier_trials/trial_<esmini_idx>/     # farthest-from-medoid (embedding)
-    ├── boundary_c<M>/trial_<esmini_idx>/      # closest pair in MFPCA embedding space
-    └── param_boundary_c<M>/trial_<esmini_idx>/ # closest pair in Parameter Space (ICs)
+├── ic_pairs/pair_c{A}_c{B}.yaml
+└── clusterN/
+    ├── action.yaml / description.txt / context.md
+    ├── cluster.json / cluster_aggregate.json
+    ├── trajectory.csv / map_overview.jpg
+    ├── snapshots/*.jpg              # dual-panel: left=pair zoom, right=ego ±R
+    ├── medoid_trial.yaml            # card A (trial motives)
+    ├── cluster_summary.yaml         # card B (cluster caption)
+    ├── cluster_interpretation.yaml  # thin pointer only (no timeline copy)
+    ├── outlier_trials/trial_<idx>/
+    ├── boundary_c<M>/trial_<idx>/   # MFPCA embedding closest pair
+    └── param_boundary_c<M>/trial_<idx>/  # IC closest pair
 ```
 
 **Auxiliary trial scopes** (same CLI — rebuild selectively with `--from-run`):
@@ -803,7 +828,9 @@ python3 app/analyzer/src/dataset_builder.py \
 Medoid / Closest pair (emb) / Closest pair (IC) / Outlier; markers appear in
 ParameterSpace (green square = IC) and ProjectionSpace (cyan diamond = emb).
 
-**BEV rendering knobs** (same CLI — see `python3 app/analyzer/src/dataset_builder.py -h`):
+**BEV dual-panel:** each `snapshots/*.jpg` is `pair zoom | ego ±R` (default R=30 m).
+Left is always the ego–partner frustum (`pair_zoom_bounds`), not the whole map.
+Set `--ego-zoom-radius 0` for a single-panel fallback.
 
 | Flag | Default | What it controls |
 | ---- | ------- | ---------------- |
@@ -814,42 +841,71 @@ ParameterSpace (green square = IC) and ProjectionSpace (cyan diamond = emb).
 | `--max-snapshots` | uncapped | Cap BEV frames per medoid |
 | `--force-map` / `--skip-map` | off | Force / skip auto map ensure |
 
+Code: `dataset_builder.py` → `map_assets.py` + `tier2_renderer` / `map_plotter` / `conflict_frame_selector`.
+
+### LLM pipeline — cluster interpretation (terminal)
+
+After preprocess has produced `results/batch<id>/<k>_cluster_s=…/`, run interpretation
+from the **repo root** in the `analyzer` conda env. Product details, prompts, and
+dataflow: [`app/llm_pipeline/README.md`](app/llm_pipeline/README.md).
+
+#### 1. API key (required for live LLM)
+
+The CLI reads the key from the **shell environment** (not from `app/analyzer/.env`
+or `app/dashboard/.env` — those are for Payload only).
+
+| Provider | Env var | Typical model |
+| -------- | ------- | ------------- |
+| **Gemini** (default) | `GOOGLE_API_KEY` | `gemini-2.5-flash` |
+| OpenAI | `OPENAI_API_KEY` | `gpt-4o` |
+
 ```bash
-python3 app/analyzer/src/dataset_builder.py \
-  --batch-id 2 --k 4 --silhouette 0.6945 \
-  --agent-id-size 18 --snapshot-size 1536
+# Prefer export in this terminal session (do not commit keys):
+export GOOGLE_API_KEY="your-gemini-key-here"
+# or:  export OPENAI_API_KEY="sk-..."
 ```
 
-Code: `dataset_builder.py` → `map_assets.py` + `tier2_renderer` / `map_plotter`.
+**Where to get a Gemini key:** [Google AI Studio](https://aistudio.google.com/apikey).
 
-### LLM pipeline — cluster interpretation
+**Dashboard “Select and analyze”:** paste the same key in the UI; the Next API route
+injects it into the env for `scripts/run_cluster_analyze.sh` only (never written to disk).
 
-After the preprocess step above has produced `results/batch<id>/<k>_cluster_s=…/`:
+#### 2. Run interpretation
+
+Default products: **medoid**, **summary**, **ic-pairs**.  
+`--products legacy` = alias for `medoid,summary` (thin `cluster_interpretation.yaml` pointer).
 
 ```bash
+cd /path/to/gpl-odd-project
+conda activate analyzer
+export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
+export GOOGLE_API_KEY="your-gemini-key-here"
+
 python3 -m llm_pipeline.cli cluster-interpret \
-  --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2
-
-python3 -m llm_pipeline.cli cluster-interpret \
-  --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2 --dry-run
+  --results-dir results/batch2/3_cluster_s=0.7036 --batch-id 2 \
+  --products medoid,summary,ic-pairs --no-review
 ```
 
-Or:
+#### 3. Outputs (roles)
 
-```bash
-bash scripts/run_cluster_analyze.sh \
-  --results-dir results/batch2/4_cluster_s=0.6945 --batch-id 2
+| File | Role |
+| ---- | ---- |
+| `clusterN/cluster_aggregate.json` | Deterministic TTC/IC digests (from Payload KPIs) |
+| `clusterN/medoid_trial.yaml` | **Trial** card — motive timeline (canonical) |
+| `clusterN/cluster_summary.yaml` | **Cluster** card — caption + risk over digests |
+| `ic_pairs/pair_c{A}_c{B}.yaml` | IC closest-pair contrast |
+| `clusterN/cluster_interpretation.yaml` | Thin pointer (label/risk/caption only — **no** timeline duplicate) |
+
+Analyze → **Split cards** is the report viewer. Explore Replayer loads the timeline from
+`medoid_trial` via the status API (not from a copied shim field).
+
+#### 4. Next (future): IC boundary model → XOSC → resim
+
+```text
+(future) IC safety / boundary model → edge IC candidates
+  → OpenSCENARIO param instantiation → sim → Payload
+  → rebuild dataset_builder + re-interpret
 ```
-
-Remove `--dry-run` and set `GOOGLE_API_KEY` (Gemini, default) or `OPENAI_API_KEY` (gpt-*) for live LLM output.
-
-**Optional — run interpretation automatically after Dashboard Analyze:**
-
-```bash
-export GPL_ODD_CLUSTER_INTERPRETATION=1
-```
-
-Then restart the Analyzer and click **Analyze** in the Dashboard.
 
 More detail: `app/llm_pipeline/README.md`.
 
@@ -1041,23 +1097,21 @@ Do not delete the per-app READMEs — they complement this root overview.
 
 **Legacy alternative:** README §4 Goal B tmux `run.sh` (same ROS stack, no Mission Control API).
 
-**Research integration:** See `cluster_interpreter_integration_plan.md` (Track B) for post-simulation clustering / BEV automation.
+**Research integration:** See root README §5 and `app/llm_pipeline/README.md` for
+clustering / BEV / split LLM cards.
 
 ---
 
 ## Related Files
 
 
-| File                                      | Purpose                                                                             |
-| ----------------------------------------- | ----------------------------------------------------------------------------------- |
+| `app/llm_pipeline/README.md`              | Split LLM products, prompts, dataflow                                               |
 | `HOW_TO_RUN.md`                           | Short quick-reference for commands                                                  |
 | `CHANGELOG.md`                            | Record of code changes                                                              |
 | `ISSUES.md`                               | **Unresolved** problems and directions to verify (not a changelog of fixes)         |
-| `cluster_interpreter_integration_plan.md` | Research integration plan (may live next to the repo clone in your LAB folder)      |
 | `readMD/MISSION_CONTROL.md`               | Simulation pipeline reference (call graph, Payload, vehicle_parameters, how to run) |
 | `readMD/MISSION_CONTROL_USER_GUIDE.md`    | Operator runbook for Mission Control on the lab PC                                  |
 | `app/analyzer/README.md`                  | Analyzer-specific setup details                                                     |
-| `app/llm_pipeline/README.md`              | LLM pipeline stages, CLI, cluster interpretation                                    |
 | `app/sampling/README.md`                  | Sampling server API reference                                                       |
 | `app/dashboard/README.md`                 | Dashboard build steps                                                               |
 | `app/payload/README.md`                   | Payload CMS local setup                                                             |

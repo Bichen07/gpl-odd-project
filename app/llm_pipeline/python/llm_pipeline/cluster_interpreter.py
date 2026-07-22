@@ -128,158 +128,13 @@ class ClusterInterpreter:
         mfpca_heatmap_path: Optional[str] = None,
         map_description: Optional[str] = None,
     ) -> Optional[ClusterInterpretation]:
-        """
-        Run LLM analysis on a single cluster.
-        
-        Args:
-            cluster_id: Cluster label (e.g., 0, 1, 2)
-            cluster_stats: Dict with keys:
-                - n_trials: int
-                - collision_rate: float (0-100)
-                - mean_ttc: float
-                - min_ttc: float
-                - mean_spret: float
-                - parameter_ranges: Dict (e.g., {"oncoming_speed": [50, 70]})
-            medoid_trial_id: Trial ID of cluster medoid
-            medoid_action_log: Formatted action log string for medoid trial
-            bev_snapshot_paths: List of BEV image paths (JPG)
-            mfpca_heatmap_path: Path to MFPCA heatmap image (PNG)
-            map_description: Optional map description text
-        
-        Returns:
-            ClusterInterpretation or None if analysis fails
-        """
-        print(f"\n{'='*60}")
-        print(f"[ClusterInterpreter] Analyzing Cluster {cluster_id}")
-        print(f"[ClusterInterpreter] Medoid trial: {medoid_trial_id}")
-        print(f"{'='*60}")
-        
-        # Load prompts (UI override wins over the on-disk template)
-        system_prompt = self._prompt("system", "cluster_system_prompt.txt")
-        common_sense = self._prompt("common_sense", "cluster_common_sense.txt")
-        interaction_prompt_template = self._prompt("interaction", "cluster_interaction_prompt.txt")
-        reviewer_prompt_template = self._prompt("reviewer", "cluster_reviewer_prompt.txt")
-        
-        if not all([system_prompt, common_sense, interaction_prompt_template]):
-            print("❌ ERROR: Failed to load prompt templates")
-            return None
-        
-        # Format cluster statistics
-        stats_text = self._format_cluster_stats(cluster_stats)
-        
-        # Get map description
-        if map_description is None:
-            map_description = self._get_map_description()
-        
-        # Format main prompt (tolerant of user-edited prompts with stray braces)
-        interaction_prompt = self._safe_format(
-            interaction_prompt_template,
-            cluster_stats=stats_text,
-            agent_actions_log=medoid_action_log,
-            map_description=map_description,
-        )
-        
-        # Encode images. The MFPCA heatmap is OPTIONAL — if no genuine
-        # trajectory-variation image exists we omit it rather than feeding a
-        # duplicate BEV frame mislabeled as a heatmap.
-        bev_images = [self._encode_image(p) for p in bev_snapshot_paths]
-        heatmap_image = self._encode_image(mfpca_heatmap_path) if mfpca_heatmap_path else None
-        print(
-            f"[ClusterInterpreter] Encoding {len(bev_snapshot_paths)} BEV snapshots"
-            + (" + variation heatmap..." if heatmap_image else " (no heatmap)...")
+        """Deprecated mega-YAML path — use split_analysis / complete_yaml_prompt."""
+        raise RuntimeError(
+            "analyze_cluster() mega-YAML path removed. "
+            "Use: python -m llm_pipeline.cli cluster-interpret "
+            "--products medoid,summary,ic-pairs"
         )
 
-        if not all(bev_images):
-            print("❌ ERROR: Failed to encode BEV images")
-            return None
-        
-        # --- PASS 1: Initial analysis ---
-        print("[ClusterInterpreter] Pass 1: Initial cluster analysis...")
-        bev_labels = [self._snapshot_label(p) for p in bev_snapshot_paths]
-        initial_yaml, initial_tokens = self._run_initial_analysis(
-            system_prompt=system_prompt,
-            common_sense=common_sense,
-            interaction_prompt=interaction_prompt,
-            bev_images=bev_images,
-            bev_labels=bev_labels,
-            heatmap_image=heatmap_image,
-            map_description=map_description,
-        )
-        
-        if not initial_yaml:
-            print("❌ ERROR: Initial analysis failed")
-            return None
-        
-        print(f"✅ Initial analysis complete: {initial_tokens['Total']} tokens")
-        
-        # --- PASS 2: Reviewer verification (optional) ---
-        review_tokens = {"Prompt": 0, "Completion": 0, "Total": 0}
-        if not self.do_review:
-            print("[ClusterInterpreter] Review pass disabled — using initial analysis")
-            final_yaml = initial_yaml
-        else:
-            print("[ClusterInterpreter] Pass 2: Reviewer verification...")
-            final_yaml, review_tokens = self._run_reviewer_pass(
-                stats_text=stats_text,
-                medoid_action_log=medoid_action_log,
-                preliminary_yaml=initial_yaml,
-                reviewer_prompt_template=reviewer_prompt_template,
-            )
-            if not final_yaml:
-                print("⚠️  WARNING: Reviewer pass failed, using initial analysis")
-                final_yaml = initial_yaml
-                review_tokens = {"Prompt": 0, "Completion": 0, "Total": 0}
-            else:
-                print(f"✅ Reviewer pass complete: {review_tokens['Total']} tokens")
-        
-        # Parse YAML (tolerate prose wrapper or missing ```yaml fence).
-        # The reviewer (Pass 2) frequently returns a long Chain-of-Thought audit
-        # and omits / truncates the final ```yaml block. In that case fall back
-        # to the Pass-1 baseline rather than discarding a good analysis.
-        parsed = self._parse_interpretation_yaml(final_yaml)
-        if parsed is None and self.do_review and final_yaml is not initial_yaml:
-            print(
-                "⚠️  WARNING: Reviewer output was not valid YAML — "
-                "falling back to Pass 1 baseline analysis"
-            )
-            parsed = self._parse_interpretation_yaml(initial_yaml)
-            if parsed is not None:
-                final_yaml = initial_yaml
-        if parsed is None:
-            return None
-        
-        # Total token usage
-        total_tokens = {
-            "Prompt": initial_tokens["Prompt"] + review_tokens["Prompt"],
-            "Completion": initial_tokens["Completion"] + review_tokens["Completion"],
-            "Total": initial_tokens["Total"] + review_tokens["Total"],
-        }
-        
-        result = ClusterInterpretation(
-            cluster_id=cluster_id,
-            cluster_label=parsed.get("cluster_label", "Unknown"),
-            confidence=parsed.get("confidence", "medium"),
-            behavior_description=parsed.get("behavior_description", ""),
-            safety_assessment=parsed.get("safety_assessment", {}),
-            parameter_conditions=parsed.get("parameter_conditions", {}),
-            ego_perspective_summary=parsed.get("ego_perspective_summary", []),
-            raw_yaml=final_yaml,
-            token_usage=total_tokens,
-            intra_consistency_score=parsed.get("intra_consistency_score"),
-            intra_notes=parsed.get("intra_notes"),
-        )
-        
-        print(f"\n[ClusterInterpreter] ✅ Analysis complete for Cluster {cluster_id}")
-        print(f"    Label: \"{result.cluster_label}\"")
-        print(f"    Confidence: {result.confidence}")
-        print(f"    Total tokens: {total_tokens['Total']}")
-        
-        return result
-    
-    # ------------------------------------------------------------------
-    # Private helpers
-    # ------------------------------------------------------------------
-    
     def _load_prompt(self, filename: str) -> Optional[str]:
         """Load a prompt template file."""
         path = self.prompt_dir / filename
@@ -579,14 +434,13 @@ Intersection geometry:
 
     @staticmethod
     def _extract_yaml_block(text: str) -> str:
-        """Pull YAML from a fenced block or from bare cluster_* keys.
+        """Pull YAML from a fenced block or from bare report keys.
 
         Models often emit a long Chain-of-Thought before the YAML, sometimes in
         a ``yaml``/``yml``/un-tagged fence and sometimes unfenced. Strategy:
-        1. Prefer the **last** fenced block that looks like the report
-           (contains ``cluster_label:``/``cluster_id:``); else the last fence.
-        2. Otherwise slice from the **first** top-level ``cluster_id:`` /
-           ``cluster_label:`` line (column 0) to the end.
+        1. Prefer the **last** fenced block that looks like a report
+           (cluster_* / trial_id / clusters:); else the last fence.
+        2. Otherwise slice from the first top-level report key.
         """
         text = (text or "").strip()
         if not text:
@@ -597,15 +451,33 @@ Intersection geometry:
             for f in re.findall(r"```(?:ya?ml)?\s*([\s\S]*?)```", text, re.IGNORECASE)
             if f.strip()
         ]
+        report_markers = (
+            "cluster_label:",
+            "cluster_id:",
+            "trial_id:",
+            "clusters:",
+            "param_dist:",
+            "motive_summary:",
+            "contrast_explanation:",
+            "numeric_digest_ref:",
+        )
         if fences:
             yaml_like = [
-                f for f in fences if ("cluster_label:" in f or "cluster_id:" in f)
+                f for f in fences if any(m in f for m in report_markers)
             ]
             return (yaml_like or fences)[-1]
 
-        m = re.search(r"(?m)^\s*(?:cluster_id|cluster_label)\s*:", text)
+        m = re.search(
+            r"(?m)^\s*(?:cluster_id|cluster_label|trial_id|clusters|param_dist)\s*:",
+            text,
+        )
         if m:
             return text[m.start() :].strip()
+        # Last-ditch: strip a leading fence if present
+        if text.startswith("```"):
+            inner = re.sub(r"^```(?:ya?ml)?\s*", "", text, flags=re.I)
+            inner = re.sub(r"\s*```\s*$", "", inner)
+            return inner.strip()
         return text
 
     def _parse_interpretation_yaml(self, raw: str) -> Optional[Dict]:
@@ -613,13 +485,52 @@ Intersection geometry:
         for candidate in (raw, self._extract_yaml_block(raw)):
             if not candidate:
                 continue
+            parsed = self._safe_load_yaml_dict(candidate)
+            if parsed is not None:
+                return parsed
+        print(f"❌ ERROR: Failed to parse final YAML (first 120 chars): {raw[:120]!r}")
+        return None
+
+    @staticmethod
+    def _safe_load_yaml_dict(text: str) -> Optional[Dict]:
+        """Load YAML dict; on truncation errors, drop incomplete trailing lines."""
+        if not text or not text.strip():
+            return None
+        body = text.strip()
+        # Drop an unclosed leading fence remnant
+        if body.startswith("```"):
+            body = re.sub(r"^```(?:ya?ml)?\s*", "", body, flags=re.I)
+            body = re.sub(r"\s*```\s*$", "", body)
+        attempts = [body]
+        # Progressive repair for cut-off generations
+        lines = body.splitlines()
+        while lines:
+            # Drop obviously incomplete last line (unclosed quote / mid-scalar)
+            last = lines[-1].rstrip()
+            if (
+                last.count('"') % 2 == 1
+                or last.count("'") % 2 == 1
+                or last.endswith((":", "-", ",", ">", "|"))
+                or (last.lstrip().startswith("- ") and len(last.strip()) < 4)
+            ):
+                lines = lines[:-1]
+                attempts.append("\n".join(lines))
+                continue
+            break
+        # Also try chopping from the end a few times
+        for n in range(1, min(12, len(lines))):
+            attempts.append("\n".join(lines[:-n]))
+        seen = set()
+        for cand in attempts:
+            if not cand or cand in seen:
+                continue
+            seen.add(cand)
             try:
-                parsed = yaml.safe_load(candidate)
-                if isinstance(parsed, dict):
+                parsed = yaml.safe_load(cand)
+                if isinstance(parsed, dict) and parsed:
                     return parsed
             except yaml.YAMLError:
                 continue
-        print(f"❌ ERROR: Failed to parse final YAML (first 120 chars): {raw[:120]!r}")
         return None
 
     def _ensure_loop(self) -> asyncio.AbstractEventLoop:
@@ -675,6 +586,52 @@ Intersection geometry:
     async def _async_invoke_llm(self, llm, messages):
         """Async wrapper for LLM invocation."""
         return await llm.ainvoke(messages)
+
+    def complete_yaml_prompt(
+        self,
+        user_prompt: str,
+        *,
+        system_prompt: Optional[str] = None,
+        bev_snapshot_paths: Optional[List[str]] = None,
+        section_title: str = "BEV Snapshots",
+    ) -> tuple[Optional[str], Dict, Optional[Dict]]:
+        """Single multimodal/text call → YAML string + tokens + parsed dict."""
+        system = system_prompt or (
+            "You are an expert AV safety analyst. Follow the task exactly. "
+            "End with a single ```yaml fenced block matching the required schema."
+        )
+        bev_snapshot_paths = bev_snapshot_paths or []
+        parts: List[Dict] = [{"type": "text", "text": user_prompt}]
+        if bev_snapshot_paths:
+            parts.append({"type": "text", "text": f"\n### {section_title}"})
+            for p in bev_snapshot_paths:
+                img = self._encode_image(p)
+                if not img:
+                    continue
+                parts.append({"type": "text", "text": self._snapshot_label(p)})
+                mime = "image/png" if p.lower().endswith(".png") else "image/jpeg"
+                parts.append({
+                    "type": "image_url",
+                    "image_url": {"url": f"data:{mime};base64,{img}"},
+                })
+        messages = [
+            SystemMessage(content=system),
+            HumanMessage(content=parts),
+        ]
+        try:
+            response, tokens = self._invoke_messages(messages, timeout=180)
+            text = self._response_to_text(response.content)
+        except Exception as e:
+            print(f"❌ ERROR: complete_yaml_prompt failed: {e}")
+            return None, {}, None
+        raw = self._extract_yaml_block(text)
+        if not (raw and (":" in raw)):
+            ext, ext_tok = self._run_yaml_extraction_pass(messages, text)
+            for k, v in (ext_tok or {}).items():
+                tokens[k] = tokens.get(k, 0) + int(v or 0)
+            raw = ext or raw
+        parsed = self._parse_interpretation_yaml(raw) if raw else None
+        return raw, tokens, parsed
 
 
 # Example usage

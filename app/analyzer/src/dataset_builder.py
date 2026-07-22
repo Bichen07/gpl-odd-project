@@ -160,17 +160,102 @@ def _real_cluster_count(result: Dict) -> int:
     return len({v["label"] for v in result.get("data", {}).values()} - {"-1"})
 
 
+def _parse_analysis_zip_bytes(
+    content: bytes,
+    *,
+    source_label: str,
+    duration_mode: str,
+    ego_name: str,
+) -> Optional[Tuple[Dict, List, Dict, Optional[Dict]]]:
+    """Unzip + navigate a saved-analysis zip to (scores, clustering_list, ego_data, selected)."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(content)) as zf:
+            zf_namelist = zf.namelist()
+            json_name = next(
+                (n for n in zf_namelist if n.endswith(".json") and "selected" not in n),
+                None,
+            )
+            if json_name is None:
+                json_name = next((n for n in zf_namelist if n.endswith(".json")), None)
+            if json_name is None:
+                print(f"❌ ERROR: No JSON file found in {source_label}")
+                return None
+            with zf.open(json_name) as jf:
+                analysis = json.load(jf)
+            selected_meta_raw: Optional[Dict] = None
+            if "selected.json" in zf_namelist:
+                try:
+                    with zf.open("selected.json") as sf:
+                        selected_meta_raw = json.load(sf)
+                except Exception as exc:
+                    print(f"⚠️  Could not read selected.json: {exc}")
+    except Exception as exc:
+        print(f"❌ ERROR: Failed to parse zip from {source_label}: {exc}")
+        return None
+
+    ego_data = analysis.get(ego_name)
+    if ego_data is None:
+        print(
+            f"❌ ERROR: ego '{ego_name}' not in saved analysis. "
+            f"Available: {list(analysis.keys())}"
+        )
+        return None
+
+    mfpca_all = ego_data.get("mfpca", {})
+    if duration_mode not in mfpca_all:
+        print(
+            f"❌ ERROR: duration_mode '{duration_mode}' not in mfpca. "
+            f"Available: {list(mfpca_all.keys())}"
+        )
+        return None
+
+    mfpca = mfpca_all[duration_mode]
+    scores = mfpca.get("scores", {})
+    clustering_list = [c for c in mfpca.get("clustering", []) if c is not None]
+
+    if not scores:
+        print("❌ ERROR: mfpca.scores is empty — no embeddings found.")
+        return None
+    if not clustering_list:
+        print("❌ ERROR: mfpca.clustering is empty — no clustering results found.")
+        return None
+
+    return scores, clustering_list, ego_data, selected_meta_raw
+
+
 def _fetch_payload_analysis(
     batch_id: int,
     save_doc_id: Optional[int] = None,
     duration_mode: str = "full",
     ego_name: str = "ITRI",
+    analysis_zip: Optional[str] = None,
 ) -> Optional[Tuple[Dict, List, Dict, Optional[Dict]]]:
-    """Fetch + parse a saved Dashboard analysis zip from Payload.
+    """Fetch + parse a saved Dashboard analysis zip from Payload or a local path.
 
     Returns (scores, clustering_list, ego_data, selected_meta_raw) or None on error.
     Shared by load_clustering_from_payload_save() and list_clusterings_from_payload_save().
+
+    When *analysis_zip* is set, skip Payload download and read that file directly
+    (paper casestudy mirror / offline Path A).
     """
+    if analysis_zip:
+        zip_path = Path(analysis_zip)
+        if not zip_path.is_file():
+            print(f"❌ ERROR: --analysis-zip not found: {zip_path}")
+            return None
+        print(f"  Using local analysis zip: {zip_path}")
+        try:
+            content = zip_path.read_bytes()
+        except OSError as exc:
+            print(f"❌ ERROR: Could not read {zip_path}: {exc}")
+            return None
+        return _parse_analysis_zip_bytes(
+            content,
+            source_label=str(zip_path),
+            duration_mode=duration_mode,
+            ego_name=ego_name,
+        )
+
     # 1. Fetch batch to get saved analysis document list
     try:
         resp = requests.get(
@@ -222,52 +307,12 @@ def _fetch_payload_analysis(
         print(f"❌ ERROR: Could not download {doc_url}: {exc}")
         return None
 
-    # 4. Unzip and parse trajectories.json (and optionally selected.json)
-    try:
-        with zipfile.ZipFile(io.BytesIO(dl.content)) as zf:
-            zf_namelist = zf.namelist()
-            json_name = next((n for n in zf_namelist if n.endswith(".json") and "selected" not in n), None)
-            if json_name is None:
-                json_name = next((n for n in zf_namelist if n.endswith(".json")), None)
-            if json_name is None:
-                print(f"❌ ERROR: No JSON file found in {doc_filename}")
-                return None
-            with zf.open(json_name) as jf:
-                analysis = json.load(jf)
-            selected_meta_raw: Optional[Dict] = None
-            if "selected.json" in zf_namelist:
-                try:
-                    with zf.open("selected.json") as sf:
-                        selected_meta_raw = json.load(sf)
-                except Exception as exc:
-                    print(f"⚠️  Could not read selected.json: {exc}")
-    except Exception as exc:
-        print(f"❌ ERROR: Failed to parse zip from {doc_filename}: {exc}")
-        return None
-
-    # 5. Navigate to ego → mfpca → duration_mode
-    ego_data = analysis.get(ego_name)
-    if ego_data is None:
-        print(f"❌ ERROR: ego '{ego_name}' not in saved analysis. Available: {list(analysis.keys())}")
-        return None
-
-    mfpca_all = ego_data.get("mfpca", {})
-    if duration_mode not in mfpca_all:
-        print(f"❌ ERROR: duration_mode '{duration_mode}' not in mfpca. Available: {list(mfpca_all.keys())}")
-        return None
-
-    mfpca = mfpca_all[duration_mode]
-    scores = mfpca.get("scores", {})
-    clustering_list = [c for c in mfpca.get("clustering", []) if c is not None]
-
-    if not scores:
-        print("❌ ERROR: mfpca.scores is empty — no embeddings found.")
-        return None
-    if not clustering_list:
-        print("❌ ERROR: mfpca.clustering is empty — no clustering results found.")
-        return None
-
-    return scores, clustering_list, ego_data, selected_meta_raw
+    return _parse_analysis_zip_bytes(
+        dl.content,
+        source_label=doc_filename,
+        duration_mode=duration_mode,
+        ego_name=ego_name,
+    )
 
 
 def _collision_flags_from_ego(ego_data: Dict) -> Dict[str, bool]:
@@ -377,86 +422,6 @@ def _cluster_metric_stats_from_ego(
             "mean_spret": round(float(np.mean(spret[lb])), 3) if spret[lb] else None,
             "parameter_ranges": pr,
         }
-    return out
-
-
-def render_cluster_trajectory_overlay(
-    out_path: Path,
-    members: List[Tuple[int, int]],
-    medoid_member: Optional[Tuple[int, int]] = None,
-    title: str = "",
-    max_members: int = 80,
-) -> bool:
-    """Render a per-cluster ego-trajectory variation image (spaghetti plot).
-
-    Overlays every cluster member's ego path (faint blue) with the medoid path
-    highlighted (red). This is the genuine "trajectory variation" signal that
-    replaces the previous behaviour of mislabeling BEV[0] as an MFPCA heatmap.
-    Best-effort: returns False (and writes nothing) if matplotlib is unavailable
-    or no member CSV could be read.
-    """
-    try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-    except Exception as e:  # pragma: no cover
-        print(f"  ⚠️  Trajectory overlay skipped (matplotlib unavailable: {e})")
-        return False
-
-    def _ego_xy(batch: int, idx: int):
-        if not csv_exists(batch, idx):
-            return None
-        df = get_csv_road_data(batch, idx)
-        if df is None or df.empty:
-            return None
-        ego = df[df["name"] == "Ego"].sort_values("time")
-        if ego.empty:
-            return None
-        return ego["x"].to_numpy(), ego["y"].to_numpy()
-
-    paths = []
-    for (b, idx) in members[:max_members]:
-        xy = _ego_xy(b, idx)
-        if xy is not None:
-            paths.append(xy)
-    medoid_xy = _ego_xy(*medoid_member) if medoid_member else None
-    if not paths and medoid_xy is None:
-        return False
-
-    fig, ax = plt.subplots(figsize=(6, 6), dpi=120)
-    for xs, ys in paths:
-        ax.plot(xs, ys, color="#1f77b4", alpha=0.18, linewidth=1.0)
-    if medoid_xy is not None:
-        mx, my = medoid_xy
-        ax.plot(mx, my, color="#d62728", linewidth=2.5, label="medoid")
-        ax.scatter([mx[0]], [my[0]], color="#2ca02c", s=36, zorder=5, label="start")
-    ax.set_aspect("equal", adjustable="datalim")
-    ax.set_title(title or f"Cluster ego-trajectory variation (n={len(paths)})")
-    ax.set_xlabel("x [m]")
-    ax.set_ylabel("y [m]")
-    ax.grid(True, alpha=0.2)
-    if medoid_xy is not None:
-        ax.legend(loc="best", fontsize=8)
-    fig.tight_layout()
-    try:
-        fig.savefig(out_path)
-    finally:
-        plt.close(fig)
-    return True
-
-
-def _cluster_members_from_result(
-    result_data: Dict, cluster_id: int, trial_index_map: Dict[str, Tuple[int, int]]
-) -> List[Tuple[int, int]]:
-    """(batch, index) tuples for every member trial of *cluster_id* with a CSV map."""
-    out: List[Tuple[int, int]] = []
-    for tid, item in (result_data.get("data", {}) or {}).items():
-        label = item.get("label") if isinstance(item, dict) else item
-        if str(label) != str(cluster_id):
-            continue
-        bi = trial_index_map.get(str(tid))
-        if bi:
-            out.append(bi)
     return out
 
 
@@ -710,6 +675,7 @@ def backfill_cluster_stats_in_dir(
     silhouette: Optional[float] = None,
     duration_mode: str = "full",
     ego_name: str = "ITRI",
+    analysis_zip: Optional[str] = None,
 ) -> bool:
     """Patch collision + TTC/SPrET/parameter stats into existing cluster.json files.
 
@@ -731,6 +697,7 @@ def backfill_cluster_stats_in_dir(
         duration_mode=duration_mode,
         ego_name=ego_name,
         silhouette=silhouette,
+        analysis_zip=analysis_zip,
     )
     if not clustering_data:
         return False
@@ -773,18 +740,6 @@ def backfill_cluster_stats_in_dir(
             f"(min_ttc={c.get('min_ttc')}, params={len(c['parameter_ranges'])})"
         )
 
-        # Real trajectory-variation image (replaces the mislabeled BEV[0]).
-        members = _cluster_members_from_result(result_data, cid, trial_index_map)
-        med = doc.get("medoid", {}) or {}
-        medoid_member = None
-        if med.get("batch_id") is not None and med.get("trial_index") is not None:
-            medoid_member = (int(med["batch_id"]), int(med["trial_index"]))
-        if render_cluster_trajectory_overlay(
-            cdir / "trajectory_overlay.png", members, medoid_member,
-            title=f"Cluster {cid} ego-trajectory variation",
-        ):
-            print(f"     ↳ trajectory_overlay.png ({len(members)} members)")
-
     print(f"✅ Backfilled {patched} cluster.json file(s) in {rd}")
     return patched > 0
 
@@ -795,13 +750,16 @@ def list_clusterings_from_payload_save(
     k: Optional[int] = None,
     duration_mode: str = "full",
     ego_name: str = "ITRI",
+    analysis_zip: Optional[str] = None,
 ) -> bool:
     """Print every clustering candidate (index, k, silhouette, task params).
 
     If k is given, only candidates with that real cluster count are shown.
     Returns True on success. Used by `--list-clusterings`.
     """
-    fetched = _fetch_payload_analysis(batch_id, save_doc_id, duration_mode, ego_name)
+    fetched = _fetch_payload_analysis(
+        batch_id, save_doc_id, duration_mode, ego_name, analysis_zip=analysis_zip
+    )
     if fetched is None:
         return False
     scores, clustering_list, _ego_data, _sel = fetched
@@ -852,6 +810,7 @@ def load_clustering_from_payload_save(
     duration_mode: str = "full",
     ego_name: str = "ITRI",
     silhouette: Optional[float] = None,
+    analysis_zip: Optional[str] = None,
 ) -> Optional[Tuple[Dict, Dict, Dict, Dict]]:
     """Fetch a saved Dashboard analysis zip from Payload and extract clustering data.
 
@@ -865,12 +824,16 @@ def load_clustering_from_payload_save(
 
     Either k or clustering_index must be provided (not both), unless the zip
     carries a selected.json with the user's choice.
+
+    Pass *analysis_zip* to read a local mirror file instead of downloading from Payload.
     """
     if k is not None and clustering_index is not None:
         print("❌ ERROR: --k and --clustering-index are mutually exclusive")
         return None
 
-    fetched = _fetch_payload_analysis(batch_id, save_doc_id, duration_mode, ego_name)
+    fetched = _fetch_payload_analysis(
+        batch_id, save_doc_id, duration_mode, ego_name, analysis_zip=analysis_zip
+    )
     if fetched is None:
         return None
     scores, clustering_list, ego_data, selected_meta_raw = fetched
@@ -2281,6 +2244,15 @@ def main():
         help="Specific Payload document ID for the saved analysis zip (default: latest)",
     )
     parser.add_argument(
+        "--analysis-zip",
+        default=None,
+        help=(
+            "Local path to a saved-analysis zip (e.g. data/paper_casestudies/case2/"
+            "casestudy2.zip). Skips Payload download; still use --batch-id / --k / "
+            "--ego-name for selection and output layout."
+        ),
+    )
+    parser.add_argument(
         "-k", "--k_clusters",
         type=int,
         default=None,
@@ -2491,7 +2463,7 @@ def main():
         "--emb-boundaries",
         "--boundaries",  # backward-compatible alias
         type=str,
-        default="all",
+        default="none",
         dest="emb_boundaries",
         metavar="SCOPE",
         help="Embedding-space closest pairs → clusterN/boundary_cM/: "
@@ -2510,7 +2482,7 @@ def main():
     parser.add_argument(
         "--outliers",
         type=str,
-        default="all",
+        default="none",
         metavar="SCOPE",
         help="Which clusters get outlier_trials: 'all' (default), 'none', "
              "or labels e.g. '1'.",
@@ -2598,6 +2570,7 @@ def main():
             k=args.k_clusters,
             duration_mode=args.duration_mode,
             ego_name=args.ego_name,
+            analysis_zip=args.analysis_zip,
         )
         sys.exit(0 if ok else 1)
 
@@ -2617,6 +2590,7 @@ def main():
             silhouette=args.silhouette,
             duration_mode=args.duration_mode,
             ego_name=args.ego_name,
+            analysis_zip=args.analysis_zip,
         )
         sys.exit(0 if ok else 1)
 
@@ -2696,6 +2670,7 @@ def main():
                 save_doc_id=args.save_doc_id,
                 duration_mode=args.duration_mode,
                 ego_name=args.ego_name,
+                analysis_zip=args.analysis_zip,
             )
             if fetched:
                 scores, _clist, ego_data, _sel = fetched
@@ -2762,6 +2737,7 @@ def main():
             duration_mode=args.duration_mode,
             ego_name=args.ego_name,
             silhouette=args.silhouette,
+            analysis_zip=args.analysis_zip,
         )
         if not clustering_data:
             sys.exit(1)
@@ -3049,21 +3025,6 @@ def main():
             hard_brake_accel=args.hard_brake_accel,
         ):
             success_count += 1
-
-        # Per-cluster trajectory-variation overlay (real "heatmap" input for the LLM).
-        if result_data is not None and trial_index_map:
-            try:
-                lb = medoid["cluster_label"]
-                members = _cluster_members_from_result(result_data, int(lb), trial_index_map)
-                medoid_member = (medoid["batch_id"], medoid["trial_index"])
-                if render_cluster_trajectory_overlay(
-                    run_dir / f"cluster{lb}" / "trajectory_overlay.png",
-                    members, medoid_member,
-                    title=f"Cluster {lb} ego-trajectory variation",
-                ):
-                    print(f"  ✓ trajectory_overlay.png ({len(members)} members)")
-            except Exception as e:
-                print(f"  ⚠️  Trajectory overlay failed: {e}")
 
     # Medoids skipped: still patch cluster.json with IC neighbors
     if (

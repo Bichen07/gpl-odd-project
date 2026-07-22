@@ -26,6 +26,12 @@ def main() -> None:
         default=["gemini-2.5-flash"],
         help="LLM model (default gemini-2.5-flash; GOOGLE_API_KEY for gemini-*)",
     )
+    ci.add_argument(
+        "--products",
+        default="medoid,summary,ic-pairs",
+        help="Comma list: medoid,summary,ic-pairs (default all). "
+             "'legacy' is an alias for medoid,summary (writes thin cluster_interpretation.yaml pointer).",
+    )
     ci.add_argument("--api-key", default=None, help="API key (overrides env; ephemeral)")
     ci.add_argument("--clusters", default=None,
                     help="Comma list of cluster ids to run (default: all)")
@@ -35,7 +41,7 @@ def main() -> None:
                     help="Path to JSON mapping cluster id -> [snapshot file names]")
     ci.add_argument("--temperature", type=float, default=0.1)
     ci.add_argument("--review", dest="review", action="store_true", default=True,
-                    help="Run the reviewer pass (default on)")
+                    help="Run the reviewer pass (default on; legacy product only)")
     ci.add_argument("--no-review", dest="review", action="store_false",
                     help="Skip the reviewer pass")
     ci.add_argument("--max-llm-snapshots", type=int, default=10,
@@ -104,21 +110,26 @@ def main() -> None:
         if cl:
             clusters = [int(x) for x in str(cl).split(",") if x.strip() != ""]
         max_snaps = getattr(args, "max_llm_snapshots", 10)
-        outputs = run_results_dir_interpretation(
+        products = getattr(args, "products", "medoid,summary,ic-pairs")
+        if str(products).strip().lower() == "legacy":
+            products = "medoid,summary"
+        from .split_analysis import run_split_analysis
+        result = run_split_analysis(
             Path(args.results_dir),
-            dataset=dataset,
             batch_id=batch_id,
+            dataset=dataset,
             model=model,
-            dry_run=getattr(args, "dry_run", False),
             api_key=getattr(args, "api_key", None),
+            products=products,
             clusters=clusters,
-            prompt_overrides=prompt_overrides,
-            images_by_cluster=images_by_cluster,
+            dry_run=getattr(args, "dry_run", False),
             temperature=getattr(args, "temperature", 0.1),
-            do_review=getattr(args, "review", True),
             max_llm_snapshots=max_snaps if max_snaps and max_snaps > 0 else None,
         )
-        out = f"Wrote {len(outputs)} interpretation(s): {sorted(outputs.keys())}"
+        out = (
+            f"Split analysis done: clusters={list((result.get('clusters') or {}).keys())} "
+            f"ic_pairs={len(result.get('ic_pairs') or [])}"
+        )
     else:
         parser.error(f"unknown command: {args.cmd}")  # type: ignore[unreachable]
     print(out)

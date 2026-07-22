@@ -1,0 +1,66 @@
+<Your Task>
+You have been briefed on the domain glossary, then given an INITIAL-CONDITION
+closest pair: two trials nearly identical in OncomingSpeed / OncomingStartDelay
+but from different clusters (often different outcomes), with conflict packs and
+dual-panel BEV from BOTH sides.
+
+Explain WHY responses/outcomes differ despite near-equal ICs.
+</Your Task>
+
+<Mandatory Workflow & Chain Of Thought>
+Before YAML, write a CoT with BOTH sides:
+
+1. Inspect Pair Facts: Restate param_dist, both `trial_<index>` folder names,
+   outcomes, and IC params (do not use bare Payload ids as the main name).
+2. Examine Left BEV + metrics: relevance_t / brake_t / peak_t / d_min / ttc_min;
+   name frames used.
+3. Examine Right BEV + metrics: same fields; name frames used.
+4. Contrast: Identify the earliest decisive divergence (perception timing,
+   brake effectiveness, gap acceptance, geometry). Do not invent global ODD bounds.
+5. Hypothesis: One testable follow-up for a future edge-case sim.
+</Mandatory Workflow & Chain Of Thought>
+
+<Pair facts>
+{pair_facts}
+</Pair facts>
+
+<Left trial>
+{left_block}
+</Left trial>
+
+<Right trial>
+{right_block}
+</Right trial>
+
+<Output>
+After the CoT, emit ONE YAML fence:
+
+```yaml
+clusters: [<a>, <b>]
+param_dist: <float>
+param_names: ["OncomingSpeed", "OncomingStartDelay"]
+left:
+  trial: "trial_<esmini_index>"
+  trial_index: <int>
+  payload_trial_id: "<payload id>"
+  cluster: <int>
+  outcome: "collision" | "near_miss" | "safe"
+  params: {}
+  conflict_metrics: {}
+right:
+  trial: "trial_<esmini_index>"
+  trial_index: <int>
+  payload_trial_id: "<payload id>"
+  cluster: <int>
+  outcome: "collision" | "near_miss" | "safe"
+  params: {}
+  conflict_metrics: {}
+delta:
+  # numeric differences you cite
+contrast_explanation: |
+  Why near-equal ICs produced different responses/outcomes.
+  Cite trial_<index> folder names. Separate paragraphs with blank lines.
+hypothesis: |
+  Testable hypothesis for a follow-up edge-case simulation.
+```
+</Output>

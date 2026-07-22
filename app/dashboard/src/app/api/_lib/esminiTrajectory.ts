@@ -3,16 +3,15 @@ import path from "path";
 
 /**
  * Shared helpers for reading esmini ground-truth CSVs and shaping them into the
- * Replayer's TrajectoryResponseData format. Used by the esmini-trajectory route,
- * which resolves the CSV either via cluster.json (medoid mode) or a
- * trialId -> trialIndex lookup (trial mode).
+ * Replayer's TrajectoryResponseData format. Used by the esmini-trajectory route
+ * (optional / debug), which resolves the CSV either via cluster.json (medoid
+ * mode) or a trialId -> trialIndex lookup (trial mode).
  *
- * Why esmini instead of the Payload observation trajectories: the LLM
- * interpretation, BEV snapshots and action.yaml are all generated from the
- * authoritative esmini CSV (0 .. scenario end). The clustering pipeline's
- * Payload trajectories are start-clipped / time-rebased, so replaying them puts
- * the video on a different clock than the interpretation caption. Feeding the
- * esmini timeline back into the replayer puts everything on ONE clock.
+ * Canonical Explore clock: Payload / analysis-zip trajectories clipped at
+ * StartValidCondition (startObservationSamplingConditions) and rebased so t=0
+ * matches Heatmap. Medoid `decision_timeline` / conflict_metrics are stored on
+ * that same Payload clip clock. Do not swap full esmini CSV into the Replayer
+ * by default — that reintroduces the pre-clip approach segment.
  */
 
 export const RECORDS_DIR = path.join(

@@ -76,7 +76,7 @@ def create_interpretation_llm(
     api_key: Optional[str] = None,
     temperature: float = 0.1,
     top_p: float = 0.95,
-    max_tokens: int = 4096,
+    max_tokens: int = 8192,
 ) -> Any:
     """Build a LangChain chat model for multimodal cluster interpretation."""
     name = normalize_model_name(model_name)

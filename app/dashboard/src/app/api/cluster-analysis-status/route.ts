@@ -61,6 +61,9 @@ type ParamBoundaryPair = {
 type FolderStatus = {
   has_analysis: boolean;
   has_preprocess: boolean;
+  has_medoid_trial: boolean;
+  has_cluster_summary: boolean;
+  has_ic_pairs: boolean;
   medoids: Record<string, string>;
   /** Primary (materialized) outlier trial per cluster */
   outliers: Record<string, string>;
@@ -75,6 +78,7 @@ type FolderStatus = {
     {
       cluster_label?: string;
       ego_perspective_summary?: unknown;
+      motive_summary?: string;
     }
   >;
 };
@@ -275,15 +279,62 @@ export async function GET(req: NextRequest) {
 
       const metaPath = path.join(clusterDir, "interpretation_meta.json");
       const yamlPath = path.join(clusterDir, "cluster_interpretation.yaml");
+      const summaryMetaPath = path.join(clusterDir, "cluster_summary_meta.json");
+      const medoidMetaPath = path.join(clusterDir, "medoid_trial_meta.json");
       const meta = readJsonSafe(metaPath);
-      if (!meta && !fs.existsSync(yamlPath)) continue;
+      const summaryMeta = readJsonSafe(summaryMetaPath);
+      const medoidMeta = readJsonSafe(medoidMetaPath);
+      const summaryParsed = (summaryMeta?.parsed as Record<string, unknown> | undefined) ?? null;
+      const medoidParsed = (medoidMeta?.parsed as Record<string, unknown> | undefined) ?? null;
+
+      const hasSplit =
+        fs.existsSync(path.join(clusterDir, "cluster_summary.yaml")) ||
+        fs.existsSync(path.join(clusterDir, "medoid_trial.yaml")) ||
+        Boolean(meta) ||
+        fs.existsSync(yamlPath);
+      if (!hasSplit) continue;
 
       hasAnalysis = true;
+
+      // Prefer canonical split artifacts: label from summary; Replayer timeline
+      // from medoid_trial (do not require a duplicated copy in cluster_interpretation).
+      const clusterLabel =
+        (summaryParsed?.label as string | undefined) ||
+        (meta?.cluster_label as string | undefined);
+      let egoSummary = medoidParsed?.decision_timeline as unknown;
+      if (!Array.isArray(egoSummary) || egoSummary.length === 0) {
+        egoSummary = meta?.ego_perspective_summary;
+      }
+
       interpretations[label] = {
-        cluster_label: meta?.cluster_label as string | undefined,
-        ego_perspective_summary: meta?.ego_perspective_summary,
+        cluster_label: clusterLabel,
+        ego_perspective_summary: egoSummary,
+        motive_summary:
+          typeof medoidParsed?.motive_summary === "string" &&
+          medoidParsed.motive_summary !== "parse_failed"
+            ? medoidParsed.motive_summary
+            : undefined,
       };
     }
+
+    let hasMedoidTrial = false;
+    let hasClusterSummary = false;
+    for (const name of clusterNames) {
+      const clusterDir = path.join(runDir, name);
+      if (fs.existsSync(path.join(clusterDir, "medoid_trial.yaml"))) {
+        hasMedoidTrial = true;
+        hasAnalysis = true;
+      }
+      if (fs.existsSync(path.join(clusterDir, "cluster_summary.yaml"))) {
+        hasClusterSummary = true;
+        hasAnalysis = true;
+      }
+    }
+    const icPairsDir = path.join(runDir, "ic_pairs");
+    const hasIcPairs =
+      fs.existsSync(icPairsDir) &&
+      fs.readdirSync(icPairsDir).some((f) => f.endsWith(".yaml"));
+    if (hasIcPairs) hasAnalysis = true;
 
     const hasPreprocess = checkPreprocessComplete(
       runDir,
@@ -295,6 +346,9 @@ export async function GET(req: NextRequest) {
     folders[entry.name] = {
       has_analysis: hasAnalysis,
       has_preprocess: hasPreprocess,
+      has_medoid_trial: hasMedoidTrial,
+      has_cluster_summary: hasClusterSummary,
+      has_ic_pairs: hasIcPairs,
       medoids,
       outliers,
       boundary_trials: boundaryTrials,

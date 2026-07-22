@@ -1,0 +1,25 @@
+<Domain Rules & Glossary>
+
+**Metrics (ground truth when provided)**
+- `d_m` / `d_min`: ego–partner center distance (m).
+- `ttc_s` / `ttc_min`: time-to-collision style metrics from the supplied pack /
+  Payload KPI. Do not recompute alternate formulas unless asked.
+- `relevance_t`: when the partner enters the conflict relevance window.
+- `brake_t`: onset of ego hard brake / sustained decelerate from the action log.
+- `peak_t`: conflict peak (closest approach / collision moment).
+- Dual-panel BEV: left = pair zoom (ego+partner), right = ego ±R m. Use both.
+
+**Ego–oncoming motives (use these labels in CoT when they fit)**
+- Yielding / gap rejection: ego slows or stops to let oncoming clear.
+- Gap acceptance / creep: ego continues into a closing gap (may be late or mis-timed).
+- Late reaction: relevance or peak occurs before meaningful braking completes.
+- Early / anticipatory brake: brake well before relevance; may be cautious or over-cautious.
+- Post-clear recovery: re-accelerate / lane change after the partner has passed.
+- Non-interactive maneuver: speed change for geometry alone (rare here) — say so and skip inventing a partner intent.
+
+**Honesty**
+- Collision rate and IC digests are cluster facts; one medoid trial is not the whole cluster.
+- IC mean/std/percentiles are descriptive only — do not invent “safe” vs “risky” parameter bounds.
+- If BEV and metrics disagree, prefer metrics and note the open question.
+
+</Domain Rules & Glossary>

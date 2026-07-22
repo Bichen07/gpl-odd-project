@@ -1,0 +1,39 @@
+<Your Task>
+You have been briefed on the domain glossary, then given enriched cluster numeric
+digests. Optionally you may see no BEV (this task is primarily numeric).
+
+Write a short CLUSTER AGGREGATE caption that characterizes the outcome mix and
+severity of the WHOLE cluster — not one medoid journey.
+</Your Task>
+
+<Mandatory Workflow & Chain Of Thought>
+Before YAML, write a short CoT:
+
+1. Inspect Digests: Restate collision_rate, n_trials, and TTC mean/p50/p10/p90
+   (and collide vs survive means when both exist).
+2. Inspect IC digests: Restate OncomingSpeed / OncomingStartDelay mean and p10/p90.
+   Treat these as descriptive stats only — do NOT invent safe/risky IC bounds.
+3. Consistency: Note whether embedding spread / outliers contradict the outcome
+   homogeneity.
+</Mandatory Workflow & Chain Of Thought>
+
+<Numeric digest (authoritative)>
+{numeric_digest}
+</Numeric digest>
+
+<Output>
+After the CoT, emit ONE YAML fence:
+
+```yaml
+cluster_id: <int>
+label: "<2-5 words>"
+risk_level: "low" | "medium" | "high"
+confidence: "high" | "medium" | "low"
+numeric_digest_ref: true
+caption: |
+  3-5 short sentences as SEPARATE paragraphs (blank line between each).
+  Cite mean/std/percentiles and collision rate from the digest.
+consistency_note: |
+  Brief note on embedding spread / outcome homogeneity.
+```
+</Output>

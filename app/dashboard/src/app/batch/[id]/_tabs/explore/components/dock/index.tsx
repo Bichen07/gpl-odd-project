@@ -149,11 +149,11 @@ function DataLoader({
       metrics[newMetric.kpi.name] = newMetric;
     }
     dispatch(batchSlice.actions.setMetrics(metrics));
-    dispatch(
-      batchSlice.actions.setSelectedMetric(
-        metrics["spret_min"] ?? metrics["ttc_min"]
-      )
-    );
+    // Prefer a metric with a non-degenerate parameter-space surface.
+    // Paper CS2 often has spret_min capped flat (all 9) which Contour cannot render.
+    const preferred =
+      metrics["ttc_min"] ?? metrics["spret_min"] ?? metrics["collision"];
+    dispatch(batchSlice.actions.setSelectedMetric(preferred));
     dispatch(
       batchSlice.actions.setSelectedSafetyBoundaryMetric(metrics["collision"])
     );

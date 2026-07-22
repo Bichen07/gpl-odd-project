@@ -730,10 +730,8 @@ def select_conflict_frames(
     frames: List[SelectedFrame] = []
     for t, lab, role, bo in merged:
         m = _metrics_at(series, t, partner_name, partner_tid)
-        # Whole-scene left panel only at relevance start (peak stays pair|ego).
-        use_whole = role == "relevance" or (
-            relevance_t is not None and abs(t - relevance_t) < 1e-3
-        )
+        # Left panel is always pair-zoom (ego+partner frustum). Whole-scene
+        # was previously forced at RELEVANCE; that made the left pane inconsistent.
         frames.append(SelectedFrame(
             t=round(t, 3),
             label=lab,
@@ -752,7 +750,7 @@ def select_conflict_frames(
             ego_lane=m["ego_lane"],
             partner_road=m["partner_road"],
             partner_lane=m["partner_lane"],
-            use_whole_scene=use_whole,
+            use_whole_scene=False,
             draw_agent_road_labels=role in (
                 "peak", "burst", "brake", "dist_min", "ttc_min", "closing", "pet",
                 "relevance", "action",

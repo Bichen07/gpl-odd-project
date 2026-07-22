@@ -771,10 +771,16 @@ def view_bounds_from_df(
 
 
 def highlight_road_ids_from_df(df: pd.DataFrame) -> List[str]:
-    """Road IDs used during the trial (for gray lane fill in MapPlotter)."""
+    """Road IDs used during the trial (for gray lane fill in MapPlotter).
+
+    Accepts either esmini ``roadId`` or trajectory ``road_id`` columns.
+    Rows with id ≤ 0 are ignored (common for Path-A materialised CSVs).
+    """
     ids = set()
-    if "roadId" in df.columns:
-        for v in df["roadId"].dropna().unique():
+    for col in ("roadId", "road_id"):
+        if col not in df.columns:
+            continue
+        for v in df[col].dropna().unique():
             try:
                 iv = int(v)
                 if iv > 0:
@@ -782,6 +788,136 @@ def highlight_road_ids_from_df(df: pd.DataFrame) -> List[str]:
             except (TypeError, ValueError):
                 pass
     return sorted(ids, key=int)
+
+
+def highlight_road_ids_near_agents(
+    df: pd.DataFrame,
+    map_tracks_csv: str,
+    *,
+    radius_m: float = 45.0,
+    max_samples: int = 40,
+) -> List[str]:
+    """Fallback when CSV road IDs are missing/zero: nearest odrplot roads to agents."""
+    from map_plotter import MapPlotter, _roads_near_anchors
+
+    if df is None or df.empty or not map_tracks_csv:
+        return []
+    # Subsample agent positions along the trial.
+    pts: List[Tuple[float, float]] = []
+    step = max(1, len(df) // max_samples)
+    for _, row in df.iloc[::step].iterrows():
+        try:
+            pts.append((float(row["x"]), float(row["y"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    if not pts:
+        return []
+    plotter = MapPlotter()
+    try:
+        (
+            _all_lanes,
+            _proc,
+            road_id_text_plot_info,
+            *_rest,
+        ) = plotter._parse_and_process_map_data(map_tracks_csv)
+    except Exception:
+        return []
+
+    found = _roads_near_anchors(road_id_text_plot_info, pts, radius_m)
+    return sorted(found, key=lambda s: int(s) if str(s).isdigit() else 0)
+
+
+def highlight_conflict_corridor_roads(
+    df: pd.DataFrame,
+    map_tracks_csv: str,
+    *,
+    partner_name: Optional[str] = None,
+    context_name: Optional[str] = None,
+    max_roads: int = 5,
+    at_time: Optional[float] = None,
+) -> List[str]:
+    """Road IDs for conflict BEV labels: ego + partner (+ context), ≤ ``max_roads``.
+
+    Prefer real ``roadId`` / ``road_id`` from those agents when present (>0).
+    Otherwise pick the single nearest odrplot road label per agent position.
+
+    ``at_time`` (e.g. peak / relevance) is used for the spatial fallback — **not**
+    the last frame of the trial (end-of-trial poses sit on far junction roads and
+    starve corridor labels on earlier snapshots).
+    """
+    from map_plotter import MapPlotter, _nearest_roads_per_anchor
+
+    if df is None or df.empty or max_roads <= 0:
+        return []
+
+    names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
+    ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
+    focus = [n for n in (ego_name, partner_name, context_name) if n]
+
+    def _ids_for_name(name: str) -> List[str]:
+        sub = df[df["name"].astype(str).str.strip() == str(name).strip()]
+        out: List[str] = []
+        for col in ("roadId", "road_id"):
+            if col not in sub.columns:
+                continue
+            for v in sub[col].dropna().unique():
+                try:
+                    iv = int(v)
+                    if iv > 0:
+                        out.append(str(iv))
+                except (TypeError, ValueError):
+                    pass
+        seen = set()
+        ordered: List[str] = []
+        for rid in out:
+            if rid not in seen:
+                seen.add(rid)
+                ordered.append(rid)
+        return ordered
+
+    chosen: List[str] = []
+    seen: set = set()
+    for name in focus:
+        for rid in _ids_for_name(name):
+            if rid not in seen:
+                seen.add(rid)
+                chosen.append(rid)
+            if len(chosen) >= max_roads:
+                return chosen[:max_roads]
+
+    if chosen:
+        return chosen[:max_roads]
+
+    # Spatial fallback: nearest road label per focus agent at ``at_time``
+    # (default: mid-trial), never the last pose alone.
+    t_ref = float(at_time) if at_time is not None else float(df["time"].median())
+    anchors: List[Tuple[float, float]] = []
+    for name in focus:
+        sub = df[df["name"].astype(str).str.strip() == str(name).strip()]
+        if sub.empty:
+            continue
+        sub = sub.sort_values("time")
+        i = int((sub["time"] - t_ref).abs().to_numpy().argmin())
+        row = sub.iloc[i]
+        try:
+            anchors.append((float(row["x"]), float(row["y"])))
+        except (KeyError, TypeError, ValueError):
+            continue
+    if not anchors or not map_tracks_csv:
+        return []
+    try:
+        (
+            _all_lanes,
+            _proc,
+            road_id_text_plot_info,
+            *_rest,
+        ) = MapPlotter()._parse_and_process_map_data(map_tracks_csv)
+    except Exception:
+        return []
+    found = _nearest_roads_per_anchor(
+        road_id_text_plot_info, anchors, max_roads=max_roads
+    )
+    return sorted(found, key=lambda s: int(s) if str(s).isdigit() else 0)
 
 
 def unique_time_steps(df: pd.DataFrame) -> List[float]:
@@ -1095,6 +1231,10 @@ class Tier2BevRenderer:
             scope_bounds=view_bounds,
             output_px=self.snapshot_output_px,
             white_border_frac=self.snapshot_border_frac,
+            fill_lane_polygons=False,
+            draw_ref_lines=True,
+            draw_ref_arrows=False,
+            max_road_labels=5,
         )
         print(f"[Tier2BevRenderer] Saved map overview {output_path}")
         return output_path
@@ -1161,7 +1301,21 @@ class Tier2BevRenderer:
                 key_with_frames = key_with_frames[:n_snapshots]
                 key_indices = [(i, lab) for i, lab, _ in key_with_frames]
 
-            highlight = highlight_road_ids_from_df(df)
+            highlight = highlight_conflict_corridor_roads(
+                df,
+                self.map_tracks_csv,
+                partner_name=selection.partner_name if selection else None,
+                context_name=selection.context_partner_name if selection else None,
+                max_roads=5,
+                at_time=selection.peak_t if selection else None,
+            )
+            if highlight:
+                print(
+                    f"[Tier2BevRenderer] conflict corridor roads (≤5): {highlight}"
+                )
+            else:
+                # Last resort: trial-wide IDs, still capped later by MapPlotter.
+                highlight = highlight_road_ids_from_df(df)[:5]
             vbounds = view_bounds_from_df(df)
             snapshots: List[BevSnapshot] = []
 
@@ -1288,6 +1442,10 @@ class Tier2BevRenderer:
             label_anchors=label_anchors,
             metric_chip=metric_chip,
             label_avoid_xy=label_avoid_xy,
+            fill_lane_polygons=False,
+            draw_ref_lines=True,
+            draw_ref_arrows=False,
+            max_road_labels=5,
         )
 
     def _render_snapshot(

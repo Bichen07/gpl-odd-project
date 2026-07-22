@@ -35,7 +35,15 @@ python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only
 
 # REBUILD BEV/labels in an existing pack
 python3 app/analyzer/src/dataset_builder.py --batch-id 2 --from-run results/batch2/4_cluster
+
+# Paper case studies (Path A): export labels from local zip, then rebuild BEV
+python3 scripts/paper_casestudies/export_clusters_to_results.py
+python3 app/analyzer/src/dataset_builder.py --batch-id 9 --k 4 \
+  --analysis-zip data/paper_casestudies/case2/casestudy2.zip \
+  --from-run results/batch9/4_cluster
 ```
+
+See `scripts/paper_casestudies/README.md` for mirroring senior Payload offline.
 
 | Output | Command |
 |--------|---------|

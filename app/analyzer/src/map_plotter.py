@@ -8,9 +8,12 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 import math
 import os
 from dataclasses import dataclass
+from functools import lru_cache
+from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
 import matplotlib.pyplot as plt
@@ -23,6 +26,10 @@ try:
 except ImportError:  # pragma: no cover
     Image = None  # type: ignore
 
+# Replayer (dashboard ``map.svg`` layer ``non_accessibles``) fill — light gray blocks.
+_NON_ACCESSIBLE_FILL = "#e6e6e6"
+_NON_ACCESSIBLE_EDGE = "#e0e0e0"
+
 
 def _coerce_highlight_road_ids(highlight_road_ids_list) -> Set[str]:
     """Accept list, comma-separated str, or iterable of road ids (xosc_gen compat)."""
@@ -32,6 +39,195 @@ def _coerce_highlight_road_ids(highlight_road_ids_list) -> Set[str]:
         parts = [p.strip() for p in highlight_road_ids_list.split(",") if p.strip()]
         return {str(p) for p in parts}
     return {str(r_id) for r_id in highlight_road_ids_list}
+
+
+@lru_cache(maxsize=2)
+def _load_non_accessible_polygons(
+    json_path: str = "",
+) -> Tuple[Tuple[Tuple[float, float], ...], ...]:
+    """Load Replayer-style gray-block polygons (map local XY metres).
+
+    Source of truth for the dashboard is ``app/dashboard/public/map.svg``
+    layer ``non_accessibles`` (fill ``#d1d1d1``). Those polygons come from
+    ``semantic-maps/data/hct_logistic/non_accessible.json`` — **not** from
+    OpenDRIVE ``<object>`` (XODR only has parking stalls, crosswalks,
+    barriers, signals; no building footprints).
+
+    Returns a tuple of closed rings as ``((x,y), ...)`` for hashing/cache.
+    """
+    candidates: List[Path] = []
+    if json_path:
+        candidates.append(Path(json_path))
+    try:
+        from repo_paths import REPO_ROOT
+
+        root = REPO_ROOT
+    except Exception:  # pragma: no cover
+        root = Path(__file__).resolve().parents[3]
+    candidates.extend(
+        [
+            root / "semantic-maps/data/hct_logistic/non_accessible.json",
+            root / "results/map/non_accessible.json",
+        ]
+    )
+    for path in candidates:
+        if not path.is_file():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        items = payload.get("non_accessible") if isinstance(payload, dict) else None
+        if not isinstance(items, list):
+            continue
+        rings: List[Tuple[Tuple[float, float], ...]] = []
+        for item in items:
+            pts = item.get("points") if isinstance(item, dict) else None
+            if not isinstance(pts, list) or len(pts) < 3:
+                continue
+            ring: List[Tuple[float, float]] = []
+            for p in pts:
+                try:
+                    ring.append((float(p["x"]), float(p["y"])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+            if len(ring) >= 3:
+                rings.append(tuple(ring))
+        if rings:
+            return tuple(rings)
+    return tuple()
+
+
+def _plot_non_accessible_blocks(ax=None) -> int:
+    """Draw light-gray non-accessible / building blocks under road geometry."""
+    rings = _load_non_accessible_polygons()
+    if not rings:
+        return 0
+    target = ax if ax is not None else plt.gca()
+    for ring in rings:
+        poly = mpatches.Polygon(
+            list(ring),
+            closed=True,
+            facecolor=_NON_ACCESSIBLE_FILL,
+            edgecolor=_NON_ACCESSIBLE_EDGE,
+            linewidth=0.4,
+            alpha=1.0,
+            zorder=0,
+        )
+        target.add_patch(poly)
+    return len(rings)
+
+
+def _thin_lane_id_labels(
+    lane_id_text_plot_info: List[dict],
+    *,
+    min_spacing_m: float = 45.0,
+    prefer_near: Optional[List[Tuple[float, float]]] = None,
+) -> List[dict]:
+    """Keep at most one lane-ID label per (road_id, lane_id), spaced apart.
+
+    odrplot emits one midpoint label per *lane section*. On long roads that
+    means the same ``1`` / ``-1`` repeats many times. We keep the first label
+    for each (road, lane) and drop later ones that fall within
+    ``min_spacing_m`` of an already-kept label with the same lane id (even on
+    a different road section) — so continuous corridors stay readable.
+
+    When ``prefer_near`` is set (ego/partner anchors), labels closer to those
+    points are considered first so conflict BEVs keep corridor lane IDs.
+    """
+    if not lane_id_text_plot_info:
+        return []
+
+    def _sort_key(info: dict):
+        road = str(info.get("road_id", ""))
+        x = float(info.get("x", 0.0))
+        if prefer_near:
+            y = float(info.get("y", 0.0))
+            d2 = min(
+                (x - float(ax)) ** 2 + (y - float(ay)) ** 2 for ax, ay in prefer_near
+            )
+            return (d2, road, x)
+        return (road, x)
+
+    ordered = sorted(lane_id_text_plot_info, key=_sort_key)
+    kept: List[dict] = []
+    seen_exact: Set[Tuple[str, str]] = set()
+    min_d2 = float(min_spacing_m) * float(min_spacing_m)
+
+    for info in ordered:
+        road = str(info.get("road_id", ""))
+        text = str(info.get("text", ""))
+        key = (road, text)
+        if key in seen_exact:
+            continue
+        x, y = float(info["x"]), float(info["y"])
+        too_close = False
+        for prev in kept:
+            if str(prev.get("text", "")) != text:
+                continue
+            dx = x - float(prev["x"])
+            dy = y - float(prev["y"])
+            if dx * dx + dy * dy < min_d2:
+                too_close = True
+                break
+        if too_close:
+            continue
+        seen_exact.add(key)
+        kept.append(info)
+    return kept
+
+
+def _roads_near_anchors(
+    road_id_text_plot_info: List[dict],
+    anchors: List[Tuple[float, float]],
+    radius_m: float,
+) -> Set[str]:
+    """Road IDs whose label anchor falls within ``radius_m`` of any agent."""
+    if not anchors or not road_id_text_plot_info:
+        return set()
+    r2 = float(radius_m) * float(radius_m)
+    out: Set[str] = set()
+    for info in road_id_text_plot_info:
+        x, y = float(info["x"]), float(info["y"])
+        for ax, ay in anchors:
+            dx, dy = x - float(ax), y - float(ay)
+            if dx * dx + dy * dy <= r2:
+                out.add(str(info["text"]))
+                break
+    return out
+
+
+def _nearest_roads_per_anchor(
+    road_id_text_plot_info: List[dict],
+    anchors: List[Tuple[float, float]],
+    *,
+    max_roads: int = 5,
+) -> Set[str]:
+    """At most one nearest road ID per agent anchor, capped at ``max_roads``.
+
+    Used for conflict BEVs so junction connector spam does not flood labels.
+    """
+    if not anchors or not road_id_text_plot_info or max_roads <= 0:
+        return set()
+    chosen: List[str] = []
+    seen: Set[str] = set()
+    for ax, ay in anchors:
+        best_id: Optional[str] = None
+        best_d2 = float("inf")
+        for info in road_id_text_plot_info:
+            rid = str(info["text"])
+            dx = float(info["x"]) - float(ax)
+            dy = float(info["y"]) - float(ay)
+            d2 = dx * dx + dy * dy
+            if d2 < best_d2:
+                best_d2 = d2
+                best_id = rid
+        if best_id is not None and best_id not in seen:
+            seen.add(best_id)
+            chosen.append(best_id)
+        if len(chosen) >= max_roads:
+            break
+    return set(chosen[:max_roads])
 
 
 def _rotated_box_vertices(
@@ -58,27 +254,31 @@ def _rotated_box_vertices(
 
 @dataclass(frozen=True)
 class BevTypography:
-    """Font sizes (matplotlib pt) for BEV labels and snapshot corner overlays."""
+    """Font sizes (matplotlib pt) for BEV labels and snapshot corner overlays.
 
-    road_label_size: float = 5.6
-    lane_label_size: float = 5.6
-    road_label_plain_size: float = 4.8
-    agent_id_fontsize: float = 6.0
+    Defaults match ``dataset_builder.py`` CLI (``--road-label-size`` etc.) so
+    standalone Tier2 renders look the same as a full ``--from-run`` build.
+    """
+
+    road_label_size: float = 10.0
+    lane_label_size: float = 10.0
+    road_label_plain_size: float = 5.0
+    agent_id_fontsize: float = 11.0
     info_fontsize: float = 8.0
     scope_fontsize: float = 7.0
     title_fontsize: float = 7.0
     # Scale-bar tick labels; falls back to scope_fontsize when None.
-    scale_bar_fontsize: Optional[float] = None
+    scale_bar_fontsize: Optional[float] = 12.0
     # Bottom-left scale bar vertical position in figure coords (0=bottom, 1=top).
-    scale_bar_y: float = 0.055
+    scale_bar_y: float = 0.06
     # Cap scale-bar width as a fraction of figure width (prevents overlaying chips).
     scale_bar_max_width_frac: float = 0.40
     # Floor scale-bar width as a fraction of figure width.
     scale_bar_min_width_frac: float = 0.22
     # Bottom-right ``d=… TTC=…`` chip on conflict BEVs.
-    metric_chip_fontsize: float = 10.0
+    metric_chip_fontsize: float = 12.0
     # Top-right panel captions: "pair zoom" / "ego ±25m" / "whole scene".
-    panel_label_fontsize: float = 9.0
+    panel_label_fontsize: float = 12.0
     # Nudge road/lane labels away from agents when closer than this (metres).
     road_label_avoid_m: float = 4.0
 
@@ -383,6 +583,12 @@ class MapPlotter:
             typography=typography,
             figure_title=figure_title,
             output_px=output_px,
+            # Full-network overview: keep all road labels; no on-road fills /
+            # no ref start-arrows. Red reference lines on (like original).
+            fill_lane_polygons=False,
+            draw_ref_lines=True,
+            draw_ref_arrows=False,
+            max_road_labels=0,
         )
 
     def plot_map_with_agents(
@@ -450,6 +656,10 @@ class MapPlotter:
         label_radius_m: float = 25.0,
         metric_chip: Optional[str] = None,
         label_avoid_xy: Optional[List[Tuple[float, float]]] = None,
+        fill_lane_polygons: bool = False,
+        draw_ref_lines: bool = True,
+        draw_ref_arrows: bool = False,
+        max_road_labels: int = 5,
     ) -> None:
         """Single render path for empty-map overviews and agent snapshots.
 
@@ -457,6 +667,10 @@ class MapPlotter:
         labels near ego/partner (conflict BEV overlays). ``metric_chip`` draws
         a short ``d=… TTC=…`` badge in the bottom-right corner.
         ``label_avoid_xy`` nudges labels away from agent centers.
+
+        Visual defaults: off-road ``non_accessible`` fills only (no on-road
+        gray lane slabs). Red OpenDRIVE reference lines are optional; start
+        arrows stay off unless ``draw_ref_arrows`` is enabled.
         """
         fig = self._begin_figure(output_px, white_border_frac)
         (
@@ -468,6 +682,35 @@ class MapPlotter:
             lane_id_text_plot_info,
         ) = self._parse_and_process_map_data(map_csv_path)
         highlight_road_ids = _coerce_highlight_road_ids(highlight_road_ids_list)
+        # Conflict snapshots: always pick roads nearest to THIS frame's
+        # ego/partner anchors. A trial-wide highlight from end-of-trial poses
+        # (far junction connectors) would leave mid-trial frames with no
+        # near-agent road/lane ID labels.
+        if label_anchors and max_road_labels != 0:
+            cap = max(1, int(max_road_labels) if max_road_labels > 0 else 5)
+            highlight_road_ids = _nearest_roads_per_anchor(
+                road_id_text_plot_info,
+                label_anchors,
+                max_roads=cap,
+            )
+        elif not highlight_road_ids and label_anchors:
+            highlight_road_ids = _nearest_roads_per_anchor(
+                road_id_text_plot_info,
+                label_anchors,
+                max_roads=max(1, int(max_road_labels) if max_road_labels > 0 else 5),
+            )
+        elif (
+            highlight_road_ids
+            and max_road_labels > 0
+            and len(highlight_road_ids) > max_road_labels
+            and not label_anchors
+        ):
+            highlight_road_ids = set(
+                sorted(
+                    highlight_road_ids,
+                    key=lambda s: int(s) if str(s).isdigit() else 0,
+                )[: int(max_road_labels)]
+            )
         highlighting_active = bool(highlight_road_ids)
         self._plot_base_map(
             all_lanes_info,
@@ -476,6 +719,9 @@ class MapPlotter:
             lane_section_dots_coords,
             highlighting_active,
             highlight_road_ids,
+            fill_lane_polygons=fill_lane_polygons,
+            draw_ref_lines=draw_ref_lines,
+            draw_ref_arrows=draw_ref_arrows,
         )
         if draw_labels:
             self._plot_text_labels(
@@ -699,8 +945,16 @@ class MapPlotter:
         lane_section_dots_coords,
         highlighting_active,
         highlight_road_ids: Set[str],
+        *,
+        fill_lane_polygons: bool = False,
+        draw_ref_lines: bool = False,
+        draw_ref_arrows: bool = False,
     ) -> None:
         del lane_section_dots_coords  # unused in xosc_gen default
+
+        # Pass 0: Replayer-matching light-gray blocks (non_accessible polygons).
+        # Same geometry as dashboard map.svg ``non_accessibles`` / ROS semantic map.
+        _plot_non_accessible_blocks()
 
         # Pass 1: draw explicit border polylines (shoulder/parking/border-typed lanes).
         for lane_info in all_lanes_info:
@@ -708,8 +962,11 @@ class MapPlotter:
                 plt.plot(
                     lane_info["x"],
                     lane_info["y"],
-                    linewidth=1.0,
-                    color="#AAAAAA",
+                    linewidth=1.4,
+                    color="#555555",
+                    solid_capstyle="round",
+                    solid_joinstyle="round",
+                    zorder=3,
                 )
 
         # Pass 2: junction connector roads often have ONLY driving lanes — no shoulder.
@@ -732,87 +989,139 @@ class MapPlotter:
                 if not pos_has_border and pos_ids:
                     outer = lanes_in_section[max(pos_ids)]
                     if outer["type"] == "driving" and len(outer["x"]) > 0:
-                        plt.plot(outer["x"], outer["y"], linewidth=1.0, color="#AAAAAA")
+                        plt.plot(
+                            outer["x"],
+                            outer["y"],
+                            linewidth=1.4,
+                            color="#555555",
+                            solid_capstyle="round",
+                            solid_joinstyle="round",
+                            zorder=3,
+                        )
 
                 if not neg_has_border and neg_ids:
                     outer = lanes_in_section[min(neg_ids)]
                     if outer["type"] == "driving" and len(outer["x"]) > 0:
-                        plt.plot(outer["x"], outer["y"], linewidth=1.0, color="#AAAAAA")
+                        plt.plot(
+                            outer["x"],
+                            outer["y"],
+                            linewidth=1.4,
+                            color="#555555",
+                            solid_capstyle="round",
+                            solid_joinstyle="round",
+                            zorder=3,
+                        )
 
-        for lane_info in all_lanes_info:
-            if highlighting_active and lane_info["road_id"] not in highlight_road_ids:
-                continue
-            if lane_info["type"] == "ref" and len(lane_info["x"]) > 0:
-                plt.plot(lane_info["x"], lane_info["y"], linewidth=2.0, color="#BB5555")
+        if draw_ref_lines:
+            for lane_info in all_lanes_info:
+                if highlighting_active and lane_info["road_id"] not in highlight_road_ids:
+                    continue
+                if lane_info["type"] == "ref" and len(lane_info["x"]) > 0:
+                    plt.plot(
+                        lane_info["x"],
+                        lane_info["y"],
+                        linewidth=2.0,
+                        color="#BB5555",
+                        zorder=4,
+                    )
 
+        # Optional on-road gray fills (disabled by default — looks like blocks on
+        # the carriageway; Replayer uses off-road non_accessible only).
+        if fill_lane_polygons:
+            for lane_info in all_lanes_info:
+                if lane_info["type"] != "driving" or len(lane_info["x"]) < 2:
+                    continue
+                r_id = lane_info["road_id"]
+                ls_idx = lane_info["lane_section"]
+                l_id_int = lane_info.get("lane_id_int")
+                if highlighting_active and r_id not in highlight_road_ids:
+                    continue
+                if not highlighting_active:
+                    continue
+                lanes_in_section = processed_roads_data.get(r_id, {}).get(ls_idx, {})
+                b1_coords, b2_coords = None, None
+                if l_id_int is not None and l_id_int > 0:
+                    if l_id_int - 1 in lanes_in_section:
+                        b1_coords = (
+                            lanes_in_section[l_id_int - 1]["x"],
+                            lanes_in_section[l_id_int - 1]["y"],
+                        )
+                    if l_id_int + 1 in lanes_in_section:
+                        b2_coords = (
+                            lanes_in_section[l_id_int + 1]["x"],
+                            lanes_in_section[l_id_int + 1]["y"],
+                        )
+                elif l_id_int is not None and l_id_int < 0:
+                    if l_id_int + 1 in lanes_in_section:
+                        b1_coords = (
+                            lanes_in_section[l_id_int + 1]["x"],
+                            lanes_in_section[l_id_int + 1]["y"],
+                        )
+                    if l_id_int - 1 in lanes_in_section:
+                        b2_coords = (
+                            lanes_in_section[l_id_int - 1]["x"],
+                            lanes_in_section[l_id_int - 1]["y"],
+                        )
+                if (
+                    b1_coords
+                    and b2_coords
+                    and len(b1_coords[0]) > 1
+                    and len(b2_coords[0]) > 1
+                ):
+                    n1, n2 = len(b1_coords[0]), len(b2_coords[0])
+                    if max(n1, n2) > 1.35 * min(n1, n2):
+                        continue
+                    min_len = min(n1, n2)
+                    poly_x = list(b1_coords[0][:min_len]) + list(
+                        reversed(b2_coords[0][:min_len])
+                    )
+                    poly_y = list(b1_coords[1][:min_len]) + list(
+                        reversed(b2_coords[1][:min_len])
+                    )
+                    span = max(max(poly_x) - min(poly_x), max(poly_y) - min(poly_y))
+                    if span > 120.0:
+                        continue
+                    plt.fill(
+                        poly_x,
+                        poly_y,
+                        color="gray",
+                        alpha=0.35,
+                        edgecolor="none",
+                        zorder=1,
+                    )
+
+        # Draw driving-lane polylines so junction connectors stay continuous
+        # (border-only pass leaves gaps where odrplot has no shoulder lanes).
         for lane_info in all_lanes_info:
             if lane_info["type"] != "driving" or len(lane_info["x"]) < 2:
                 continue
-            r_id = lane_info["road_id"]
-            ls_idx = lane_info["lane_section"]
-            l_id_int = lane_info.get("lane_id_int")
-            if r_id not in highlight_road_ids:
-                continue
-            lanes_in_section = processed_roads_data.get(r_id, {}).get(ls_idx, {})
-            b1_coords, b2_coords = None, None
-            if l_id_int is not None and l_id_int > 0:
-                if l_id_int - 1 in lanes_in_section:
-                    b1_coords = (
-                        lanes_in_section[l_id_int - 1]["x"],
-                        lanes_in_section[l_id_int - 1]["y"],
-                    )
-                if l_id_int + 1 in lanes_in_section:
-                    b2_coords = (
-                        lanes_in_section[l_id_int + 1]["x"],
-                        lanes_in_section[l_id_int + 1]["y"],
-                    )
-            elif l_id_int is not None and l_id_int < 0:
-                if l_id_int + 1 in lanes_in_section:
-                    b1_coords = (
-                        lanes_in_section[l_id_int + 1]["x"],
-                        lanes_in_section[l_id_int + 1]["y"],
-                    )
-                if l_id_int - 1 in lanes_in_section:
-                    b2_coords = (
-                        lanes_in_section[l_id_int - 1]["x"],
-                        lanes_in_section[l_id_int - 1]["y"],
-                    )
-            if (
-                b1_coords
-                and b2_coords
-                and len(b1_coords[0]) > 1
-                and len(b2_coords[0]) > 1
-            ):
-                min_len = min(len(b1_coords[0]), len(b2_coords[0]))
-                poly_x = list(b1_coords[0][:min_len]) + list(
-                    reversed(b2_coords[0][:min_len])
-                )
-                poly_y = list(b1_coords[1][:min_len]) + list(
-                    reversed(b2_coords[1][:min_len])
-                )
-                plt.fill(
-                    poly_x,
-                    poly_y,
-                    color="gray",
-                    alpha=0.35,
-                    edgecolor="none",
-                )
+            plt.plot(
+                lane_info["x"],
+                lane_info["y"],
+                linewidth=0.95,
+                color="#666666",
+                zorder=2,
+                solid_capstyle="round",
+                solid_joinstyle="round",
+            )
 
-        for info in road_start_dots_plot_info:
-            if highlighting_active and info["road_id"] not in highlight_road_ids:
-                continue
-            if not (info["dx"] == 0 and info["dy"] == 0):
-                plt.arrow(
-                    info["x"],
-                    info["y"],
-                    info["dx"],
-                    info["dy"],
-                    width=0.1,
-                    head_width=1.0,
-                    head_length=1.5,
-                    color="#BB5555",
-                    length_includes_head=True,
-                )
+        if draw_ref_arrows:
+            for info in road_start_dots_plot_info:
+                if highlighting_active and info["road_id"] not in highlight_road_ids:
+                    continue
+                if not (info["dx"] == 0 and info["dy"] == 0):
+                    plt.arrow(
+                        info["x"],
+                        info["y"],
+                        info["dx"],
+                        info["dy"],
+                        width=0.1,
+                        head_width=1.0,
+                        head_length=1.5,
+                        color="#BB5555",
+                        length_includes_head=True,
+                        zorder=4,
+                    )
 
     def _plot_text_labels(
         self,
@@ -868,7 +1177,23 @@ class MapPlotter:
                     ny = float(ay) + dy * scale
             return nx, ny
 
-        for info in lane_id_text_plot_info:
+        # One label per (road, lane). Filter to highlighted roads *before*
+        # thinning — otherwise a far junction's ``1``/``-1`` eats the ego
+        # corridor labels via the global spacing rule.
+        lane_candidates = list(lane_id_text_plot_info)
+        if highlighting_active:
+            lane_candidates = [
+                info
+                for info in lane_candidates
+                if info["road_id"] in highlight_road_ids
+            ]
+        thinned_lanes = _thin_lane_id_labels(
+            lane_candidates,
+            min_spacing_m=25.0 if label_anchors else 45.0,
+            prefer_near=label_anchors,
+        )
+
+        for info in thinned_lanes:
             if highlighting_active and info["road_id"] not in highlight_road_ids:
                 continue
             if not _near_anchor(info["x"], info["y"]):
@@ -890,31 +1215,24 @@ class MapPlotter:
             if not _near_anchor(info["x"], info["y"]):
                 continue
             lx, ly = _nudge(info["x"], info["y"])
-            if highlighting_active:
-                if road_id_str in highlight_road_ids:
-                    plt.text(
-                        lx,
-                        ly,
-                        road_id_str,
-                        size=typography.road_label_size,
-                        color="white",
-                        fontweight="bold",
-                        ha="center",
-                        va="center",
-                        bbox=road_bbox,
-                        zorder=25,
-                    )
-            else:
-                plt.text(
-                    lx,
-                    ly,
-                    road_id_str,
-                    size=typography.road_label_plain_size,
-                    color="#222222",
-                    ha="center",
-                    va="center",
-                    zorder=25,
-                )
+            if highlighting_active and road_id_str not in highlight_road_ids:
+                # Far from the trial corridor — skip (avoids tiny plain labels).
+                continue
+            # Always use the red-box style for road IDs that we do show
+            # (batch2 / xosc_gen look). Plain black was only a fallback when
+            # highlight was empty and produced unreadable clutter.
+            plt.text(
+                lx,
+                ly,
+                road_id_str,
+                size=typography.road_label_size,
+                color="white",
+                fontweight="bold",
+                ha="center",
+                va="center",
+                bbox=road_bbox,
+                zorder=25,
+            )
 
     def _plot_trajectory_trails(
         self,

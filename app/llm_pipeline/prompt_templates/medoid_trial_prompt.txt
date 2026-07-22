@@ -1,0 +1,69 @@
+<Your Task>
+You have been briefed on the domain glossary, then given conflict metrics, a
+textual trial context (action / snapshot evidence), and a sequence of dual-panel
+BEV frames for ONE medoid trial (representative of its cluster, NOT the cluster
+as a whole).
+
+Your job is to deduce ego MOTIVES and decision quality around the oncoming
+conflict: why ego braked / crept / yielded / resumed, relative to gap, TTC, and
+BEV geometry. Identify interactive decisions involving ego; ignore junction
+enter/exit filler already listed in the rule-based log.
+</Your Task>
+
+<Mandatory Workflow & Chain Of Thought>
+Present a step-by-step CoT BEFORE the YAML. For EACH salient ego action near the
+conflict (hard brake, decelerate, creep, re-accelerate, lane change), write:
+
+1. Inspect Action: Name the action and time window.
+   - e.g. "Analyzing: Ego hard brake onset at t=27.66s (speed 9.2→…)."
+2. Examine Visual Evidence: Name which BEV frames (before / during / after) you
+   use; describe ego–partner distance, azimuth, and relative motion.
+   - e.g. "Frames RELEVANCE t=30.02 and NEAR_MISS t=33.20 show partner closing ahead-left…"
+3. Intention Reasoning: Combine metrics + BEV to classify the motive using the
+   glossary (yield / gap acceptance / late reaction / early brake / recovery).
+   State whether the peak (d_min / ttc_min) is consistent with that intent.
+
+Focus especially on ego as the actor or the yielding party. Do not invent
+cluster-wide rates. Do not narrate "Ego entered a junction".
+</Mandatory Workflow & Chain Of Thought>
+
+<Inputs>
+1. Precomputed conflict_metrics (peak_t, brake_t, relevance_t, d_min, ttc_min)
+   Times are seconds on the Payload observation clip clock (t=0 = StartValidCondition /
+   startObservationSamplingConditions fire). Match Replayer / heatmap playhead.
+2. Trial context / snapshot evidence table
+3. BEV snapshots labelled by time + event
+4. Outcome of THIS trial only
+</Inputs>
+
+<Output>
+After the CoT, emit ONE YAML fence:
+
+```yaml
+trial_id: "<id>"
+outcome: "collision" | "near_miss" | "safe"
+conflict_metrics:
+  brake_t: <float or null>
+  relevance_t: <float or null>
+  peak_t: <float or null>
+  d_min: <float or null>
+  ttc_min: <float or null>
+motive_summary: |
+  3-5 sentences on WHY ego acted as it did near the conflict.
+  Separate paragraphs with blank lines.
+decision_timeline:
+  - timestamp: <float>
+    description: "motive/decision language; no road IDs; no junction travelogue"
+  # 8-10 events: approach → conflict → outcome; LAST = final outcome
+  # timestamps MUST use the same Payload clip clock as conflict_metrics (not absolute esmini)
+open_questions: []
+```
+</Output>
+
+<Conflict metrics>
+{conflict_metrics}
+</Conflict metrics>
+
+<Trial context>
+{trial_context}
+</Trial context>

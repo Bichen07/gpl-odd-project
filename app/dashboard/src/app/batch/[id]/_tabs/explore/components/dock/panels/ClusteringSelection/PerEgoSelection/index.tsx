@@ -84,7 +84,7 @@ interface AnalysisStatusEntry {
   task: ClusteringTask | null;
   interpretations: Record<
     string,
-    { cluster_label?: string; ego_perspective_summary?: unknown }
+    { cluster_label?: string; ego_perspective_summary?: unknown; motive_summary?: string }
   >;
 }
 
@@ -160,6 +160,9 @@ export default function PerEgoSelection({
   const selectedTrialIds = useAppSelector((state) => {
     return state.batch.selectedTrialIds;
   });
+  const highlightRolesByTrialId = useAppSelector(
+    (state) => state.batch.highlightRolesByTrialId,
+  );
   const [duplicatedFilterRatio, setDuplicatedFilterRatio] =
     useState<number>(0.005);
   const [noiseFilterRatio, setNoiseFilterRatio] = useState<number>(0.05);
@@ -359,6 +362,56 @@ export default function PerEgoSelection({
     setSelectedOutlierLabels(new Set());
     dispatch(batchSlice.actions.setHighlightRolesByTrialId({}));
   }, [currentAnalysis?.folder, dispatch]);
+
+  // Keep Highlight-trials chips in sync with Redux roles (so Ctrl+merge on the
+  // scatterplot does not leave ClusteringSelection looking deselected, and so
+  // clearing roles elsewhere updates the chips).
+  useEffect(() => {
+    if (!currentAnalysis) return;
+    if (selectedTrialIds.by !== "highlight") {
+      setSelectedMedoidLabels(new Set());
+      setSelectedPairKeys(new Set());
+      setSelectedParamPairKeys(new Set());
+      setSelectedOutlierLabels(new Set());
+      return;
+    }
+
+    const nextMedoids = new Set<string>();
+    for (const [label, tid] of Object.entries(currentAnalysis.medoids ?? {})) {
+      if (highlightRolesByTrialId[String(tid)]?.includes("medoid")) {
+        nextMedoids.add(label);
+      }
+    }
+    const nextPairs = new Set<string>();
+    for (const bp of currentAnalysis.boundaryPairs ?? []) {
+      const key = boundaryPairKey(bp.cluster_a, bp.cluster_b);
+      const a = highlightRolesByTrialId[String(bp.trial_a)];
+      const b = highlightRolesByTrialId[String(bp.trial_b)];
+      if (a?.includes("boundary") && b?.includes("boundary")) {
+        nextPairs.add(key);
+      }
+    }
+    const nextParamPairs = new Set<string>();
+    for (const bp of currentAnalysis.paramBoundaryPairs ?? []) {
+      const key = boundaryPairKey(bp.cluster_a, bp.cluster_b);
+      const a = highlightRolesByTrialId[String(bp.trial_a)];
+      const b = highlightRolesByTrialId[String(bp.trial_b)];
+      if (a?.includes("param_boundary") && b?.includes("param_boundary")) {
+        nextParamPairs.add(key);
+      }
+    }
+    const nextOutliers = new Set<string>();
+    for (const [label, tid] of Object.entries(currentAnalysis.outliers ?? {})) {
+      if (highlightRolesByTrialId[String(tid)]?.includes("outlier")) {
+        nextOutliers.add(label);
+      }
+    }
+
+    setSelectedMedoidLabels(nextMedoids);
+    setSelectedPairKeys(nextPairs);
+    setSelectedParamPairKeys(nextParamPairs);
+    setSelectedOutlierLabels(nextOutliers);
+  }, [currentAnalysis, highlightRolesByTrialId, selectedTrialIds.by]);
 
   const toggleMedoidLabel = useCallback(
     (label: string) => {
@@ -1539,7 +1592,7 @@ export default function PerEgoSelection({
 
             return (
               <Stack
-                key={i}
+                key={`clustering-result-${index}`}
                 onClick={() => {
                   console.log(result);
                   dispatch(

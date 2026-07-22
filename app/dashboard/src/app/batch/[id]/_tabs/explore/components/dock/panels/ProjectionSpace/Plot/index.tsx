@@ -189,6 +189,46 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   const [scatterplot, setScatterPlot] = useState<ReturnType<
     typeof createScatterplot
   > | null>(null);
+  const scatterplotAliveRef = useRef(false);
+  const ctrlHeldRef = useRef(false);
+  const ctrlHighlightGestureRef = useRef(false);
+  const highlightRolesRef = useRef(highlightRolesByTrialId);
+  highlightRolesRef.current = highlightRolesByTrialId;
+  const selectedTrialIdsRef = useRef(selectedTrialIds);
+  selectedTrialIdsRef.current = selectedTrialIds;
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey) ctrlHeldRef.current = true;
+    };
+    const onKeyUp = (event: KeyboardEvent) => {
+      ctrlHeldRef.current = event.ctrlKey || event.metaKey;
+    };
+    const onBlur = () => {
+      ctrlHeldRef.current = false;
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, []);
+
+  const safeScatterplotSet = useCallback(
+    (props: Record<string, unknown>) => {
+      if (!scatterplotAliveRef.current || scatterplot == null) return;
+      try {
+        scatterplot.set(props);
+      } catch {
+        scatterplotAliveRef.current = false;
+      }
+    },
+    [scatterplot],
+  );
+
   const [points, setPoints] = useState<number[][]>([]);
   const highlightMarkers = useMemo(() => {
     const order = globalStorage.trialOrder[egoName] ?? [];
@@ -197,15 +237,16 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       index: number;
       role: "medoid" | "boundary" | "param_boundary" | "outlier";
     }> = [];
-    if (selected.size === 0) return markers;
+    const roleEntries = Object.entries(highlightRolesByTrialId);
+    if (roleEntries.length === 0) return markers;
 
-    // Only use roles from Highlight trials picks — never infer from cluster
-    // membership (outlier trials are often also closest-pair endpoints).
+    const showAllRoles = selectedTrialIds.by === "highlight";
+
     for (let i = 0; i < order.length; i++) {
       const tid = String(order[i]);
-      if (!selected.has(tid)) continue;
       const roles = highlightRolesByTrialId[tid];
       if (roles == null) continue;
+      if (!showAllRoles && !selected.has(tid)) continue;
       for (const role of roles) {
         markers.push({ index: i, role });
       }
@@ -405,41 +446,102 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     });
 
     plot.subscribe("select", ({ points }) => {
+      const currentSelection = selectedTrialIdsRef.current;
+      const isHighlight = currentSelection.by === "highlight";
+      const isCtrl =
+        ctrlHeldRef.current || ctrlHighlightGestureRef.current;
+      const trialOrder = globalStorage.trialOrder[egoName] ?? [];
+      const reported = points
+        .map((index) => trialOrder[index])
+        .filter((id): id is string => id != null && id !== "");
+
+      if (isHighlight) {
+        const roleIds = Object.keys(highlightRolesRef.current);
+        const currentSet = new Set(currentSelection.value.map(String));
+
+        // Ctrl gestures handled by manual click / lassoEnd — ignore select.
+        if (isCtrl) {
+          return;
+        }
+
+        if (
+          reported.length === 0 ||
+          reported.every((id) => currentSet.has(String(id)))
+        ) {
+          return;
+        }
+      }
+
       const selection = points;
       if (selection.length === 1) {
-        const trialId = globalStorage.trialOrder[egoName][selection[0]];
+        const trialId = trialOrder[selection[0]];
         dispatch(batchSlice.actions.setSelectedTrialId(trialId));
         dispatch(
           batchSlice.actions.setSelectedTrialIds({
             by: "mfpca",
             value: [trialId],
-          })
+          }),
         );
       } else {
         const selectedTrialIdValues = [];
         for (const index of selection) {
-          selectedTrialIdValues.push(globalStorage.trialOrder[egoName][index]);
+          selectedTrialIdValues.push(trialOrder[index]);
         }
-        // console.log(selection.length);
-        // console.log(selectedTrialIdValues.length);
         dispatch(
           batchSlice.actions.setSelectedTrialIds({
             by: "mfpca",
             value: selectedTrialIdValues,
-          })
+          }),
         );
       }
       dispatch(interactionSlice.actions.record(panelName + ".select"));
     });
 
     plot.subscribe("deselect", () => {
+      if (selectedTrialIdsRef.current.by === "highlight") {
+        return;
+      }
       console.log("deselect mfpca");
       dispatch(batchSlice.actions.setSelectedTrialId(null));
       dispatch(batchSlice.actions.setSelectedTrialIds({ by: "", value: [] }));
       dispatch(interactionSlice.actions.record(panelName + ".deselect"));
     });
 
+    plot.subscribe("lassoEnd", () => {
+      const currentSelection = selectedTrialIdsRef.current;
+      if (currentSelection.by !== "highlight") return;
+      if (!(ctrlHeldRef.current || ctrlHighlightGestureRef.current)) return;
+
+      // After Ctrl+lasso, read scatterplot's selected indices (extras only are
+      // fed into select during highlight) and merge with role trials.
+      const selectedIndexes = (plot as any).get?.("selectedPoints") as
+        | number[]
+        | undefined;
+      const trialOrder = globalStorage.trialOrder[egoName] ?? [];
+      const reported = (selectedIndexes ?? [])
+        .map((index) => trialOrder[index])
+        .filter((id): id is string => id != null && id !== "");
+      if (reported.length === 0) return;
+
+      const roleIds = Object.keys(highlightRolesRef.current);
+      const merged = [
+        ...new Set([
+          ...currentSelection.value.map(String),
+          ...roleIds,
+          ...reported,
+        ]),
+      ];
+      dispatch(
+        batchSlice.actions.setSelectedTrialIds({
+          by: "highlight",
+          value: merged,
+        }),
+      );
+      dispatch(interactionSlice.actions.record(panelName + ".select"));
+    });
+
     setScatterPlot(plot);
+    scatterplotAliveRef.current = true;
 
     // --- Middle-mouse-button panning ---------------------------------------
     // The left mouse button is reserved for selection (mouseMode "lasso"), so
@@ -453,6 +555,32 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     let midPanning = false;
     let lastPanX = 0;
     let lastPanY = 0;
+    let ctrlHighlightDown: { x: number; y: number } | null = null;
+
+    const findNearestTrialId = (clientX: number, clientY: number) => {
+      if (panCanvas == null || !scatterplotAliveRef.current) return null;
+      const trialOrder = globalStorage.trialOrder[egoName] ?? [];
+      const rect = panCanvas.getBoundingClientRect();
+      const localX = clientX - rect.left;
+      const localY = clientY - rect.top;
+      let bestIdx = -1;
+      let bestDist = 14;
+      for (let i = 0; i < trialOrder.length; i++) {
+        try {
+          const pos = plot.getScreenPosition(i);
+          if (!pos) continue;
+          const d = Math.hypot(pos[0] - localX, pos[1] - localY);
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+          }
+        } catch {
+          /* filtered */
+        }
+      }
+      return bestIdx >= 0 ? String(trialOrder[bestIdx]) : null;
+    };
+
     const onPanMouseDown = (event: globalThis.MouseEvent) => {
       if (event.button !== 1) return; // middle mouse button only
       event.preventDefault();
@@ -479,19 +607,75 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
     const onAuxClick = (event: globalThis.MouseEvent) => {
       if (event.button === 1) event.preventDefault();
     };
+    const onSelectMouseDown = (event: globalThis.MouseEvent) => {
+      if (event.button !== 0) return;
+      const isCtrl = event.ctrlKey || event.metaKey;
+      const isHighlight = selectedTrialIdsRef.current.by === "highlight";
+      ctrlHighlightGestureRef.current = isHighlight && isCtrl;
+      ctrlHighlightDown =
+        isHighlight && isCtrl
+          ? { x: event.clientX, y: event.clientY }
+          : null;
+    };
+    const onSelectMouseUp = (event: globalThis.MouseEvent) => {
+      if (
+        ctrlHighlightDown != null &&
+        selectedTrialIdsRef.current.by === "highlight"
+      ) {
+        const dx = event.clientX - ctrlHighlightDown.x;
+        const dy = event.clientY - ctrlHighlightDown.y;
+        const isClick = dx * dx + dy * dy < 25;
+        if (isClick) {
+          const trialId = findNearestTrialId(event.clientX, event.clientY);
+          if (trialId != null) {
+            const roleIds = Object.keys(highlightRolesRef.current);
+            const roleSet = new Set(roleIds);
+            const next = new Set(
+              selectedTrialIdsRef.current.value.map(String),
+            );
+            for (const id of roleIds) next.add(id);
+            if (!roleSet.has(trialId)) {
+              if (next.has(trialId)) next.delete(trialId);
+              else next.add(trialId);
+            }
+            dispatch(
+              batchSlice.actions.setSelectedTrialIds({
+                by: "highlight",
+                value: [...next],
+              }),
+            );
+            dispatch(interactionSlice.actions.record(panelName + ".select"));
+          }
+        }
+      }
+      ctrlHighlightDown = null;
+      setTimeout(() => {
+        ctrlHighlightGestureRef.current = false;
+      }, 0);
+    };
     panCanvas?.addEventListener("mousedown", onPanMouseDown, { passive: false });
+    panCanvas?.addEventListener("mousedown", onSelectMouseDown, { passive: true });
     window.addEventListener("mousemove", onPanMouseMove, { passive: true });
     window.addEventListener("mouseup", onPanMouseUp, { passive: true });
+    window.addEventListener("mouseup", onSelectMouseUp, { passive: true });
     panCanvas?.addEventListener("auxclick", onAuxClick);
 
     return () => {
+      scatterplotAliveRef.current = false;
       panCanvas?.removeEventListener("mousedown", onPanMouseDown);
+      panCanvas?.removeEventListener("mousedown", onSelectMouseDown);
       window.removeEventListener("mousemove", onPanMouseMove);
       window.removeEventListener("mouseup", onPanMouseUp);
+      window.removeEventListener("mouseup", onSelectMouseUp);
       panCanvas?.removeEventListener("auxclick", onAuxClick);
-      plot.destroy();
+      try {
+        plot.destroy();
+      } catch {
+        /* already destroyed */
+      }
+      setScatterPlot((prev) => (prev === plot ? null : prev));
     };
-  }, [isReady, canvasRef.current, trajectoryAnalysis]);
+  }, [isReady, canvasRef.current, trajectoryAnalysis, selectedTrialIds.by]);
 
   // useEffect(() => {
   //   if (scatterplot == null) {
@@ -517,11 +701,11 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       if (selectedMetric && selectedMetric.kpi.rule === "greaterThan") {
         colors.reverse();
       }
-      scatterplot.set({
+      safeScatterplotSet({
         pointColor: colors,
       });
     } else if (clusterInfo == null) {
-      scatterplot.set({
+      safeScatterplotSet({
         pointColor: [
           chroma("black").rgba(),
           chroma("black").rgba(),
@@ -561,11 +745,11 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       if (Object.keys(clusterInfo ?? {}).includes("-1")) {
         colors = [chroma(noiseColor).rgba(), ...colors];
       }
-      scatterplot.set({
+      safeScatterplotSet({
         pointColor: colors,
       });
     }
-  }, [clusterInfo, scatterplot, colorMode, selectedMetric]);
+  }, [clusterInfo, scatterplot, colorMode, selectedMetric, safeScatterplotSet]);
 
   const drawPoints = useCallback(
     _.debounce(
@@ -611,7 +795,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
           // if (selectedPairTrialId != null) {
           // }
 
-          const label = clusteringResult?.data[trialId].label ?? 0;
+          const label = clusteringResult?.data?.[trialId]?.label ?? 0;
           let labelNumber = Number(label);
           if (
             clusteringResult?.task.method.includes("dbscan") &&
@@ -669,14 +853,28 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
           // newPoints[i][3] = labelNumber;
           // newPoints[i][3] = passed ? 0 : 1;
         }
-        scatterplot.draw(newPoints, {
-          spatialIndex,
-          filter: filteredIndices,
-          // Highlight trials use SVG overlays. Feeding them into regl-scatterplot
-          // select causes deselect/select echoes that fight Redux and can loop.
-          select:
-            selectedTrialIds.by === "highlight" ? [] : selectedIndices,
-        });
+        if (!scatterplotAliveRef.current) {
+          return;
+        }
+        try {
+          const roleSet = new Set(Object.keys(highlightRolesRef.current));
+          const selectIndices =
+            selectedTrialIds.by === "highlight"
+              ? selectedIndices.filter((i) => {
+                  const id = String(
+                    (globalStorage.trialOrder[egoName] ?? [])[i] ?? "",
+                  );
+                  return id !== "" && !roleSet.has(id);
+                })
+              : selectedIndices;
+          scatterplot.draw(newPoints, {
+            spatialIndex,
+            filter: filteredIndices,
+            select: selectIndices,
+          });
+        } catch {
+          scatterplotAliveRef.current = false;
+        }
       },
       100
     ),
