@@ -61,6 +61,9 @@ import axios from "axios";
 import { interactionSlice } from "../../../../redux/slices/interaction";
 import { ClusteringResult } from "@/app/_shared/graphql/queries/clustering";
 import EgoTimelineBox from "@/app/_shared/components/EgoTimelineBox";
+import { sampleEgoKinematicsAtTime } from "@/app/_shared/utils/egoTimeline";
+import { resolveReplayerClusterCaption } from "@/app/_shared/utils/replayerCaption";
+import { resolveReplayerFocusTrial } from "@/app/_shared/utils/replayerFocusTrial";
 
 const clusteringDuration = 5;
 const afterClusteringDuration = 3;
@@ -175,6 +178,12 @@ const Replayer = () => {
   const selectedTrialIds = useAppSelector(
     (state) => state.batch.selectedTrialIds,
   );
+  const replayerTraceTrialId = useAppSelector(
+    (state) => state.batch.replayerTraceTrialId,
+  );
+  const replayerTraceByCluster = useAppSelector(
+    (state) => state.batch.replayerTraceByCluster,
+  );
   const [containerAspect, setContainerAspect] = useState(1);
 
   const [sliderSRatio, setSliderSRatio] = useState(0);
@@ -217,6 +226,21 @@ const Replayer = () => {
   const highlightRolesByTrialId = useAppSelector(
     (state) => state.batch.highlightRolesByTrialId,
   );
+
+  const cameraFocusRef = useRef({
+    replayerTraceTrialId: null as string | null,
+    replayerTraceByCluster: {} as Record<string, string>,
+    selectedTrialIds: { by: "", value: [] as string[] },
+    highlightRolesByTrialId: {} as typeof highlightRolesByTrialId,
+    clusterAnalysisByEgo: null as typeof clusterAnalysisByEgo,
+  });
+  cameraFocusRef.current = {
+    replayerTraceTrialId,
+    replayerTraceByCluster,
+    selectedTrialIds,
+    highlightRolesByTrialId,
+    clusterAnalysisByEgo,
+  };
 
   const clipTimeManualOverride = useAppSelector(
     (state) => state.batch.clipTimeManualOverride,
@@ -271,52 +295,71 @@ const Replayer = () => {
     return () => observer.disconnect();
   }, []);
 
-  const getClusterInterpretation = useCallback(
+  const getClusterCaption = useCallback(
     (egoName: string, clusterLabel: string) => {
-      if (!clusterAnalysisByEgo || selectedTrialIds.value.length === 0) {
-        return null;
-      }
-      // Timeline captions only when Highlight → Medoid is selected for this cluster.
-      if (selectedTrialIds.by !== "highlight") return null;
+      if (selectedTrialIds.value.length === 0) return null;
 
-      const ctx = clusterAnalysisByEgo[egoName];
-      if (!ctx?.hasAnalysis) return null;
-      const interp = ctx.interpretations[clusterLabel];
-      if (!interp?.ego_perspective_summary) return null;
+      const ctx = clusterAnalysisByEgo?.[egoName] ?? null;
+      const result = clusteringResult?.[egoName] ?? null;
 
-      const medoidId = ctx.medoids[clusterLabel];
-      if (!medoidId || !selectedTrialIds.value.includes(medoidId)) return null;
-      const roles = highlightRolesByTrialId[medoidId] ?? [];
-      if (!roles.includes("medoid")) return null;
-
-      return {
-        label: clusterLabel,
-        clusterLabel: interp.cluster_label,
-        summary: interp.ego_perspective_summary,
-        motiveSummary:
-          typeof interp.motive_summary === "string" && interp.motive_summary.trim()
-            ? interp.motive_summary
-            : null,
-      };
+      return resolveReplayerClusterCaption({
+        clusterLabel,
+        ctx,
+        selectedTrialIds,
+        highlightRolesByTrialId,
+        trialClusterLabel: (trialId: string) => {
+          const label = result?.data?.[trialId]?.label;
+          if (label == null) {
+            // Try numeric / string key variants.
+            const alt =
+              result?.data?.[String(Number(trialId))]?.label ??
+              result?.data?.[String(trialId)]?.label;
+            return alt != null ? String(alt) : null;
+          }
+          return String(label);
+        },
+      });
     },
     [
       clusterAnalysisByEgo,
+      clusteringResult,
       selectedTrialIds,
       highlightRolesByTrialId,
     ],
   );
 
-  const firstActiveInterpretation = useMemo(() => {
+  const firstActiveCaption = useMemo(() => {
     for (const egoName of egos) {
       const ctx = clusterAnalysisByEgo?.[egoName];
-      if (!ctx?.hasAnalysis) continue;
-      for (const label of Object.keys(ctx.interpretations)) {
-        const interp = getClusterInterpretation(egoName, label);
-        if (interp) return { egoName, ...interp };
+      const labels = ctx?.hasAnalysis
+        ? Object.keys(ctx.interpretations)
+        : Object.keys(clusterInfo?.[egoName] ?? {});
+      for (const label of labels) {
+        const caption = getClusterCaption(egoName, label);
+        if (caption) return { ...caption, egoName };
+      }
+      // Fallback: still try visible cluster windows from clustering result.
+      if (labels.length === 0 && clusteringResult?.[egoName]?.data) {
+        const seen = new Set<string>();
+        for (const trialId of Object.keys(clusteringResult[egoName].data)) {
+          const lab = String(
+            clusteringResult[egoName].data[trialId]?.label ?? "",
+          );
+          if (!lab || seen.has(lab)) continue;
+          seen.add(lab);
+          const caption = getClusterCaption(egoName, lab);
+          if (caption) return { ...caption, egoName };
+        }
       }
     }
     return null;
-  }, [egos, clusterAnalysisByEgo, getClusterInterpretation]);
+  }, [
+    egos,
+    clusterAnalysisByEgo,
+    clusterInfo,
+    clusteringResult,
+    getClusterCaption,
+  ]);
 
   useEffect(() => {
     if (clipTimeManualOverride != null && clipTimePaused) {
@@ -358,6 +401,24 @@ const Replayer = () => {
       }
     | undefined
   >(undefined);
+
+  const egoKinematicsFor = useCallback(
+    (egoName: string, medoidId: string | undefined) => {
+      if (!medoidId || !trajectories) {
+        return { velocityMps: null, accelMps2: null };
+      }
+      const egoTrajectories = trajectories[egoName] ?? trajectories["main"] ?? {};
+      const traj =
+        egoTrajectories[medoidId] ??
+        egoTrajectories[String(Number(medoidId))] ??
+        undefined;
+      const egoPoses = traj?.trajectory?.Ego as
+        | Array<{ x: number; y: number; speed?: number }>
+        | undefined;
+      return sampleEgoKinematicsAtTime(traj?.time, egoPoses, displayTimeSec);
+    },
+    [trajectories, displayTimeSec],
+  );
 
   useEffect(() => {
     appData.paused = clipTimePaused;
@@ -671,10 +732,8 @@ const Replayer = () => {
           }
         }
         function syncViewportTransform(master: Viewport, target: Viewport) {
-          target.position.copyFrom(master.position);
+          // Zoom only: each pane centers on its own focus ego during playback.
           target.scale.copyFrom(master.scale);
-          target.rotation = master.rotation;
-          target.pivot.copyFrom(master.pivot);
         }
         const flatViewers: {
           app: Application;
@@ -793,8 +852,9 @@ const Replayer = () => {
   }, [window]);
 
   useEffect(() => {
-    globalStorage.ITRI.trialIdForS = selectedTrialIds.value[0];
-  }, [selectedTrialIds]);
+    globalStorage.ITRI.trialIdForS =
+      replayerTraceTrialId ?? selectedTrialIds.value[0];
+  }, [selectedTrialIds, replayerTraceTrialId]);
 
   useEffect(() => {
     if (
@@ -1030,10 +1090,6 @@ const Replayer = () => {
               width = width == 0 ? 2.2 : width;
               length = length == 0 ? 5.14 : length;
 
-              const egoX = trajectory.trajectory["Ego"][0]["x"];
-              const egoY = trajectory.trajectory["Ego"][0]["y"];
-              const egoYaw = trajectory.trajectory["Ego"][0]["yaw"]; // Assuming `yaw` is in radians
-
               // let agentGraphic: Graphics | Sprite = new Graphics();
               let agentGraphic: Graphics | Sprite = new Sprite(Texture.WHITE);
               let sprite: Sprite | undefined = undefined;
@@ -1049,13 +1105,7 @@ const Replayer = () => {
                 sprite.position.set(x, y);
                 sprite.rotation = yaw + 3.14;
                 shapes.addChild(sprite);
-
-                const sceneAngleForEgo = -(-egoYaw + 3.14 / 2);
-                sceneNode.pivot.set(egoX, egoY);
-                sceneNode.position.set(0, 0);
-                sceneNode.rotation = sceneAngleForEgo;
-                viewport.moveCenter(0, 0);
-                viewport.setZoom(5);
+                // Camera follow is applied after all trials are built (focus trial).
               } else {
                 agentGraphic.width = width;
                 agentGraphic.height = length;
@@ -1106,6 +1156,48 @@ const Replayer = () => {
 
         appData.timeMax = newTimeMax;
 
+        const applyCameraFollow = (
+          time: number | null,
+          sRatio: number | null,
+          opts?: { setInitialOrientation?: boolean },
+        ) => {
+          const focus = cameraFocusRef.current;
+          const focusId = resolveReplayerFocusTrial({
+            availableTrialIds: Object.keys(agentsData),
+            replayerTraceByCluster: focus.replayerTraceByCluster,
+            replayerTraceTrialId: focus.replayerTraceTrialId,
+            viewerClusterLabel: viewerName,
+            clusterAnalysis: focus.clusterAnalysisByEgo?.[egoName] ?? null,
+            selectedTrialIds: focus.selectedTrialIds,
+            highlightRolesByTrialId: focus.highlightRolesByTrialId,
+          });
+          if (focusId == null) return;
+          const egoAgent = agentsData[focusId]?.["Ego"];
+          if (egoAgent == null) return;
+          const pos =
+            time != null
+              ? egoAgent.getPositionAtTime(time)
+              : sRatio != null
+                ? egoAgent.getPositionAtS(sRatio)
+                : null;
+          if (pos?.x == null || pos?.y == null) return;
+          // Same display as before: map orientation is fixed after framing.
+          // Only translate so the focus ego stays centered — do not rotate
+          // with ego yaw during playback.
+          sceneNode.pivot.set(pos.x, pos.y);
+          sceneNode.position.set(0, 0);
+          if (opts?.setInitialOrientation) {
+            const yaw = pos.yaw ?? 0;
+            sceneNode.rotation = -(-yaw + 3.14 / 2);
+          }
+          viewport.moveCenter(0, 0);
+        };
+
+        // Initial framing: match legacy ego-aligned orientation once, then follow
+        // by translation only.
+        applyCameraFollow(0, null, { setInitialOrientation: true });
+        viewport.setZoom(5);
+
         const update = (ticker: Ticker) => {
           if (timeOrS === "s") {
             return;
@@ -1141,17 +1233,11 @@ const Replayer = () => {
                 );
                 agent.sprite.rotation = (agentUpdatedPosition?.yaw ?? 0) + 3.14;
               }
-              // if (
-              //   globalStorage.ITRI.trialIdForS === trialId &&
-              //   agentName === "Ego" &&
-              //   sTypographyRef.current
-              // ) {
-              //   sTypographyRef.current.innerText =
-              //     agentUpdatedPosition?.s_ratio.toFixed(3) ?? "0";
-              // }
             }
             i++;
           }
+
+          applyCameraFollow(time, null);
 
           if (timeTypographyRef.current) {
             timeTypographyRef.current.innerText = time.toFixed(3);
@@ -1251,6 +1337,18 @@ const Replayer = () => {
               alpha = selectedTrialIds.value.includes(trialId) ? 0.75 : 0.0;
             }
           }
+          // Keep camera-follow trial(s) visible even if selection alpha dims others.
+          const traced = new Set(
+            Object.values(
+              cameraFocusRef.current.replayerTraceByCluster ?? {},
+            ).map(String),
+          );
+          if (replayerTraceTrialId != null) {
+            traced.add(String(replayerTraceTrialId));
+          }
+          if (traced.has(String(trialId))) {
+            alpha = Math.max(alpha, 0.85);
+          }
           for (const agent of Object.values(item)) {
             agent.graphics.alpha = alpha;
             if (agent.sprite) {
@@ -1260,7 +1358,52 @@ const Replayer = () => {
         }
       }
     }
-  }, [selectedTrialIds, viewerData, clipTimePaused]);
+  }, [selectedTrialIds, viewerData, clipTimePaused, replayerTraceTrialId, replayerTraceByCluster, timeOrS]);
+
+  // Recenter on the focus ego when the right-click trace target changes (paused).
+  useEffect(() => {
+    if (viewerData == null || viewers == null || timeOrS !== "time") return;
+    if (!clipTimePaused) return;
+    const time = appData.lastTime
+      ? Object.values(appData.lastTime)[0] ?? clipTimeManualOverride ?? 0
+      : clipTimeManualOverride ?? 0;
+    for (const egoName of Object.keys(viewerData)) {
+      for (const viewerName of Object.keys(viewerData[egoName])) {
+        const agentsData = viewerData[egoName][viewerName].agentsData;
+        const viewer = viewers[egoName]?.[viewerName];
+        if (viewer == null) continue;
+        const focus = cameraFocusRef.current;
+        const focusId = resolveReplayerFocusTrial({
+          availableTrialIds: Object.keys(agentsData),
+          replayerTraceByCluster: focus.replayerTraceByCluster,
+          replayerTraceTrialId: focus.replayerTraceTrialId,
+          viewerClusterLabel: viewerName,
+          clusterAnalysis: focus.clusterAnalysisByEgo?.[egoName] ?? null,
+          selectedTrialIds: focus.selectedTrialIds,
+          highlightRolesByTrialId: focus.highlightRolesByTrialId,
+        });
+        if (focusId == null) continue;
+        const egoAgent = agentsData[focusId]?.["Ego"];
+        if (egoAgent == null) continue;
+        const tKey = egoName + viewerName;
+        const t = appData.lastTime[tKey] ?? time;
+        const pos = egoAgent.getPositionAtTime(t);
+        if (pos?.x == null || pos?.y == null) continue;
+        viewer.sceneNode.pivot.set(pos.x, pos.y);
+        viewer.sceneNode.position.set(0, 0);
+        // Keep framing orientation — do not rewrite rotation on follow.
+        viewer.viewport.moveCenter(0, 0);
+      }
+    }
+  }, [
+    replayerTraceTrialId,
+    replayerTraceByCluster,
+    viewerData,
+    viewers,
+    clipTimePaused,
+    timeOrS,
+    clipTimeManualOverride,
+  ]);
 
   useEffect(() => {
     if (viewerData == null || timeOrS === "time") {
@@ -1287,9 +1430,31 @@ const Replayer = () => {
             }
           }
         }
+
+        const viewer = viewers?.[egoName]?.[viewerName];
+        if (viewer == null) continue;
+        const focus = cameraFocusRef.current;
+        const focusId = resolveReplayerFocusTrial({
+          availableTrialIds: Object.keys(agentsData),
+          replayerTraceByCluster: focus.replayerTraceByCluster,
+          replayerTraceTrialId: focus.replayerTraceTrialId,
+          viewerClusterLabel: viewerName,
+          clusterAnalysis: focus.clusterAnalysisByEgo?.[egoName] ?? null,
+          selectedTrialIds: focus.selectedTrialIds,
+          highlightRolesByTrialId: focus.highlightRolesByTrialId,
+        });
+        if (focusId == null) continue;
+        const egoAgent = agentsData[focusId]?.["Ego"];
+        if (egoAgent == null) continue;
+        const pos = egoAgent.getPositionAtS(sliderSRatio);
+        if (pos?.x == null || pos?.y == null) continue;
+        viewer.sceneNode.pivot.set(pos.x, pos.y);
+        viewer.sceneNode.position.set(0, 0);
+        // Keep framing orientation — do not rewrite rotation on follow.
+        viewer.viewport.moveCenter(0, 0);
       }
     }
-  }, [viewerData, sliderSRatio]);
+  }, [viewerData, sliderSRatio, viewers, timeOrS, replayerTraceByCluster]);
 
   let canvases: ReactNode = null;
   if (
@@ -1422,10 +1587,10 @@ const Replayer = () => {
                   }}
                 />
 
-                {/* Interpretation caption — top-right; Motive button — bottom-right. */}
+                {/* Caption — top-right; Motive button — bottom-right (medoid only). */}
                 {(() => {
-                  const panelInterp = getClusterInterpretation(egoName, label);
-                  if (!panelInterp || timeOrS !== "time") return null;
+                  const panelCaption = getClusterCaption(egoName, label);
+                  if (!panelCaption || timeOrS !== "time") return null;
                   const motiveKey = `${egoName}:${label}`;
                   return (
                     <>
@@ -1434,39 +1599,34 @@ const Replayer = () => {
                           position: "absolute",
                           top: 20,
                           right: 20,
-                          width: useMultiColumnLayout
-                            ? "min(100% - 40px, 520px)"
-                            : "min(100% - 40px, 280px)",
+                          width: 280,
+                          maxWidth: "55%",
                           maxHeight: "calc(100% - 80px)",
                           overflowY: "auto",
                           zIndex: 20,
-                          pointerEvents: "none",
+                          // Allow wheel/drag scroll on the caption; map stays behind.
+                          pointerEvents: "auto",
                         }}
                       >
                         <EgoTimelineBox
-                          summary={panelInterp.summary}
+                          summary={panelCaption.summary}
                           timeSec={displayTimeSec}
-                          title={
-                            panelInterp.clusterLabel
-                              ? `Cluster ${panelInterp.label}: ${panelInterp.clusterLabel}`
-                              : `Cluster ${panelInterp.label}`
-                          }
+                          title={panelCaption.title}
                           variant="chat"
                           borderColor={color}
                           compact
+                          {...egoKinematicsFor(egoName, panelCaption.trialId)}
                         />
                       </Box>
-                      {panelInterp.motiveSummary && (
+                      {panelCaption.motiveSummary && (
                         <Button
                           size="small"
                           variant="contained"
                           onClick={() =>
                             setMotiveOpen({
                               key: motiveKey,
-                              title: panelInterp.clusterLabel
-                                ? `Cluster ${panelInterp.label}: ${panelInterp.clusterLabel}`
-                                : `Cluster ${panelInterp.label}`,
-                              text: panelInterp.motiveSummary as string,
+                              title: panelCaption.title,
+                              text: panelCaption.motiveSummary as string,
                             })
                           }
                           sx={{
@@ -1495,44 +1655,43 @@ const Replayer = () => {
         <Box sx={{ flex: 1, minWidth: 0, width: "100%", position: "relative" }}>
           <canvas id="replayer-main-main-canvas" ref={canvasRef}></canvas>
         </Box>
-        {firstActiveInterpretation && timeOrS === "time" && (
+        {firstActiveCaption && timeOrS === "time" && (
           <>
             <Box
               sx={{
                 position: "absolute",
                 top: 20,
                 right: 20,
-                width: "min(100% - 40px, 520px)",
+                width: 400,
+                maxWidth: "65%",
                 maxHeight: "calc(100% - 80px)",
                 overflowY: "auto",
                 zIndex: 20,
-                pointerEvents: "none",
+                pointerEvents: "auto",
               }}
             >
               <EgoTimelineBox
-                summary={firstActiveInterpretation.summary}
+                summary={firstActiveCaption.summary}
                 timeSec={displayTimeSec}
-                title={
-                  firstActiveInterpretation.clusterLabel
-                    ? `Cluster ${firstActiveInterpretation.label}: ${firstActiveInterpretation.clusterLabel}`
-                    : `Cluster ${firstActiveInterpretation.label}`
-                }
+                title={firstActiveCaption.title}
                 variant="chat"
                 borderColor="#888"
                 compact
+                {...egoKinematicsFor(
+                  firstActiveCaption.egoName,
+                  firstActiveCaption.trialId,
+                )}
               />
             </Box>
-            {firstActiveInterpretation.motiveSummary && (
+            {firstActiveCaption.motiveSummary && (
               <Button
                 size="small"
                 variant="contained"
                 onClick={() =>
                   setMotiveOpen({
                     key: "main",
-                    title: firstActiveInterpretation.clusterLabel
-                      ? `Cluster ${firstActiveInterpretation.label}: ${firstActiveInterpretation.clusterLabel}`
-                      : `Cluster ${firstActiveInterpretation.label}`,
-                    text: firstActiveInterpretation.motiveSummary as string,
+                    title: firstActiveCaption.title,
+                    text: firstActiveCaption.motiveSummary as string,
                   })
                 }
                 sx={{

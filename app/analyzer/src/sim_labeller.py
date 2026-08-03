@@ -18,13 +18,11 @@ Design notes
 ------------
 1.  We treat Ego (always present) as track_id 0 and assign integer ids 1..N
     to the named agents in the order they appear in the first frame.
-2.  Ego road_id/lane_id come straight from the Observation (`egoRoadId`,
-    `egoLaneId`) — these are the authoritative esmini values.
-3.  Non-Ego agents have `roadId=0, laneId=0` in Payload due to the
-    scenario_sampler.py:1405 bug. We reconstruct them spatially using
-    `assign_agent_road_id(x, y, parser)` against the parsed .xodr lane
-    boundaries.
-4.  No floating-point fields are coerced to ints except road_id / lane_id.
+2.  When Payload/CSV ``roadId`` is missing or 0, road/lane are inferred by
+    nearest sampled OpenDRIVE lane polyline (Ego and NPCs alike). This is
+    not metrology GT — junctions can mis-assign — but enables Labeller
+    lane-change / junction text when esmini IDs are stuck at 0.
+3.  No floating-point fields are coerced to ints except road_id / lane_id.
 """
 
 from __future__ import annotations
@@ -52,6 +50,9 @@ def assign_agent_road_id(
     Uses every LaneLine that is not a road reference (`lane_type != "ref"`),
     which includes drivable lanes, shoulders and borders. Returns (0, 0) only
     when the parser has no lane samples.
+
+    Limitation: dense nearest-point (not true centerline projection); parallel
+    roads / junctions can flip IDs frame-to-frame.
     """
     best_d2 = math.inf
     best = (0, 0)
@@ -68,6 +69,21 @@ def assign_agent_road_id(
                     rid = 0
                 best = (rid, int(line.lane_id))
     return best
+
+
+def resolve_road_lane(
+    x: float,
+    y: float,
+    rid: int,
+    lid: int,
+    parser,
+) -> Tuple[int, int]:
+    """Prefer payload/CSV IDs; if ``rid == 0`` (missing GT), infer from map."""
+    if int(rid) != 0:
+        return int(rid), int(lid)
+    if parser is None:
+        return 0, int(lid)
+    return assign_agent_road_id(float(x), float(y), parser)
 
 
 # ---------------------------------------------------------------------------
@@ -139,16 +155,20 @@ def build_trajectory_csv(
 
         for ob in observations:
             t = float(ob["time"])
+            ex, ey = float(ob["egoX"]), float(ob["egoY"])
+            ego_rid = int(ob.get("egoRoadId", 0) or 0)
+            ego_lid = int(ob.get("egoLaneId", 0) or 0)
+            ego_rid, ego_lid = resolve_road_lane(ex, ey, ego_rid, ego_lid, parser)
 
             writer.writerow({
                 "trackId": 0,
                 "time": t,
-                "x": float(ob["egoX"]),
-                "y": float(ob["egoY"]),
+                "x": ex,
+                "y": ey,
                 "velocity": float(ob.get("egoSpeed", 0.0)),
                 "heading": float(ob.get("egoYaw", 0.0)),
-                "road_id": int(ob.get("egoRoadId", 0) or 0),
-                "lane_id": int(ob.get("egoLaneId", 0) or 0),
+                "road_id": ego_rid,
+                "lane_id": ego_lid,
                 "lane_offset": float(ob.get("egoLaneOffset", 0.0) or 0.0),
                 "s": float(ob.get("egoS", 0.0) or 0.0),
             })
@@ -160,10 +180,7 @@ def build_trajectory_csv(
                 ax, ay = float(ag["x"]), float(ag["y"])
                 rid_payload = int(ag.get("roadId", 0) or 0)
                 lid_payload = int(ag.get("laneId", 0) or 0)
-                if rid_payload == 0 and lid_payload == 0:
-                    rid, lid = assign_agent_road_id(ax, ay, parser)
-                else:
-                    rid, lid = rid_payload, lid_payload
+                rid, lid = resolve_road_lane(ax, ay, rid_payload, lid_payload, parser)
                 writer.writerow({
                     "trackId": name_to_id[name],
                     "time": t,

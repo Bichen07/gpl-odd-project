@@ -795,16 +795,13 @@ results/batch2/3_cluster_s=0.7036/
 ├── manifest.json                    # medoids + boundary_pairs + param_boundary_pairs
 ├── ic_pairs/pair_c{A}_c{B}.yaml
 └── clusterN/
-    ├── action.yaml / description.txt / context.md
-    ├── cluster.json / cluster_aggregate.json
-    ├── trajectory.csv / map_overview.jpg
-    ├── snapshots/*.jpg              # dual-panel: left=pair zoom, right=ego ±R
-    ├── medoid_trial.yaml            # card A (trial motives)
-    ├── cluster_summary.yaml         # card B (cluster caption)
-    ├── cluster_interpretation.yaml  # thin pointer only (no timeline copy)
-    ├── outlier_trials/trial_<idx>/
-    ├── boundary_c<M>/trial_<idx>/   # MFPCA embedding closest pair
-    └── param_boundary_c<M>/trial_<idx>/  # IC closest pair
+    ├── raw/                         # trajectory.csv, cluster.json
+    ├── processed/                   # action, description, context, snapshots, …
+    ├── output/                      # medoid_trial / cluster_summary / shim YAMLs
+    └── highlight_trials/
+        ├── outlier_trials/trial_<idx>/
+        ├── boundary_c<M>/trial_<idx>/   # MFPCA embedding closest pair
+        └── param_boundary_c<M>/trial_<idx>/  # IC closest pair
 ```
 
 **Auxiliary trial scopes** (same CLI — rebuild selectively with `--from-run`):
@@ -812,9 +809,9 @@ results/batch2/3_cluster_s=0.7036/
 | Flag | Default | What it builds |
 | ---- | ------- | -------------- |
 | `--medoids` | `all` | Medoid pack under `clusterN/` |
-| `--emb-boundaries` (`--boundaries`) | `all` | Embedding closest pairs → `boundary_c*` |
-| `--param-boundaries` | `none` | IC closest pairs → `param_boundary_c*` (z-scored OncomingSpeed / OncomingStartDelay) |
-| `--outliers` | `all` | Top outlier → `outlier_trials/` |
+| `--emb-boundaries` (`--boundaries`) | `all` | Embedding closest pairs → `highlight_trials/boundary_c*` |
+| `--param-boundaries` | `none` | IC closest pairs → `highlight_trials/param_boundary_c*` (z-scored OncomingSpeed / OncomingStartDelay) |
+| `--outliers` | `all` | Top outlier → `highlight_trials/outlier_trials/` |
 
 ```bash
 # IC (Parameter Space) closest pairs only — keep existing medoids / emb pairs:

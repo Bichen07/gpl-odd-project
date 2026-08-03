@@ -1,23 +1,29 @@
 <Your Task>
-You have been briefed on the domain glossary, then given an INITIAL-CONDITION
-closest pair: two trials nearly identical in OncomingSpeed / OncomingStartDelay
-but from different clusters (often different outcomes), with conflict packs and
-dual-panel BEV from BOTH sides.
+INITIAL-CONDITION matched pair: two trials with nearly identical scenario inputs
+(OncomingSpeed, OncomingStartDelay; param_dist ≤ caliper) from different embedding
+clusters. Explain whether the cluster split is justified or over-fine.
 
-Explain WHY responses/outcomes differ despite near-equal ICs.
+IC params are sampled OpenSCENARIO inputs (Opposite start/target speed and start
+delay) — NOT measured speed at peak conflict.
 </Your Task>
 
-<Mandatory Workflow & Chain Of Thought>
-Before YAML, write a CoT with BOTH sides:
+<How to read>
+- card_role=primary → outcomes differ → ask why behavior/outcome diverged.
+- card_role=secondary → same outcome → ask if embedding over-split the ODD.
+- Prefer conflict_metrics + context timeline over guessing from BEV alone.
+- Synced BEVs: each image is ego±25m | ego±25m at the **same shared clock** t
+  (left = cluster A, right = cluster B). Title event tokens match filenames
+  (e.g. `0p5s_before_APPROACH_Opposite`). See common_sense BEV reading guide
+  for arrows / trails / chips.
+</How to read>
 
-1. Inspect Pair Facts: Restate param_dist, both `trial_<index>` folder names,
-   outcomes, and IC params (do not use bare Payload ids as the main name).
-2. Examine Left BEV + metrics: relevance_t / brake_t / peak_t / d_min / ttc_min;
-   name frames used.
-3. Examine Right BEV + metrics: same fields; name frames used.
-4. Contrast: Identify the earliest decisive divergence (perception timing,
-   brake effectiveness, gap acceptance, geometry). Do not invent global ODD bounds.
-5. Hypothesis: One testable follow-up for a future edge-case sim.
+<Mandatory Workflow & Chain Of Thought>
+1. Pair facts: param_dist, card_role, both trial folders, outcomes, IC params.
+2. Left: peak_t / brake_t / relevance_t / d_min / ttc_min; cite context beats.
+3. Right: same.
+4. Earliest decisive divergence (timing, brake, gap, heading).
+5. separation_call: justified | over_fine | inconclusive — with one-line reason.
+6. Optional testable hypothesis. No global ODD bounds from one pair.
 </Mandatory Workflow & Chain Of Thought>
 
 <Pair facts>
@@ -32,12 +38,21 @@ Before YAML, write a CoT with BOTH sides:
 {right_block}
 </Right trial>
 
+<Left context (truncated)>
+{left_context}
+</Left context>
+
+<Right context (truncated)>
+{right_context}
+</Right context>
+
 <Output>
-After the CoT, emit ONE YAML fence:
+After CoT, ONE YAML fence. Do NOT invent conflict_metrics (pipeline injects GT).
 
 ```yaml
 clusters: [<a>, <b>]
 param_dist: <float>
+card_role: "primary" | "secondary"
 param_names: ["OncomingSpeed", "OncomingStartDelay"]
 left:
   trial: "trial_<esmini_index>"
@@ -46,7 +61,6 @@ left:
   cluster: <int>
   outcome: "collision" | "near_miss" | "safe"
   params: {}
-  conflict_metrics: {}
 right:
   trial: "trial_<esmini_index>"
   trial_index: <int>
@@ -54,13 +68,14 @@ right:
   cluster: <int>
   outcome: "collision" | "near_miss" | "safe"
   params: {}
-  conflict_metrics: {}
-delta:
-  # numeric differences you cite
+delta: {}
 contrast_explanation: |
-  Why near-equal ICs produced different responses/outcomes.
-  Cite trial_<index> folder names. Separate paragraphs with blank lines.
+  Why matched ICs diverged (or look alike). Cite trial_<index>. Blank lines
+  between paragraphs.
+separation_call: "justified" | "over_fine" | "inconclusive"
+separation_reason: |
+  One short note.
 hypothesis: |
-  Testable hypothesis for a follow-up edge-case simulation.
+  Testable follow-up, or empty.
 ```
 </Output>

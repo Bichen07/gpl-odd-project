@@ -73,18 +73,18 @@ HumanMessage text:
        {trial_context}     ← truncated action/description context (below)
   + dual-panel BEV JPGs (up to --max-llm-snapshots, evenly spaced)
 
-→ clusterN/medoid_trial.yaml (+ medoid_trial_meta.json)
+→ clusterN/output/medoid_trial.yaml  (single file; optional ``llm_meta.token_usage``)
 ```
 
 #### Inputs you can open and check
 
 | Slot in prompt | Built from | Example path |
 |----------------|------------|--------------|
-| **conflict_metrics JSON** | Runtime dict from `extract_conflict_pack(cluster_dir)` — **not** a saved file by itself. Built from `llm_snapshots.json` + ego brake times in `action.yaml`. Echoed again inside output YAML as `conflict_metrics:`. | Sources: `cluster0/snapshots/llm_snapshots.json`, `cluster0/action.yaml`. Output echo: `cluster0/medoid_trial.yaml` → `conflict_metrics` |
-| **truncated trial_context** | `action_log_from_description(cluster_dir)`: prefer `context.md`, else `description.txt`, else compact render of `action.yaml`. If longer than **6000 chars**, truncated with `…[truncated]`. | Prefer: `cluster0/context.md` (check size; LLM may only see first 6k). Fallback: `cluster0/description.txt`, `cluster0/action.yaml` |
-| **BEV images** | `clusterN/snapshots/*.jpg` via `collect_bev_snapshot_paths` | e.g. `cluster0/snapshots/trial_1188_t_30.02_RELEVANCE_Opposite.jpg` |
-| Snapshot index / frame metrics | Same pack source | `cluster0/snapshots/llm_snapshots.json` (`peak_t`, `relevance_t`, per-frame `d_m`/`ttc_s`) |
-| Medoid identity | `cluster.json` / `manifest.json` | `cluster0/cluster.json` → `medoid.trial_id`; manifest `clusters[].trial_index` (e.g. 1188) |
+| **conflict_metrics JSON** | Runtime dict from `extract_conflict_pack(cluster_dir)` — **not** a saved file by itself. Built from `llm_snapshots.json` + ego brake times in `action.yaml`. Echoed again inside output YAML as `conflict_metrics:`. | Sources: `cluster0/processed/snapshots/llm_snapshots.json`, `cluster0/processed/action.yaml`. Output echo: `cluster0/output/medoid_trial.yaml` → `conflict_metrics` |
+| **truncated trial_context** | `action_log_from_description(cluster_dir)`: prefer `context.md`, else `description.txt`, else compact render of `action.yaml`. If longer than **6000 chars**, truncated with `…[truncated]`. | Prefer: `cluster0/processed/context.md` (sentence timeline only; glossary is in `common_sense.txt`). Fallback: `cluster0/processed/description.txt`, `cluster0/processed/action.yaml` |
+| **BEV images** | `clusterN/processed/snapshots/*.jpg` via `collect_bev_snapshot_paths` | e.g. `cluster0/processed/snapshots/trial_1067_t_17.20_NEAR_MISS_Opposite.jpg` |
+| Snapshot index / frame metrics | Same pack source | `cluster0/processed/snapshots/llm_snapshots.json` (`peak_t`, per-frame `d_m`/`ttc_s`) |
+| Medoid identity | `cluster.json` / `manifest.json` | `cluster0/raw/cluster.json` → `medoid.trial_id` |
 
 **What `conflict_metrics` contains (typical keys):**
 
@@ -108,12 +108,27 @@ HumanMessage text:
 - `d_min` / `ttc_min` ← min over snapshot frames (or interaction rows in `action.yaml`)
 - `brake_t` ← earliest ego `EMERGENCY_BRAKE` / hard brake / else first `DECELERATE` in `action.yaml`
 
-**What “truncated action/description context” is:** the Labeller card text (scenario + snapshot evidence table + action timeline), not a second JSON. Open `context.md` to see the full text the pipeline prefers.
+**What “truncated action/description context” is:** the Labeller **sentence
+timeline** in `processed/context.md` (conflict bursts + accelerate/decelerate +
+same-lane TURN_* with Δheading / heading-vs-travel-direction notes). Open that
+file to see exactly what the medoid LLM prefers. Human tables live in
+`processed/description.txt` (fallback only).
 
-Canonical output keys: `trial_id`, `outcome`, `conflict_metrics`, `motive_summary`,
-`decision_timeline[{timestamp, description}]`, `open_questions`.
+Canonical output keys (LLM narrative): `trial_id`, `outcome`, `motive_summary`,
+`decision_timeline[{timestamp, description}]`, optional `open_questions`.
+`conflict_metrics` is **injected from GT** by `split_analysis` after the call —
+do not ask the model to copy it (wastes tokens; pipeline overwrites anyway).
 
-Example output: `results/batch2/3_cluster_s=0.7036/cluster0/medoid_trial.yaml`
+Example output: `results/batch9/4_cluster_s=0.7482/cluster0/output/medoid_trial.yaml`
+
+**Nested pack layout (writers):**
+
+```text
+clusterN/
+  raw/         trajectory.csv, cluster.json
+  processed/   action.yaml, description.txt, context.md, snapshots/, map_overview.jpg
+  output/      medoid_trial.yaml, cluster_summary.yaml, …
+```
 
 ---
 
@@ -130,7 +145,7 @@ HumanMessage text:
        {numeric_digest} ← format_aggregate_for_prompt(cluster_aggregate.json)
   (text only — no BEV)
 
-→ clusterN/cluster_summary.yaml (+ cluster_summary_meta.json)
+→ clusterN/output/cluster_summary.yaml  (single file; optional ``llm_meta.token_usage``)
 ```
 
 | Slot | Source file to inspect |
@@ -144,46 +159,32 @@ Canonical keys: `cluster_id`, `label`, `risk_level`, `caption`, `consistency_not
 
 ### 3) IC closest pairs (`--products ic-pairs`)
 
+Only pairs with **z-scored IC `param_dist ≤ 0.1`** are packed/LLM'd.
+
 ```text
 SystemMessage:  system_prompt.txt
 
 HumanMessage text:
   common_sense.txt
   + ic_pair_prompt.txt with:
-       {pair_facts}   ← short text from manifest.param_boundary_pairs
-       {left_block}   ← JSON: trial_*/params/outcome + extract_conflict_pack(left_dir)
-       {right_block}  ← same for right
-  + BEV from both param_boundary folders (≤4 each)
+       {pair_facts} / {left_block} / {right_block}
+       {left_context} / {right_context}  ← truncated context.md
+  + synced pair-zoom|pair-zoom BEVs (peak-relative t′)
 
-→ ic_pairs/pair_c{A}_c{B}.yaml
+→ ic_pairs/c{A}-c{B}/
+     pair.json, synced_bev/, cA_trial_*/ + cB_trial_*/
+     contrast.yaml   ← one comparison LLM output
 ```
 
-| Slot | Source to inspect |
-|------|-------------------|
-| Pair list | `manifest.json` → `param_boundary_pairs` |
-| Left trial folder | e.g. `cluster0/param_boundary_c1/trial_134/` |
-| Right trial folder | e.g. `cluster1/param_boundary_c0/trial_1222/` |
-| Left/right packs | Built like medoid `conflict_metrics` from that trial’s `snapshots/llm_snapshots.json` + `action.yaml` |
-| Left/right BEVs | `…/trial_*/snapshots/*.jpg` |
-| Output | `ic_pairs/pair_c0_c1.yaml` (ids = `trial_<esmini_index>`, plus `payload_trial_id`) |
+| Slot | Source |
+|------|--------|
+| Gate | `manifest.param_boundary_pairs` with `ic_match` / `card_role` |
+| Packs | `ic_pairs/c0-c3/` (rebuild: `scripts/rebuild_ic_pairs.py`) |
+| Synced BEV | `ic_pairs/c0-c3/synced_bev/tprime_*.jpg` |
+| Output | `ic_pairs/c0-c3/contrast.yaml` |
 
----
-
-### 4) Thin pointer — `cluster_interpretation.yaml` (no LLM)
-
-Not produced by a prompt. After medoid and/or summary succeed,
-`write_legacy_shim()` copies summary label/risk/caption + a pointer to medoid:
-
-```text
-cluster_summary.yaml + medoid_trial.yaml (trial_id only)
-  → write_legacy_shim()
-  → cluster_interpretation.yaml
-```
-
-Example: `cluster0/cluster_interpretation.yaml` — **no** `decision_timeline` copy.
-
-Replayer timeline + motive come from `medoid_trial_meta.json` via
-`/api/cluster-analysis-status`.
+`card_role=primary` → outcome mismatch; `secondary` → same outcome (over-split probe).
+Far pairs (`ic_match=false`) are skipped for LLM.
 
 ---
 
@@ -193,7 +194,7 @@ Replayer timeline + motive come from `medoid_trial_meta.json` via
 2. `cluster0/action.yaml` — ego brake actions  
 3. `cluster0/context.md` — full trial_context source (note 6k truncate)  
 4. `cluster0/cluster_aggregate.json` — summary digest input  
-5. `manifest.json` → `param_boundary_pairs` + one `param_boundary_c*/trial_*/` folder  
+5. `manifest.json` → `param_boundary_pairs` + one `highlight_trials/param_boundary_c*/trial_*/` folder  
 6. Prompt files under `app/llm_pipeline/prompt_templates/`  
 7. Then run interpret (see CLI)
 
@@ -206,17 +207,23 @@ export GOOGLE_API_KEY="…"   # or OPENAI_API_KEY
 
 python -m llm_pipeline.cli cluster-interpret \
   --results-dir results/batch2/3_cluster_s=0.7036 --batch-id 2 \
-  --products medoid,summary,ic-pairs --no-review
+  --products medoid
 ```
 
-`--products legacy` ≡ `medoid,summary`.
+Default product is **`medoid`** only (one YAML: `output/medoid_trial.yaml`).
+Pass `--products medoid,summary,ic-pairs` or `--products all` when you also want
+cluster captions / IC pair cards. Each product writes **one YAML** (no
+`*_meta.json` sidecars); token usage lives under `llm_meta:` inside that file.
+
+Explore Replayer timeline + motive come from `medoid_trial.yaml` via
+`/api/cluster-analysis-status`.
 
 ## Package map
 
 | Module | Role |
 |--------|------|
 | `cli.py` | `cluster-interpret`, `cross-cluster-eval` |
-| `split_analysis.py` | Product orchestration; `_with_common_sense` / `_system_prompt`; shim |
+| `split_analysis.py` | Product orchestration; `_with_common_sense` / `_system_prompt` |
 | `cluster_aggregates.py` | Digests + `extract_conflict_pack` |
 | `cluster_interpreter.py` | `complete_yaml_prompt` (SystemMessage + HumanMessage + images) |
 | `cluster_interpretation_pipeline.py` | `action_log_from_description`, `collect_bev_snapshot_paths` |

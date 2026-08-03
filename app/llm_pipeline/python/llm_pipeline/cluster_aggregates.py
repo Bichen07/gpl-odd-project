@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -13,6 +14,20 @@ import numpy as np
 
 # Conflict / timeline fields that are absolute esmini seconds before clip rebase.
 _TIME_KEYS = ("peak_t", "relevance_t", "brake_t")
+
+
+def _cluster_paths():
+    """Lazy import analyzer ``cluster_paths`` (nested-then-flat resolve)."""
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    import cluster_paths as cp  # type: ignore
+
+    return cp
+
+
+def _resolve(trial_dir: Path, artifact: str) -> Optional[Path]:
+    return _cluster_paths().resolve_path(trial_dir, artifact, must_exist=True)
 
 
 def resolve_observation_clip_start(trial_id: str) -> Optional[float]:
@@ -69,8 +84,8 @@ def estimate_clip_start_from_cluster_json(trial_dir: Path) -> Optional[float]:
     road 92 near s=0, tolerance 3 m) then adds one observation frame (0.1 s) to
     match Payload's first kept ``esminiSeconds``.
     """
-    cj_path = Path(trial_dir) / "cluster.json"
-    if not cj_path.is_file():
+    cj_path = _resolve(Path(trial_dir), "cluster.json")
+    if cj_path is None:
         return None
     try:
         med = (json.loads(cj_path.read_text(encoding="utf-8")).get("medoid") or {})
@@ -81,13 +96,6 @@ def estimate_clip_start_from_cluster_json(trial_dir: Path) -> Optional[float]:
 
     # Prefer analyzer helper when importable.
     try:
-        import sys
-
-        # .../app/llm_pipeline/python/llm_pipeline/cluster_aggregates.py → app/
-        repo_app = Path(__file__).resolve().parents[3]
-        analyzer_src = repo_app / "analyzer" / "src"
-        if str(analyzer_src) not in sys.path:
-            sys.path.insert(0, str(analyzer_src))
         from csv_roadid_loader import get_csv_road_data  # type: ignore
 
         df = get_csv_road_data(batch_id, trial_index)
@@ -125,8 +133,8 @@ def load_clip_start(trial_dir: Path, trial_id: Optional[str] = None) -> Optional
 
     tid = trial_id
     if not tid:
-        cj = Path(trial_dir) / "cluster.json"
-        if cj.is_file():
+        cj = _resolve(Path(trial_dir), "cluster.json")
+        if cj is not None:
             try:
                 med = (json.loads(cj.read_text(encoding="utf-8")).get("medoid") or {})
                 tid = med.get("trial_id")
@@ -364,8 +372,9 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
         "outcome_hint": None,
         "snapshot_count": 0,
     }
-    snaps_path = trial_dir / "snapshots" / "llm_snapshots.json"
-    if snaps_path.is_file():
+    snap_dir = _resolve(trial_dir, "snapshots")
+    snaps_path = (snap_dir / "llm_snapshots.json") if snap_dir is not None else None
+    if snaps_path is not None and snaps_path.is_file():
         try:
             doc = json.loads(snaps_path.read_text(encoding="utf-8"))
         except Exception:
@@ -393,8 +402,8 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
             pack["ttc_min"] = round(min(ttc_vals), 3)
         pack["outcome_hint"] = "collision" if collided else "survive_or_near_miss"
 
-    action_path = trial_dir / "action.yaml"
-    if action_path.is_file():
+    action_path = _resolve(trial_dir, "action.yaml")
+    if action_path is not None:
         try:
             import yaml
             data = yaml.safe_load(action_path.read_text(encoding="utf-8")) or {}
@@ -430,14 +439,6 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
                 if "COLLISION" in typ:
                     pack["outcome_hint"] = "collision"
 
-    cj = trial_dir / "cluster.json"
-    # Medoid folder has cluster.json with medoid.collided
-    parent_cj = trial_dir / "cluster.json"
-    if not parent_cj.is_file() and (trial_dir.parent / "cluster.json").is_file():
-        # trial under param_boundary — check medoid folder sibling not needed
-        pass
-    if (trial_dir / ".." ).name.startswith("cluster") is False:
-        pass
     # Prefer explicit collided from a local trial meta if present
     for meta_name in ("trial_meta.json", "medoid.json"):
         mp = trial_dir / meta_name
@@ -461,27 +462,76 @@ def find_param_boundary_trial_dir(
     run_dir: Path, src_cluster: str, tgt_cluster: str, trial_id: str,
     trial_index_map: Optional[Dict[str, Tuple[int, int]]] = None,
 ) -> Optional[Path]:
-    """Locate ``cluster{src}/param_boundary_c{tgt}/trial_<esmini_idx>/``."""
-    base = run_dir / f"cluster{src_cluster}" / f"param_boundary_c{tgt_cluster}"
-    if not base.is_dir():
+    """Locate IC-pair side pack.
+
+    Prefer ``ic_pairs/cA-cB/c{src}_trial_<idx>/``; fall back to legacy
+    ``cluster{src}/highlight_trials/param_boundary_c{tgt}/trial_<idx>/``.
+    """
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    try:
+        from ic_pair_packs import find_ic_pair_side_dir  # type: ignore
+
+        found = find_ic_pair_side_dir(
+            run_dir, src_cluster, tgt_cluster, trial_id, trial_index_map
+        )
+        if found is not None:
+            return found
+    except Exception:
+        pass
+
+    cp = _cluster_paths()
+    cluster_dir = run_dir / f"cluster{src_cluster}"
+    base = cp.resolve_highlight_subdir(
+        cluster_dir, f"param_boundary_c{tgt_cluster}", must_exist=True
+    )
+    if base is None:
         return None
     if trial_index_map and str(trial_id) in trial_index_map:
         _b, ti = trial_index_map[str(trial_id)]
         cand = base / f"trial_{ti}"
         if cand.is_dir():
             return cand
-    subs = sorted(p for p in base.iterdir() if p.is_dir() and p.name.startswith("trial_"))
+    subs = sorted(
+        p for p in base.iterdir() if p.is_dir() and p.name.startswith("trial_")
+    )
     if len(subs) == 1:
         return subs[0]
     return None
 
 
+def collect_synced_ic_bev_paths(
+    run_dir: Path, cluster_a: Any, cluster_b: Any, max_n: int = 6
+) -> List[str]:
+    """Peak-aligned pair-zoom|pair-zoom JPGs under ``ic_pairs/cA-cB/synced_bev/``."""
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from ic_pair_packs import pair_pack_dir  # type: ignore
+
+    synced = pair_pack_dir(run_dir, cluster_a, cluster_b) / "synced_bev"
+    if not synced.is_dir():
+        return []
+    files = sorted(synced.glob("t_*.jpg"))
+    if not files:
+        files = sorted(synced.glob("tprime_*.jpg"))
+    if not files:
+        files = sorted(synced.glob("*.jpg"))
+    return [str(p) for p in files[: max(0, max_n)]]
+
+
 def write_cluster_aggregate(cluster_dir: Path, aggregate: Dict[str, Any]) -> Path:
-    out = cluster_dir / "cluster_aggregate.json"
+    cp = _cluster_paths()
+    out = cp.write_path(cluster_dir, "cluster_aggregate.json")
     out.write_text(json.dumps(aggregate, indent=2), encoding="utf-8")
     # Patch cluster.json soft fields for compat
-    cj = cluster_dir / "cluster.json"
-    if cj.is_file():
+    cj = cp.resolve_path(cluster_dir, "cluster.json", must_exist=True)
+    if cj is not None:
         try:
             doc = json.loads(cj.read_text(encoding="utf-8"))
             cluster = doc.setdefault("cluster", {})
@@ -507,31 +557,62 @@ def write_cluster_aggregate(cluster_dir: Path, aggregate: Dict[str, Any]) -> Pat
 
 
 def format_aggregate_for_prompt(agg: Dict[str, Any]) -> str:
-    """Compact text block for cluster-summary LLM."""
+    """Compact text block for cluster-summary LLM (with ODD framing)."""
     lines = [
+        "Scenario family: oncoming interaction on a mapped urban/suburban road "
+        "network (gpl-odd / hct_6-style) — junctions, possible parked roadside "
+        "agents, NOT highway free-flow cruise.",
+        "TTC in this digest = Payload polygon look-ahead KPI (mostly longitudinal). "
+        "It is NOT a universal severity scale: the same seconds mean different "
+        "things on highway vs urban, and lateral pass-by / near-miss can look "
+        "'tight' on TTC while still being a successful yield. Prefer collision_rate "
+        "and collide-vs-survive TTC split over absolute TTC myths. "
+        "Do not invent MTTC / joint lateral–longitudinal scores — they are not in "
+        "this digest; if severity is ambiguous, say so.",
+        "",
         f"Cluster {agg.get('cluster_label')}: n_trials={agg.get('n_trials')}, "
         f"collision_rate={agg.get('collision_rate')}% "
         f"({agg.get('collision_count')}/{agg.get('n_trials')})",
     ]
     ttc = agg.get("ttc") or {}
     lines.append(
-        f"TTC (all): n={ttc.get('n')} mean={ttc.get('mean')} std={ttc.get('std')} "
-        f"p10/p50/p90={ttc.get('p10')}/{ttc.get('p50')}/{ttc.get('p90')} min={ttc.get('min')}"
+        f"TTC (all trials): n={ttc.get('n')} mean={ttc.get('mean')}s "
+        f"std={ttc.get('std')} "
+        f"p10/p50/p90={ttc.get('p10')}/{ttc.get('p50')}/{ttc.get('p90')}s "
+        f"min={ttc.get('min')}s"
     )
     tc, ts = agg.get("ttc_collide") or {}, agg.get("ttc_survive") or {}
     if tc.get("n"):
-        lines.append(f"TTC | collide: mean={tc.get('mean')} p50={tc.get('p50')} n={tc.get('n')}")
-    if ts.get("n"):
-        lines.append(f"TTC | survive: mean={ts.get('mean')} p50={ts.get('p50')} n={ts.get('n')}")
-    for name, d in (agg.get("ic") or {}).items():
         lines.append(
-            f"IC {name}: mean={d.get('mean')} std={d.get('std')} "
+            f"TTC | collided trials: mean={tc.get('mean')}s p50={tc.get('p50')}s "
+            f"n={tc.get('n')}"
+        )
+    if ts.get("n"):
+        lines.append(
+            f"TTC | survived trials: mean={ts.get('mean')}s p50={ts.get('p50')}s "
+            f"n={ts.get('n')}"
+        )
+    if agg.get("mean_spret") is not None:
+        lines.append(
+            f"mean_spret={agg.get('mean_spret')} (secondary KPI; treat as descriptive)"
+        )
+    for name, d in (agg.get("ic") or {}).items():
+        unit = "m/s" if "Speed" in str(name) else ("s" if "Delay" in str(name) else "")
+        u = f" {unit}" if unit else ""
+        lines.append(
+            f"IC {name}: mean={d.get('mean')}{u} std={d.get('std')} "
             f"p10={d.get('p10')} p90={d.get('p90')} range={d.get('range')}"
         )
     iv = agg.get("intra_variance") or {}
     if iv:
         lines.append(
-            f"Embedding spread: mean_dist={iv.get('mean_dist_to_medoid')} "
-            f"std={iv.get('std_dist_to_medoid')} outliers={iv.get('outlier_trial_ids', [])[:3]}"
+            f"Embedding spread: mean_dist_to_medoid={iv.get('mean_dist_to_medoid')} "
+            f"std={iv.get('std_dist_to_medoid')} "
+            f"outlier_trial_ids={iv.get('outlier_trial_ids', [])[:3]}"
         )
+    lines.append(
+        "Relative reading cues for THIS batch only: collision_rate is primary; "
+        "within survivors, lower p10 TTC ⇒ tighter conflicts; compare clusters "
+        "to each other rather than to highway headway lore (e.g. '3 s is safe')."
+    )
     return "\n".join(lines)

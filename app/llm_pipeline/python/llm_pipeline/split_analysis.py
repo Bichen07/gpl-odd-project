@@ -10,6 +10,7 @@ import yaml
 
 from .cluster_aggregates import (
     build_enriched_cluster_aggregate,
+    collect_synced_ic_bev_paths,
     extract_conflict_pack,
     find_param_boundary_trial_dir,
     format_aggregate_for_prompt,
@@ -34,6 +35,18 @@ from .llm_factory import (
 from .paths import PROMPT_TEMPLATES_DIR, REPO_ROOT
 
 
+def _cp():
+    """Analyzer cluster_paths (nested write / nested-then-flat read)."""
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    import cluster_paths as cp  # type: ignore
+
+    return cp
+
+
 PRODUCT_ALIASES = {
     "medoid": "medoid",
     "summary": "summary",
@@ -43,22 +56,28 @@ PRODUCT_ALIASES = {
     "all": "all",
 }
 
+# Default: medoid trial narrative only. Summary / IC pairs are opt-in.
+DEFAULT_PRODUCTS = frozenset({"medoid"})
+
 
 def parse_products(spec: Optional[str]) -> Set[str]:
-    if not spec or spec.strip().lower() in ("all", ""):
+    if not spec or not str(spec).strip():
+        return set(DEFAULT_PRODUCTS)
+    if str(spec).strip().lower() == "all":
         return {"medoid", "summary", "ic-pairs"}
     out: Set[str] = set()
     for part in spec.split(","):
         raw = part.strip().lower()
-        # Ignore removed Decision-Tree product if callers still pass it.
-        if raw in ("dt", "tree"):
+        # Ignore removed products if callers still pass them.
+        if raw in ("dt", "tree", "legacy"):
             continue
         key = PRODUCT_ALIASES.get(raw)
         if key == "all":
             return {"medoid", "summary", "ic-pairs"}
         if key:
             out.add(key)
-    return out or {"medoid", "summary", "ic-pairs"}
+    return out or set(DEFAULT_PRODUCTS)
+
 
 
 def _load_template(name: str) -> str:
@@ -105,9 +124,10 @@ def _strip_yaml_fence(body: str) -> str:
 
 
 def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta: Dict) -> Dict:
-    """Write YAML + sibling *_meta.json. Prefer salvaged raw over parse_failed stubs.
+    """Write a single YAML artifact (no sibling *_meta.json).
 
-    Returns the final parsed dict written to meta.
+    Optional pipeline fields (token usage, stubs) go under ``llm_meta``.
+    Prefer salvaged raw over parse_failed stubs. Returns the final document.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -140,8 +160,10 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
                 if field == "decision_timeline" and not loaded[field]:
                     continue
                 final[field] = loaded[field]
-        # Fill missing keys from loaded
+        # Fill missing keys from loaded (skip pipeline-only keys)
         for k, v in loaded.items():
+            if k == "llm_meta":
+                continue
             if k not in final or final.get(k) in (None, "", "parse_failed", []):
                 if v not in (None, "", "parse_failed"):
                     final[k] = v
@@ -163,15 +185,27 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
                 base.update(parsed[side])
                 final[side] = base
 
+    llm_meta: Dict[str, Any] = {}
+    if isinstance(meta, dict):
+        for k, v in meta.items():
+            if v is not None:
+                llm_meta[k] = v
+    if llm_meta:
+        final["llm_meta"] = llm_meta
+
     body = yaml.safe_dump(final or {"empty": True}, sort_keys=False)
     path.write_text(body if body.endswith("\n") else body + "\n", encoding="utf-8")
+    # Drop obsolete sidecar if a prior run left one behind.
     meta_path = (
         path.with_name(path.stem + "_meta.json")
         if path.suffix == ".yaml"
         else path.with_name(path.name + ".meta.json")
     )
-    meta_doc = {"parsed": final, **meta}
-    meta_path.write_text(json.dumps(meta_doc, indent=2, default=str), encoding="utf-8")
+    if meta_path.is_file():
+        try:
+            meta_path.unlink()
+        except OSError:
+            pass
     return final
 
 
@@ -327,69 +361,6 @@ def _outcome_from_pack_and_flags(
     return "safe"
 
 
-def write_legacy_shim(
-    cluster_dir: Path,
-    cluster_id: int,
-    summary: Optional[Dict[str, Any]],
-    medoid: Optional[Dict[str, Any]],
-    aggregate: Optional[Dict[str, Any]],
-) -> Path:
-    """Thin pointer YAML for older Explore clients.
-
-    Does **not** copy the medoid decision timeline (that lives only in
-    ``medoid_trial.yaml``). Caption/label/risk come from ``cluster_summary``.
-    Explore Replayer should prefer ``medoid_trial`` / status API, which reads
-    the timeline from the medoid file.
-    """
-    label = (summary or {}).get("label") or f"Cluster {cluster_id}"
-    risk = (summary or {}).get("risk_level") or "medium"
-    conf = (summary or {}).get("confidence") or "medium"
-    caption = (summary or {}).get("caption") or ""
-    rate = (aggregate or {}).get("collision_rate")
-    medoid_tid = (medoid or {}).get("trial_id")
-    doc = {
-        "cluster_id": cluster_id,
-        "cluster_label": label,
-        "confidence": conf,
-        "behavior_description": caption,
-        "safety_assessment": {
-            "risk_level": risk,
-            "failure_mode": (summary or {}).get("consistency_note") or "",
-            "collision_rate": f"{rate}%" if rate is not None else "n/a",
-        },
-        "canonical_artifacts": {
-            "cluster_summary": "cluster_summary.yaml",
-            "medoid_trial": "medoid_trial.yaml",
-            "medoid_trial_id": medoid_tid,
-            "note": (
-                "Cluster narrative = cluster_summary.yaml; "
-                "trial motive timeline = medoid_trial.yaml (not duplicated here)."
-            ),
-        },
-        "parameter_conditions": {
-            "trigger": "See cluster_summary.yaml + cluster_aggregate.json",
-            "safe_range": "See IC digests in cluster_aggregate.json (descriptive only)",
-            "risky_boundary": "Not modeled yet",
-        },
-    }
-    path = cluster_dir / "cluster_interpretation.yaml"
-    path.write_text(yaml.safe_dump(doc, sort_keys=False), encoding="utf-8")
-    meta = {
-        "cluster_id": cluster_id,
-        "cluster_label": label,
-        "confidence": conf,
-        "behavior_description": caption,
-        "safety_assessment": doc["safety_assessment"],
-        "parameter_conditions": doc["parameter_conditions"],
-        "canonical_artifacts": doc["canonical_artifacts"],
-        "split_analysis_shim": True,
-    }
-    (cluster_dir / "interpretation_meta.json").write_text(
-        json.dumps(meta, indent=2, default=str), encoding="utf-8"
-    )
-    return path
-
-
 def run_split_analysis(
     results_dir: Path,
     *,
@@ -455,8 +426,9 @@ def run_split_analysis(
             continue
         print(f"\n[split-analysis] cluster{cid}")
         cj = {}
-        if (cluster_dir / "cluster.json").is_file():
-            cj = json.loads((cluster_dir / "cluster.json").read_text(encoding="utf-8"))
+        cj_path = _cp().resolve_path(cluster_dir, "cluster.json", must_exist=True)
+        if cj_path is not None:
+            cj = json.loads(cj_path.read_text(encoding="utf-8"))
         cblk = cj.get("cluster") or {}
         mblk = cj.get("medoid") or {}
         medoid_tid = str(mblk.get("trial_id") or "")
@@ -478,9 +450,9 @@ def run_split_analysis(
             aggregate["n_trials"] = cblk.get("n_trials") or cblk.get("size")
             if cblk.get("parameter_ranges"):
                 aggregate["parameter_ranges"] = cblk["parameter_ranges"]
-        write_cluster_aggregate(cluster_dir, aggregate)
+        agg_path = write_cluster_aggregate(cluster_dir, aggregate)
 
-        cluster_out: Dict[str, Any] = {"aggregate": str(cluster_dir / "cluster_aggregate.json")}
+        cluster_out: Dict[str, Any] = {"aggregate": str(agg_path)}
         summary_parsed = None
         medoid_parsed = None
 
@@ -519,7 +491,7 @@ def run_split_analysis(
             bev = collect_bev_snapshot_paths(
                 cluster_dir, max_llm_snapshots=max_llm_snapshots
             )
-            out_path = cluster_dir / "medoid_trial.yaml"
+            out_path = _cp().write_path(cluster_dir, "medoid_trial.yaml")
             if dry_run or interpreter is None:
                 stub = {
                     "trial_id": medoid_tid,
@@ -570,7 +542,7 @@ def run_split_analysis(
             prompt = _with_common_sense(
                 _safe_replace(summary_tpl, numeric_digest=digest)
             )
-            out_path = cluster_dir / "cluster_summary.yaml"
+            out_path = _cp().write_path(cluster_dir, "cluster_summary.yaml")
             if dry_run or interpreter is None:
                 stub = {
                     "cluster_id": cid,
@@ -612,26 +584,44 @@ def run_split_analysis(
             cluster_out["cluster_summary"] = str(out_path)
             print(f"  ✓ {out_path.name}")
 
-        # Legacy shim when we produced either card
-        if summary_parsed is not None or medoid_parsed is not None:
-            write_legacy_shim(
-                cluster_dir, cid, summary_parsed, medoid_parsed, aggregate
-            )
-            cluster_out["legacy_shim"] = str(cluster_dir / "cluster_interpretation.yaml")
-
         outputs["clusters"][str(cid)] = cluster_out
 
-    # --- IC pairs ---
+    # --- IC pairs (gated matched packs under ic_pairs/cA-cB/) ---
     if "ic-pairs" in prods:
-        print("\n[split-analysis] IC closest pairs…")
+        print("\n[split-analysis] IC matched pairs…")
         manifest = {}
         mp = results_dir / "manifest.json"
         if mp.is_file():
             manifest = json.loads(mp.read_text(encoding="utf-8"))
         pairs = manifest.get("param_boundary_pairs") or []
-        pair_dir = results_dir / "ic_pairs"
-        pair_dir.mkdir(exist_ok=True)
+        # Annotate if older manifests lack ic_match
+        try:
+            import sys as _sys
+
+            _asrc = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+            if str(_asrc) not in _sys.path:
+                _sys.path.insert(0, str(_asrc))
+            from ic_pair_packs import (  # type: ignore
+                annotate_param_boundary_pairs,
+                pair_folder_name,
+                pair_pack_dir,
+            )
+
+            if pairs and "ic_match" not in (pairs[0] or {}):
+                pairs = annotate_param_boundary_pairs(pairs)
+        except Exception:
+            pair_folder_name = lambda a, b: f"c{min(int(a),int(b))}-c{max(int(a),int(b))}"
+            pair_pack_dir = lambda rd, a, b: Path(rd) / "ic_pairs" / pair_folder_name(a, b)
+
+        pair_root = results_dir / "ic_pairs"
+        pair_root.mkdir(exist_ok=True)
         for bp in pairs:
+            if bp.get("ic_match") is False:
+                print(
+                    f"  ⏭  c{bp.get('cluster_a')}↔c{bp.get('cluster_b')} "
+                    f"param_dist={bp.get('param_dist')} (not IC-matched)"
+                )
+                continue
             ca, cb = str(bp["cluster_a"]), str(bp["cluster_b"])
             if clusters is not None and (
                 int(ca) not in clusters and int(cb) not in clusters
@@ -644,23 +634,14 @@ def run_split_analysis(
             right_dir = find_param_boundary_trial_dir(
                 results_dir, cb, ca, tb, index_map
             )
-            # Prefer exact index folders
-            if index_map.get(ta):
-                _b, ti = index_map[ta]
-                cand = results_dir / f"cluster{ca}" / f"param_boundary_c{cb}" / f"trial_{ti}"
-                if cand.is_dir():
-                    left_dir = cand
-            if index_map.get(tb):
-                _b, ti = index_map[tb]
-                cand = results_dir / f"cluster{cb}" / f"param_boundary_c{ca}" / f"trial_{ti}"
-                if cand.is_dir():
-                    right_dir = cand
+            if left_dir is None or right_dir is None:
+                print(f"  ⚠️  missing pack for c{ca}↔c{cb} — rebuild ic_pairs first")
+                continue
 
             left_pack = extract_conflict_pack(left_dir) if left_dir else {}
             right_pack = extract_conflict_pack(right_dir) if right_dir else {}
             left_ref = _trial_ref(ta, left_dir, index_map)
             right_ref = _trial_ref(tb, right_dir, index_map)
-            # Prefer short trial_dir for YAML (relative-ish basename path)
             if left_dir:
                 try:
                     left_pack = {
@@ -681,21 +662,31 @@ def run_split_analysis(
             right_params = _params_for_trial(tb, trials, scenario_params)
             left_out = _outcome_from_pack_and_flags(ta, left_pack, flags)
             right_out = _outcome_from_pack_and_flags(tb, right_pack, flags)
-            # Prefer flag from bp
             if bp.get("collided_a") is not None:
                 left_out = "collision" if bp["collided_a"] else "safe"
             if bp.get("collided_b") is not None:
                 right_out = "collision" if bp["collided_b"] else "safe"
+            card_role = bp.get("card_role") or (
+                "primary" if left_out != right_out else "secondary"
+            )
+
+            left_ctx = action_log_from_description(left_dir)
+            right_ctx = action_log_from_description(right_dir)
+            if len(left_ctx) > 4000:
+                left_ctx = left_ctx[:4000] + "\n…[truncated]"
+            if len(right_ctx) > 4000:
+                right_ctx = right_ctx[:4000] + "\n…[truncated]"
 
             pair_facts = (
                 f"clusters {ca}↔{cb} param_dist={bp.get('param_dist')} "
-                f"names={bp.get('param_names')}\n"
+                f"card_role={card_role} names={bp.get('param_names')}\n"
+                f"IC = scenario inputs (Opposite start/target speed + start delay), "
+                f"not peak kinematics.\n"
                 f"{left_ref['trial']} (payload {ta}) outcome={left_out} "
                 f"params={left_params}\n"
                 f"{right_ref['trial']} (payload {tb}) outcome={right_out} "
                 f"params={right_params}\n"
-                f"Cite trials as {left_ref['trial']} / {right_ref['trial']} "
-                f"(folder names), not bare Payload ids."
+                f"Cite trials as {left_ref['trial']} / {right_ref['trial']}."
             )
             left_block = json.dumps({
                 **left_ref,
@@ -717,26 +708,52 @@ def run_split_analysis(
                     pair_facts=pair_facts,
                     left_block=left_block,
                     right_block=right_block,
+                    left_context=left_ctx or "(no context.md)",
+                    right_context=right_ctx or "(no context.md)",
                 )
             )
-            bev: List[str] = []
-            for d in (left_dir, right_dir):
-                if d:
-                    bev.extend(
-                        collect_bev_snapshot_paths(d, max_llm_snapshots=4)
-                    )
-            out_path = pair_dir / f"pair_c{ca}_c{cb}.yaml"
+            bev = collect_synced_ic_bev_paths(results_dir, ca, cb, max_n=6)
+            if not bev:
+                for d in (left_dir, right_dir):
+                    if d:
+                        bev.extend(
+                            collect_bev_snapshot_paths(d, max_llm_snapshots=3)
+                        )
+            pack_dir = pair_pack_dir(results_dir, ca, cb)
+            pack_dir.mkdir(parents=True, exist_ok=True)
+            out_path = pack_dir / "contrast.yaml"
+            # Drop legacy flat YAML if present
+            legacy = pair_root / f"pair_c{ca}_c{cb}.yaml"
+            if legacy.is_file():
+                legacy.unlink(missing_ok=True)
+
+            base_doc = {
+                "clusters": [int(ca), int(cb)],
+                "param_dist": bp.get("param_dist"),
+                "card_role": card_role,
+                "param_names": bp.get("param_names"),
+                "left": {
+                    **left_ref,
+                    "cluster": int(ca),
+                    "outcome": left_out,
+                    "params": left_params,
+                    "conflict_metrics": left_pack,
+                },
+                "right": {
+                    **right_ref,
+                    "cluster": int(cb),
+                    "outcome": right_out,
+                    "params": right_params,
+                    "conflict_metrics": right_pack,
+                },
+                "delta": {},
+            }
             if dry_run or interpreter is None:
                 stub = {
-                    "clusters": [int(ca), int(cb)],
-                    "param_dist": bp.get("param_dist"),
-                    "param_names": bp.get("param_names"),
-                    "left": {**left_ref, "cluster": int(ca), "outcome": left_out,
-                             "params": left_params, "conflict_metrics": left_pack},
-                    "right": {**right_ref, "cluster": int(cb), "outcome": right_out,
-                              "params": right_params, "conflict_metrics": right_pack},
-                    "delta": {},
+                    **base_doc,
                     "contrast_explanation": "stub (dry_run)",
+                    "separation_call": "inconclusive",
+                    "separation_reason": "stub",
                     "hypothesis": "",
                     "stub": True,
                 }
@@ -745,18 +762,17 @@ def run_split_analysis(
                 raw, tokens, parsed = interpreter.complete_yaml_prompt(
                     prompt,
                     system_prompt=_system_prompt(),
-                    bev_snapshot_paths=bev[:10],
-                    section_title="IC pair BEV (left then right)",
+                    bev_snapshot_paths=bev[:8],
+                    section_title="IC pair synced BEV (left|right at same t′)",
                 )
                 if parsed is None:
                     parsed = {
-                        "clusters": [int(ca), int(cb)],
-                        "param_dist": bp.get("param_dist"),
+                        **base_doc,
                         "contrast_explanation": "parse_failed",
+                        "separation_call": "inconclusive",
                     }
                 parsed.setdefault("left", {})
                 parsed.setdefault("right", {})
-                # Authoritative naming + metrics (overwrite LLM trial_id confusion)
                 parsed["left"] = {**left_ref, **(parsed.get("left") or {})}
                 parsed["right"] = {**right_ref, **(parsed.get("right") or {})}
                 parsed["left"].update(left_ref)
@@ -770,17 +786,17 @@ def run_split_analysis(
                 parsed["left"]["outcome"] = left_out
                 parsed["right"]["outcome"] = right_out
                 parsed["param_dist"] = bp.get("param_dist")
-                if isinstance(parsed.get("contrast_explanation"), str):
-                    parsed["contrast_explanation"] = _format_caption_paragraphs(
-                        parsed["contrast_explanation"]
-                    )
-                if isinstance(parsed.get("hypothesis"), str):
-                    parsed["hypothesis"] = _format_caption_paragraphs(
-                        parsed["hypothesis"]
-                    )
+                parsed["card_role"] = card_role
+                for key in (
+                    "contrast_explanation",
+                    "hypothesis",
+                    "separation_reason",
+                ):
+                    if isinstance(parsed.get(key), str):
+                        parsed[key] = _format_caption_paragraphs(parsed[key])
                 _write_yaml_doc(out_path, raw, parsed, {"token_usage": tokens})
             outputs["ic_pairs"].append(str(out_path))
-            print(f"  ✓ {out_path.name}")
+            print(f"  ✓ {pair_folder_name(ca, cb)}/contrast.yaml [{card_role}]")
 
     summary_path = results_dir / "split_analysis_summary.json"
     summary_path.write_text(json.dumps(outputs, indent=2), encoding="utf-8")

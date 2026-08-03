@@ -5,6 +5,52 @@
 Service for the Dashboard to analyze trajectories in a batch for
 clustering and visualization (MFPCA, UMAP, HDBSCAN).
 
+## Path A artifact contract (action → description → BEV)
+
+Medoid / trial packs under `results/batch*/…/clusterN/` use nested layout:
+
+```text
+clusterN/
+  raw/          trajectory.csv, cluster.json
+  processed/    action.yaml, description.txt, context.md, snapshots/, map_overview.jpg
+  output/       medoid_trial*.yaml, cluster_summary*, cluster_interpretation*
+  highlight_trials/
+    outlier_trials/trial_*/
+    boundary_c*/trial_*/
+    param_boundary_c*/trial_*/
+```
+
+Build order (xosc_gen Steps 1 → 2 → 2.5):
+
+```text
+esmini CSV
+  → labeller.py (+ collision_partner) → processed/action.yaml  [single source of truth]
+  → description.py                    → processed/description.txt  [human prose]
+  → conflict_frame_selector.select_action_frames
+       (timestamps ⊆ action.yaml only; noise filter may drop stamps, never invent)
+  → tier2_renderer + map_plotter      → processed/snapshots/*.jpg
+  → format_conflict_timeline_sentences → processed/context.md  [LLM sentence timeline]
+```
+
+**BEV timestamps:** action.yaml boundaries + interaction key times, plus burst
+samples at −2/−1/−0.5/−0.2/0/+0.2/+0.5/+1 s around labelled COLLISION/NEAR_MISS.
+**Banned:** inventing kinematic labels Labeller never emitted (`ego_HARD_BRAKE`
+from `np.gradient`, `MAX_CLOSING`, unconstrained TTC extrema, …).
+Hard-brake BEV frames appear only when Labeller emits `EMERGENCY_BRAKE`
+(`taxonomy.Thresholds.EMERGENCY_DECEL = -4.0` m/s² mean accel).
+
+| Module | Owns |
+|--------|------|
+| `taxonomy.py` / `labeller.py` | Action vocabulary + detection |
+| `description.py` | Human prose from `action.yaml` (no raw az table) |
+| `conflict_frame_selector.py` | Action timestamps + sentence timeline / evidence helpers |
+| `tier2_renderer.py` / `map_plotter.py` | Render dual-panel BEVs at those times |
+| `cluster_paths.py` | Nested write / nested-then-flat read |
+| `dataset_builder.py` | Orchestrates the order above |
+
+CLI: `--conflict-window-s` only **filters** action stamps near a labelled conflict
+peak; it is not a kinematic search window.
+
 ## Setup
 
 ### Install Miniconda

@@ -23,6 +23,17 @@ export const CLUSTER_HIGHLIGHT_STYLE: Record<
   outlier: { label: "Outlier", color: "#FF7043", shape: "triangle" },
 };
 
+/**
+ * Distinct from medoid/outlier role markers: the trial the Replayer camera
+ * follows after a right-click (double ring + crosshair).
+ */
+export const REPLAYER_TRACE_STYLE = {
+  label: "Replayer camera follow",
+  color: "#00ACC1",
+  outerR: 14,
+  innerR: 7,
+} as const;
+
 export function trialsForRole(
   ctx: ClusterAnalysisContext | null | undefined,
   role: ClusterHighlightRole,

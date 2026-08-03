@@ -32,23 +32,48 @@ _WEIGHTS = {
 
 def _load_cluster_docs(run_dir: Path) -> List[Dict[str, Any]]:
     docs: List[Dict[str, Any]] = []
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from cluster_paths import resolve_path  # type: ignore
+
+    try:
+        import yaml  # type: ignore
+    except Exception:
+        yaml = None  # type: ignore
+
     for cdir in sorted(run_dir.glob("cluster*")):
         if not (cdir.is_dir() and cdir.name[len("cluster"):].isdigit()):
             continue
-        cj = cdir / "cluster.json"
-        mj = cdir / "interpretation_meta.json"
-        if not cj.is_file():
+        cj = resolve_path(cdir, "cluster.json", must_exist=True)
+        if cj is None:
             continue
         try:
             cluster_doc = json.loads(cj.read_text(encoding="utf-8"))
         except Exception:
             continue
         meta: Dict[str, Any] = {}
-        if mj.is_file():
-            try:
-                meta = json.loads(mj.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+        if yaml is not None:
+            for name in ("cluster_summary.yaml", "medoid_trial.yaml"):
+                yp = resolve_path(cdir, name, must_exist=True)
+                if yp is None:
+                    continue
+                try:
+                    doc = yaml.safe_load(yp.read_text(encoding="utf-8"))
+                except Exception:
+                    continue
+                if not isinstance(doc, dict):
+                    continue
+                meta = {
+                    "cluster_label": doc.get("label"),
+                    "behavior_description": doc.get("caption")
+                    or doc.get("motive_summary"),
+                }
+                if meta.get("cluster_label") or meta.get("behavior_description"):
+                    break
+                meta = {}
         docs.append({"cluster_doc": cluster_doc, "meta": meta})
     return docs
 

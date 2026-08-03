@@ -3,6 +3,8 @@ import { spawn } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { resolveClusterArtifact } from "../../_lib/clusterPaths";
+import { metaFromYamlPath } from "../../_lib/readYaml";
 
 /**
  * POST /api/cluster-analyze/run
@@ -66,18 +68,16 @@ function collectResults(
     const cid = parseInt(m[1], 10);
     if (clusters && clusters.length > 0 && !clusters.includes(cid)) continue;
     const clusterDir = path.join(resultsDir, entry.name);
-    const metaPath = path.join(clusterDir, "interpretation_meta.json");
-    const yamlPath = path.join(clusterDir, "cluster_interpretation.yaml");
-    let meta: Record<string, unknown> | null = null;
-    if (fs.existsSync(metaPath)) {
-      try {
-        meta = JSON.parse(fs.readFileSync(metaPath, "utf-8"));
-      } catch {
-        meta = null;
-      }
-    }
-    let rawYaml = "";
-    if (fs.existsSync(yamlPath)) rawYaml = fs.readFileSync(yamlPath, "utf-8");
+    const medoidPath = resolveClusterArtifact(clusterDir, "medoid_trial.yaml");
+    const summaryPath = resolveClusterArtifact(clusterDir, "cluster_summary.yaml");
+    const medoidMeta = metaFromYamlPath(medoidPath);
+    const summaryMeta = metaFromYamlPath(summaryPath);
+    const rawYaml = medoidPath
+      ? fs.readFileSync(medoidPath, "utf-8")
+      : summaryPath
+        ? fs.readFileSync(summaryPath, "utf-8")
+        : "";
+    const meta = medoidMeta ?? summaryMeta;
     if (meta || rawYaml) results.push({ cluster: cid, meta, rawYaml });
   }
   results.sort((a, b) => (a.cluster as number) - (b.cluster as number));
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
   const products =
     typeof body.products === "string" && body.products.trim()
       ? body.products.trim()
-      : "medoid,summary,ic-pairs";
+      : "medoid";
 
   if (!/^\d+$/.test(batchId) || !/^\d+_cluster_s=[-0-9.]+$/.test(folder)) {
     return Response.json({ error: "invalid batchId or folder" }, { status: 400 });

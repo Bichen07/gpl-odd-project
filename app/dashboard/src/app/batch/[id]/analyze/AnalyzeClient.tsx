@@ -379,8 +379,8 @@ export default function AnalyzeClient({
   const [splitSubTab, setSplitSubTab] = useState(0);
   const [products, setProducts] = useState({
     medoid: true,
-    summary: true,
-    "ic-pairs": true,
+    summary: false,
+    "ic-pairs": false,
   });
   const [logs, setLogs] = useState<string>("");
   const [logFile, setLogFile] = useState<string>("");

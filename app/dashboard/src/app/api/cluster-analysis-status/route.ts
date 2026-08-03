@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  clusterArtifactExists,
+  resolveClusterArtifact,
+  resolveHighlightSubdir,
+} from "../_lib/clusterPaths";
+import { metaFromYamlPath } from "../_lib/readYaml";
 
 /**
  * GET /api/cluster-analysis-status?batchId=2
@@ -56,6 +62,8 @@ type ParamBoundaryPair = {
   trial_b: string;
   param_dist?: number;
   param_names?: string[];
+  ic_match?: boolean;
+  card_role?: string;
 };
 
 type FolderStatus = {
@@ -101,21 +109,24 @@ function checkPreprocessComplete(
 
   for (const name of clusterNames) {
     const clusterDir = path.join(runDir, name);
-    const cj = readJsonSafe(path.join(clusterDir, "cluster.json"));
+    const cjPath = resolveClusterArtifact(clusterDir, "cluster.json");
+    const cj = cjPath ? readJsonSafe(cjPath) : null;
     const medoid = cj?.medoid as Record<string, unknown> | undefined;
     if (medoid?.trial_id == null) return false;
-    if (!fs.existsSync(path.join(clusterDir, "action.yaml"))) return false;
+    if (!clusterArtifactExists(clusterDir, "action.yaml")) return false;
 
     const clusterMeta = (cj?.cluster ?? {}) as Record<string, unknown>;
     const intra = (clusterMeta.intra_variance ?? {}) as Record<string, unknown>;
     const outlierIds = (intra.outlier_trial_ids ?? []) as unknown[];
     if (outlierIds.length > 0) {
-      if (!hasTrialSubdirs(path.join(clusterDir, "outlier_trials"))) return false;
+      const od = resolveHighlightSubdir(clusterDir, "outlier_trials");
+      if (!od || !hasTrialSubdirs(od)) return false;
     }
 
     const neighbors = (intra.boundary_neighbors ?? {}) as Record<string, string>;
     for (const tgt of Object.keys(neighbors)) {
-      if (!hasTrialSubdirs(path.join(clusterDir, `boundary_c${tgt}`))) return false;
+      const bd = resolveHighlightSubdir(clusterDir, `boundary_c${tgt}`);
+      if (!bd || !hasTrialSubdirs(bd)) return false;
     }
   }
 
@@ -123,28 +134,26 @@ function checkPreprocessComplete(
   for (const bp of boundaryPairs) {
     const a = String(bp.cluster_a);
     const b = String(bp.cluster_b);
-    if (!hasTrialSubdirs(path.join(runDir, `cluster${a}`, `boundary_c${b}`))) {
-      return false;
-    }
-    if (!hasTrialSubdirs(path.join(runDir, `cluster${b}`, `boundary_c${a}`))) {
-      return false;
-    }
+    const ab = resolveHighlightSubdir(path.join(runDir, `cluster${a}`), `boundary_c${b}`);
+    const ba = resolveHighlightSubdir(path.join(runDir, `cluster${b}`), `boundary_c${a}`);
+    if (!ab || !hasTrialSubdirs(ab)) return false;
+    if (!ba || !hasTrialSubdirs(ba)) return false;
   }
 
-  // IC (parameter-space) pairs are optional unless declared in the manifest.
+  // IC matched pairs live under ic_pairs/cA-cB/ (gated by param_dist).
   for (const bp of paramBoundaryPairs) {
-    const a = String(bp.cluster_a);
-    const b = String(bp.cluster_b);
-    if (
-      !hasTrialSubdirs(path.join(runDir, `cluster${a}`, `param_boundary_c${b}`))
-    ) {
-      return false;
-    }
-    if (
-      !hasTrialSubdirs(path.join(runDir, `cluster${b}`, `param_boundary_c${a}`))
-    ) {
-      return false;
-    }
+    const matched = (bp as ParamBoundaryPair & { ic_match?: boolean }).ic_match;
+    if (matched === false) continue;
+    const a = Number(bp.cluster_a);
+    const b = Number(bp.cluster_b);
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const pack = path.join(runDir, "ic_pairs", `c${lo}-c${hi}`);
+    if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
+    const sides = fs
+      .readdirSync(pack, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && /^c\d+_trial_/.test(e.name));
+    if (sides.length < 2) return false;
   }
 
   return true;
@@ -202,6 +211,8 @@ export async function GET(req: NextRequest) {
       param_names: Array.isArray(bp.param_names)
         ? bp.param_names.map(String)
         : undefined,
+      ic_match: typeof bp.ic_match === "boolean" ? bp.ic_match : undefined,
+      card_role: typeof bp.card_role === "string" ? bp.card_role : undefined,
     }));
 
     const outliers: Record<string, string> = {};
@@ -221,7 +232,8 @@ export async function GET(req: NextRequest) {
     for (const name of clusterNames) {
       const label = name.replace("cluster", "");
       const clusterDir = path.join(runDir, name);
-      const cj = readJsonSafe(path.join(clusterDir, "cluster.json"));
+      const cjPath = resolveClusterArtifact(clusterDir, "cluster.json");
+      const cj = cjPath ? readJsonSafe(cjPath) : null;
 
       if (!medoids[label]) {
         const medoid = cj?.medoid as Record<string, unknown> | undefined;
@@ -235,7 +247,7 @@ export async function GET(req: NextRequest) {
       const outlierIds = ((intra.outlier_trial_ids ?? []) as unknown[])
         .map((id) => String(id))
         .filter(Boolean);
-      // Only the top outlier is materialized under outlier_trials/trial_*.
+      // Only the top outlier is materialized under highlight_trials/outlier_trials/trial_*.
       if (outlierIds.length > 0) {
         outliers[label] = outlierIds[0];
       }
@@ -277,34 +289,23 @@ export async function GET(req: NextRequest) {
         paramBoundaryTrials[label] = paramUniq;
       }
 
-      const metaPath = path.join(clusterDir, "interpretation_meta.json");
-      const yamlPath = path.join(clusterDir, "cluster_interpretation.yaml");
-      const summaryMetaPath = path.join(clusterDir, "cluster_summary_meta.json");
-      const medoidMetaPath = path.join(clusterDir, "medoid_trial_meta.json");
-      const meta = readJsonSafe(metaPath);
-      const summaryMeta = readJsonSafe(summaryMetaPath);
-      const medoidMeta = readJsonSafe(medoidMetaPath);
+      const summaryPath = resolveClusterArtifact(clusterDir, "cluster_summary.yaml");
+      const medoidPath = resolveClusterArtifact(clusterDir, "medoid_trial.yaml");
+      const summaryMeta = metaFromYamlPath(summaryPath);
+      const medoidMeta = metaFromYamlPath(medoidPath);
       const summaryParsed = (summaryMeta?.parsed as Record<string, unknown> | undefined) ?? null;
       const medoidParsed = (medoidMeta?.parsed as Record<string, unknown> | undefined) ?? null;
 
       const hasSplit =
-        fs.existsSync(path.join(clusterDir, "cluster_summary.yaml")) ||
-        fs.existsSync(path.join(clusterDir, "medoid_trial.yaml")) ||
-        Boolean(meta) ||
-        fs.existsSync(yamlPath);
+        clusterArtifactExists(clusterDir, "cluster_summary.yaml") ||
+        clusterArtifactExists(clusterDir, "medoid_trial.yaml");
       if (!hasSplit) continue;
 
       hasAnalysis = true;
 
-      // Prefer canonical split artifacts: label from summary; Replayer timeline
-      // from medoid_trial (do not require a duplicated copy in cluster_interpretation).
-      const clusterLabel =
-        (summaryParsed?.label as string | undefined) ||
-        (meta?.cluster_label as string | undefined);
-      let egoSummary = medoidParsed?.decision_timeline as unknown;
-      if (!Array.isArray(egoSummary) || egoSummary.length === 0) {
-        egoSummary = meta?.ego_perspective_summary;
-      }
+      // Label from summary when present; Replayer timeline from medoid only.
+      const clusterLabel = summaryParsed?.label as string | undefined;
+      const egoSummary = medoidParsed?.decision_timeline as unknown;
 
       interpretations[label] = {
         cluster_label: clusterLabel,
@@ -321,11 +322,11 @@ export async function GET(req: NextRequest) {
     let hasClusterSummary = false;
     for (const name of clusterNames) {
       const clusterDir = path.join(runDir, name);
-      if (fs.existsSync(path.join(clusterDir, "medoid_trial.yaml"))) {
+      if (clusterArtifactExists(clusterDir, "medoid_trial.yaml")) {
         hasMedoidTrial = true;
         hasAnalysis = true;
       }
-      if (fs.existsSync(path.join(clusterDir, "cluster_summary.yaml"))) {
+      if (clusterArtifactExists(clusterDir, "cluster_summary.yaml")) {
         hasClusterSummary = true;
         hasAnalysis = true;
       }
@@ -333,7 +334,14 @@ export async function GET(req: NextRequest) {
     const icPairsDir = path.join(runDir, "ic_pairs");
     const hasIcPairs =
       fs.existsSync(icPairsDir) &&
-      fs.readdirSync(icPairsDir).some((f) => f.endsWith(".yaml"));
+      fs.readdirSync(icPairsDir).some((f) => {
+        const p = path.join(icPairsDir, f);
+        if (f.endsWith(".yaml") && fs.statSync(p).isFile()) return true;
+        return (
+          fs.statSync(p).isDirectory() &&
+          fs.existsSync(path.join(p, "contrast.yaml"))
+        );
+      });
     if (hasIcPairs) hasAnalysis = true;
 
     const hasPreprocess = checkPreprocessComplete(

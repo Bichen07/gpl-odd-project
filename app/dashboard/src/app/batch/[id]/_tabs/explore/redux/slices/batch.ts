@@ -166,6 +166,14 @@ export interface BatchState {
   selectedTrialIds: { by: string; value: string[] };
   /** Plot marker roles from Highlight trials picks (trialId → roles). */
   highlightRolesByTrialId: Record<string, ClusterHighlightRole[]>;
+  /**
+   * Per-cluster Replayer camera-follow targets (right-click on Parameter /
+   * Projection). Key = cluster label (or "main" when unclustered).
+   * Empty → fall back to medoid / role ladder / first selected.
+   */
+  replayerTraceByCluster: Record<string, string>;
+  /** Most recently right-clicked follow trial (single-pane / last focus). */
+  replayerTraceTrialId: string | null;
   hoveredTrialId: string | null;
   freeformTrialIds: string[];
   metrics: { [kpiName: string]: CriticalityMetric } | null;
@@ -236,6 +244,8 @@ const initialState: BatchState = {
   selectedTrialId: null,
   selectedTrialIds: { by: "", value: [] },
   highlightRolesByTrialId: {},
+  replayerTraceByCluster: {},
+  replayerTraceTrialId: null,
   freeformTrialIds: [],
   hoveredTrialId: null,
   metrics: null,
@@ -816,6 +826,41 @@ export const batchSlice = createSlice({
     ) => {
       state.selectedTrialId = action.payload;
     },
+    /** Background click / explicit clear — sync Parameter, Projection, Replayer. */
+    clearTrialSelection: (state: BatchState) => {
+      state.selectedTrialId = null;
+      state.selectedTrialIds = { by: "", value: [] };
+      state.highlightRolesByTrialId = {};
+      state.replayerTraceByCluster = {};
+      state.replayerTraceTrialId = null;
+    },
+    setReplayerTraceTrialId: (
+      state: BatchState,
+      action: PayloadAction<string | null>,
+    ) => {
+      const next =
+        action.payload == null || action.payload === ""
+          ? null
+          : String(action.payload);
+      if (state.replayerTraceTrialId === next) return;
+      state.replayerTraceTrialId = next;
+    },
+    /**
+     * Set camera-follow for one cluster (right-click). Keeps other clusters'
+     * follow targets so multi-cluster selection can trace each pane.
+     */
+    setReplayerTraceForCluster: (
+      state: BatchState,
+      action: PayloadAction<{ clusterLabel: string; trialId: string }>,
+    ) => {
+      const label = String(action.payload.clusterLabel || "main");
+      const trialId = String(action.payload.trialId);
+      if (!trialId) return;
+      // Re-insert so this cluster is last in key order (main-view fallback).
+      const { [label]: _removed, ...rest } = state.replayerTraceByCluster;
+      state.replayerTraceByCluster = { ...rest, [label]: trialId };
+      state.replayerTraceTrialId = trialId;
+    },
     setSelectedTrialIds: (
       state: BatchState,
       action: PayloadAction<typeof state.selectedTrialIds>
@@ -829,6 +874,23 @@ export const batchSlice = createSlice({
         return a.every((id) => setB.has(String(id)));
       };
 
+      const pruneTraces = (ids: string[]) => {
+        const set = new Set(ids.map(String));
+        const nextMap: Record<string, string> = {};
+        for (const [label, tid] of Object.entries(state.replayerTraceByCluster)) {
+          if (set.has(String(tid))) nextMap[label] = String(tid);
+        }
+        state.replayerTraceByCluster = nextMap;
+        if (
+          state.replayerTraceTrialId != null &&
+          !set.has(String(state.replayerTraceTrialId))
+        ) {
+          const remaining = Object.values(nextMap);
+          state.replayerTraceTrialId =
+            remaining.length > 0 ? remaining[remaining.length - 1] : null;
+        }
+      };
+
       if (next.by === "highlight") {
         if (
           prev.by === "highlight" &&
@@ -840,6 +902,7 @@ export const batchSlice = createSlice({
           by: "highlight",
           value: next.value.map(String),
         };
+        pruneTraces(state.selectedTrialIds.value);
         return;
       }
 
@@ -847,9 +910,15 @@ export const batchSlice = createSlice({
 
       // Scatterplot.draw() fires deselect/select echoes. During Highlight-trial
       // mode keep the full role set and avoid Redux updates that re-trigger
-      // draw → select → dispatch loops.
+      // draw → select → dispatch loops. Empty value is an intentional clear
+      // (background click) — handled by clearTrialSelection; still honor it here
+      // if dispatched via setSelectedTrialIds({ by:"", value:[] }).
       if (roleIds.length > 0) {
         if (next.value.length === 0) {
+          state.selectedTrialId = null;
+          state.selectedTrialIds = { by: "", value: [] };
+          state.highlightRolesByTrialId = {};
+          pruneTraces([]);
           return;
         }
         const nextSet = new Set(next.value.map(String));
@@ -866,6 +935,7 @@ export const batchSlice = createSlice({
             by: "highlight",
             value: next.value.map(String),
           };
+          pruneTraces(state.selectedTrialIds.value);
           return;
         }
 
@@ -883,6 +953,7 @@ export const batchSlice = createSlice({
             by: "highlight",
             value: roleIds,
           };
+          pruneTraces(state.selectedTrialIds.value);
           return;
         }
         state.selectedTrialIds = {
@@ -890,6 +961,7 @@ export const batchSlice = createSlice({
           value: next.value.map(String),
         };
         state.highlightRolesByTrialId = {};
+        pruneTraces(state.selectedTrialIds.value);
         return;
       }
 
@@ -904,6 +976,7 @@ export const batchSlice = createSlice({
         by: next.by,
         value: next.value.map(String),
       };
+      pruneTraces(state.selectedTrialIds.value);
     },
     setHighlightRolesByTrialId: (
       state: BatchState,

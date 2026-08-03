@@ -2,10 +2,11 @@
 """Build structured LLM dataset from medoid trials (single CLI entry point).
 
 Auto-ensures shared map assets under ``results/map/`` (via ``map_assets``), then
-for each cluster medoid generates:
-- trajectory.csv, action.yaml, description.txt
-- conflict-centered BEV snapshots + map_overview.jpg
-- cluster.json, context.md, manifest.json
+for each cluster medoid generates nested pack layout::
+
+  clusterN/raw/{trajectory.csv,cluster.json}
+  clusterN/processed/{action.yaml,description.txt,context.md,snapshots/,map_overview.jpg}
+  clusterN/output/   # LLM YAMLs (medoid_trial / cluster_summary / shim)
 
 Examples::
 
@@ -30,12 +31,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 import numpy as np
+import pandas as pd
 
 import yaml
 import requests
 
 # Add analyzer src to path for flat-module imports
 from repo_paths import ANALYZER_SRC, REPO_ROOT, RESULTS_DIR
+from cluster_paths import (
+    ensure_layout,
+    highlight_subdir,
+    migrate_flat_to_nested,
+    migrate_highlight_trials,
+    processed_dir,
+    resolve_path,
+    snapshots_dir as nested_snapshots_dir,
+    write_path,
+)
 
 if str(ANALYZER_SRC) not in sys.path:
     sys.path.insert(0, str(ANALYZER_SRC))
@@ -713,8 +725,8 @@ def backfill_cluster_stats_in_dir(
         if not (cdir.is_dir() and cdir.name[len("cluster"):].isdigit()):
             continue
         cid = int(cdir.name[len("cluster"):])
-        cj = cdir / "cluster.json"
-        if not cj.is_file():
+        cj = resolve_path(cdir, "cluster.json", must_exist=True)
+        if cj is None:
             continue
         try:
             doc = json.loads(cj.read_text(encoding="utf-8"))
@@ -1315,10 +1327,12 @@ def attach_param_boundary_neighbors(
     intra_by_cluster: Dict[str, Dict[str, Any]],
     param_boundary_pairs: List[Dict[str, Any]],
 ) -> None:
-    """Write ``param_boundary_neighbors`` onto each cluster's intra_variance block."""
+    """Write ``param_boundary_neighbors`` for IC-matched pairs only."""
     for iv in intra_by_cluster.values():
         iv.setdefault("param_boundary_neighbors", {})
     for bp in param_boundary_pairs:
+        if bp.get("ic_match") is False:
+            continue
         a, b = str(bp["cluster_a"]), str(bp["cluster_b"])
         if a in intra_by_cluster:
             intra_by_cluster[a].setdefault("param_boundary_neighbors", {})[b] = str(
@@ -1340,13 +1354,15 @@ def patch_cluster_json_param_neighbors(
     """
     neighbors: Dict[str, Dict[str, str]] = {}
     for bp in param_boundary_pairs:
+        if bp.get("ic_match") is False:
+            continue
         a, b = str(bp["cluster_a"]), str(bp["cluster_b"])
         neighbors.setdefault(a, {})[b] = str(bp["trial_a"])
         neighbors.setdefault(b, {})[a] = str(bp["trial_b"])
     patched = 0
     for label, neigh in neighbors.items():
-        cj_path = run_dir / f"cluster{label}" / "cluster.json"
-        if not cj_path.is_file():
+        cj_path = resolve_path(run_dir / f"cluster{label}", "cluster.json", must_exist=True)
+        if cj_path is None:
             continue
         try:
             doc = json.loads(cj_path.read_text(encoding="utf-8"))
@@ -1356,7 +1372,7 @@ def patch_cluster_json_param_neighbors(
             cj_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
             patched += 1
         except Exception as exc:
-            print(f"  ⚠️  Could not patch {cj_path.name}: {exc}")
+            print(f"  ⚠️  Could not patch cluster{label}/cluster.json: {exc}")
     return patched
 
 
@@ -1497,13 +1513,19 @@ def write_context_md(
     cluster_dir: Path,
     cluster_doc: Optional[Dict[str, Any]],
     action_data: Optional[Dict[str, Any]],
+    selection: Any = None,
+    snap_filenames: Optional[List[str]] = None,
+    traj_df: Any = None,
+    map_tracks_csv: Optional[str] = None,
 ) -> None:
-    """Write a single self-contained LLM context card for one cluster.
+    """Write LLM ``processed/context.md``: header + unified conflict timeline.
 
-    Combines the cluster/medoid header, the prose description, the structured
-    agent action timeline, and an ordered index of BEV snapshots so the model
-    can read one file (plus the images) instead of stitching several artifacts.
+    Same-lane TURN_LEFT/RIGHT live in ``action.yaml`` and appear in the
+    timeline (not a separate heading section). Agent-action tables stay in
+    human ``description.txt``. ``traj_df`` is accepted for API compatibility.
     """
+    from conflict_frame_selector import format_conflict_timeline_sentences
+
     cd = cluster_doc or {}
     c = cd.get("cluster", {})
     m = cd.get("medoid", {})
@@ -1541,73 +1563,21 @@ def write_context_md(
         lines.append(f"- **Agents**: {ag_str}")
     lines.append("")
 
-    # Scenario description (prose)
-    desc_path = cluster_dir / "description.txt"
-    if desc_path.is_file():
-        lines.append("## Scenario description")
-        lines.append("")
-        lines.append(desc_path.read_text(encoding="utf-8").strip())
-        lines.append("")
-
-    # Structured agent action timeline
-    if action_data and action_data.get("agents"):
-        lines.append("## Agent actions")
-        lines.append("")
-        for ag in action_data["agents"]:
-            role = ag.get("role", "npc")
-            header = f"### {ag.get('name', '?')} ({ag.get('type', 'car')}, {role})"
-            rel = ag.get("relation_to_ego")
-            if rel:
-                header += f" — {rel}"
-            lines.append(header)
-            lines.append("")
-            lines.append("| time | action | road | lane |")
-            lines.append("|------|--------|------|------|")
-            for ev in ag.get("actions", []):
-                st = ev.get("start_time")
-                et = ev.get("end_time")
-                tspan = f"{st:.1f}s" if st == et else f"{st:.1f}–{et:.1f}s"
-                lines.append(
-                    f"| {tspan} | {ev.get('action')} | {ev.get('road_id')} | {ev.get('lane_id')} |"
-                )
-            lines.append("")
-
-    # Interactive (multi-agent) events from the Interactive Action Detector.
-    interactions = (action_data or {}).get("interactions") or []
-    if interactions:
-        lines.append("## Interactions (multi-agent conflicts)")
-        lines.append("")
-        lines.append("| key time | type | with agent | detail |")
-        lines.append("|----------|------|------------|--------|")
-        for iv in interactions:
-            det = []
-            if iv.get("min_distance_m") is not None:
-                det.append(f"min dist {iv['min_distance_m']}m")
-            if iv.get("min_clearance_m") is not None:
-                det.append(f"min clearance {iv['min_clearance_m']}m")
-            if iv.get("min_ttc_s") is not None:
-                det.append(f"min TTC {iv['min_ttc_s']}s")
-            if iv.get("ego_reaction_accel") is not None:
-                det.append(f"ego accel {iv['ego_reaction_accel']}m/s²")
-            lines.append(
-                f"| {iv.get('key_time')}s | {iv.get('type')} | "
-                f"{iv.get('with_name') or ('track ' + str(iv.get('with_track_id')))} | {', '.join(det)} |"
-            )
+    if selection is not None and getattr(selection, "frames", None):
+        lines.append(
+            format_conflict_timeline_sentences(
+                selection,
+                filenames=snap_filenames,
+                action_data=action_data,
+                traj_df=traj_df,
+                map_tracks_csv=map_tracks_csv,
+            ).rstrip()
+        )
         lines.append("")
 
-    # BEV snapshot index
-    snap_dir = cluster_dir / "snapshots"
-    snaps = sorted(p.name for p in snap_dir.glob("*.jpg")) if snap_dir.is_dir() else []
-    if snaps or (cluster_dir / "map_overview.jpg").is_file():
-        lines.append("## BEV snapshots (chronological)")
-        lines.append("")
-        if (cluster_dir / "map_overview.jpg").is_file():
-            lines.append("- `map_overview.jpg` — whole-map view with the medoid trajectory")
-        for name in snaps:
-            lines.append(f"- `snapshots/{name}`")
-        lines.append("")
-
-    (cluster_dir / "context.md").write_text("\n".join(lines), encoding="utf-8")
+    write_path(cluster_dir, "context.md").write_text(
+        "\n".join(lines), encoding="utf-8"
+    )
 
 
 def process_medoid(
@@ -1629,10 +1599,9 @@ def process_medoid(
     contact_clearance_m: float = 0.5,
     conflict_relevance_m: float = 5.0,
     intra_variance: Optional[Dict[str, Any]] = None,
-    conflict_window_s: float = 6.0,
-    conflict_distance_m: float = 40.0,
-    conflict_burst_step_s: float = 0.0,
-    hard_brake_accel: float = -2.5,
+    conflict_window_s: Optional[float] = None,
+    conflict_window_before_s: float = 15.0,
+    conflict_window_after_s: float = 8.0,
 ) -> bool:
     """Process a single medoid trial: generate all required files.
     
@@ -1651,6 +1620,14 @@ def process_medoid(
     
     cluster_dir = run_dir / f"cluster{label}"
     cluster_dir.mkdir(parents=True, exist_ok=True)
+    # Preserve any flat LLM YAMLs into output/ before rewriting raw/processed.
+    moved = migrate_flat_to_nested(cluster_dir)
+    if moved:
+        print(f"  ✓ Migrated flat artifacts: {', '.join(moved)}")
+    ht_moved = migrate_highlight_trials(cluster_dir)
+    if ht_moved:
+        print(f"  ✓ Migrated highlight trials: {', '.join(ht_moved)}")
+    ensure_layout(cluster_dir)
 
     # 1. Check if CSV exists
     if not csv_exists(batch_id, trial_index):
@@ -1675,7 +1652,7 @@ def process_medoid(
         return False
     
     # 4. Build trajectory.csv in xosc_gen format
-    trajectory_path = cluster_dir / "trajectory.csv"
+    trajectory_path = write_path(cluster_dir, "trajectory.csv")
     try:
         registry = build_trajectory_csv(observations, parser, trajectory_path)
         print(f"  ✓ Generated trajectory.csv")
@@ -1686,7 +1663,7 @@ def process_medoid(
     
     # 5. Build meta.yaml (intermediate input for the labeller; removed from output later)
     location_for_meta = Path(xodr_path).stem
-    meta_path = cluster_dir / "meta.yaml"
+    meta_path = write_path(cluster_dir, "meta.yaml")
     try:
         build_meta_yaml(
             registry,
@@ -1701,23 +1678,27 @@ def process_medoid(
         del df
         return False
     
-    # 6. Action labelling (Step 2) + scenario description (Step 3)
-    #    Rule-based, map-agnostic (taxonomy.py / labeller.py / description.py).
+    # 6. Action labelling (xosc_gen Step 1) then description prose (Step 2).
+    #    BEV (Step 2.5) must follow — timestamps come only from action.yaml.
     from pipeline_imports import ensure_llm_pipeline
 
     ensure_llm_pipeline()
     from llm_pipeline.cluster_stats import trial_collision_flag
 
     action_data_for_ctx: Optional[Dict[str, Any]] = None
+    traj_for_desc = None
     trial_id = str(medoid.get("trial_id") or "")
     medoid_collided = trial_collision_flag(collision_flags or {}, trial_id) or bool(
         medoid.get("collided")
     )
     trial_info = (trials_meta or {}).get(trial_id) if trials_meta else None
     trial_events = trial_info.get("events") if isinstance(trial_info, dict) else None
+    action_yaml_path = write_path(cluster_dir, "action.yaml")
+    desc_path = write_path(cluster_dir, "description.txt")
     try:
         from labeller import label_trajectory, save_action_yaml
         from description import build_description, save_description_txt
+        from dataset_config import map_tracks_path_for_dataset
 
         map_yaml = RESULTS_DIR / "map" / f"{Path(xodr_path).stem}.yaml"
         action_data = label_trajectory(
@@ -1731,18 +1712,32 @@ def process_medoid(
             conflict_relevance_m=conflict_relevance_m,
         )
         action_data_for_ctx = action_data
-        save_action_yaml(action_data, cluster_dir / "action.yaml")
-        # description.txt written after BEV so Snapshot evidence can include filenames
+        save_action_yaml(action_data, action_yaml_path)
+        # Enrich tables from labelled trajectory.csv (not raw esmini columns).
+        traj_for_desc = pd.read_csv(trajectory_path)
+        map_tracks_csv = map_tracks_path_for_dataset(dataset_name)
+        save_description_txt(
+            build_description(
+                action_data,
+                traj_df=traj_for_desc,
+                map_tracks_csv=str(map_tracks_csv) if map_tracks_csv.is_file() else None,
+            ),
+            desc_path,
+        )
         if not map_yaml.is_file():
             print("  ⚠️  action/description built WITHOUT junction info — run "
                   "map assets first (--map-only)")
-        print(f"  ✓ Generated action.yaml")
+        print(f"  ✓ Generated action.yaml + description.txt (prose)")
     except Exception as e:
         print(f"  ⚠️  Action/description generation failed: {e}")
+        traj_for_desc = None
 
-    # 7. Generate BEV snapshots (Step 4 — MapPlotter + odrplot tracks)
-    snapshots_dir = cluster_dir / "snapshots"
+    # 7. BEV snapshots from action.yaml timestamps only (xosc_gen Step 2.5)
+    snaps_out = nested_snapshots_dir(cluster_dir)
+    proc_dir = processed_dir(cluster_dir)
     selection_bundle: list = []
+    map_tracks = None
+    map_tracks_for_ctx: Optional[str] = None
     try:
         from tier2_renderer import (
             Tier2BevRenderer,
@@ -1751,7 +1746,10 @@ def process_medoid(
 
         _xodr, map_tracks, location = resolve_tier2_paths(dataset_name)
         if map_tracks.is_file():
-            action_yaml = cluster_dir / "action.yaml"
+            map_tracks_for_ctx = str(map_tracks)
+        if map_tracks.is_file():
+            if not action_yaml_path.is_file():
+                raise FileNotFoundError("action.yaml missing — cannot render BEV")
             tier2 = Tier2BevRenderer(
                 str(map_tracks),
                 str(xodr_path if xodr_path.is_file() else _xodr),
@@ -1762,45 +1760,55 @@ def process_medoid(
                 typography=typography,
                 ego_zoom_radius=ego_zoom_radius,
             )
-            snapshots_dir.mkdir(parents=True, exist_ok=True)
+            snaps_out.mkdir(parents=True, exist_ok=True)
             snaps = tier2.render_trial_from_esmini_csv(
                 batch_id,
                 trial_index,
-                str(snapshots_dir),
+                str(snaps_out),
                 n_snapshots=max_snapshots,
                 file_prefix=f"trial_{trial_index}",
-                overview_dir=str(cluster_dir),
-                action_yaml_path=str(action_yaml) if action_yaml.is_file() else None,
+                overview_dir=str(proc_dir),
+                action_yaml_path=str(action_yaml_path),
                 conflict_window_s=conflict_window_s,
-                conflict_distance_m=conflict_distance_m,
-                conflict_burst_step_s=conflict_burst_step_s,
-                hard_brake_accel=hard_brake_accel,
+                conflict_window_before_s=conflict_window_before_s,
+                conflict_window_after_s=conflict_window_after_s,
                 selection_out=selection_bundle,
             )
-            print(f"  ✓ Generated {len(snaps)} conflict-centered BEV snapshots")
+            print(f"  ✓ Generated {len(snaps)} action-derived BEV snapshots")
             print(f"  ✓ map_overview.jpg")
         else:
             print("  ⚠️  BEV skipped — run dataset_builder.py --batch-id <n> --map-only")
     except Exception as e:
         print(f"  ⚠️  BEV generation failed: {e}")
 
-    # 7b. description.txt with Snapshot evidence table (after BEV filenames known)
+    # 7b. Human description: optional short BEV filename list (no metrics table).
     if action_data_for_ctx is not None:
         try:
             from description import build_description, save_description_txt
-            from conflict_frame_selector import format_snapshot_evidence_block
+            from conflict_frame_selector import format_bev_frame_index
 
             evidence = None
             if len(selection_bundle) >= 2:
-                evidence = format_snapshot_evidence_block(
+                evidence = format_bev_frame_index(
                     selection_bundle[0], selection_bundle[1]
                 )
             save_description_txt(
-                build_description(action_data_for_ctx, snapshot_evidence=evidence),
-                cluster_dir / "description.txt",
+                build_description(
+                    action_data_for_ctx,
+                    snapshot_evidence=evidence,
+                    traj_df=traj_for_desc,
+                    map_tracks_csv=(
+                        str(map_tracks)
+                        if (map_tracks is not None and map_tracks.is_file())
+                        else None
+                    ),
+                ),
+                desc_path,
             )
-            print(f"  ✓ Generated description.txt"
-                  + (" (with Snapshot evidence)" if evidence else ""))
+            print(
+                f"  ✓ Updated description.txt"
+                + (" (with BEV frame index)" if evidence else "")
+            )
         except Exception as e:
             print(f"  ⚠️  description.txt failed: {e}")
     
@@ -1864,23 +1872,33 @@ def process_medoid(
                 ],
             },
         }
-        with (cluster_dir / "cluster.json").open("w") as f:
+        with write_path(cluster_dir, "cluster.json").open("w") as f:
             json.dump(cluster_doc, f, indent=2)
         print(f"  ✓ Saved cluster.json")
     except Exception as e:
         cluster_doc = None
         print(f"  ⚠️  Failed to write cluster.json: {e}")
 
-    # 9. Consolidated LLM context card (description + actions + snapshot index)
+    # 9. LLM context card: sentence timeline + agent digest (no raw az table).
     try:
-        write_context_md(cluster_dir, cluster_doc, action_data_for_ctx)
+        sel = selection_bundle[0] if selection_bundle else None
+        fnames = selection_bundle[1] if len(selection_bundle) >= 2 else None
+        write_context_md(
+            cluster_dir,
+            cluster_doc,
+            action_data_for_ctx,
+            selection=sel,
+            snap_filenames=fnames,
+            traj_df=traj_for_desc,
+            map_tracks_csv=map_tracks_for_ctx,
+        )
         print(f"  ✓ Saved context.md")
     except Exception as e:
         print(f"  ⚠️  Failed to write context.md: {e}")
 
     # meta.yaml is an intermediate input to the labeller only — drop it from output.
     try:
-        (cluster_dir / "meta.yaml").unlink(missing_ok=True)
+        meta_path.unlink(missing_ok=True)
     except Exception:
         pass
 
@@ -1908,16 +1926,14 @@ def process_trial_to_dir(
     ego_zoom_radius: float = 30.0,
     contact_clearance_m: float = 0.5,
     conflict_relevance_m: float = 5.0,
-    conflict_window_s: float = 6.0,
-    conflict_distance_m: float = 40.0,
-    conflict_burst_step_s: float = 0.0,
-    hard_brake_accel: float = -2.5,
+    conflict_window_s: Optional[float] = None,
+    conflict_window_before_s: float = 15.0,
+    conflict_window_after_s: float = 8.0,
 ) -> bool:
-    """Generate action.yaml + description.txt + BEV snapshots for one trial.
+    """Generate nested pack artifacts for one aux trial under *out_dir*.
 
-    Mirrors the core of ``process_medoid`` but writes only the per-trial artifacts
-    (no cluster.json / context.md) to *out_dir*.  Used for outlier and boundary
-    trials under ``cluster<N>/outlier_trials/`` and ``cluster<N>/boundary_c<M>/``.
+    Mirrors the core of ``process_medoid`` but writes only per-trial artifacts
+    (no cluster.json / context.md). Used for outlier and boundary trials.
     """
     from map_plotter import DEFAULT_BEV_TYPOGRAPHY
 
@@ -1925,6 +1941,8 @@ def process_trial_to_dir(
         typography = DEFAULT_BEV_TYPOGRAPHY
 
     out_dir.mkdir(parents=True, exist_ok=True)
+    migrate_flat_to_nested(out_dir)
+    ensure_layout(out_dir)
 
     if not csv_exists(batch_id, trial_index):
         print(f"    ❌ CSV missing for batch {batch_id} trial {trial_index} — skipped")
@@ -1941,8 +1959,8 @@ def process_trial_to_dir(
         print(f"    ❌ DataFrame conversion failed: {e}")
         return False
 
-    trajectory_path = out_dir / "trajectory.csv"
-    meta_path = out_dir / "meta.yaml"
+    trajectory_path = write_path(out_dir, "trajectory.csv")
+    meta_path = write_path(out_dir, "meta.yaml")
     location_for_meta = Path(xodr_path).stem
 
     try:
@@ -1960,8 +1978,13 @@ def process_trial_to_dir(
     from llm_pipeline.cluster_stats import trial_collision_flag
 
     action_data = None
+    traj_for_desc = None
+    action_yaml_path = write_path(out_dir, "action.yaml")
+    desc_path = write_path(out_dir, "description.txt")
     try:
         from labeller import label_trajectory, save_action_yaml
+        from description import build_description, save_description_txt
+        from dataset_config import map_tracks_path_for_dataset
 
         map_yaml = (
             Path(xodr_path).parent.parent / "map" / f"{location_for_meta}.yaml"
@@ -1975,12 +1998,23 @@ def process_trial_to_dir(
             contact_clearance_m=contact_clearance_m,
             conflict_relevance_m=conflict_relevance_m,
         )
-        save_action_yaml(action_data, out_dir / "action.yaml")
+        save_action_yaml(action_data, action_yaml_path)
+        traj_for_desc = pd.read_csv(trajectory_path)
+        map_tracks_csv = map_tracks_path_for_dataset(dataset_name)
+        save_description_txt(
+            build_description(
+                action_data,
+                traj_df=traj_for_desc,
+                map_tracks_csv=str(map_tracks_csv) if map_tracks_csv.is_file() else None,
+            ),
+            desc_path,
+        )
     except Exception as e:
         print(f"    ⚠️  Action/description failed: {e}")
 
-    snapshots_dir = out_dir / "snapshots"
+    snaps_out = nested_snapshots_dir(out_dir)
     selection_bundle: list = []
+    map_tracks = None
     try:
         from tier2_renderer import (
             Tier2BevRenderer,
@@ -1999,18 +2033,18 @@ def process_trial_to_dir(
                 typography=typography,
                 ego_zoom_radius=ego_zoom_radius,
             )
-            action_yaml_path = out_dir / "action.yaml"
+            if not action_yaml_path.is_file():
+                raise FileNotFoundError("action.yaml missing — cannot render BEV")
             snaps = tier2.render_trial_from_esmini_csv(
                 batch_id, trial_index,
-                str(snapshots_dir),
+                str(snaps_out),
                 n_snapshots=max_snapshots,
                 file_prefix=f"trial_{trial_index}",
                 overview_dir=None,
-                action_yaml_path=str(action_yaml_path) if action_yaml_path.is_file() else None,
+                action_yaml_path=str(action_yaml_path),
                 conflict_window_s=conflict_window_s,
-                conflict_distance_m=conflict_distance_m,
-                conflict_burst_step_s=conflict_burst_step_s,
-                hard_brake_accel=hard_brake_accel,
+                conflict_window_before_s=conflict_window_before_s,
+                conflict_window_after_s=conflict_window_after_s,
                 selection_out=selection_bundle,
             )
             print(f"    ✓ {len(snaps)} BEV snapshots")
@@ -2020,16 +2054,25 @@ def process_trial_to_dir(
     if action_data is not None:
         try:
             from description import build_description, save_description_txt
-            from conflict_frame_selector import format_snapshot_evidence_block
+            from conflict_frame_selector import format_bev_frame_index
 
             evidence = None
             if len(selection_bundle) >= 2:
-                evidence = format_snapshot_evidence_block(
+                evidence = format_bev_frame_index(
                     selection_bundle[0], selection_bundle[1]
                 )
             save_description_txt(
-                build_description(action_data, snapshot_evidence=evidence),
-                out_dir / "description.txt",
+                build_description(
+                    action_data,
+                    snapshot_evidence=evidence,
+                    traj_df=traj_for_desc,
+                    map_tracks_csv=(
+                        str(map_tracks)
+                        if (map_tracks is not None and map_tracks.is_file())
+                        else None
+                    ),
+                ),
+                desc_path,
             )
         except Exception as e:
             print(f"    ⚠️  description.txt failed: {e}")
@@ -2060,10 +2103,9 @@ def process_auxiliary_trials(
     ego_zoom_radius: float = 30.0,
     contact_clearance_m: float = 0.5,
     conflict_relevance_m: float = 5.0,
-    conflict_window_s: float = 6.0,
-    conflict_distance_m: float = 40.0,
-    conflict_burst_step_s: float = 0.0,
-    hard_brake_accel: float = -2.5,
+    conflict_window_s: Optional[float] = None,
+    conflict_window_before_s: float = 15.0,
+    conflict_window_after_s: float = 8.0,
     outlier_scope: Optional[Set[str]] = None,
     boundary_scope: Optional[Set[str]] = None,
     param_boundary_pairs: Optional[List[Dict[str, Any]]] = None,
@@ -2071,9 +2113,9 @@ def process_auxiliary_trials(
 ) -> None:
     """Build full trial artifacts for outlier and boundary trials.
 
-    Outlier → ``cluster<N>/outlier_trials/trial_<id>/``
-    Embedding boundary → ``cluster<N>/boundary_c<M>/trial_<id>/``
-    Param (IC) boundary → ``cluster<N>/param_boundary_c<M>/trial_<id>/``
+    Outlier → ``cluster<N>/highlight_trials/outlier_trials/trial_<id>/``
+    Embedding boundary → ``cluster<N>/highlight_trials/boundary_c<M>/trial_<id>/``
+    Param (IC) boundary → ``<run>/ic_pairs/cA-cB/`` (gated by param_dist ≤ τ)
 
     ``outlier_scope`` / ``boundary_scope`` / ``param_boundary_scope``:
     None=all, empty=skip, else cluster labels.
@@ -2115,9 +2157,11 @@ def process_auxiliary_trials(
                     continue
                 collided = bool((collision_flags or {}).get(str(tid), False))
                 out_dir = (
-                    run_dir
-                    / f"cluster{src_label}"
-                    / f"{folder_prefix}{tgt_label}"
+                    highlight_subdir(
+                        run_dir / f"cluster{src_label}",
+                        folder_prefix,
+                        target_cluster=tgt_label,
+                    )
                     / f"trial_{ti}"
                 )
                 print(
@@ -2138,9 +2182,8 @@ def process_auxiliary_trials(
                     contact_clearance_m=contact_clearance_m,
                     conflict_relevance_m=conflict_relevance_m,
                     conflict_window_s=conflict_window_s,
-                    conflict_distance_m=conflict_distance_m,
-                    conflict_burst_step_s=conflict_burst_step_s,
-                    hard_brake_accel=hard_brake_accel,
+                    conflict_window_before_s=conflict_window_before_s,
+                    conflict_window_after_s=conflict_window_after_s,
                 )
 
     # --- outlier trials ---
@@ -2159,7 +2202,10 @@ def process_auxiliary_trials(
                 print(f"  ⚠️  Outlier trial {top_tid} not in index map — skipped")
                 continue
             collided = bool((collision_flags or {}).get(top_tid, False))
-            out_dir = run_dir / f"cluster{label_str}" / "outlier_trials" / f"trial_{ti}"
+            out_dir = (
+                highlight_subdir(run_dir / f"cluster{label_str}", "outlier_trials")
+                / f"trial_{ti}"
+            )
             print(f"  🔸 Outlier cluster {label_str}: trial {top_tid} (batch {b}, idx {ti})"
                   f"{' COLLISION' if collided else ''}")
             process_trial_to_dir(
@@ -2175,9 +2221,8 @@ def process_auxiliary_trials(
                 contact_clearance_m=contact_clearance_m,
                 conflict_relevance_m=conflict_relevance_m,
                 conflict_window_s=conflict_window_s,
-                conflict_distance_m=conflict_distance_m,
-                conflict_burst_step_s=conflict_burst_step_s,
-                hard_brake_accel=hard_brake_accel,
+                conflict_window_before_s=conflict_window_before_s,
+                conflict_window_after_s=conflict_window_after_s,
             )
 
     # --- embedding-space closest pairs ---
@@ -2189,14 +2234,32 @@ def process_auxiliary_trials(
         label="Emb-boundary",
     )
 
-    # --- parameter-space (initial condition) closest pairs ---
-    _build_boundary_dirs(
-        param_boundary_pairs or [],
-        param_boundary_scope,
-        folder_prefix="param_boundary_c",
-        dist_key="param_dist",
-        label="IC-boundary",
-    )
+    # --- parameter-space (initial condition) closest pairs → ic_pairs/cA-cB/ ---
+    if param_boundary_scope is not None and len(param_boundary_scope) == 0:
+        print("  ⏭  IC-pair packs skipped (--param-boundaries none)")
+    elif param_boundary_pairs:
+        from ic_pair_packs import process_ic_pair_packs
+
+        process_ic_pair_packs(
+            run_dir=run_dir,
+            param_boundary_pairs=param_boundary_pairs,
+            trial_index_map=trial_index_map,
+            collision_flags=collision_flags,
+            trials_meta=trials_meta,
+            xodr_path=xodr_path,
+            parser_xodr=parser_xodr,
+            dataset_name=dataset_name,
+            snapshot_output_px=snapshot_output_px,
+            snapshot_border_frac=snapshot_border_frac,
+            typography=typography,
+            ego_zoom_radius=ego_zoom_radius if ego_zoom_radius else 25.0,
+            contact_clearance_m=contact_clearance_m,
+            conflict_relevance_m=conflict_relevance_m,
+            conflict_window_s=conflict_window_s,
+            conflict_window_before_s=conflict_window_before_s,
+            conflict_window_after_s=conflict_window_after_s,
+            scope=param_boundary_scope,
+        )
 
 
 def main():
@@ -2466,7 +2529,7 @@ def main():
         default="none",
         dest="emb_boundaries",
         metavar="SCOPE",
-        help="Embedding-space closest pairs → clusterN/boundary_cM/: "
+        help="Embedding-space closest pairs → clusterN/highlight_trials/boundary_cM/: "
              "'all' (default), 'none', or labels e.g. '1'.",
     )
     parser.add_argument(
@@ -2474,17 +2537,16 @@ def main():
         type=str,
         default="none",
         metavar="SCOPE",
-        help="Parameter-space (initial condition) closest pairs → "
-             "clusterN/param_boundary_cM/: 'all', 'none' (default), "
-             "or labels e.g. '1'. Distance uses z-scored trial parameters "
-             "(e.g. OncomingStartDelay, OncomingSpeed).",
+        help="IC closest pairs → results/.../ic_pairs/cA-cB/ (param_dist≤0.1 only): "
+             "'all', 'none' (default), or labels e.g. '1'. Distance is z-scored "
+             "OncomingSpeed / OncomingStartDelay L2.",
     )
     parser.add_argument(
         "--outliers",
         type=str,
         default="none",
         metavar="SCOPE",
-        help="Which clusters get outlier_trials: 'all' (default), 'none', "
+        help="Which clusters get highlight_trials/outlier_trials: 'all' (default), 'none', "
              "or labels e.g. '1'.",
     )
     parser.add_argument(
@@ -2507,29 +2569,25 @@ def main():
         help="Optional cap on BEV frames rendered (default: uncapped, all key times)",
     )
     parser.add_argument(
-        "--conflict-window-s",
+        "--conflict-window-before-s",
+        type=float,
+        default=15.0,
+        help="Keep action-derived BEV/context frames from peak−BEFORE to peak "
+             "(default: 15). Captures pre-conflict setup maneuvers.",
+    )
+    parser.add_argument(
+        "--conflict-window-after-s",
         type=float,
         default=8.0,
-        help="Keep BEV frames within ±W seconds of conflict peak (default: 6)",
+        help="Keep action-derived BEV/context frames from peak to peak+AFTER "
+             "(default: 8).",
     )
     parser.add_argument(
-        "--conflict-distance-m",
+        "--conflict-window-s",
         type=float,
-        default=50.0,
-        help="Also keep frames where ego–partner distance < D metres (default: 40)",
-    )
-    parser.add_argument(
-        "--conflict-burst-step-s",
-        type=float,
-        default=0.0,
-        help="If >0, densify burst sampling with this step in [-2,+1]s around peak. "
-             "Default 0 = discrete offsets only (-2,-1,-0.5,-0.2,0,+0.2,+0.5,+1).",
-    )
-    parser.add_argument(
-        "--hard-brake-accel",
-        type=float,
-        default=-2.5,
-        help="Ego accel threshold (m/s²) for hard-brake onset frame (default: -2.5)",
+        default=None,
+        help="Legacy symmetric ±W override for the conflict peak window. "
+             "If set, ignores --conflict-window-before-s / --conflict-window-after-s.",
     )
 
     args = parser.parse_args()
@@ -2623,9 +2681,12 @@ def main():
             dataset_name = resolved
             print(f"   Resolved dataset '{dataset_name}' from batch id {args.batch_id}")
         elif args.batch_id is not None:
-            dataset_name = f"batch{args.batch_id}"
-            print(f"   ⚠️  No dataset config maps to batch {args.batch_id}; "
-                  f"using '{dataset_name}' (BEV/map assets may be unavailable)")
+            # Custom batch folders (e.g. batch9) still share hct_6 map assets.
+            dataset_name = "dataset1"
+            print(
+                f"   ⚠️  No dataset config maps to batch {args.batch_id}; "
+                f"using '{dataset_name}' for map/BEV assets"
+            )
         else:
             dataset_name = "unknown"
 
@@ -2962,9 +3023,15 @@ def main():
                 collision_flags=collision_flags,
                 ego_scenario_params=ego_scenario_params or None,
             )
+            from ic_pair_packs import annotate_param_boundary_pairs
+
+            param_boundary_pairs = annotate_param_boundary_pairs(
+                param_boundary_pairs
+            )
             for bp in param_boundary_pairs:
+                role = bp.get("card_role", "?")
                 print(
-                    f"  IC-boundary c{bp['cluster_a']}↔c{bp['cluster_b']}: "
+                    f"  IC-boundary [{role}] c{bp['cluster_a']}↔c{bp['cluster_b']}: "
                     f"dist={bp['param_dist']:.4f} "
                     f"(trials {bp['trial_a']} ↔ {bp['trial_b']})"
                 )
@@ -3020,9 +3087,8 @@ def main():
             conflict_relevance_m=args.conflict_relevance_m,
             intra_variance=intra_by_cluster.get(medoid["cluster_label"]),
             conflict_window_s=args.conflict_window_s,
-            conflict_distance_m=args.conflict_distance_m,
-            conflict_burst_step_s=args.conflict_burst_step_s,
-            hard_brake_accel=args.hard_brake_accel,
+            conflict_window_before_s=args.conflict_window_before_s,
+            conflict_window_after_s=args.conflict_window_after_s,
         ):
             success_count += 1
 
@@ -3070,9 +3136,8 @@ def main():
                 contact_clearance_m=args.contact_clearance_m,
                 conflict_relevance_m=args.conflict_relevance_m,
                 conflict_window_s=args.conflict_window_s,
-                conflict_distance_m=args.conflict_distance_m,
-                conflict_burst_step_s=args.conflict_burst_step_s,
-                hard_brake_accel=args.hard_brake_accel,
+                conflict_window_before_s=args.conflict_window_before_s,
+                conflict_window_after_s=args.conflict_window_after_s,
                 outlier_scope=outlier_scope,
                 boundary_scope=boundary_scope,
                 param_boundary_pairs=param_boundary_pairs,

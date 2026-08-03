@@ -6,6 +6,7 @@ import {
   findProjectRoot,
   readJsonSafe,
 } from "../_lib/esminiTrajectory";
+import { resolveClusterArtifact } from "../_lib/clusterPaths";
 
 /**
  * GET /api/esmini-trajectory
@@ -77,7 +78,8 @@ function resolveMedoid(
     folder,
     `cluster${label}`,
   );
-  const clusterJson = readJsonSafe(path.join(clusterDir, "cluster.json"));
+  const cjPath = resolveClusterArtifact(clusterDir, "cluster.json");
+  const clusterJson = cjPath ? readJsonSafe(cjPath) : null;
   const medoid = (clusterJson?.medoid ?? {}) as Record<string, unknown>;
   if (medoid.batch_id == null || medoid.trial_index == null) {
     return null;

@@ -74,8 +74,21 @@ def _longitudinal_actions(t: np.ndarray, v: np.ndarray, road: np.ndarray,
     n = len(t)
     if n < 2:
         return []
+    # Light velocity smooth before frame accel labels. Raw esmini speed is noisy
+    # enough that a real post-conflict recovery (Δv ≈ +8 m/s over ~15 s) shatters
+    # into 1–3 frame ACC/DEC flickers and fails MIN_EVENT_DURATION. Window ≈0.7 s
+    # at 0.1 s sampling; details still report speeds from the smoothed series so
+    # start/target match the labelled interval.
+    win = 7
+    if n >= 3:
+        pad = win // 2
+        v_pad = np.pad(v.astype(float), (pad, pad), mode="edge")
+        kernel = np.ones(win, dtype=float) / float(win)
+        v_s = np.convolve(v_pad, kernel, mode="valid")
+    else:
+        v_s = v.astype(float)
     dt = np.diff(t)
-    dv = np.diff(v)
+    dv = np.diff(v_s)
     acc = np.divide(dv, dt, out=np.zeros_like(dv), where=dt != 0)
     labels = np.where(acc > Thresholds.CRUISE_BAND, EgoAction.ACCELERATE.value,
                       np.where(acc < -Thresholds.CRUISE_BAND,
@@ -85,7 +98,7 @@ def _longitudinal_actions(t: np.ndarray, v: np.ndarray, road: np.ndarray,
 
     def emit(a: int, b: int, action: str) -> None:
         dur = float(t[b] - t[a])
-        v0, v1 = float(v[a]), float(v[b])
+        v0, v1 = float(v_s[a]), float(v_s[b])
         out.append(ActionEvent(
             agent_id=agent_id, agent_role=role, action=str(action),
             start_time=float(t[a]), end_time=float(t[b]),
@@ -117,19 +130,19 @@ def _longitudinal_actions(t: np.ndarray, v: np.ndarray, road: np.ndarray,
                 dur_a = t[split] - t[scan]
                 dur_b = t[k] - t[split]
                 if dur_a > Thresholds.MIN_EVENT_DURATION and dur_b > 0:
-                    acc_a = (v[split] - v[scan]) / dur_a
-                    acc_b = (v[k] - v[split]) / dur_b
+                    acc_a = (v_s[split] - v_s[scan]) / dur_a
+                    acc_b = (v_s[k] - v_s[split]) / dur_b
                     if abs(acc_a - acc_b) > Thresholds.ACCEL_DEV_THRESHOLD:
                         emit(scan, split, cur)  # segment A — xosc keeps it as-is
                         scan = split
             final_end = end + 1  # one past the last frame of the run
             f_dur = t[final_end] - t[scan]
-            f_dv = v[final_end] - v[scan]
+            f_dv = v_s[final_end] - v_s[scan]
             if f_dur > Thresholds.MIN_EVENT_DURATION and abs(f_dv) > Thresholds.MIN_DELTA_V:
                 emit(scan, final_end, cur)
         start = end + 1
 
-    out = _merge_short_same_type(out, t, v, Thresholds.MERGE_SHORT_S)
+    out = _merge_short_same_type(out, t, v_s, Thresholds.MERGE_SHORT_S)
 
     # Ours (additive): a slow_down whose mean accel ≤ EMERGENCY_DECEL is an
     # emergency brake — relabel without changing xosc's segmentation.
@@ -229,6 +242,75 @@ def _merge_short_same_type(events: List[ActionEvent], t: np.ndarray, v: np.ndarr
     return actions
 
 
+def _overlaps_lane_change(
+    t0: float, t1: float, lane_changes: List[ActionEvent], *, frac: float = 0.5
+) -> bool:
+    """True if [t0,t1] substantially overlaps a LANE_CHANGE interval."""
+    dur = max(1e-6, t1 - t0)
+    for lc in lane_changes:
+        ov = min(t1, lc.end_time) - max(t0, lc.start_time)
+        if ov >= frac * dur:
+            return True
+    return False
+
+
+def _same_lane_turn_actions(
+    df: pd.DataFrame,
+    agent_id: int,
+    role: str,
+    lane_changes: List[ActionEvent],
+) -> List[ActionEvent]:
+    """Route-level same-lane TURN_LEFT / TURN_RIGHT from heading arcs.
+
+    Complements junction ``ENTER_JUNCTION.intent`` (40° threshold): here a
+    sustained |Δheading| ≥ ``SAME_LANE_TURN_DEG`` on a fixed road/lane is enough
+    (swerve around parked traffic, follow road curvature). Overlaps with
+    ``LANE_CHANGE_*`` are skipped — those already encode lateral intent.
+    """
+    try:
+        from kinematics_context import detect_heading_sweeps
+    except ImportError:  # pragma: no cover
+        return []
+
+    sweeps = detect_heading_sweeps(
+        df,
+        track_id=agent_id,
+        min_deg=Thresholds.SAME_LANE_TURN_DEG,
+        min_s=Thresholds.SAME_LANE_TURN_MIN_S,
+    )
+    out: List[ActionEvent] = []
+    for sw in sweeps:
+        if _overlaps_lane_change(sw.t0, sw.t1, lane_changes):
+            continue
+        action = (
+            EgoAction.TURN_LEFT.value
+            if sw.direction == "LEFT"
+            else EgoAction.TURN_RIGHT.value
+        )
+        out.append(
+            ActionEvent(
+                agent_id=agent_id,
+                agent_role=role,
+                action=action,
+                start_time=float(sw.t0),
+                end_time=float(sw.t1),
+                road_id=int(sw.road_id if sw.road_id is not None else 0),
+                lane_id=int(sw.lane_id if sw.lane_id is not None else 0),
+                detail={
+                    "scope": "same_lane",
+                    "heading_change_deg": float(sw.delta_deg),
+                    "heading_start_deg": float(sw.hdg0_deg),
+                    "heading_end_deg": float(sw.hdg1_deg),
+                    "vs_path_start_deg": sw.vs_path0_deg,
+                    "vs_path_end_deg": sw.vs_path1_deg,
+                    "path_tangent_start_deg": sw.path_tangent0_deg,
+                    "path_tangent_end_deg": sw.path_tangent1_deg,
+                },
+            )
+        )
+    return out
+
+
 def _agent_speed_actions(df: pd.DataFrame, junction_roads: Set[int]) -> List[ActionEvent]:
     """Classify longitudinal + junction transitions frame-by-frame for one agent."""
     df = df.sort_values("time").reset_index(drop=True)
@@ -243,7 +325,12 @@ def _agent_speed_actions(df: pd.DataFrame, junction_roads: Set[int]) -> List[Act
     lane = df["lane_id"].to_numpy(dtype=int)
     head = (df["heading"].to_numpy(dtype=float)
             if "heading" in df.columns else np.zeros(len(df)))
-    agent_id = int(df["trackId"].iloc[0])
+    # Also accept track_id-only frames (after rename) for agent id lookup.
+    agent_id = int(
+        df["trackId"].iloc[0]
+        if "trackId" in df.columns
+        else df["track_id"].iloc[0]
+    )
     role = "ego" if agent_id == 0 else "npc"
 
     # --- Longitudinal (xosc port) + sustained STOPPED (ours) --------------
@@ -296,6 +383,13 @@ def _agent_speed_actions(df: pd.DataFrame, junction_roads: Set[int]) -> List[Act
                 "direction": dir_word,                # xosc parity
             },
         ))
+
+    # --- Route: same-lane TURN_LEFT / TURN_RIGHT (heading arcs, ≥15°) ------
+    lane_changes = [
+        e for e in discrete
+        if e.action in (EgoAction.LANE_CHANGE_LEFT.value, EgoAction.LANE_CHANGE_RIGHT.value)
+    ]
+    discrete += _same_lane_turn_actions(df, agent_id, role, lane_changes)
 
     # --- Route: one ENTER (with turn intent) + one EXIT per junction pass -
     # heading is in degrees (esmini CCW); +Δ ⇒ left, −Δ ⇒ right.

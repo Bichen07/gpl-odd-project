@@ -184,24 +184,31 @@ def build_cluster_stats(
 def action_log_from_description(cluster_dir: Path) -> str:
     """Preferred LLM text signal: the rule-based Labeller/Describer output.
 
-    Uses `context.md` if present (header + description + action table), else
-    `description.txt`, else `action.yaml` rendered to a compact timeline.
+    Uses nested-then-flat `context.md` if present (sentence timeline + agent
+    digest), else `description.txt`, else `action.yaml` rendered compactly.
     Returns "" when none are available (caller falls back to observations).
     """
-    context_md = cluster_dir / "context.md"
-    if context_md.is_file():
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from cluster_paths import resolve_path  # type: ignore
+
+    context_md = resolve_path(cluster_dir, "context.md", must_exist=True)
+    if context_md is not None:
         text = context_md.read_text(encoding="utf-8").strip()
         if text:
             return text
 
-    description = cluster_dir / "description.txt"
-    if description.is_file():
+    description = resolve_path(cluster_dir, "description.txt", must_exist=True)
+    if description is not None:
         text = description.read_text(encoding="utf-8").strip()
         if text:
             return text
 
-    action_yaml = cluster_dir / "action.yaml"
-    if action_yaml.is_file():
+    action_yaml = resolve_path(cluster_dir, "action.yaml", must_exist=True)
+    if action_yaml is not None:
         try:
             import yaml
 
@@ -360,12 +367,23 @@ def collect_bev_snapshot_paths(
 ) -> List[str]:
     """Collect BEV image paths from a cluster dir.
 
-    Supports both the V1 layout (``snapshots/``) and the legacy layout
-    (``bev/``). When *max_llm_snapshots* is set, evenly subsample for LLM.
+    Supports nested ``processed/snapshots/``, flat ``snapshots/``, and legacy
+    ``bev/``. When *max_llm_snapshots* is set, evenly subsample for LLM.
     """
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from cluster_paths import resolve_path  # type: ignore
+
     paths: List[str] = []
-    for sub in ("snapshots", "bev"):
-        d = cluster_dir / sub
+    snap = resolve_path(cluster_dir, "snapshots", must_exist=True)
+    candidates = []
+    if snap is not None:
+        candidates.append(snap)
+    candidates.append(cluster_dir / "bev")
+    for d in candidates:
         if d.is_dir():
             found = sorted(d.glob("*.jpg")) + sorted(d.glob("*.png"))
             if found:
@@ -453,21 +471,29 @@ def write_stub_interpretation(
     cluster_stats: Dict[str, Any],
     reason: str,
 ) -> Path:
-    out = cluster_dir / "cluster_interpretation.yaml"
-    meta = cluster_dir / "interpretation_meta.json"
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from cluster_paths import resolve_path, write_path  # type: ignore
+
+    out = write_path(cluster_dir, "cluster_interpretation.yaml")
+    meta = write_path(cluster_dir, "interpretation_meta.json")
 
     # Do NOT clobber a previously successful (non-stub) interpretation with a
     # failure stub. A re-run that fails (e.g. the LLM intermittently returns
     # prose instead of YAML) must preserve the good result already on disk.
-    if reason not in ("dry_run",) and meta.is_file():
+    prior_meta = resolve_path(cluster_dir, "interpretation_meta.json", must_exist=True)
+    if reason not in ("dry_run",) and prior_meta is not None:
         try:
-            prior = json.loads(meta.read_text(encoding="utf-8"))
+            prior = json.loads(prior_meta.read_text(encoding="utf-8"))
             if not prior.get("stub", False):
                 print(
                     f"  ⚠️  cluster{cluster_id}: new run failed ({reason}); "
                     "keeping previous successful interpretation on disk."
                 )
-                return out
+                return resolve_path(cluster_dir, "cluster_interpretation.yaml") or out
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -535,9 +561,16 @@ def interpret_cluster_dir(
     """
     # Prefer the consolidated cluster.json (2026-06 layout); fall back to the
     # legacy stats.json / medoid.json triplet for older runs.
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from cluster_paths import resolve_path  # type: ignore
+
     stats: Dict[str, Any] = {}
-    cluster_json_path = cluster_dir / "cluster.json"
-    if cluster_json_path.is_file():
+    cluster_json_path = resolve_path(cluster_dir, "cluster.json", must_exist=True)
+    if cluster_json_path is not None:
         doc = json.loads(cluster_json_path.read_text(encoding="utf-8"))
         c = doc.get("cluster", {})
         m = doc.get("medoid", {})
@@ -629,7 +662,7 @@ def interpret_cluster_dir(
 
     # Intra-cluster variance (Phase A) — read from cluster.json and pass to formatter.
     iv = stats.get("intra_variance") or {}
-    if not iv and cluster_json_path.is_file():
+    if not iv and cluster_json_path is not None:
         doc = json.loads(cluster_json_path.read_text(encoding="utf-8"))
         iv = doc.get("cluster", {}).get("intra_variance") or {}
     if iv:
@@ -638,10 +671,18 @@ def interpret_cluster_dir(
         outlier_ids = iv.get("outlier_trial_ids", [])
         if outlier_ids:
             outlier_desc_text = ""
-            outlier_trials_dir = cluster_dir / "outlier_trials"
-            for sub in sorted(outlier_trials_dir.glob("trial_*")) if outlier_trials_dir.is_dir() else []:
-                desc_f = sub / "description.txt"
-                if desc_f.is_file():
+            from cluster_paths import resolve_highlight_subdir  # type: ignore
+
+            outlier_trials_dir = resolve_highlight_subdir(
+                cluster_dir, "outlier_trials", must_exist=True
+            )
+            for sub in sorted(outlier_trials_dir.glob("trial_*")) if outlier_trials_dir else []:
+                desc_f = resolve_path(sub, "description.txt", must_exist=True)
+                if desc_f is None:
+                    desc_f = sub / "description.txt"
+                    if not desc_f.is_file():
+                        desc_f = None
+                if desc_f is not None:
                     outlier_desc_text = desc_f.read_text(encoding="utf-8").strip()
                     break
             if outlier_desc_text:
@@ -652,7 +693,8 @@ def interpret_cluster_dir(
     # (resolved under snapshots/ or bev/) or absolute/relative paths.
     bev_paths: List[str] = []
     if bev_selection:
-        snap_dirs = [cluster_dir / "snapshots", cluster_dir / "bev"]
+        snap_nested = resolve_path(cluster_dir, "snapshots", must_exist=True)
+        snap_dirs = [d for d in (snap_nested, cluster_dir / "snapshots", cluster_dir / "bev") if d]
         for entry in bev_selection:
             p = Path(entry)
             if p.is_file():
@@ -660,6 +702,8 @@ def interpret_cluster_dir(
                 continue
             name = p.name
             for d in snap_dirs:
+                if d is None or not d.is_dir():
+                    continue
                 cand = d / name
                 if cand.is_file():
                     bev_paths.append(str(cand))
@@ -700,8 +744,8 @@ def interpret_cluster_dir(
         temperature=temperature,
         max_llm_snapshots=max_llm_snapshots,
     )
-    out = cluster_dir / "cluster_interpretation.yaml"
-    if out.is_file():
+    out = resolve_path(cluster_dir, "cluster_interpretation.yaml", must_exist=True)
+    if out is not None:
         return out
     return write_stub_interpretation(
         cluster_dir,

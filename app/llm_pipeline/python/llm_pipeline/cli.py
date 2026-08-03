@@ -28,9 +28,9 @@ def main() -> None:
     )
     ci.add_argument(
         "--products",
-        default="medoid,summary,ic-pairs",
-        help="Comma list: medoid,summary,ic-pairs (default all). "
-             "'legacy' is an alias for medoid,summary (writes thin cluster_interpretation.yaml pointer).",
+        default="medoid",
+        help="Comma list: medoid[,summary][,ic-pairs]. Default is medoid only "
+             "(one YAML: output/medoid_trial.yaml). Use 'all' for all products.",
     )
     ci.add_argument("--api-key", default=None, help="API key (overrides env; ephemeral)")
     ci.add_argument("--clusters", default=None,
@@ -40,10 +40,6 @@ def main() -> None:
     ci.add_argument("--images-json", default=None,
                     help="Path to JSON mapping cluster id -> [snapshot file names]")
     ci.add_argument("--temperature", type=float, default=0.1)
-    ci.add_argument("--review", dest="review", action="store_true", default=True,
-                    help="Run the reviewer pass (default on; legacy product only)")
-    ci.add_argument("--no-review", dest="review", action="store_false",
-                    help="Skip the reviewer pass")
     ci.add_argument("--max-llm-snapshots", type=int, default=10,
                     help="Even-subsample cap when no explicit image selection (0 = all)")
     ci.add_argument(
@@ -95,7 +91,7 @@ def main() -> None:
                 dataset = None
 
         # Builder layout: results/batch<id>/<k>_cluster_s=.../cluster<N>/
-        from .cluster_interpretation_pipeline import run_results_dir_interpretation
+        from .split_analysis import run_split_analysis
 
         prompt_overrides = None
         pj = getattr(args, "prompts_json", None)
@@ -110,10 +106,7 @@ def main() -> None:
         if cl:
             clusters = [int(x) for x in str(cl).split(",") if x.strip() != ""]
         max_snaps = getattr(args, "max_llm_snapshots", 10)
-        products = getattr(args, "products", "medoid,summary,ic-pairs")
-        if str(products).strip().lower() == "legacy":
-            products = "medoid,summary"
-        from .split_analysis import run_split_analysis
+        products = getattr(args, "products", "medoid")
         result = run_split_analysis(
             Path(args.results_dir),
             batch_id=batch_id,

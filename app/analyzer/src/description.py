@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
-"""description.py — V1-5 / Step T-3: natural-language scenario narration.
+"""description.py — natural-language scenario narration from ``action.yaml``.
 
-Reads `action.yaml` (from labeller.py) and renders a plain-English
-`description.txt` that feeds directly into the LLM prompt (Step 5).
+Reads Labeller output and renders human ``description.txt`` (scenario prose,
+per-agent actions, Critical/Interactions). Optional *snapshot_evidence* may add
+a short BEV filename index — never the raw az/d/ttc metrics table (LLM context
+uses ``processed/context.md`` sentence timelines instead).
 
 Map-agnostic: narration is driven by the taxonomy action labels, so it works on
 the full hct_6 network (not only intersection maneuvers).
 
 CLI:
   python3 app/analyzer/src/description.py \
-      --action results/dataset1/4/cluster0/action.yaml \
-      --out    results/dataset1/4/cluster0/description.txt
+      --action results/dataset1/4/cluster0/processed/action.yaml \
+      --out    results/dataset1/4/cluster0/processed/description.txt
 """
 from __future__ import annotations
 
 import argparse
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+
+try:
+    import pandas as pd
+except ImportError:  # pragma: no cover
+    pd = None  # type: ignore
 
 # Human-readable phrasing for each action label.
 _EGO_PHRASES = {
@@ -29,6 +36,9 @@ _EGO_PHRASES = {
     "STOPPED": "is stopped",
     "LANE_CHANGE_LEFT": "changes lane to the left",
     "LANE_CHANGE_RIGHT": "changes lane to the right",
+    "TURN_LEFT": "turns left",
+    "TURN_RIGHT": "turns right",
+    "GO_STRAIGHT": "goes straight",
     "ENTER_JUNCTION": "enters a junction",
     "EXIT_JUNCTION": "exits the junction",
     "COLLISION": "collides",
@@ -87,6 +97,11 @@ def _narrate_agent(agent: Dict) -> List[str]:
             extra = f" (~{attrs['speed']} m/s)"
         elif "to_lane" in attrs:                          # lane change
             extra = f" (lane {attrs['from_lane']}→{attrs['to_lane']})"
+        elif attrs.get("scope") == "same_lane" and "heading_change_deg" in attrs:
+            extra = (
+                f" (same-lane, Δheading={attrs['heading_change_deg']}°, "
+                f"{attrs.get('heading_start_deg')}°→{attrs.get('heading_end_deg')}°)"
+            )
         elif "intent" in attrs:                           # junction entry
             intent_word = _INTENT_PHRASES.get(attrs["intent"], attrs["intent"].lower())
             extra = (f", intending to {intent_word} "
@@ -183,10 +198,158 @@ def _format_collision_structured(iv: Dict) -> List[str]:
     return lines
 
 
+def _agent_action_table(
+    agent: Dict,
+    traj_df: Any = None,
+    partner_tid: Optional[int] = None,
+    partner_label: str = "Opposite",
+    map_tracks_csv: Optional[str] = None,
+) -> List[str]:
+    """Detailed kinematics table for human ``description.txt``."""
+    from kinematics_context import format_enriched_action_table
+
+    return format_enriched_action_table(
+        agent,
+        traj_df,
+        partner_tid if agent.get("role") == "ego" else None,
+        partner_label,
+        map_tracks_csv=map_tracks_csv,
+    )
+
+
+def _ego_actions_with_checkpoints_table(
+    action_data: Dict,
+    ego_agent: Dict,
+    traj_df: Any,
+    partner_tid: Optional[int],
+    partner_label: str,
+    map_tracks_csv: Optional[str] = None,
+) -> List[str]:
+    """Single Ego table: action rows + before/after near-miss rows, time-sorted."""
+    if traj_df is None:
+        return _agent_action_table(
+            ego_agent,
+            traj_df=traj_df,
+            partner_tid=partner_tid,
+            partner_label=partner_label,
+            map_tracks_csv=map_tracks_csv,
+        )
+
+    from kinematics_context import enrich_action_row, sample_kinematics_at_time
+
+    def _fmt_num(v, fmt):
+        return "—" if v is None else fmt.format(v)
+
+    rows: List[Tuple[float, str]] = []
+
+    # Action rows.
+    for act in ego_agent.get("actions") or []:
+        st = float(act.get("start_time", 0.0))
+        et = float(act.get("end_time", st))
+        kin = enrich_action_row(
+            act,
+            traj_df,
+            int(ego_agent.get("track_id", 0)),
+            partner_tid,
+            map_tracks_csv=map_tracks_csv,
+        )
+        tspan = f"{st:.1f}s" if abs(st - et) < 1e-6 else f"{st:.1f}–{et:.1f}s"
+        v_cell = _fmt_num(kin.get("v0"), "{:.2f}") if abs(st - et) < 1e-6 else (
+            f"{_fmt_num(kin.get('v0'), '{:.2f}')}→{_fmt_num(kin.get('v1'), '{:.2f}')}"
+        )
+        a_cell = _fmt_num(kin.get("a"), "{:.2f}")
+        if abs(st - et) < 1e-6:
+            h_cell = _fmt_num(kin.get("hdg0"), "{:.1f}")
+            vs_cell = _fmt_num(kin.get("vs0"), "{:+.1f}")
+            vlat_cell = _fmt_num(kin.get("vlat0"), "{:+.2f}")
+        else:
+            h0 = _fmt_num(kin.get("hdg0"), "{:.1f}")
+            h1 = _fmt_num(kin.get("hdg1"), "{:.1f}")
+            dh = _fmt_num(kin.get("d_hdg"), "{:+.1f}")
+            h_cell = f"{h0}→{h1} (Δ{dh})" if h0 != "—" else "—"
+            vs0 = _fmt_num(kin.get("vs0"), "{:+.1f}")
+            vs1 = _fmt_num(kin.get("vs1"), "{:+.1f}")
+            vs_cell = f"{vs0}→{vs1}" if vs0 != "—" or vs1 != "—" else "—"
+            vl0 = _fmt_num(kin.get("vlat0"), "{:+.2f}")
+            vl1 = _fmt_num(kin.get("vlat1"), "{:+.2f}")
+            vlat_cell = f"{vl0}→{vl1}" if vl0 != "—" or vl1 != "—" else "—"
+        d_cell = (
+            f"{_fmt_num(kin.get('d0'), '{:.1f}')}→{_fmt_num(kin.get('d1'), '{:.1f}')}"
+            if kin.get("d1") is not None and abs(st - et) > 1e-6
+            else _fmt_num(kin.get("d0"), "{:.1f}")
+        )
+        az_cell = (
+            f"{_fmt_num(kin.get('az0'), '{:.1f}')}→{_fmt_num(kin.get('az1'), '{:.1f}')}"
+            if kin.get("az1") is not None and abs(st - et) > 1e-6
+            else _fmt_num(kin.get("az0"), "{:.1f}")
+        )
+        row = (
+            f"| {tspan} | {act.get('action')} | {act.get('road_id')} | {act.get('lane_id')} | "
+            f"{v_cell} | {a_cell} | {h_cell} | {vs_cell} | {vlat_cell} | {d_cell} | {az_cell} |"
+        )
+        rows.append((st, row))
+
+    # Checkpoint rows.
+    peak_t = None
+    for iv in action_data.get("interactions") or []:
+        if str(iv.get("type")) in {"NEAR_MISS", "COLLISION"} and iv.get("key_time") is not None:
+            peak_t = float(iv["key_time"])
+            break
+    if peak_t is not None:
+        checkpoints: List[Tuple[str, float]] = [
+            ("2s before", peak_t - 2.0),
+            ("1s before", peak_t - 1.0),
+            ("0.5s before", peak_t - 0.5),
+            ("0.2s before", peak_t - 0.2),
+            ("near-miss", peak_t),
+            ("0.2s after", peak_t + 0.2),
+            ("0.5s after", peak_t + 0.5),
+            ("1s after", peak_t + 1.0),
+        ]
+        for label, t in checkpoints:
+            k = sample_kinematics_at_time(
+                traj_df,
+                track_id=int(ego_agent.get("track_id", 0)),
+                t=t,
+                partner_tid=partner_tid,
+                map_tracks_csv=map_tracks_csv,
+            )
+            if not k:
+                continue
+            row = (
+                f"| {k['t']:.2f}s | {label} | {k.get('road_id','—')} | {k.get('lane_id','—')} | "
+                f"{k.get('v', 0.0):.2f} | {_fmt_num(k.get('a'), '{:.2f}')} | "
+                f"{k.get('hdg', 0.0):.1f} | {_fmt_num(k.get('vs_road'), '{:+.1f}')} | "
+                f"{_fmt_num(k.get('v_lat'), '{:+.2f}')} | "
+                f"{_fmt_num(k.get('d'), '{:.1f}')} | {_fmt_num(k.get('az'), '{:.1f}')} |"
+            )
+            rows.append((float(k["t"]), row))
+
+    rows.sort(key=lambda it: it[0])
+    lines = [
+        "### Ego (car, ego)",
+        "",
+        "_vs road_ = nose heading − local road direction at current position.",
+        "_v_lat_ ≈ v * sin(vs_road): signed lateral speed (+ leftward, − rightward).",
+        "",
+        "| time | action | road | lane | v (m/s) | a (m/s²) | heading (°) | vs road (°) | "
+        f"v_lat (m/s) | d→{partner_label} (m) | az→{partner_label} (°) |",
+        "|------|--------|------|------|---------|----------|-------------|---------------|"
+        "-------------|-------------------|--------------------|",
+    ]
+    lines.extend(r for _, r in rows)
+    lines.append("")
+    return lines
+
+
 def build_description(
     action_data: Dict,
     snapshot_evidence: Optional[str] = None,
+    traj_df: Any = None,
+    map_tracks_csv: Optional[str] = None,
 ) -> str:
+    from kinematics_context import partner_name, primary_partner_track_id
+
     parts: List[str] = []
     loc = action_data.get("location", "unknown")
     dur = action_data.get("duration", "?")
@@ -198,12 +361,45 @@ def build_description(
         )
     parts.append("")
 
-    if snapshot_evidence:
-        parts.append(snapshot_evidence.rstrip())
-        parts.append("")
+    partner_tid = primary_partner_track_id(action_data) if traj_df is not None else None
+    pname = partner_name(action_data, partner_tid)
 
-    # Ego first, then NPCs.
+    # Detailed structured tables with kinematics when trajectory is available.
+    parts.append("## Agent actions")
+    parts.append("")
+    if traj_df is not None and partner_tid is not None:
+        parts.append(
+            f"Ego rows include velocity, accel, heading, and geometry vs "
+            f"**{pname}** (track {partner_tid}) at action start→end."
+        )
+        parts.append("")
     agents = sorted(action_data.get("agents", []), key=lambda a: a["track_id"])
+    for agent in agents:
+        if str(agent.get("role", "")).lower() == "ego":
+            parts.extend(
+                _ego_actions_with_checkpoints_table(
+                    action_data=action_data,
+                    ego_agent=agent,
+                    traj_df=traj_df,
+                    partner_tid=partner_tid,
+                    partner_label=pname,
+                    map_tracks_csv=map_tracks_csv,
+                )
+            )
+        else:
+            parts.extend(
+                _agent_action_table(
+                    agent,
+                    traj_df=traj_df,
+                    partner_tid=partner_tid,
+                    partner_label=pname,
+                    map_tracks_csv=map_tracks_csv,
+                )
+            )
+
+    # Prose narration (human-readable complement to the tables).
+    parts.append("## Narration")
+    parts.append("")
     for agent in agents:
         parts.extend(_narrate_agent(agent))
         parts.append("")
@@ -240,6 +436,10 @@ def build_description(
             parts.append(
                 f"  t={kt:.1f}s: {phrase} with {partner}{_format_interaction_detail(iv)}"
             )
+        parts.append("")
+
+    if snapshot_evidence:
+        parts.append(snapshot_evidence.rstrip())
         parts.append("")
 
     return "\n".join(parts).rstrip() + "\n"

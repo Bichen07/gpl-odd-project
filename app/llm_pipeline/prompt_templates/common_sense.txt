@@ -1,25 +1,70 @@
 <Domain Rules & Glossary>
 
-**Metrics (ground truth when provided)**
-- `d_m` / `d_min`: ego–partner center distance (m).
-- `ttc_s` / `ttc_min`: time-to-collision style metrics from the supplied pack /
-  Payload KPI. Do not recompute alternate formulas unless asked.
-- `relevance_t`: when the partner enters the conflict relevance window.
+**Conflict metrics (authoritative when provided — do not recompute)**
+- `d_min` / `d_m`: ego–partner center distance (m).
+- `ttc_min` / `ttc_s`: time-to-collision from the pack / Payload KPI.
+- `peak_t`: closest approach or collision time.
+- `relevance_t`: partner enters the conflict window.
 - `brake_t`: onset of ego hard brake / sustained decelerate from the action log.
-- `peak_t`: conflict peak (closest approach / collision moment).
-- Dual-panel BEV: left = pair zoom (ego+partner), right = ego ±R m. Use both.
+- Conflict pack window (BEV / context stamps): default **15 s before** peak through
+  **8 s after** peak (asymmetric; captures pre-conflict setup). Legacy ±W if set.
 
-**Ego–oncoming motives (use these labels in CoT when they fit)**
-- Yielding / gap rejection: ego slows or stops to let oncoming clear.
-- Gap acceptance / creep: ego continues into a closing gap (may be late or mis-timed).
-- Late reaction: relevance or peak occurs before meaningful braking completes.
-- Early / anticipatory brake: brake well before relevance; may be cautious or over-cautious.
-- Post-clear recovery: re-accelerate / lane change after the partner has passed.
-- Non-interactive maneuver: speed change for geometry alone (rare here) — say so and skip inventing a partner intent.
+**BEV reading guide (how frames are drawn)**
+- Layout:
+  - Medoid: dual panel — left = pair zoom (ego+partner framed); right = ego ±25 m.
+  - IC synced pair: dual panel — left = cluster A ego ±25 m; right = cluster B ego ±25 m
+    at the **same shared clock** `t` (StartValidCondition clip per trial).
+- Title / filename event token (same rule everywhere): includes burst timing when
+  present, e.g. `0p5s_before_APPROACH_Opposite`, `0p5s_after_POST_Opposite`,
+  `COLLISION_Opposite`. Context lines use the same timing in words
+  (“0.5s before approach phase…”).
+- Agents: Ego = orange box; other vehicles = blue. On-car ID circle = legend ID.
+- Velocity arrows (from vehicle nose): **length ∝ speed**; Ego = dark green;
+  others = cyan/blue. No arrow ≈ stationary / near-zero speed.
+- Past path (trail up to this frame): Ego = orange line; others = blue line.
+- Overlays: top-left legend (ID → role + speed); bottom-left scale bar (m);
+  bottom-right `d=` / `TTC=` chip on conflict/pair panels when available;
+  red road-ID / black lane-ID boxes on highlighted corridor roads.
+- Prefer metrics + context timeline if a BEV overlay is ambiguous.
+
+**Geometry phrases in the trial timeline**
+- Azimuth: partner bearing vs ego heading (°); 0 = ahead, + left, − right, ±180 = behind.
+  Sectors: FRONT ±30°, FRONT LEFT 30–60°, LEFT 60–120°, … ; bands: far≥40 m,
+  moderate 15–40, near 5–15, very close <5.
+- **Δheading**: change in nose yaw (°); + ≈ left (CCW), − ≈ right (CW).
+- **heading vs road direction**: nose heading minus local lane/road tangent at the
+  vehicle position; 0° = nose parallel to road.
+  Sign: `+vs_road` means nose points to road-left; `-vs_road` means nose points to
+  road-right.
+  Do NOT infer severity from angle alone. Use both angle and speed:
+  - lateral speed estimate: `v_lat ≈ v * sin(|vs_road|)` (m/s)
+  - low lateral effect: `v_lat < 0.3 m/s` (often near-parallel / drift)
+  - moderate lateral effect: `0.3–0.8 m/s`
+  - strong lateral effect: `> 0.8 m/s`
+  This avoids the false rule "`|vs_road| <= 5°` is always parallel" at high speed.
+  Not the same as azimuth to another agent.
+
+**Rule-based actions (trust the log; do not invent)**
+- Speed: ACCELERATE / DECELERATE / EMERGENCY_BRAKE / STOPPED.
+- Lane: LANE_CHANGE_LEFT / RIGHT (lane_id change).
+- Same-lane TURN_LEFT / RIGHT: heading change without lane_id change (≥15°, ≥1.5 s).
+- Junction ENTER/EXIT: separate; turn intent there uses a larger junction threshold.
+- COLLISION / NEAR_MISS: partner named in the log (`with_name`).
+- APPROACH_* / POST_*: conflict burst samples around peak (often labeled
+  `Ns before/after` in context and BEV titles).
+
+**Motive labels (use in CoT when they fit)**
+Yield / gap rejection · gap acceptance / creep · late reaction · early brake ·
+post-clear recovery (speed up or same-lane turn after partner passes).
+
+**Wording**
+- Longitudinal: "slow down" / "speed up" / "hard brake" / "maintain speed" +
+  lightly|moderately|severely — never "speed adjustment".
+- Same-lane: "turn left/right (same lane)"; quote Δheading; not a lane change
+  unless LANE_CHANGE_* is present. Ignore junction enter/exit filler for motives.
 
 **Honesty**
-- Collision rate and IC digests are cluster facts; one medoid trial is not the whole cluster.
-- IC mean/std/percentiles are descriptive only — do not invent “safe” vs “risky” parameter bounds.
-- If BEV and metrics disagree, prefer metrics and note the open question.
+- One medoid ≠ whole cluster. IC percentiles are descriptive, not safe/risky bounds.
+- If BEV and metrics disagree, prefer metrics and note uncertainty.
 
 </Domain Rules & Glossary>

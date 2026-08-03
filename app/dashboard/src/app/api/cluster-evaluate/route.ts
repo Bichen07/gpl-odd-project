@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import { resolveClusterArtifact } from "../_lib/clusterPaths";
+import { readYamlDoc } from "../_lib/readYaml";
 
 /**
  * GET /api/cluster-evaluate?batchId=2
@@ -78,8 +80,11 @@ export async function GET(req: NextRequest) {
       .filter(
         (e) => e.isDirectory() && /^cluster\d+$/.test(e.name)
       )) {
-      const cjPath = path.join(runDir, sub.name, "cluster.json");
-      const cj = readJsonSafe(cjPath);
+      const cjPath = resolveClusterArtifact(
+        path.join(runDir, sub.name),
+        "cluster.json",
+      );
+      const cj = cjPath ? readJsonSafe(cjPath) : null;
       if (cj) {
         const clusterBlock = (cj as Record<string, unknown>).cluster as
           | Record<string, unknown>
@@ -95,17 +100,17 @@ export async function GET(req: NextRequest) {
         }
       }
 
-      // Also check for interpretation_meta for intra_consistency_score
-      const metaPath = path.join(runDir, sub.name, "interpretation_meta.json");
-      const meta = readJsonSafe(metaPath);
-      if (meta && clusterIntra) {
-        const label = sub.name.replace("cluster", "");
+      const summaryDoc = readYamlDoc(
+        resolveClusterArtifact(path.join(runDir, sub.name), "cluster_summary.yaml"),
+      );
+      if (summaryDoc) {
+        const label = String(
+          ((cj as Record<string, unknown> | null)?.cluster as Record<string, unknown> | undefined)
+            ?.label ?? sub.name.replace("cluster", ""),
+        );
         const existing = clusterIntra[label] as Record<string, unknown> | undefined;
         if (existing) {
-          existing.intra_consistency_score =
-            (meta as Record<string, unknown>).intra_consistency_score ?? null;
-          existing.cluster_label =
-            (meta as Record<string, unknown>).cluster_label ?? null;
+          existing.cluster_label = summaryDoc.label ?? null;
         }
       }
     }

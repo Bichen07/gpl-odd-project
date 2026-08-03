@@ -59,7 +59,8 @@
     "react-zoom-pan-pinch": "^3.7.0",
     "regl-scatterplot": "./third_party/regl-scatterplot",
     "sass": "^1.86.3",
-    "ts-toolbelt": "^9.6.0"
+    "ts-toolbelt": "^9.6.0",
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@graphql-codegen/cli": "^5.0.2",

@@ -17,20 +17,25 @@ export const SCATTERPLOT_CONTROL_HELP: ReadonlyArray<{
   action: string;
   description: string;
 }> = [
-  { action: "Left click", description: "Select one trajectory trial" },
   {
-    action: "Ctrl + left click",
+    action: "Left click",
     description:
-      "Add or remove a trial from the current selection (does not clear Highlight → Medoid selection)",
+      "Add or remove a trial from the current selection (Highlight role trials stay selected until you clear or uncheck them in Clustering Selection)",
   },
   {
     action: "Left drag",
-    description: "Draw a selection range (lasso) to select multiple trials",
+    description:
+      "Draw a selection range (lasso) and add those trials to the current selection",
   },
   {
-    action: "Ctrl + left drag",
+    action: "Left click background",
     description:
-      "Draw a selection range (lasso) and add/remove those trials to the current selection (does not clear Highlight → Medoid selection)",
+      "Clear the selection in Parameter Space, Trajectory Projection, and Replayer",
+  },
+  {
+    action: "Right click",
+    description:
+      "Set the Replayer camera-follow trial for that trial's cluster (cyan crosshair). On an already-selected point: follow that ego. On an unselected point: add it to the selection and follow. Background / right-drag: no effect. Each cluster keeps its own follow target",
   },
   {
     action: "Middle mouse button drag",
@@ -38,9 +43,9 @@ export const SCATTERPLOT_CONTROL_HELP: ReadonlyArray<{
   },
   { action: "Mouse wheel", description: "Zoom in and out" },
   {
-    action: "White circle marker",
+    action: "Cyan dashed crosshair",
     description:
-      "Medoid trajectory (visual marker only — not auto-selected unless you click it)",
+      "Replayer camera-follow trial (set by right-click; distinct from medoid / outlier / pair markers)",
   },
 ];
 

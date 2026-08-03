@@ -15,6 +15,7 @@ if str(LLM_PKG) not in sys.path:
     sys.path.insert(0, str(LLM_PKG))
 
 from map_plotter import MapPlotter, _coerce_highlight_road_ids
+from conflict_frame_selector import select_action_frames
 from tier2_renderer import (
     _heading_to_degrees,
     build_agent_registry,
@@ -22,9 +23,6 @@ from tier2_renderer import (
     highlight_road_ids_from_df,
     infer_agent_role,
     load_medoids_from_clustering,
-    merge_key_frame_times,
-    pick_critical_timestamps,
-    resolve_key_frames,
     tier2_output_dir,
     view_bounds_from_df,
 )
@@ -81,84 +79,58 @@ def test_extract_action_timestamps_gpl(tmp_path):
 
     semantic = extract_action_timestamps_gpl(path, semantic_only=True)
     labels = {lb for _, lb in semantic}
-    assert "LANE_CHANGE_RIGHT" in labels
-    assert "ENTER_JUNCTION" in labels
+    assert any("LANE_CHANGE_RIGHT" in lb for lb in labels)
+    assert any("ENTER_JUNCTION" in lb for lb in labels)
     assert not any("MAINTAIN_SPEED" in lb for lb in labels)
 
 
-def test_merge_key_frame_times_includes_action_and_heuristic():
+def test_select_action_frames_no_invented_hard_brake():
+    """BEV times must come from action.yaml — never invent HARD_BRAKE from gradient."""
     import pandas as pd
 
-    times = [float(i) * 0.5 for i in range(40)]
+    times = [float(i) * 0.1 for i in range(141)]
     rows = []
     for t in times:
-        rows.append(
-            {
-                "name": "Ego",
-                "time": t,
-                "x": t * 2,
-                "y": 0.0,
-                "h": 0.0,
-                "speed": max(0.0, 10.0 - t),
-                "roadId": 1 if t < 10 else 2,
-            }
-        )
-        rows.append(
-            {
-                "name": "Oncoming",
-                "time": t,
-                "x": 80.0 - t * 2,
-                "y": 0.0,
-                "h": 3.14,
-                "speed": 5.0,
-                "roadId": 1,
-            }
-        )
+        # Noisy speed early (would falsely trip old HARD_BRAKE detector)
+        v = 12.0 + (0.5 if abs(t - 6.1) < 0.05 else 0.0)
+        if t >= 12.9:
+            v = max(3.0, 12.0 - (t - 12.9) * 4.0)
+        rows.append({
+            "name": "Ego", "time": t, "x": 300 + t * 10, "y": 100.0,
+            "h": 0.6, "speed": v, "roadId": 21, "laneId": -1,
+        })
+        rows.append({
+            "name": "Parking", "time": t, "x": 434.0, "y": 150.0,
+            "h": 0.6, "speed": 0.0, "roadId": 21, "laneId": -1,
+        })
     df = pd.DataFrame(rows)
-    action_frames = [(13.13, "ENTER_JUNCTION"), (6.86, "LANE_CHANGE_RIGHT")]
-    merged = merge_key_frame_times(df, times, action_frames, min_gap=0.1)
-    labels = {lb for _, lb in merged}
-    assert "ENTER_JUNCTION" in labels
-    assert "closest_approach" in labels or "start" in labels
-
-
-def test_resolve_key_frames_hybrid_from_yaml(tmp_path):
-    import pandas as pd
-    import yaml
-
-    times = [float(i) for i in range(20)]
-    df = pd.DataFrame(
-        {
-            "name": ["Ego"] * 20,
-            "time": times,
-            "x": [float(i) for i in range(20)],
-            "y": [0.0] * 20,
-            "h": [0.0] * 20,
-            "speed": [5.0] * 20,
-            "roadId": [1] * 20,
-        }
-    )
     action = {
-        "agents": [
-            {
-                "actions": [
-                    {"action": "ENTER_JUNCTION", "start_time": 13.0, "end_time": 13.0},
-                ]
-            }
-        ]
+        "agents": [{
+            "track_id": 0, "name": "Ego", "role": "ego",
+            "actions": [
+                {"action": "DECELERATE", "start_time": 12.9, "end_time": 13.8,
+                 "attributes": {"acceleration": -3.92}},
+                {"action": "COLLISION", "start_time": 14.08, "end_time": 14.08,
+                 "attributes": {"with_name": "Parking", "with_track_id": 2}},
+            ],
+        }, {
+            "track_id": 2, "name": "Parking", "role": "npc",
+            "actions": [
+                {"action": "STOPPED", "start_time": 0.0, "end_time": 14.08},
+            ],
+        }],
+        "interactions": [{
+            "type": "COLLISION", "key_time": 14.08,
+            "with_name": "Parking", "with_track_id": 2,
+        }],
     }
-    yaml_path = tmp_path / "action.yaml"
-    yaml_path.write_text(yaml.safe_dump(action))
-
-    picks = resolve_key_frames(
-        df,
-        times,
-        action_yaml_path=str(yaml_path),
-        key_frame_mode="hybrid",
-        min_gap=0.1,
-    )
-    assert any("ENTER_JUNCTION" in lb for _, lb in picks)
-    assert len(picks) > 1
+    sel = select_action_frames(df, action_data=action, time_steps=times, conflict_window_s=8.0)
+    labels = [f.label for f in sel.frames]
+    assert not any("HARD_BRAKE" in lb for lb in labels)
+    assert not any("MAX_CLOSING" in lb for lb in labels)
+    assert any("DECELERATE" in lb for lb in labels)
+    assert any("COLLISION" in lb for lb in labels)
+    assert all(abs(f.t - 6.1) > 0.05 for f in sel.frames)
 
 
 def test_select_evenly_spaced_snapshots_covers_timeline():
@@ -176,43 +148,6 @@ def test_select_evenly_spaced_snapshots_covers_timeline():
 def test_extract_snapshot_timestamp_from_slug_filename():
     p = "trial_2951_t_13.13_ENTER_JUNCTION.jpg"
     assert extract_snapshot_timestamp(p) == pytest.approx(13.13)
-
-
-def test_pick_critical_timestamps_min_count():
-    import pandas as pd
-
-    times = [float(i) * 0.5 for i in range(40)]
-    rows = []
-    for t in times:
-        rows.append(
-            {
-                "name": "Ego",
-                "time": t,
-                "x": t * 2,
-                "y": 0.0,
-                "h": 0.0,
-                "speed": max(0.0, 10.0 - t),
-                "roadId": 1 if t < 10 else 2,
-            }
-        )
-        rows.append(
-            {
-                "name": "Oncoming",
-                "time": t,
-                "x": 80.0 - t * 2,
-                "y": 0.0,
-                "h": 3.14,
-                "speed": 5.0,
-                "roadId": 1,
-            }
-        )
-    df = pd.DataFrame(rows)
-    picks = pick_critical_timestamps(df, times, max_frames=10, min_gap=0.3)
-    assert len(picks) >= 6
-    labels = {lb for _, lb in picks}
-    assert picks[0] == (0, "start")
-    assert picks[-1][0] == len(times) - 1
-    assert picks[-1][1] == "end"
 
 
 def test_agent_registry_display_ids():

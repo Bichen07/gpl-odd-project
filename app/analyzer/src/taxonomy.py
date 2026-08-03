@@ -55,7 +55,9 @@ class Thresholds:
     # a per-frame acceleration with |a| > CRUISE_BAND is speed_up/slow_down, else
     # cruise (the implicit baseline). This is the xosc-faithful segmentation.
     CRUISE_BAND = 0.05     # m/s² → |a| below this is "cruise" (not a maneuver)
-    EMERGENCY_DECEL = -4.0  # m/s² → a slow_down with mean accel ≤ this ⇒ EMERGENCY_BRAKE
+    EMERGENCY_DECEL = -4.0  # m/s² → slow_down with mean accel ≤ this ⇒ EMERGENCY_BRAKE
+    # (BEV may show a hard-brake frame only when Labeller emits EMERGENCY_BRAKE —
+    # never from an independent gradient threshold.)
     STOPPED_SPEED = 0.3    # m/s  → STOPPED / PARKED
     MIN_EVENT_DURATION = 0.5  # s   → a kept speed segment must last ≥ this (thesis §4.2)
     # Conciseness filters (thesis §4.2 "eliminate spurious or insignificant events").
@@ -79,6 +81,11 @@ class Thresholds:
     ONCOMING_HEADING = 2.2  # rad  → |Δheading| above this ⇒ opposing direction
     TURN_HEADING_DEG = 40.0  # deg → net |Δheading| through a junction ⇒ a turn
     #   (xosc_gen label_route_decisions uses 40°: |Δθ|≤40 ⇒ straight, else turn)
+    # Same-lane / same-road route arcs (swerve, follow curve) — not OpenDRIVE
+    # lane_id changes and not junction passages. Lower threshold than junction
+    # turns: 15° over ≥1.5 s is enough to matter for LLM / BEV packs.
+    SAME_LANE_TURN_DEG = 15.0  # deg → |Δheading| for same-lane TURN_LEFT/RIGHT
+    SAME_LANE_TURN_MIN_S = 1.5  # s   → minimum sustained heading arc
     ROUTE_MIN_DISP = 0.1   # m    → skip a junction passage with displacement below this
     # Interactive Action Detector (composite, multi-agent).
     TTC_NEAR_MISS = 2.5    # s    → TTC below this while closing ⇒ near_miss

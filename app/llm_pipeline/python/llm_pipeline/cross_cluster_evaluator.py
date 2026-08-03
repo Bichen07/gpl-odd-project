@@ -1,6 +1,6 @@
 """cross_cluster_evaluator.py — Phase 6b: Cross-cluster behavioral comparison.
 
-Reads all per-cluster cluster.json + interpretation_meta.json for one
+Reads all per-cluster cluster.json + cluster_summary.yaml for one
 ``<k>_cluster_s=<sil>/`` directory, optionally loads boundary trial
 descriptions, then asks the LLM to rate inter-cluster separation and
 boundary clarity.
@@ -51,26 +51,59 @@ class CrossClusterEval:
     raw_json: str = ""
 
 
+def _narrative_from_yaml(path: Path) -> Dict[str, Any]:
+    """Map cluster_summary.yaml (or medoid) fields into the eval meta shape."""
+    try:
+        import yaml  # type: ignore
+
+        doc = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(doc, dict):
+        return {}
+    return {
+        "cluster_label": doc.get("label"),
+        "behavior_description": doc.get("caption") or doc.get("motive_summary"),
+        "confidence": doc.get("confidence"),
+        "safety_assessment": {
+            "risk_level": doc.get("risk_level"),
+            "failure_mode": doc.get("consistency_note"),
+        },
+    }
+
+
 def _load_cluster_docs(run_dir: Path) -> List[Dict[str, Any]]:
-    """Load cluster.json + interpretation_meta.json for every cluster<N> folder."""
+    """Load cluster.json + narrative YAML for every cluster<N> folder.
+
+    Prefer ``cluster_summary.yaml``; fall back to ``medoid_trial.yaml``.
+    """
     docs: List[Dict[str, Any]] = []
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from cluster_paths import resolve_path  # type: ignore
+
     for cdir in sorted(run_dir.glob("cluster*")):
         if not (cdir.is_dir() and cdir.name[len("cluster"):].isdigit()):
             continue
-        cj = cdir / "cluster.json"
-        mj = cdir / "interpretation_meta.json"
-        if not cj.is_file():
+        cj = resolve_path(cdir, "cluster.json", must_exist=True)
+        if cj is None:
             continue
         try:
             cluster_doc = json.loads(cj.read_text(encoding="utf-8"))
         except Exception:
             continue
         meta: Dict[str, Any] = {}
-        if mj.is_file():
-            try:
-                meta = json.loads(mj.read_text(encoding="utf-8"))
-            except Exception:
-                pass
+        for name in ("cluster_summary.yaml", "medoid_trial.yaml"):
+            yp = resolve_path(cdir, name, must_exist=True)
+            if yp is None:
+                continue
+            meta = _narrative_from_yaml(yp)
+            if meta.get("cluster_label") or meta.get("behavior_description"):
+                break
+            meta = {}
         docs.append({"cluster_doc": cluster_doc, "meta": meta, "cluster_dir": cdir})
     return docs
 
@@ -93,12 +126,23 @@ def _boundary_description_text(run_dir: Path, bp: Dict[str, Any]) -> str:
     cb, tb = bp.get("cluster_b"), bp.get("trial_b")
 
     def _read(cluster_label: Any, trial_id: Any) -> str:
+        import sys
+
+        analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+        if str(analyzer_src) not in sys.path:
+            sys.path.insert(0, str(analyzer_src))
+        from cluster_paths import resolve_highlight_subdir, resolve_path  # type: ignore
+
         cdir = run_dir / f"cluster{cluster_label}"
-        bdir = cdir / f"boundary_c{cb if cluster_label == ca else ca}"
-        for sub in sorted(bdir.glob("trial_*")) if bdir.is_dir() else []:
-            desc = sub / "description.txt"
-            if desc.is_file():
-                return desc.read_text(encoding="utf-8").strip()
+        tgt = cb if cluster_label == ca else ca
+        bdir = resolve_highlight_subdir(cdir, f"boundary_c{tgt}", must_exist=True)
+        for sub in sorted(bdir.glob("trial_*")) if bdir else []:
+            desc = resolve_path(sub, "description.txt", must_exist=True)
+            if desc is None:
+                desc = sub / "description.txt"
+                if not desc.is_file():
+                    continue
+            return desc.read_text(encoding="utf-8").strip()
         return ""
 
     text_a = _read(ca, ta)
