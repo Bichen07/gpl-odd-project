@@ -11,25 +11,16 @@ import { resolveClusterArtifact } from "../_lib/clusterPaths";
 /**
  * GET /api/esmini-trajectory
  *
- * Returns the FULL esmini ground-truth trajectory for a trial, in the Replayer's
- * TrajectoryResponseData shape. This lets any trajectory play the full, un-clipped
- * scenario timeline so it starts at the same initial frame as the CSV / BEV
- * snapshots (the Payload API trajectories are start-clipped and time-rebased).
+ * Returns esmini ground-truth trajectory for a trial, in the Replayer's
+ * TrajectoryResponseData shape. By default applies
+ * ``app/analyzer/config/clip_conditions.yaml`` (analysis-stage clip shared with
+ * LLM timelines). Pass ``applyAnalysisClip=0`` for full post-spawn CSV.
  *
  * The esmini CSV is named esmini_<batch>_<trialIndex>.csv. There are two ways to
  * resolve which CSV to load — pick whichever the caller has on hand:
  *
  *   1. Medoid mode  ?batchId=2&folder=4_cluster_s%3D0.6945&label=0
- *      Reads the medoid's (batch_id, trial_index) from the cluster's cluster.json.
- *      Use this when the caller only knows the cluster, not the esmini index
- *      (cluster.json is the authoritative source for a medoid).
- *
  *   2. Trial mode   ?batchId=2&trialId=3269[&trialIndex=17]
- *      trialIndex (from the trial's esminiDat.filename) is authoritative; when it
- *      is absent we fall back to resolving trialId -> trialIndex via the Payload
- *      REST API (best-effort — clustering trial IDs may not exist in Payload).
- *
- * See ../_lib/esminiTrajectory.ts for why esmini (not Payload obs) is used.
  */
 
 // trialId -> trialIndex, cached for the lifetime of the server process.
@@ -99,6 +90,8 @@ export async function GET(req: NextRequest) {
   const folder = sp.get("folder");
   const label = sp.get("label");
   const framePeriod = Number(sp.get("framePeriod") ?? "0.1") || 0.1;
+  // Default ON: apply clip_conditions.yaml. Pass applyAnalysisClip=0 for full post-spawn.
+  const applyAnalysisClip = sp.get("applyAnalysisClip") !== "0";
 
   if (!batchId || !/^\d+$/.test(batchId)) {
     return NextResponse.json({ error: "valid batchId required" }, { status: 400 });
@@ -152,7 +145,12 @@ export async function GET(req: NextRequest) {
     `esmini_${csvBatch}_${trialIndex}.csv`,
   );
 
-  const result = buildEsminiTrajectory(csvPath, responseTrialId, framePeriod);
+  const result = buildEsminiTrajectory(csvPath, responseTrialId, {
+    framePeriod,
+    applyAnalysisClip,
+    batchId: csvBatch,
+    projectRoot: root,
+  });
   if (result == null) {
     return NextResponse.json(
       { error: `esmini CSV missing or empty: esmini_${csvBatch}_${trialIndex}.csv` },

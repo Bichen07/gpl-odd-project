@@ -491,10 +491,268 @@ const Replayer = () => {
     fetchAndUnzip();
   }, [trajectoryAnalysis]);
 
-  // Keep Payload / analysis-zip trajectories as-is. Those are clipped at
-  // StartValidCondition (startObservationSamplingConditions) and rebased so
-  // t=0 matches Heatmap. Do NOT swap in full esmini CSV here — that reintroduces
-  // the pre-clip approach segment and desyncs captions from the playhead.
+  // ---------------------------------------------------------------------------
+  // Analysis-stage clip from esmini CSV + clip_conditions.yaml
+  // ---------------------------------------------------------------------------
+  // true  = Replayer uses config-clipped CSV (same rule as LLM timelines).
+  // false = keep Payload / analysis-zip only (sim-upload clip).
+  // Toggle by commenting/uncommenting the two lines below:
+  const USE_ANALYSIS_CLIP_CSV = true;
+  // const USE_ANALYSIS_CLIP_CSV = false;
+  //
+  // Switch clip geometry in: app/analyzer/config/clip_conditions.yaml
+  //   active: current_startvalid      # legacy road-92
+  //   # active: analysis_adjustable   # editable world-XY
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!USE_ANALYSIS_CLIP_CSV) {
+      dispatch(batchSlice.actions.setHeatmapClipOffsetSec(0));
+      return undefined;
+    }
+    if (trajectories == null || batchId == null) {
+      return undefined;
+    }
+    let cancelled = false;
+
+    const applyAnalysisClippedCsv = async () => {
+      const patched: NonNullable<typeof trajectories> = {};
+      for (const [egoName, egoTrajs] of Object.entries(trajectories)) {
+        patched[egoName] = { ...egoTrajs };
+      }
+
+      let changed = false;
+      // Offsets are trial-dependent — never take max across trials (overshoots playhead).
+      const offsetsByTrial = new Map<string, number>();
+
+      const ingestEsmini = (
+        egoBucket: Record<string, TrajectoryResponseData>,
+        trialId: string,
+        data: TrajectoryResponseData & {
+          source?: string;
+          heatmapClipOffsetSec?: number;
+        },
+      ) => {
+        egoBucket[trialId] = { ...data, trialId: Number(trialId) };
+        changed = true;
+        const off = Number(data.heatmapClipOffsetSec ?? 0);
+        if (Number.isFinite(off) && off >= 0) {
+          offsetsByTrial.set(String(trialId), off);
+        }
+      };
+
+      const noteOffset = (
+        trialId: string,
+        data: { heatmapClipOffsetSec?: number },
+      ) => {
+        const off = Number(data.heatmapClipOffsetSec ?? 0);
+        if (Number.isFinite(off) && off >= 0) {
+          offsetsByTrial.set(String(trialId), off);
+        }
+      };
+
+      // Medoids from cluster analysis folders
+      if (trajectoryAnalysis != null) {
+        for (const egoName of Object.keys(clusterAnalysisByEgo ?? {})) {
+          const ctx = clusterAnalysisByEgo?.[egoName];
+          if (!ctx?.hasAnalysis && !ctx?.hasPreprocess) continue;
+          const egoBucket = patched[egoName];
+          if (egoBucket == null) continue;
+
+          for (const [label, trialId] of Object.entries(ctx.medoids)) {
+            const existing = egoBucket[trialId] as
+              | (TrajectoryResponseData & {
+                  source?: string;
+                  clipProfile?: string | null;
+                  clipStartEsminiS?: number | null;
+                  heatmapClipOffsetSec?: number;
+                })
+              | undefined;
+            if (existing == null) continue;
+            try {
+              const resp = await fetch(
+                `/api/esmini-trajectory?batchId=${encodeURIComponent(
+                  String(batchId),
+                )}&folder=${encodeURIComponent(
+                  ctx.folder,
+                )}&label=${encodeURIComponent(label)}`,
+              );
+              if (!resp.ok) continue;
+              const data = await resp.json();
+              if (data?.trajectory == null || !Array.isArray(data?.time)) continue;
+              // Skip replace when clip start unchanged (avoids setTrajectories loop).
+              if (
+                existing.source === "esmini" &&
+                Number(data.clipStartEsminiS ?? NaN) ===
+                  Number(existing.clipStartEsminiS ?? NaN) &&
+                Number(data.heatmapClipOffsetSec ?? 0) ===
+                  Number(existing.heatmapClipOffsetSec ?? 0)
+              ) {
+                noteOffset(trialId, data);
+                continue;
+              }
+              ingestEsmini(egoBucket, trialId, data);
+            } catch {
+              /* keep Payload trajectory */
+            }
+          }
+        }
+      }
+
+      // Selected trials (need esminiDat.filename / trialIndex when available)
+      const selectedIds = selectedTrialIds.value ?? [];
+      if (selectedIds.length > 0) {
+        const patchTasks: Promise<void>[] = [];
+        for (const egoName of Object.keys(patched)) {
+          const egoBucket = patched[egoName];
+          if (egoBucket == null) continue;
+          const egoTrials = (
+            trajectoryAnalysis != null
+              ? (trajectoryAnalysis[egoName]?.trials as
+                  | Record<string, Record<string, unknown>>
+                  | undefined)
+              : undefined
+          );
+
+          for (const trialId of selectedIds) {
+            const existing = egoBucket[trialId] as
+              | (TrajectoryResponseData & {
+                  source?: string;
+                  clipStartEsminiS?: number | null;
+                  heatmapClipOffsetSec?: number;
+                })
+              | undefined;
+            if (existing == null) continue;
+
+            const meta = egoTrials?.[trialId] as
+              | { batchId?: string; esminiDat?: { filename?: string }; trialIndex?: number }
+              | undefined;
+            const filename = meta?.esminiDat?.filename ?? "";
+            const m = /esmini_(\d+)_(\d+)\.dat/.exec(filename);
+            const csvBatch = m ? m[1] : (meta?.batchId ?? String(batchId));
+            const csvIndex =
+              m?.[2] ??
+              (meta?.trialIndex != null ? String(meta.trialIndex) : null);
+
+            let url = `/api/esmini-trajectory?batchId=${encodeURIComponent(
+              String(csvBatch),
+            )}&trialId=${encodeURIComponent(trialId)}`;
+            if (csvIndex != null) {
+              url += `&trialIndex=${encodeURIComponent(csvIndex)}`;
+            }
+
+            patchTasks.push(
+              (async () => {
+                try {
+                  const resp = await fetch(url);
+                  if (!resp.ok) return;
+                  const data = await resp.json();
+                  if (data?.trajectory == null || !Array.isArray(data?.time)) {
+                    return;
+                  }
+                  if (
+                    existing.source === "esmini" &&
+                    Number(data.clipStartEsminiS ?? NaN) ===
+                      Number(existing.clipStartEsminiS ?? NaN) &&
+                    Number(data.heatmapClipOffsetSec ?? 0) ===
+                      Number(existing.heatmapClipOffsetSec ?? 0)
+                  ) {
+                    noteOffset(trialId, data);
+                    return;
+                  }
+                  ingestEsmini(egoBucket, trialId, data);
+                } catch {
+                  /* keep Payload */
+                }
+              })(),
+            );
+          }
+        }
+        await Promise.all(patchTasks);
+      }
+
+      // Collect offsets already on trajs (when we skipped fetches).
+      if (offsetsByTrial.size === 0) {
+        for (const egoBucket of Object.values(patched)) {
+          for (const [tid, traj] of Object.entries(egoBucket)) {
+            const off = Number(
+              (traj as { heatmapClipOffsetSec?: number })
+                .heatmapClipOffsetSec ?? 0,
+            );
+            if (Number.isFinite(off) && off > 0) {
+              offsetsByTrial.set(String(tid), off);
+            }
+          }
+        }
+      }
+
+      // Prefer the trial driving the Replayer clock — not max/random batch CSV.
+      const preferredIds = [
+        replayerTraceTrialId,
+        selectedTrialId != null ? String(selectedTrialId) : null,
+        ...(selectedIds.map(String) ?? []),
+      ].filter((x): x is string => x != null && x !== "");
+
+      let chosenOffset = 0;
+      for (const tid of preferredIds) {
+        const off = offsetsByTrial.get(tid) ?? offsetsByTrial.get(String(Number(tid)));
+        if (off != null && Number.isFinite(off)) {
+          chosenOffset = off;
+          break;
+        }
+      }
+      if (chosenOffset === 0 && offsetsByTrial.size > 0) {
+        // Median of known trial offsets (stable vs max which overshoots).
+        const sorted = [...offsetsByTrial.values()].sort((a, b) => a - b);
+        chosenOffset = sorted[Math.floor(sorted.length / 2)] ?? 0;
+      }
+
+      // Fallback API only when we still have nothing (e.g. before trajs load).
+      // Never replace a positive offset with API 0 (batch9 has no esmini_9_*).
+      if (chosenOffset === 0) {
+        try {
+          const resp = await fetch(
+            `/api/heatmap-clip-offset?batchId=${encodeURIComponent(String(batchId))}`,
+            { cache: "no-store" },
+          );
+          if (resp.ok) {
+            const data = (await resp.json()) as {
+              heatmapClipOffsetSec?: number;
+            };
+            const off = Number(data.heatmapClipOffsetSec ?? 0);
+            if (Number.isFinite(off) && off > 0) chosenOffset = off;
+          }
+        } catch {
+          /* keep 0 */
+        }
+      }
+
+      if (!cancelled) {
+        dispatch(batchSlice.actions.setHeatmapClipOffsetSec(chosenOffset));
+        if (changed) {
+          setTrajectories(patched);
+          dispatch(batchSlice.actions.setClipTimeManualOverride(0));
+        }
+      }
+    };
+
+    void applyAnalysisClippedCsv();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    trajectoryAnalysis,
+    trajectories,
+    batchId,
+    clusterAnalysisByEgo,
+    selectedTrialIds,
+    selectedTrialId,
+    replayerTraceTrialId,
+    dispatch,
+  ]);
+
+  // Keep Payload / analysis-zip when USE_ANALYSIS_CLIP_CSV is false.
+  // Analysis-clip mode (above) rebases from raw/clipped esmini CSV using
+  // app/analyzer/config/clip_conditions.yaml so Replayer matches LLM timelines.
 
   const clusterCounter = useMemo(() => {
     let trials: Trial[] = batchTrials;

@@ -1,0 +1,126 @@
+# Analysis-stage observation clip (Replayer + LLM timelines).
+# Does NOT change simulation upload. Applies to raw esmini_*.csv and
+# already-clipped Payload/export CSVs via the same geometric rule.
+#
+# ---------------------------------------------------------------------------
+# HOW TO SWITCH (comment / uncomment ONE active line):
+# ---------------------------------------------------------------------------
+active: current_startvalid
+# active: analysis_adjustable
+#
+# After switching:
+#   1. Reload dashboard (Heatmap playhead follows automatically).
+#   2. Rebuild LLM packs if you need updated context.md / decision timelines.
+#   3. Open Explore Replayer with USE_ANALYSIS_CLIP_CSV=true (see Replayer).
+#
+# Heatmap PNGs stay on the current_startvalid / Payload clock; playhead offset
+# is derived as (active clip − that origin). No second knob to set.
+#
+# NOTE: batch1 / batch2 / batch3 use DIFFERENT routes on the map.
+#   - batch2 (+ batch7–9 drive-out corridor): road 92 / ~(300,58) then NE to ~(492,191)
+#   - batch1: south from ~(-8,58) toward ~(-4,-44) — never hits road 92
+#   - batch3: SE from ~(516,207) toward ~(652,82) — never hits road 92
+# Per-batch overrides below make BOTH profiles work on batches 1–9.
+
+profiles:
+  # Default / "same as now" for the drive-out corridor (batch2 raw + batch7–9).
+  # Primary: road 92, s≈0, +0.1s. Fallback world XY for stripped roadId CSVs.
+  # Batches 1 and 3 override this via batch_overrides (their routes have no road 92).
+  current_startvalid:
+    description: "Legacy StartValid ≈ road 92, s≈0 (+0.1s); world fallback ~(300,58)"
+    type: road_s_with_world_fallback
+    road_id: 92
+    s: 0.0
+    s_tol: 3.0
+    xy_tol_m: 3.0
+    frame_offset_s: 0.1
+    fallback_x: 300.0
+    fallback_y: 58.0
+    fallback_xy_tol_m: 5.0
+
+  # Farther along the drive-out corridor — obvious Replayer jump vs current_startvalid.
+  # Batches 1 / 3 use farther points on THEIR routes (see batch_overrides).
+  analysis_adjustable:
+    description: "Farther world-XY clip (drive-out default ~(420,142))"
+    type: world_xy
+    x: 420.0
+    y: 142.0
+    xy_tol_m: 4.0
+    frame_offset_s: 0.0
+
+# Optional per-map field overlays (merged onto the active profile).
+map_overrides: {}
+
+# Per-batch overlays (merged last). Required because batch1/3 ≠ drive-out path.
+batch_overrides:
+  # batch1: southbound corridor (no road 92)
+  "1":
+    current_startvalid:
+      type: world_xy
+      x: -14.0
+      y: 7.0
+      xy_tol_m: 5.0
+      frame_offset_s: 0.1
+    analysis_adjustable:
+      type: world_xy
+      x: -2.5
+      y: -30.0
+      xy_tol_m: 5.0
+      frame_offset_s: 0.0
+
+  # batch2: drive-out — uses global profiles (road 92 / far 420,142)
+  # (explicit far override kept for clarity)
+  "2":
+    analysis_adjustable:
+      type: world_xy
+      x: 420.0
+      y: 142.0
+      xy_tol_m: 4.0
+      frame_offset_s: 0.0
+
+  # batch3: SE corridor (no road 92)
+  "3":
+    current_startvalid:
+      type: world_xy
+      x: 535.0
+      y: 220.0
+      xy_tol_m: 6.0
+      frame_offset_s: 0.1
+    analysis_adjustable:
+      type: world_xy
+      x: 628.0
+      y: 118.0
+      xy_tol_m: 6.0
+      frame_offset_s: 0.0
+
+  # batch7–9: already-clipped drive-out CSVs (same far gate as batch2)
+  "7":
+    analysis_adjustable:
+      type: world_xy
+      x: 420.0
+      y: 142.0
+      xy_tol_m: 4.0
+      frame_offset_s: 0.0
+  "8":
+    analysis_adjustable:
+      type: world_xy
+      x: 420.0
+      y: 142.0
+      xy_tol_m: 4.0
+      frame_offset_s: 0.0
+  "9":
+    analysis_adjustable:
+      type: world_xy
+      x: 420.0
+      y: 142.0
+      xy_tol_m: 4.0
+      frame_offset_s: 0.0
+
+# batch_id → map_id when CSV header is missing
+batch_map_defaults:
+  "1": hct_6
+  "2": hct_6_no_930
+  "3": hct_6
+  "7": hct_6
+  "8": hct_6
+  "9": hct_6

@@ -221,6 +221,11 @@ export interface BatchState {
 
   clipTimeManualOverride: number | null;
   clipPaused: boolean;
+  /**
+   * Seconds to shift the Heatmap playhead so it matches analysis-stage clip
+   * (clip_conditions.yaml). 0 = heatmap origin == Replayer t=0.
+   */
+  heatmapClipOffsetSec: number;
 
   tree: { [egoName: string]: kdTree<{ [key: string]: number }> };
   treePoints: {
@@ -290,6 +295,7 @@ const initialState: BatchState = {
 
   clipTimeManualOverride: null,
   clipPaused: true,
+  heatmapClipOffsetSec: 0,
 
   tree: {},
   treePoints: {},
@@ -1015,6 +1021,14 @@ export const batchSlice = createSlice({
       action: PayloadAction<typeof initialState.clipPaused>
     ) => {
       state.clipPaused = action.payload;
+    },
+    setHeatmapClipOffsetSec: (
+      state: BatchState,
+      action: PayloadAction<number>
+    ) => {
+      const v = Number(action.payload);
+      state.heatmapClipOffsetSec =
+        Number.isFinite(v) && v > 0 ? v : 0;
     },
   },
 });

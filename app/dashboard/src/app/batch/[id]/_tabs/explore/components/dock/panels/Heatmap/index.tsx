@@ -184,6 +184,51 @@ export default function TrajectoryHeatmap() {
   const heatmapLocalScaleY = useAppSelector(
     (state) => state.batch.heatmapLocalScaleY
   );
+  /** Align Heatmap playhead with analysis clip (clip_conditions.yaml). */
+  const heatmapClipOffsetSec = useAppSelector(
+    (state) => state.batch.heatmapClipOffsetSec
+  );
+  const heatmapClipOffsetRef = useRef(heatmapClipOffsetSec);
+  heatmapClipOffsetRef.current = heatmapClipOffsetSec;
+
+  // Seed offset from YAML when unset. Replayer owns the live per-trial value —
+  // do not overwrite it with a batch-level estimate (or with 0 on batch9 miss).
+  useEffect(() => {
+    const batchId = params?.id;
+    if (batchId == null || batchId === "") return undefined;
+    let cancelled = false;
+    const refresh = async () => {
+      if (heatmapClipOffsetRef.current > 0) return;
+      try {
+        const resp = await fetch(
+          `/api/heatmap-clip-offset?batchId=${encodeURIComponent(String(batchId))}`,
+          { cache: "no-store" },
+        );
+        if (!resp.ok || cancelled) return;
+        const data = (await resp.json()) as {
+          heatmapClipOffsetSec?: number;
+        };
+        if (cancelled) return;
+        const off = Number(data.heatmapClipOffsetSec ?? 0);
+        if (!Number.isFinite(off) || off <= 0) return;
+        if (heatmapClipOffsetRef.current > 0) return;
+        dispatch(batchSlice.actions.setHeatmapClipOffsetSec(off));
+      } catch {
+        /* keep previous offset */
+      }
+    };
+    void refresh();
+    const onFocus = () => {
+      void refresh();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [params?.id, dispatch]);
 
   const batchTrials = useAppSelector((state) => {
     let result: Trial[] = [];
@@ -1493,7 +1538,8 @@ export default function TrajectoryHeatmap() {
                                       height: "100%",
                                       top: `-0.5px`,
                                       left: `calc(${timeOrS === "time"
-                                          ? ((timer ?? 0) /
+                                          ? (((timer ?? 0) +
+                                              heatmapClipOffsetSec) /
                                             (framePeriod ?? 1)) *
                                           resolution
                                           : (globalStroage.sRatio ?? 0) *
@@ -1501,6 +1547,28 @@ export default function TrajectoryHeatmap() {
                                         }px - 0.5px)`,
                                     }}
                                   />
+                                  {/* Mask heatmap columns before analysis clip (Payload origin → new t=0). */}
+                                  {timeOrS === "time" &&
+                                  heatmapClipOffsetSec > 0 ? (
+                                    <Box
+                                      component="div"
+                                      className="analysis_clip_mask"
+                                      sx={{
+                                        position: "absolute",
+                                        top: 0,
+                                        left: 0,
+                                        height: "100%",
+                                        width: `${
+                                          (heatmapClipOffsetSec /
+                                            (framePeriod ?? 1)) *
+                                          resolution
+                                        }px`,
+                                        backgroundColor: "rgba(0,0,0,0.55)",
+                                        pointerEvents: "none",
+                                        zIndex: 1,
+                                      }}
+                                    />
+                                  ) : null}
                                   <Box
                                     component="div"
                                     sx={{

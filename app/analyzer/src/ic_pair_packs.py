@@ -225,41 +225,25 @@ def _snap_time(time_steps: Sequence[float], t: float) -> float:
     return float(arr[int(np.argmin(np.abs(arr - float(t))))])
 
 
-def estimate_clip_start_from_esmini_df(df) -> Optional[float]:
-    """Replayer-aligned t=0: Ego reaches StartValidCondition (road 92, s≈0).
+def estimate_clip_start_from_esmini_df(
+    df,
+    *,
+    map_id: Optional[str] = None,
+    batch_id: Optional[int] = None,
+) -> Optional[float]:
+    """Analysis-stage t=0 from ``app/analyzer/config/clip_conditions.yaml``.
 
     Accepts esmini CSV (``roadId`` / ``name``) or trajectory.csv (``road_id`` /
-    ``trackId``). Same offline estimate as Payload clip rebase.
+    ``trackId``). Same rule as Replayer analysis-clip mode (not a separate guess).
     """
     if df is None or getattr(df, "empty", True):
         return None
     try:
+        from clip_conditions import resolve_clip_start_from_df
         from conflict_frame_selector import _normalize_traj_df
 
         d = _normalize_traj_df(df)
-        road_col = "road_id" if "road_id" in d.columns else (
-            "roadId" if "roadId" in d.columns else None
-        )
-        if road_col is None or "s" not in d.columns:
-            return None
-        if "trackId" in d.columns:
-            ego = d[d["trackId"] == 0].sort_values("time")
-        else:
-            names = d["name"].astype(str).str.strip().str.lower()
-            ego = d[names == "ego"].sort_values("time")
-        if ego.empty:
-            return None
-        tgt_rows = ego[(ego[road_col] == 92) & (ego["s"].abs() <= 3.0)]
-        if tgt_rows.empty:
-            return None
-        tgt = tgt_rows.iloc[0]
-        dx = ego["x"].astype(float) - float(tgt["x"])
-        dy = ego["y"].astype(float) - float(tgt["y"])
-        dist = (dx * dx + dy * dy) ** 0.5
-        hit = ego[dist <= 3.0]
-        if hit.empty:
-            return None
-        return round(float(hit.iloc[0]["time"]) + 0.1, 3)
+        return resolve_clip_start_from_df(d, map_id=map_id, batch_id=batch_id)
     except Exception:
         return None
 

@@ -78,11 +78,10 @@ def resolve_observation_clip_start(trial_id: str) -> Optional[float]:
 
 
 def estimate_clip_start_from_cluster_json(trial_dir: Path) -> Optional[float]:
-    """Offline estimate of Payload clip start from medoid esmini CSV.
+    """Analysis clip start from medoid esmini CSV via ``clip_conditions.yaml``.
 
-    Approximates ``StartValidCondition`` (ReachPosition to first Ego frame on
-    road 92 near s=0, tolerance 3 m) then adds one observation frame (0.1 s) to
-    match Payload's first kept ``esminiSeconds``.
+    Same rule as Replayer analysis-clip / ``ic_pair_packs`` (not a separate
+    road-92 guess).
     """
     cj_path = _resolve(Path(trial_dir), "cluster.json")
     if cj_path is None:
@@ -94,34 +93,20 @@ def estimate_clip_start_from_cluster_json(trial_dir: Path) -> Optional[float]:
     except Exception:
         return None
 
-    # Prefer analyzer helper when importable.
     try:
         from csv_roadid_loader import get_csv_road_data  # type: ignore
+        from clip_conditions import resolve_clip_start_from_df  # type: ignore
 
         df = get_csv_road_data(batch_id, trial_index)
         if df is None or df.empty:
             return None
-        ego = df[df["name"].astype(str).str.lower() == "ego"].sort_values("time")
-        if ego.empty:
-            return None
-        tgt_rows = ego[(ego["roadId"] == 92) & (ego["s"].abs() <= 3.0)]
-        if tgt_rows.empty:
-            return None
-        tgt = tgt_rows.iloc[0]
-        dx = ego["x"].astype(float) - float(tgt["x"])
-        dy = ego["y"].astype(float) - float(tgt["y"])
-        dist = (dx * dx + dy * dy) ** 0.5
-        hit = ego[dist <= 3.0]
-        if hit.empty:
-            return None
-        # Payload first obs ≈ condition fire + one 0.1 s sample tick.
-        return round(float(hit.iloc[0]["time"]) + 0.1, 3)
+        return resolve_clip_start_from_df(df, batch_id=batch_id)
     except Exception:
         return None
 
 
 def load_clip_start(trial_dir: Path, trial_id: Optional[str] = None) -> Optional[float]:
-    """Load clip start from ``clip_time.json``, Payload, or esmini CSV estimate."""
+    """Load clip start from ``clip_time.json``, config+CSV, or Payload fallback."""
     clip_path = Path(trial_dir) / "clip_time.json"
     if clip_path.is_file():
         try:
@@ -130,6 +115,11 @@ def load_clip_start(trial_dir: Path, trial_id: Optional[str] = None) -> Optional
                 return float(data["clip_start_esmini_s"])
         except Exception:
             pass
+
+    # Prefer shared clip_conditions.yaml + esmini CSV (analysis-stage clock).
+    from_csv = estimate_clip_start_from_cluster_json(Path(trial_dir))
+    if from_csv is not None:
+        return from_csv
 
     tid = trial_id
     if not tid:
@@ -146,7 +136,7 @@ def load_clip_start(trial_dir: Path, trial_id: Optional[str] = None) -> Optional
         if from_payload is not None:
             return from_payload
 
-    return estimate_clip_start_from_cluster_json(Path(trial_dir))
+    return None
 
 
 def write_clip_time(
@@ -154,17 +144,18 @@ def write_clip_time(
     clip_start: float,
     *,
     trial_id: Optional[str] = None,
-    source: str = "payload_first_observation",
+    source: str = "clip_conditions.yaml",
 ) -> Path:
     """Persist clip metadata next to medoid artifacts."""
     path = Path(trial_dir) / "clip_time.json"
     doc = {
         "clip_start_esmini_s": round(float(clip_start), 3),
-        "time_origin": "payload_observation_clip",
+        "time_origin": "analysis_clip_conditions",
         "source": source,
         "note": (
-            "t=0 for Replayer/Heatmap/medoid_trial matches first Payload "
-            "observation (StartValidCondition / startObservationSamplingConditions)."
+            "t=0 for Replayer/LLM timelines from app/analyzer/config/"
+            "clip_conditions.yaml applied to esmini CSV (analysis-stage; "
+            "simulation upload unchanged)."
         ),
     }
     if trial_id is not None:
