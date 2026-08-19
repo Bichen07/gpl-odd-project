@@ -80,7 +80,7 @@ def resolve_observation_clip_start(trial_id: str) -> Optional[float]:
 def estimate_clip_start_from_cluster_json(trial_dir: Path) -> Optional[float]:
     """Analysis clip start from medoid esmini CSV via ``clip_conditions.yaml``.
 
-    Same rule as Replayer analysis-clip / ``ic_pair_packs`` (not a separate
+    Same rule as Replayer analysis-clip / ``parameter_space_pair_packs`` (not a separate
     road-92 guess).
     """
     cj_path = _resolve(Path(trial_dir), "cluster.json")
@@ -181,6 +181,10 @@ def rebase_conflict_pack(pack: Dict[str, Any], clip_start: float) -> Dict[str, A
     for key in _TIME_KEYS:
         if key in out:
             out[key] = rebase_seconds(out.get(key), clip_start)
+    if isinstance(out.get("impact"), dict) and "t" in out["impact"]:
+        impact = dict(out["impact"])
+        impact["t"] = rebase_seconds(impact.get("t"), clip_start)
+        out["impact"] = impact
     out["clip_start_esmini_s"] = round(float(clip_start), 3)
     out["time_origin"] = "payload_observation_clip"
     return out
@@ -228,11 +232,21 @@ def _percentile(vals: List[float], q: float) -> Optional[float]:
     return round(float(np.percentile(np.asarray(vals, dtype=float), q)), 3)
 
 
+# TTC KPI ceiling tolerance: values within this of the observed max are
+# treated as "at the look-ahead ceiling" (no live conflict detected), not a
+# literal measured gap. Empirical, not hardcoded to a specific seconds value,
+# because the ceiling is set by Payload's KPI computation, not by us.
+_CEILING_TOL = 1e-3
+
+
 def _ttc_digest(vals: List[float]) -> Dict[str, Any]:
     if not vals:
         return {"n": 0, "mean": None, "std": None, "min": None,
-                "p10": None, "p50": None, "p90": None}
+                "p10": None, "p50": None, "p90": None,
+                "ceiling_estimate": None, "at_ceiling_frac": None}
     arr = np.asarray(vals, dtype=float)
+    ceiling = float(arr.max())
+    at_ceiling = int(np.sum(arr >= ceiling - _CEILING_TOL))
     return {
         "n": int(len(arr)),
         "mean": round(float(arr.mean()), 3),
@@ -241,6 +255,12 @@ def _ttc_digest(vals: List[float]) -> Dict[str, Any]:
         "p10": _percentile(vals, 10),
         "p50": _percentile(vals, 50),
         "p90": _percentile(vals, 90),
+        # Empirical ceiling honesty (Stage A1): when a large share of values
+        # sit at the observed max, that max is very likely the KPI's
+        # look-ahead ceiling (no live conflict found), not a real measured
+        # TTC. Only meaningful when n is not tiny.
+        "ceiling_estimate": round(ceiling, 3),
+        "at_ceiling_frac": round(at_ceiling / len(arr), 3),
     }
 
 
@@ -281,6 +301,7 @@ def build_enriched_cluster_aggregate(
     ttc_collide: List[float] = []
     ttc_survive: List[float] = []
     spret_vals: List[float] = []
+    spret_capped_n = 0
     param_vals: Dict[str, List[float]] = {}
 
     for tid in trial_ids:
@@ -309,6 +330,8 @@ def build_enriched_cluster_aggregate(
                 ttc_here = fval
                 ttc_all.append(fval)
             elif kpi == "spret_min":
+                if fval >= 9.0:
+                    spret_capped_n += 1
                 spret_vals.append(min(fval, 9.0))
         if collided:
             collisions += 1
@@ -344,10 +367,137 @@ def build_enriched_cluster_aggregate(
         "mean_ttc": _ttc_digest(ttc_all).get("mean"),
         "min_ttc": _ttc_digest(ttc_all).get("min"),
         "mean_spret": round(float(np.mean(spret_vals)), 3) if spret_vals else None,
+        # SPrET is code-capped at 9.0 (see `min(fval, 9.0)` above); surface how
+        # much of the mean is sitting at that cap so it reads as "no scaled
+        # encroachment predicted", not "9 is a real measured value".
+        "spret_capped_frac": (
+            round(spret_capped_n / len(spret_vals), 3) if spret_vals else None
+        ),
         "ic": ic,
         "parameter_ranges": parameter_ranges,
         "intra_variance": intra_variance or {},
     }
+
+
+def _bearing_sector(az_deg: float) -> Optional[str]:
+    """Mirror analyzer ``conflict_frame_selector._bearing_sector`` (lazy import,
+    no hard dependency edge from llm_pipeline -> analyzer at module load time).
+    """
+    try:
+        analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+        if str(analyzer_src) not in sys.path:
+            sys.path.insert(0, str(analyzer_src))
+        from conflict_frame_selector import _bearing_sector as _sector  # type: ignore
+
+        return _sector(float(az_deg))
+    except Exception:
+        return None
+
+
+def _frame_metric(frame: Dict[str, Any], key: str, *legacy: str) -> Any:
+    """Read canonical metric key; accept legacy snapshot keys once."""
+    if frame.get(key) is not None:
+        return frame.get(key)
+    for k in legacy:
+        if frame.get(k) is not None:
+            return frame.get(k)
+    return None
+
+
+def _impact_classification(
+    frame: Dict[str, Any], partner_name: Optional[str]
+) -> Optional[Dict[str, Any]]:
+    """Deterministic collision geometry from the COLLISION frame's kinematics.
+
+    Answers "who hit whom, from which angle, at what speed" from the same
+    az/v_ego/v_partner/closing already computed upstream (see
+    ``conflict_frame_selector.SelectedFrame``) but never surfaced to the LLM.
+    This is handed to the LLM as ground truth (not inferred by it) so the
+    medoid/Parameter-space pair prompts can describe collisions precisely instead of
+    guessing from bare distance/ttc numbers.
+    """
+    az = _frame_metric(frame, "az", "az_deg")
+    if az is None:
+        return None
+    az = float(az)
+    sector = _bearing_sector(az)
+    partner = partner_name or "the partner"
+    v_ego = frame.get("v_ego")
+    v_partner = frame.get("v_partner")
+    dv = None
+    if v_ego is not None and v_partner is not None:
+        dv = round(float(v_partner) - float(v_ego), 2)
+
+    # Naming: `striking_vehicle` = the one whose FRONT made contact (the mover
+    # that closed the gap); `struck_vehicle` = the one whose REAR/side was hit.
+    if sector in ("BEHIND", "BEHIND LEFT", "BEHIND RIGHT"):
+        impact_type = "rear-end"
+        striking_vehicle, struck_vehicle = partner, "Ego"
+        detail = f"{partner} approaches from behind (az={az:.1f}°) and strikes Ego's rear."
+    elif sector in ("FRONT", "FRONT LEFT", "FRONT RIGHT"):
+        impact_type = "rear-end"
+        striking_vehicle, struck_vehicle = "Ego", partner
+        detail = f"Ego is trailing {partner} (az={az:.1f}°) and strikes {partner}'s rear."
+    elif sector in ("LEFT", "RIGHT"):
+        impact_type = "side/lateral impact"
+        striking_vehicle = struck_vehicle = None
+        side = "left" if sector == "LEFT" else "right"
+        detail = (
+            f"{partner} contacts Ego's {side} side (az={az:.1f}°) — "
+            f"side-swipe or T-bone geometry, not a straight-line rear-end."
+        )
+    else:
+        impact_type = "unclear"
+        striking_vehicle = struck_vehicle = None
+        detail = f"Ambiguous impact geometry at az={az:.1f}°."
+
+    if dv is not None:
+        faster = partner if dv > 0.1 else ("Ego" if dv < -0.1 else "neither (~equal)")
+        detail += f" At impact v_ego={v_ego:.2f} m/s, v_partner={v_partner:.2f} m/s (faster: {faster})."
+
+    return {
+        "t": frame.get("t"),
+        "partner": partner_name,
+        "az": round(az, 1),
+        "bearing_sector": sector,
+        "d": _frame_metric(frame, "d", "d_m"),
+        "v_ego": v_ego,
+        "v_partner": v_partner,
+        "closing": _frame_metric(frame, "closing", "closing_mps"),
+        "impact_type": impact_type,
+        "striking_vehicle": striking_vehicle,
+        "struck_vehicle": struck_vehicle,
+        "detail": detail,
+    }
+
+
+def apply_collision_detail(parsed: Dict[str, Any], pack: Dict[str, Any]) -> Dict[str, Any]:
+    """Force ``collision_detail`` to match ``pack['impact']`` (deterministic GT).
+
+    The LLM is asked to copy ``impact_type`` / ``struck_by`` / ``bearing_sector``
+    verbatim and only author the one-sentence ``narrative`` — but LLM compliance
+    with "copy this field" instructions is not guaranteed, so the structured
+    fields are overwritten here the same way ``conflict_metrics`` already is.
+    Only the narrative sentence (if the LLM wrote one) is kept as-is.
+    """
+    impact = pack.get("impact") if isinstance(pack, dict) else None
+    if not isinstance(impact, dict):
+        parsed.pop("collision_detail", None)
+        return parsed
+    existing = parsed.get("collision_detail")
+    narrative = None
+    if isinstance(existing, dict):
+        narrative = existing.get("narrative")
+    if not narrative or not isinstance(narrative, str) or not narrative.strip():
+        narrative = impact.get("detail")
+    parsed["collision_detail"] = {
+        "impact_type": impact.get("impact_type"),
+        "striking_vehicle": impact.get("striking_vehicle"),
+        "struck_vehicle": impact.get("struck_vehicle"),
+        "bearing_sector": impact.get("bearing_sector"),
+        "narrative": narrative,
+    }
+    return parsed
 
 
 def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
@@ -357,11 +507,12 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
         "peak_t": None,
         "relevance_t": None,
         "brake_t": None,
-        "d_min": None,
-        "ttc_min": None,
+        "d": None,
+        "ttc": None,
         "partner": None,
         "outcome_hint": None,
         "snapshot_count": 0,
+        "impact": None,
     }
     snap_dir = _resolve(trial_dir, "snapshots")
     snaps_path = (snap_dir / "llm_snapshots.json") if snap_dir is not None else None
@@ -377,21 +528,28 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
         pack["snapshot_count"] = len(frames)
         d_vals, ttc_vals = [], []
         collided = False
+        collision_frame: Optional[Dict[str, Any]] = None
         for fr in frames:
             if not isinstance(fr, dict):
                 continue
-            if fr.get("d_m") is not None:
-                d_vals.append(float(fr["d_m"]))
-            if fr.get("ttc_s") is not None:
-                ttc_vals.append(float(fr["ttc_s"]))
+            d_v = _frame_metric(fr, "d", "d_m")
+            ttc_v = _frame_metric(fr, "ttc", "ttc_s")
+            if d_v is not None:
+                d_vals.append(float(d_v))
+            if ttc_v is not None:
+                ttc_vals.append(float(ttc_v))
             label = str(fr.get("label") or "")
             if "COLLISION" in label.upper():
                 collided = True
+                if collision_frame is None:
+                    collision_frame = fr
         if d_vals:
-            pack["d_min"] = round(min(d_vals), 3)
+            pack["d"] = round(min(d_vals), 3)
         if ttc_vals:
-            pack["ttc_min"] = round(min(ttc_vals), 3)
+            pack["ttc"] = round(min(ttc_vals), 3)
         pack["outcome_hint"] = "collision" if collided else "survive_or_near_miss"
+        if collision_frame is not None:
+            pack["impact"] = _impact_classification(collision_frame, pack["partner"])
 
     action_path = _resolve(trial_dir, "action.yaml")
     if action_path is not None:
@@ -423,10 +581,10 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
                 continue
             typ = str(ix.get("type") or "").upper()
             if typ in ("NEAR_MISS", "COLLISION") or "COLLISION" in typ:
-                if pack.get("ttc_min") is None and ix.get("min_ttc_s") is not None:
-                    pack["ttc_min"] = float(ix["min_ttc_s"])
-                if pack.get("d_min") is None and ix.get("min_distance_m") is not None:
-                    pack["d_min"] = float(ix["min_distance_m"])
+                if pack.get("ttc") is None and ix.get("min_ttc_s") is not None:
+                    pack["ttc"] = float(ix["min_ttc_s"])
+                if pack.get("d") is None and ix.get("min_distance_m") is not None:
+                    pack["d"] = float(ix["min_distance_m"])
                 if "COLLISION" in typ:
                     pack["outcome_hint"] = "collision"
 
@@ -453,9 +611,9 @@ def find_param_boundary_trial_dir(
     run_dir: Path, src_cluster: str, tgt_cluster: str, trial_id: str,
     trial_index_map: Optional[Dict[str, Tuple[int, int]]] = None,
 ) -> Optional[Path]:
-    """Locate IC-pair side pack.
+    """Locate Parameter-space pair side pack.
 
-    Prefer ``ic_pairs/cA-cB/c{src}_trial_<idx>/``; fall back to legacy
+    Prefer ``parameter_space_pairs/cA-cB/c{src}_trial_<idx>/``; fall back to legacy
     ``cluster{src}/highlight_trials/param_boundary_c{tgt}/trial_<idx>/``.
     """
     import sys
@@ -464,9 +622,9 @@ def find_param_boundary_trial_dir(
     if str(analyzer_src) not in sys.path:
         sys.path.insert(0, str(analyzer_src))
     try:
-        from ic_pair_packs import find_ic_pair_side_dir  # type: ignore
+        from parameter_space_pair_packs import find_parameter_space_pair_side_dir  # type: ignore
 
-        found = find_ic_pair_side_dir(
+        found = find_parameter_space_pair_side_dir(
             run_dir, src_cluster, tgt_cluster, trial_id, trial_index_map
         )
         if found is not None:
@@ -494,16 +652,16 @@ def find_param_boundary_trial_dir(
     return None
 
 
-def collect_synced_ic_bev_paths(
+def collect_synced_parameter_space_bev_paths(
     run_dir: Path, cluster_a: Any, cluster_b: Any, max_n: int = 6
 ) -> List[str]:
-    """Peak-aligned pair-zoom|pair-zoom JPGs under ``ic_pairs/cA-cB/synced_bev/``."""
+    """Peak-aligned pair-zoom|pair-zoom JPGs under ``parameter_space_pairs/cA-cB/synced_bev/``."""
     import sys
 
     analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
     if str(analyzer_src) not in sys.path:
         sys.path.insert(0, str(analyzer_src))
-    from ic_pair_packs import pair_pack_dir  # type: ignore
+    from parameter_space_pair_packs import pair_pack_dir  # type: ignore
 
     synced = pair_pack_dir(run_dir, cluster_a, cluster_b) / "synced_bev"
     if not synced.is_dir():
@@ -576,16 +734,35 @@ def format_aggregate_for_prompt(agg: Dict[str, Any]) -> str:
     if tc.get("n"):
         lines.append(
             f"TTC | collided trials: mean={tc.get('mean')}s p50={tc.get('p50')}s "
-            f"n={tc.get('n')}"
+            f"n={tc.get('n')} — expected near 0s: TTC is defined at/through the "
+            "contact frame, this is definitional, not a near-miss-that-failed."
         )
     if ts.get("n"):
         lines.append(
             f"TTC | survived trials: mean={ts.get('mean')}s p50={ts.get('p50')}s "
             f"n={ts.get('n')}"
         )
+        at_ceiling = ts.get("at_ceiling_frac")
+        if at_ceiling is not None and at_ceiling >= 0.2:
+            lines.append(
+                f"  ⚠ {at_ceiling * 100:.0f}% of survived trials sit at/above "
+                f"the observed TTC ceiling ({ts.get('ceiling_estimate')}s) for "
+                "this run — read that as 'no live conflict detected inside the "
+                "KPI look-ahead window', NOT 'a "
+                f"{ts.get('ceiling_estimate')}-second gap'. Do not average this "
+                "ceiling value into a claim about typical conflict tightness."
+            )
     if agg.get("mean_spret") is not None:
+        capped = agg.get("spret_capped_frac")
+        cap_note = (
+            f"; {capped * 100:.0f}% of trials are at the 9.0 cap (code-applied "
+            "ceiling — no scaled encroachment predicted, not a measured 9)"
+            if capped is not None and capped >= 0.2
+            else ""
+        )
         lines.append(
-            f"mean_spret={agg.get('mean_spret')} (secondary KPI; treat as descriptive)"
+            f"mean_spret={agg.get('mean_spret')} (SPrET = Scaled Predictive "
+            "Encroachment Time, secondary KPI; descriptive only" + cap_note + ")"
         )
     for name, d in (agg.get("ic") or {}).items():
         unit = "m/s" if "Speed" in str(name) else ("s" if "Delay" in str(name) else "")
@@ -597,7 +774,8 @@ def format_aggregate_for_prompt(agg: Dict[str, Any]) -> str:
     iv = agg.get("intra_variance") or {}
     if iv:
         lines.append(
-            f"Embedding spread: mean_dist_to_medoid={iv.get('mean_dist_to_medoid')} "
+            f"Embedding spread (FPC/embedding-space units, NOT meters): "
+            f"mean_dist_to_medoid={iv.get('mean_dist_to_medoid')} "
             f"std={iv.get('std_dist_to_medoid')} "
             f"outlier_trial_ids={iv.get('outlier_trial_ids', [])[:3]}"
         )
@@ -607,3 +785,135 @@ def format_aggregate_for_prompt(agg: Dict[str, Any]) -> str:
         "to each other rather than to highway headway lore (e.g. '3 s is safe')."
     )
     return "\n".join(lines)
+
+
+# ─── Stage A2: cross-cluster relative ranking (deterministic, no LLM) ──────
+#
+# A raw absolute number ("survivor TTC p10 = 1.95s") has no universal
+# severity — the same seconds mean different things across scenario families.
+# Telling the LLM that in prose is a soft constraint it can still ignore by
+# falling back on generic priors. The fix computed here is structural: rank
+# every cluster in THIS run against its siblings (same ODD, same scenario
+# family, so the comparison is apples-to-apples by construction) and hand the
+# LLM the precomputed rank sentence instead of asking it to judge magnitude.
+
+# (metric, path-in-aggregate, ascending, label, unit) — ascending=True means
+# "lower is tighter/worse" for a risk framing (TTC, SPrET-margin); collision
+# rate ascending=True means "lower is safer".
+_RELATIVE_METRICS: List[Tuple[str, Tuple[str, ...], bool, str, str]] = [
+    ("collision_rate", ("collision_rate",), True, "collision_rate", "%"),
+    (
+        "ttc_survive_p10",
+        ("ttc_survive", "p10"),
+        True,
+        "survivor TTC p10",
+        "s",
+    ),
+    ("mean_spret", ("mean_spret",), True, "mean_spret", ""),
+]
+
+
+def _get_path(d: Dict[str, Any], path: Tuple[str, ...]) -> Optional[float]:
+    cur: Any = d
+    for key in path:
+        if not isinstance(cur, dict):
+            return None
+        cur = cur.get(key)
+    try:
+        return float(cur) if cur is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _rank_ascending(values: Dict[Any, float]) -> Dict[Any, int]:
+    """1-based rank, ties share the same (lowest) rank."""
+    ordered = sorted(set(values.values()))
+    rank_of_value = {v: i + 1 for i, v in enumerate(ordered)}
+    return {k: rank_of_value[v] for k, v in values.items()}
+
+
+def _ordinal(n: int) -> str:
+    if 10 <= n % 100 <= 20:
+        suffix = "th"
+    else:
+        suffix = {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+    return f"{n}{suffix}"
+
+
+def relative_cluster_digest(
+    aggregates: Dict[Any, Dict[str, Any]],
+) -> Dict[str, str]:
+    """Per-cluster sentence ranking this run's clusters against each other.
+
+    Pure Python / no LLM. Input is every cluster's ``cluster_aggregate.json``
+    dict for the SAME run (same ODD, same scenario family), keyed by cluster
+    label. Output maps ``str(cluster_label) -> sentence`` describing where
+    this cluster ranks on each metric among only its siblings in this run.
+    """
+    labels = list(aggregates.keys())
+    k = len(labels)
+    if k <= 1:
+        only = str(labels[0]) if labels else None
+        return (
+            {only: "Only one cluster in this run — no sibling to rank against."}
+            if only is not None
+            else {}
+        )
+
+    per_metric_values: Dict[str, Dict[Any, float]] = {}
+    per_metric_ranks: Dict[str, Dict[Any, int]] = {}
+    for key, path, ascending, _label, _unit in _RELATIVE_METRICS:
+        vals: Dict[Any, float] = {}
+        for lab in labels:
+            v = _get_path(aggregates[lab], path)
+            if v is not None:
+                vals[lab] = v if ascending else -v
+        if len(vals) < 2:
+            continue
+        per_metric_values[key] = {
+            lab: (vals[lab] if ascending else -vals[lab]) for lab in vals
+        }
+        per_metric_ranks[key] = _rank_ascending(vals)
+
+    out: Dict[str, str] = {}
+    for lab in labels:
+        n_here = 0
+        for key, path, ascending, label, unit in _RELATIVE_METRICS:
+            ranks = per_metric_ranks.get(key)
+            if ranks is None or lab not in ranks:
+                continue
+            n_here = len(ranks)
+            r = ranks[lab]
+            v = per_metric_values[key][lab]
+            n = len(ranks)
+            tie_n = sum(1 for rr in ranks.values() if rr == r)
+            tie_txt = "tied for " if tie_n > 1 else ""
+            sense = "lowest" if r == 1 else ("highest" if r == n else _ordinal(r))
+            qual = ""
+            if key == "ttc_survive_p10":
+                qual = " (tightest)" if r == 1 else (" (loosest)" if r == n else "")
+            elif key == "collision_rate":
+                qual = " (safest)" if r == 1 else (" (riskiest)" if r == n else "")
+            u = f"{unit}" if unit else ""
+            out.setdefault(str(lab), "")
+            piece = (
+                f"{label} ({v:.3g}{u}) is {tie_txt}{sense}{qual} of {n} "
+                "clusters in this run"
+            )
+            out[str(lab)] = (
+                piece if not out[str(lab)] else out[str(lab)] + "; " + piece
+            )
+        if not out.get(str(lab)):
+            out[str(lab)] = (
+                "No comparable metric available across siblings for this "
+                "cluster yet — treat any absolute number below as "
+                "descriptive only, not graded."
+            )
+        else:
+            out[str(lab)] = (
+                out[str(lab)]
+                + f". Read magnitude relative to these {n_here} sibling "
+                "clusters only — not against highway/urban lore or a "
+                "universal seconds threshold."
+            )
+    return out

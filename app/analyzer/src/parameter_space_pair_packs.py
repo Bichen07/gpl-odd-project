@@ -1,8 +1,9 @@
-"""IC closest-pair packs under ``results/.../ic_pairs/cA-cB/``.
+"""Parameter-space closest-pair packs under ``results/.../parameter_space_pairs/cA-cB/``.
 
-Gates pairs by z-scored L2 caliper ``param_dist ≤ IC_PARAM_DIST_TAU``, writes
-per-side trial packs + peak-aligned pair-zoom|pair-zoom BEVs, and removes the
-legacy ``cluster*/highlight_trials/param_boundary_c*`` layout.
+Gates pairs by z-scored L2 caliper ``param_dist ≤ PARAMETER_SPACE_DIST_TAU``, writes
+thin per-side trial dirs (raw + action.yaml) + pack-level ``process/context.md``,
+``synced_bev/``, and ``output/``, and removes the legacy
+``cluster*/highlight_trials/param_boundary_c*`` layout.
 """
 from __future__ import annotations
 
@@ -12,14 +13,79 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-# Z-scored L2 caliper in 2D IC space (OncomingSpeed, OncomingStartDelay).
-IC_PARAM_DIST_TAU = 0.1
+# Z-scored L2 caliper in 2D parameter space (OncomingSpeed, OncomingStartDelay).
+PARAMETER_SPACE_DIST_TAU = 0.1
 
-# Match dataset_builder CLI defaults for IC pair BEVs.
-IC_SNAPSHOT_OUTPUT_PX = 512
-IC_EGO_ZOOM_RADIUS_M = 25.0
-IC_MAX_SYNCED_FRAMES = 18  # wider pre-peak window (−15s) needs more stamps
-IC_REBASE_MERGE_TOL_S = 0.25
+# Match dataset_builder CLI defaults for Parameter-space pair BEVs.
+PARAMETER_SPACE_SNAPSHOT_OUTPUT_PX = 512
+PARAMETER_SPACE_EGO_ZOOM_RADIUS_M = 25.0  # unused fallback; pairs use adaptive d+2 m
+PARAMETER_SPACE_MAX_SYNCED_FRAMES = 18  # wider pre-peak window (−15s) needs more stamps
+PARAMETER_SPACE_REBASE_MERGE_TOL_S = 0.25
+
+
+def _fmt_clearance(val: Any) -> str:
+    """Human-facing minimum distance between vehicle boundaries."""
+    if val is None:
+        return "n/a"
+    try:
+        return f"{float(val):.1f} m"
+    except (TypeError, ValueError):
+        return "n/a"
+
+
+def _fmt_div_reason(div: Dict[str, Any]) -> str:
+    """Use precise human nouns for a persistent geometry difference."""
+    cl = div.get("left_clearance_m")
+    cr = div.get("right_clearance_m")
+    bits: List[str] = []
+    if cl is not None and cr is not None:
+        bits.append(
+            "minimum distance between vehicle boundaries "
+            f"{float(cl):.1f} vs {float(cr):.1f} m"
+        )
+    ll = div.get("left_rel_lat_m")
+    lr = div.get("right_rel_lat_m")
+    if ll is not None and lr is not None:
+        bits.append(
+            "partner lateral position in ego coordinates "
+            f"{float(ll):+.1f} vs {float(lr):+.1f} m"
+        )
+    ps_l = div.get("left_pass_state")
+    ps_r = div.get("right_pass_state")
+    if ps_l and ps_r and ps_l != ps_r:
+        bits.append(f"longitudinal relationship {ps_l} vs {ps_r}")
+    if bits:
+        return "; ".join(bits)
+    return str(div.get("reason") or "geometry")
+
+
+def _gloss_event_label(
+    label: Optional[str],
+    *,
+    t: Optional[float] = None,
+) -> Optional[str]:
+    """Turn action/burst slugs into short readable phrases when possible.
+
+    Uses the same start/end nouns as medoid timelines. Pair times are omitted
+    here because synced-clock ``t`` may not match each side's ``action.yaml``.
+    """
+    if not label:
+        return None
+    try:
+        from conflict_frame_selector import _event_gloss  # type: ignore
+
+        return _event_gloss(str(label), t=t)
+    except Exception:
+        return str(label)
+
+
+def _resolution_phrase(value: Any) -> str:
+    """Readable interaction outcome for a stored resolution code."""
+    return {
+        "pass_first": "Ego passed the partner first",
+        "yield": "Ego yielded and remained behind the partner",
+        "unresolved": "pass/yield order remained unresolved",
+    }.get(str(value), str(value))
 
 
 def pair_folder_name(cluster_a: Any, cluster_b: Any) -> str:
@@ -29,16 +95,245 @@ def pair_folder_name(cluster_a: Any, cluster_b: Any) -> str:
     return f"c{a}-c{b}"
 
 
-def annotate_param_boundary_pairs(
+def write_pair_process_context_md(
+    pack_dir: Path,
+    *,
+    left_cluster: Any,
+    right_cluster: Any,
+    pair_doc: Optional[Dict[str, Any]] = None,
+    max_lines: int = 80,
+) -> Path:
+    """Write ``pack_dir/process/context.md`` from ``synced_bev_index.json``.
+
+    Single shared-clock pair context for the Parameter-space pair LLM (replaces per-trial
+    ``processed/context.md`` under each side).
+    """
+    process_dir = Path(pack_dir) / "process"
+    process_dir.mkdir(parents=True, exist_ok=True)
+    out = process_dir / "context.md"
+    idx_path = Path(pack_dir) / "synced_bev" / "synced_bev_index.json"
+    left_lab, right_lab = f"c{int(left_cluster)}", f"c{int(right_cluster)}"
+
+    header: List[str] = [
+        f"# Parameter-space pair {Path(pack_dir).name}",
+        "",
+        f"Shared-clock comparison of [{left_lab}] vs [{right_lab}].",
+        "t = seconds from each side's own OpenSCENARIO StartValidCondition "
+        "(scenario-start condition) clip "
+        "(same shared t on both sides). Each timeline line spells out: ego and "
+        "partner ground speeds; center-to-center distance; estimated time to "
+        "collision; partner azimuth relative to ego heading; center-distance "
+        "closing/opening rate; partner position in ego coordinates; longitudinal "
+        "relationship; minimum distance between vehicle boundaries; and Ego's "
+        "average speed during the previous 1 second. "
+        "Synced panels share one scale: the larger center-to-center distance "
+        "+ 2 m; each panel is ego-centered with a fixed "
+        "initial-yaw (Replayer) rotation.",
+        "",
+    ]
+    if isinstance(pair_doc, dict):
+        header.extend(
+            [
+                "- **normalized scenario-parameter distance**: "
+                f"{pair_doc.get('param_dist')}",
+                f"- **comparison role**: {pair_doc.get('card_role')}",
+                "- **matched scenario parameters**: "
+                f"{pair_doc.get('param_names')}",
+                f"- **left**: cluster={left_lab}, trial={pair_doc.get('trial_a')}, "
+                f"outcome={'collision' if pair_doc.get('collided_a') else 'safe'}",
+                f"- **right**: cluster={right_lab}, trial={pair_doc.get('trial_b')}, "
+                f"outcome={'collision' if pair_doc.get('collided_b') else 'safe'}",
+                "",
+            ]
+        )
+    header.append("")
+
+    if not idx_path.is_file():
+        header.append(
+            "(no synced_bev_index.json yet — rebuild synced BEVs to populate "
+            "this timeline)"
+        )
+        out.write_text("\n".join(header) + "\n", encoding="utf-8")
+        return out
+
+    try:
+        doc: Dict[str, Any] = json.loads(idx_path.read_text(encoding="utf-8"))
+    except Exception:
+        header.append("(synced_bev_index.json unreadable)")
+        out.write_text("\n".join(header) + "\n", encoding="utf-8")
+        return out
+
+    frames = doc.get("frames") or []
+    geom = doc.get("geometry_summary") or {}
+    if geom:
+        header.extend(
+            [
+                "## Deterministic interaction geometry",
+                "",
+                "- **left rule-based interaction outcome**: "
+                f"{_resolution_phrase(geom.get('left_resolution'))} "
+                "(minimum distance between vehicle boundaries "
+                f"{_fmt_clearance(geom.get('left_min_clearance_m'))})",
+                "- **right rule-based interaction outcome**: "
+                f"{_resolution_phrase(geom.get('right_resolution'))} "
+                "(minimum distance between vehicle boundaries "
+                f"{_fmt_clearance(geom.get('right_min_clearance_m'))})",
+                f"- **near-identical motion**: {geom.get('near_identical_motion')}",
+            ]
+        )
+        div = geom.get("first_persistent_divergence") or {}
+        if div:
+            header.append(
+                f"- **first persistent divergence**: t={div.get('t_s')}s — "
+                f"{_fmt_div_reason(div)}"
+            )
+        else:
+            header.append(
+                "- **first persistent divergence**: none "
+                "(no sustained split in geometry or minimum distance between "
+                "vehicle boundaries)"
+            )
+        header.append(
+            "- Evidence order: ground-truth outcome and minimum vehicle-boundary "
+            "distance → longitudinal relationship / signed geometry → distance "
+            "traveled during the previous 1 second → instantaneous speed. "
+            "Do not treat a single Δv sample or sub-second brake-onset gap as causal "
+            "without persistent geometric separation."
+        )
+        header.append("")
+
+    header.append("## Merged timeline (shared clock)")
+    header.append("")
+
+    if not frames:
+        header.append("(synced_bev_index.json has no frames)")
+        out.write_text("\n".join(header) + "\n", encoding="utf-8")
+        return out
+
+    def _fmt(
+        alive: Optional[bool],
+        label: Optional[str],
+        d: Optional[float],
+        ttc: Optional[float],
+        v_ego: Optional[float],
+        v_partner: Optional[float],
+        az: Optional[float],
+        closing: Optional[float],
+        rel_long: Optional[float] = None,
+        rel_lat: Optional[float] = None,
+        clearance: Optional[float] = None,
+        pass_state: Optional[str] = None,
+        roll_speed: Optional[float] = None,
+        t: Optional[float] = None,
+    ) -> str:
+        if not alive:
+            return "ended (out of frame / clip)"
+        try:
+            from conflict_frame_selector import (  # type: ignore
+                format_side_metric_bits,
+            )
+        except Exception:
+            format_side_metric_bits = None  # type: ignore
+        if format_side_metric_bits is not None:
+            bits = format_side_metric_bits(
+                d=d,
+                ttc=ttc,
+                v_ego=v_ego,
+                v_partner=v_partner,
+                az=az,
+                closing=closing,
+                rel_long_m=rel_long,
+                rel_lat_m=rel_lat,
+                clearance_m=clearance,
+                pass_state=pass_state,
+                rolling_speed_1s_mps=roll_speed,
+            )
+        else:
+            bits = []
+            if v_ego is not None:
+                bits.append(f"ego speed={float(v_ego):.1f} m/s")
+            if v_partner is not None:
+                bits.append(f"partner speed={float(v_partner):.1f} m/s")
+            if d is not None:
+                bits.append(f"center-to-center distance={float(d):.1f} m")
+            if ttc is not None:
+                bits.append(f"estimated time to collision={float(ttc):.1f} s")
+            if clearance is not None:
+                bits.append(
+                    "minimum distance between vehicle boundaries="
+                    f"{float(clearance):.1f} m"
+                )
+        text = " ".join(bits) if bits else "(no metrics at this frame)"
+        gloss = _gloss_event_label(label, t=t)
+        if gloss:
+            text += f" — {gloss}"
+        return text
+
+    def _pick(fr: Dict[str, Any], *keys: str) -> Any:
+        for k in keys:
+            if fr.get(k) is not None:
+                return fr.get(k)
+        return None
+
+    lines = list(header)
+    truncated = len(frames) > max_lines
+    shown = frames[:max_lines] if truncated else frames
+    for fr in shown:
+        t_s = fr.get("t_s")
+        if t_s is None:
+            continue
+        left_txt = _fmt(
+            fr.get("left_alive"),
+            fr.get("left_label"),
+            _pick(fr, "left_d", "left_d_m"),
+            _pick(fr, "left_ttc", "left_ttc_s"),
+            fr.get("left_v_ego"),
+            fr.get("left_v_partner"),
+            _pick(fr, "left_az", "left_az_deg"),
+            _pick(fr, "left_closing", "left_closing_mps"),
+            fr.get("left_rel_long_m"),
+            fr.get("left_rel_lat_m"),
+            fr.get("left_clearance_m"),
+            fr.get("left_pass_state"),
+            fr.get("left_rolling_speed_1s_mps"),
+            t=float(t_s),
+        )
+        right_txt = _fmt(
+            fr.get("right_alive"),
+            fr.get("right_label"),
+            _pick(fr, "right_d", "right_d_m"),
+            _pick(fr, "right_ttc", "right_ttc_s"),
+            fr.get("right_v_ego"),
+            fr.get("right_v_partner"),
+            _pick(fr, "right_az", "right_az_deg"),
+            _pick(fr, "right_closing", "right_closing_mps"),
+            fr.get("right_rel_long_m"),
+            fr.get("right_rel_lat_m"),
+            fr.get("right_clearance_m"),
+            fr.get("right_pass_state"),
+            fr.get("right_rolling_speed_1s_mps"),
+            t=float(t_s),
+        )
+        lines.append(
+            f"- t={float(t_s):.2f}s: [{left_lab}] {left_txt} | "
+            f"[{right_lab}] {right_txt}"
+        )
+    if truncated:
+        lines.append(f"…[{len(frames) - max_lines} more frames omitted]")
+    out.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return out
+
+
+def annotate_parameter_space_pairs(
     pairs: List[Dict[str, Any]],
     *,
-    tau: float = IC_PARAM_DIST_TAU,
+    tau: float = PARAMETER_SPACE_DIST_TAU,
 ) -> List[Dict[str, Any]]:
-    """Tag each closest-pair with ``ic_match`` / ``card_role``.
+    """Tag each closest-pair with ``parameter_space_match`` / ``card_role``.
 
     ``card_role``:
-      - ``primary``   — matched IC + outcome mismatch (why different?)
-      - ``secondary`` — matched IC + same outcome (over-split?)
+      - ``primary``   — matched parameter-space + outcome mismatch (why different?)
+      - ``secondary`` — matched parameter-space + same outcome (over-split?)
       - ``skipped``   — param_dist > tau (not a matched natural experiment)
 
     Also logs an elbow sanity check on sorted distances (does not override tau).
@@ -64,7 +359,7 @@ def annotate_param_boundary_pairs(
         row = dict(bp)
         d = row.get("param_dist")
         matched = isinstance(d, (int, float)) and float(d) <= float(tau)
-        row["ic_match"] = bool(matched)
+        row["parameter_space_match"] = bool(matched)
         row["param_dist_tau"] = float(tau)
         if not matched:
             row["card_role"] = "skipped"
@@ -73,7 +368,7 @@ def annotate_param_boundary_pairs(
             cb = bool(row.get("collided_b"))
             row["card_role"] = "primary" if ca != cb else "secondary"
         out.append(row)
-    n_ok = sum(1 for p in out if p.get("ic_match"))
+    n_ok = sum(1 for p in out if p.get("parameter_space_match"))
     print(
         f"  📐 IC gate: {n_ok}/{len(out)} pairs with param_dist ≤ {tau} "
         f"(primary={sum(1 for p in out if p.get('card_role')=='primary')}, "
@@ -82,12 +377,20 @@ def annotate_param_boundary_pairs(
     return out
 
 
-def ic_pairs_root(run_dir: Path) -> Path:
-    return Path(run_dir) / "ic_pairs"
+def parameter_space_pairs_root(run_dir: Path) -> Path:
+    """Prefer ``parameter_space_pairs/``; fall back to legacy ``ic_pairs/``."""
+    run_dir = Path(run_dir)
+    new = run_dir / "parameter_space_pairs"
+    if new.is_dir():
+        return new
+    legacy = run_dir / "ic_pairs"
+    if legacy.is_dir():
+        return legacy
+    return new
 
 
 def pair_pack_dir(run_dir: Path, cluster_a: Any, cluster_b: Any) -> Path:
-    return ic_pairs_root(run_dir) / pair_folder_name(cluster_a, cluster_b)
+    return parameter_space_pairs_root(run_dir) / pair_folder_name(cluster_a, cluster_b)
 
 
 def side_trial_dir(
@@ -98,14 +401,14 @@ def side_trial_dir(
     return pack_dir / f"c{int(cluster)}_trial_{int(trial_index)}"
 
 
-def find_ic_pair_side_dir(
+def find_parameter_space_pair_side_dir(
     run_dir: Path,
     cluster: Any,
     other_cluster: Any,
     trial_id: str,
     trial_index_map: Optional[Dict[str, Tuple[int, int]]] = None,
 ) -> Optional[Path]:
-    """Resolve ``ic_pairs/cA-cB/c{cluster}_trial_{idx}/`` (new layout)."""
+    """Resolve ``parameter_space_pairs/cA-cB/c{cluster}_trial_{idx}/`` (new layout)."""
     pack = pair_pack_dir(run_dir, cluster, other_cluster)
     if not pack.is_dir():
         return None
@@ -140,7 +443,7 @@ def remove_legacy_param_boundary_dirs(run_dir: Path) -> List[str]:
     return removed
 
 
-def write_ic_trial_context_md(
+def write_parameter_space_trial_context_md(
     trial_dir: Path,
     *,
     cluster: Any,
@@ -155,8 +458,9 @@ def write_ic_trial_context_md(
     conflict_window_before_s: float = 15.0,
     conflict_window_after_s: float = 8.0,
     conflict_window_s: Optional[float] = None,
+    heading: str = "Parameter-space pair trial",
 ) -> Path:
-    """Write ``context.md`` for an IC-pair side (no medoid cluster header)."""
+    """Write ``context.md`` for a pair side (IC or embedding)."""
     from conflict_frame_selector import (
         format_conflict_timeline_sentences,
         _resolve_conflict_windows,
@@ -164,7 +468,7 @@ def write_ic_trial_context_md(
     from cluster_paths import write_path
 
     lines: List[str] = [
-        f"# IC-pair trial — cluster {cluster}",
+        f"# {heading} — cluster {cluster}",
         "",
         f"- **Payload trial id**: {payload_trial_id}",
         f"- **esmini index**: {trial_index}",
@@ -200,6 +504,10 @@ def write_ic_trial_context_md(
         sel_view = _Sel()
         sel_view.frames = frames
         sel_view.partner_name = getattr(selection, "partner_name", None)
+        sel_view.interaction_resolution = getattr(
+            selection, "interaction_resolution", None
+        )
+        sel_view.pass_time = getattr(selection, "pass_time", None)
         lines.append(
             format_conflict_timeline_sentences(
                 sel_view,
@@ -282,8 +590,8 @@ def _merge_rebased_action_times(
     clip_l: float,
     clip_r: float,
     *,
-    merge_tol_s: float = IC_REBASE_MERGE_TOL_S,
-    max_frames: int = IC_MAX_SYNCED_FRAMES,
+    merge_tol_s: float = PARAMETER_SPACE_REBASE_MERGE_TOL_S,
+    max_frames: int = PARAMETER_SPACE_MAX_SYNCED_FRAMES,
 ) -> List[Dict[str, Any]]:
     """Union of both trials' action/conflict stamps on a shared Replayer clock."""
     events: List[Dict[str, Any]] = []
@@ -344,7 +652,7 @@ def _merge_rebased_action_times(
     return clusters
 
 
-def render_synced_ic_pair_bevs(
+def render_synced_parameter_space_pair_bevs(
     *,
     left_df,
     right_df,
@@ -355,11 +663,11 @@ def render_synced_ic_pair_bevs(
     out_dir: Path,
     dataset_name: str,
     xodr_path: Path,
-    snapshot_output_px: int = IC_SNAPSHOT_OUTPUT_PX,
+    snapshot_output_px: int = PARAMETER_SPACE_SNAPSHOT_OUTPUT_PX,
     snapshot_border_frac: float = 0.10,
     typography=None,
-    ego_zoom_radius: float = IC_EGO_ZOOM_RADIUS_M,
-    max_frames: int = IC_MAX_SYNCED_FRAMES,
+    ego_zoom_radius: float = PARAMETER_SPACE_EGO_ZOOM_RADIUS_M,
+    max_frames: int = PARAMETER_SPACE_MAX_SYNCED_FRAMES,
     conflict_window_before_s: float = 15.0,
     conflict_window_after_s: float = 8.0,
     conflict_window_s: Optional[float] = None,
@@ -369,12 +677,12 @@ def render_synced_ic_pair_bevs(
     right_meta_yaml: Optional[Path] = None,
     parser_xodr: Any = None,
 ) -> List[str]:
-    """Write shared-clock ego±R|ego±R JPGs into ``out_dir``.
+    """Write shared-clock ego-centered pair JPGs into ``out_dir``.
 
     One shared time ``t'`` (esmini − StartValidCondition clip per side). Frames =
     action stamps in either side's ``[peak−before, peak+after]`` window
-    (defaults 15 s / 8 s; OR across sides). Panels use ego ±``ego_zoom_radius`` m.
-    Ended side → map-only at last ego-zoom bounds.
+    (defaults 15 s / 8 s; OR across sides). Panels share one adaptive scale
+    ``max(d_left, d_right)+2 m``. Ended side → map-only at last ego-zoom bounds.
     Title: ``t = X.XXs  —  cA_slug; cB_slug``.
     """
     from map_plotter import DEFAULT_BEV_TYPOGRAPHY
@@ -386,6 +694,7 @@ def render_synced_ic_pair_bevs(
         unique_time_steps,
         _ego_position_lookup,
         _agent_position_lookup,
+        _ego_initial_yaw_deg,
         esmini_df_to_trajectory_csv,
         write_meta_yaml,
         highlight_conflict_corridor_roads,
@@ -398,6 +707,9 @@ def render_synced_ic_pair_bevs(
         _pair_series,
         _metrics_at,
         _normalize_traj_df,
+        ego_centered_square_bounds,
+        shared_pair_half_extent,
+        pair_geometry_summary,
     )
 
     if typography is None:
@@ -412,7 +724,7 @@ def render_synced_ic_pair_bevs(
         print("    ⚠️  map tracks missing — synced IC BEVs skipped")
         return []
 
-    zoom_r = float(ego_zoom_radius) if ego_zoom_radius else IC_EGO_ZOOM_RADIUS_M
+    zoom_r = float(ego_zoom_radius) if ego_zoom_radius else PARAMETER_SPACE_EGO_ZOOM_RADIUS_M
 
     renderer = Tier2BevRenderer(
         str(map_tracks),
@@ -441,22 +753,18 @@ def render_synced_ic_pair_bevs(
             return 0.0
         return float(clip)
 
-    def _ego_zoom_bounds(ego_xy) -> Tuple[float, float, float, float]:
-        ex, ey = float(ego_xy[0]), float(ego_xy[1])
-        return (ex - zoom_r, ex + zoom_r, ey - zoom_r, ey + zoom_r)
+    def _panel_caption(label: str, half_m: float) -> str:
+        return f"{label} ego \u00b1{half_m:.0f}m"
 
-    def _last_ego_bounds(side) -> Tuple[float, float, float, float]:
+    def _render_ended_panel(path: str, side, label: str, half_m: float) -> None:
+        """Same BEV panel pipeline as live side; t past end → map only, no cars."""
         ego = side["ego_at"](side["t_max"])
         if ego is not None:
-            return _ego_zoom_bounds(ego)
-        return side["vbounds"]
-
-    def _panel_caption(label: str) -> str:
-        return f"{label} ego \u00b1{zoom_r:.0f}m"
-
-    def _render_ended_panel(path: str, side, label: str) -> None:
-        """Same BEV panel pipeline as live side; t past end → map only, no cars."""
-        bounds = _last_ego_bounds(side)
+            bounds = ego_centered_square_bounds(ego, half_m)
+            center = ego
+        else:
+            bounds = side["vbounds"]
+            center = None
         renderer._render_one_panel(
             path,
             traj_csv=side["traj"],
@@ -464,11 +772,13 @@ def render_synced_ic_pair_bevs(
             highlight=side["highlight"],
             view_bounds=bounds,
             t=float(side["t_max"]) + 10.0,
-            time_label=_panel_caption(label),
+            time_label=_panel_caption(label, half_m),
             draw_labels=True,
             label_anchors=None,
             metric_chip=None,
             label_avoid_xy=None,
+            view_yaw_deg=side.get("yaw_deg"),
+            view_center=center,
         )
 
     def _prep(df, action_yaml: Path, *, traj_src: Optional[Path]):
@@ -482,7 +792,7 @@ def render_synced_ic_pair_bevs(
             conflict_window_before_s=float(conflict_window_before_s),
             conflict_window_after_s=float(conflict_window_after_s),
         )
-        work = Path(tempfile.mkdtemp(prefix="ic_pair_bev_"))
+        work = Path(tempfile.mkdtemp(prefix="parameter_space_pair_bev_"))
         traj = work / "trajectory.csv"
         meta = work / "meta.yaml"
         registry = esmini_df_to_trajectory_csv(df, traj)
@@ -529,6 +839,9 @@ def render_synced_ic_pair_bevs(
             "partner_name": sel.partner_name,
             "partner_tid": partner_tid,
             "series": series,
+            "yaw_deg": _ego_initial_yaw_deg(df),
+            "resolution": getattr(sel, "interaction_resolution", None),
+            "pass_time": getattr(sel, "pass_time", None),
         }
 
     left = _prep(left_df, left_action_yaml, traj_src=left_traj_csv)
@@ -645,11 +958,20 @@ def render_synced_ic_pair_bevs(
             m_r: Dict[str, Any] = {}
 
             if left_alive and ego_l is not None and t_l is not None:
-                bounds_l = _ego_zoom_bounds(ego_l)
                 m_l = _metrics_at(
-                    left["series"], t_l, left["partner_name"], left["partner_tid"]
+                    left["series"], t_l, left["partner_name"], left["partner_tid"],
+                    source_df=left["df"],
                 )
-                chip_l = _metric_chip_text(m_l.get("d_m"), m_l.get("ttc_s"))
+            if right_alive and ego_r is not None and t_r is not None:
+                m_r = _metrics_at(
+                    right["series"], t_r, right["partner_name"], right["partner_tid"],
+                    source_df=right["df"],
+                )
+            half = shared_pair_half_extent(m_l.get("d"), m_r.get("d"))
+
+            if left_alive and ego_l is not None and t_l is not None:
+                bounds_l = ego_centered_square_bounds(ego_l, half)
+                chip_l = _metric_chip_text(m_l.get("d"), m_l.get("ttc"))
                 avoid_l = [ego_l] + ([partner_l] if partner_l else [])
                 renderer._render_one_panel(
                     left_tmp,
@@ -658,21 +980,20 @@ def render_synced_ic_pair_bevs(
                     highlight=left["highlight"],
                     view_bounds=bounds_l,
                     t=t_l,
-                    time_label=_panel_caption(left_label),
+                    time_label=_panel_caption(left_label, half),
                     draw_labels=True,
                     label_anchors=avoid_l,
                     metric_chip=chip_l,
                     label_avoid_xy=avoid_l,
+                    view_yaw_deg=left.get("yaw_deg"),
+                    view_center=ego_l,
                 )
             else:
-                _render_ended_panel(left_tmp, left, left_label)
+                _render_ended_panel(left_tmp, left, left_label, half)
 
             if right_alive and ego_r is not None and t_r is not None:
-                bounds_r = _ego_zoom_bounds(ego_r)
-                m_r = _metrics_at(
-                    right["series"], t_r, right["partner_name"], right["partner_tid"]
-                )
-                chip_r = _metric_chip_text(m_r.get("d_m"), m_r.get("ttc_s"))
+                bounds_r = ego_centered_square_bounds(ego_r, half)
+                chip_r = _metric_chip_text(m_r.get("d"), m_r.get("ttc"))
                 avoid_r = [ego_r] + ([partner_r] if partner_r else [])
                 renderer._render_one_panel(
                     right_tmp,
@@ -681,14 +1002,16 @@ def render_synced_ic_pair_bevs(
                     highlight=right["highlight"],
                     view_bounds=bounds_r,
                     t=t_r,
-                    time_label=_panel_caption(right_label),
+                    time_label=_panel_caption(right_label, half),
                     draw_labels=True,
                     label_anchors=avoid_r,
                     metric_chip=chip_r,
                     label_avoid_xy=avoid_r,
+                    view_yaw_deg=right.get("yaw_deg"),
+                    view_center=ego_r,
                 )
             else:
-                _render_ended_panel(right_tmp, right, right_label)
+                _render_ended_panel(right_tmp, right, right_label, half)
 
             if not compose_dual_bev(left_tmp, right_tmp, str(out_path), title=title):
                 continue
@@ -703,13 +1026,64 @@ def render_synced_ic_pair_bevs(
                     "right_clip_start_s": right["clip"],
                     "left_label": getattr(fr_l, "label", None),
                     "right_label": getattr(fr_r, "label", None),
-                    "left_d_m": m_l.get("d_m"),
-                    "left_ttc_s": m_l.get("ttc_s"),
-                    "right_d_m": m_r.get("d_m"),
-                    "right_ttc_s": m_r.get("ttc_s"),
+                    "camera_half_m": round(float(half), 2),
+                    "left_view_yaw_deg": (
+                        round(float(left["yaw_deg"]), 2)
+                        if left.get("yaw_deg") is not None
+                        else None
+                    ),
+                    "right_view_yaw_deg": (
+                        round(float(right["yaw_deg"]), 2)
+                        if right.get("yaw_deg") is not None
+                        else None
+                    ),
+                    "left_d": m_l.get("d"),
+                    "left_ttc": m_l.get("ttc"),
+                    "left_v_ego": m_l.get("v_ego"),
+                    "left_v_partner": m_l.get("v_partner"),
+                    "left_az": m_l.get("az"),
+                    "left_closing": m_l.get("closing"),
+                    "left_rel_long_m": m_l.get("rel_long_m"),
+                    "left_rel_lat_m": m_l.get("rel_lat_m"),
+                    "left_clearance_m": m_l.get("clearance_m"),
+                    "left_pass_state": m_l.get("pass_state"),
+                    "left_rolling_disp_1s_m": m_l.get("rolling_disp_1s_m"),
+                    "left_rolling_speed_1s_mps": m_l.get("rolling_speed_1s_mps"),
+                    "right_d": m_r.get("d"),
+                    "right_ttc": m_r.get("ttc"),
+                    "right_v_ego": m_r.get("v_ego"),
+                    "right_v_partner": m_r.get("v_partner"),
+                    "right_az": m_r.get("az"),
+                    "right_closing": m_r.get("closing"),
+                    "right_rel_long_m": m_r.get("rel_long_m"),
+                    "right_rel_lat_m": m_r.get("rel_lat_m"),
+                    "right_clearance_m": m_r.get("clearance_m"),
+                    "right_pass_state": m_r.get("pass_state"),
+                    "right_rolling_disp_1s_m": m_r.get("rolling_disp_1s_m"),
+                    "right_rolling_speed_1s_mps": m_r.get("rolling_speed_1s_mps"),
+                    "delta_clearance_m": (
+                        round(float(m_l["clearance_m"]) - float(m_r["clearance_m"]), 3)
+                        if m_l.get("clearance_m") is not None
+                        and m_r.get("clearance_m") is not None
+                        else None
+                    ),
+                    "delta_rel_lat_m": (
+                        round(float(m_l["rel_lat_m"]) - float(m_r["rel_lat_m"]), 3)
+                        if m_l.get("rel_lat_m") is not None
+                        and m_r.get("rel_lat_m") is not None
+                        else None
+                    ),
                     "title": title,
                 }
             )
+        geom = pair_geometry_summary(index)
+        # Prefer trial-level resolution from the full series when available.
+        if left.get("resolution"):
+            geom["left_resolution"] = left["resolution"]
+        if right.get("resolution"):
+            geom["right_resolution"] = right["resolution"]
+        geom["left_pass_time"] = left.get("pass_time")
+        geom["right_pass_time"] = right.get("pass_time")
         (out_dir / "synced_bev_index.json").write_text(
             json.dumps(
                 {
@@ -718,12 +1092,13 @@ def render_synced_ic_pair_bevs(
                         "Single shared t = esmini_t - clip_start per side. "
                         "Frames kept if inside left [peak−before, peak+after] OR "
                         "right same (defaults before=15s, after=8s). "
-                        f"Panels: ego ±{zoom_r:.0f}m. "
+                        "Panels share adaptive scale max(d_L, d_R)+2 m, "
+                        "ego-centered, fixed initial-yaw (Replayer) rotation. "
                         "Ended side = map-only at last ego-zoom bounds."
                     ),
                     "conflict_window_before_s": win_before,
                     "conflict_window_after_s": win_after,
-                    "ego_zoom_radius_m": zoom_r,
+                    "adaptive_margin_m": 2.0,
                     "left_peak_s": round(peak_l, 3),
                     "right_peak_s": round(peak_r, 3),
                     "window_lo_s": round(min(peak_l, peak_r) - win_before, 3),
@@ -732,6 +1107,9 @@ def render_synced_ic_pair_bevs(
                     "right_clip_start_s": right["clip"],
                     "left_t_max_s": left["t_max"],
                     "right_t_max_s": right["t_max"],
+                    "left_view_yaw_deg": left.get("yaw_deg"),
+                    "right_view_yaw_deg": right.get("yaw_deg"),
+                    "geometry_summary": geom,
                     "frames": index,
                 },
                 indent=2,
@@ -745,9 +1123,9 @@ def render_synced_ic_pair_bevs(
     return written
 
 
-def process_ic_pair_packs(
+def process_parameter_space_pair_packs(
     run_dir: Path,
-    param_boundary_pairs: List[Dict[str, Any]],
+    parameter_space_pairs: List[Dict[str, Any]],
     trial_index_map: Dict[str, Tuple[int, int]],
     collision_flags: Optional[Dict[str, bool]],
     trials_meta: Optional[Dict[str, Any]],
@@ -755,19 +1133,19 @@ def process_ic_pair_packs(
     parser_xodr: Any,
     *,
     dataset_name: str = "dataset1",
-    snapshot_output_px: int = IC_SNAPSHOT_OUTPUT_PX,
+    snapshot_output_px: int = PARAMETER_SPACE_SNAPSHOT_OUTPUT_PX,
     snapshot_border_frac: float = 0.10,
     typography=None,
-    ego_zoom_radius: float = IC_EGO_ZOOM_RADIUS_M,
+    ego_zoom_radius: float = PARAMETER_SPACE_EGO_ZOOM_RADIUS_M,
     contact_clearance_m: float = 0.5,
     conflict_relevance_m: float = 5.0,
     conflict_window_s: Optional[float] = None,
     conflict_window_before_s: float = 15.0,
     conflict_window_after_s: float = 8.0,
-    tau: float = IC_PARAM_DIST_TAU,
+    tau: float = PARAMETER_SPACE_DIST_TAU,
     scope: Optional[set] = None,
 ) -> List[Dict[str, Any]]:
-    """Materialize gated IC pairs under ``ic_pairs/cA-cB/`` and drop legacy dirs."""
+    """Materialize gated Parameter-space pairs under ``parameter_space_pairs/cA-cB/`` and drop legacy dirs."""
     from csv_roadid_loader import get_csv_road_data
     from dataset_builder import process_trial_to_dir, cluster_in_scope
     from cluster_paths import resolve_path
@@ -780,7 +1158,7 @@ def process_ic_pair_packs(
         typography = DEFAULT_BEV_TYPOGRAPHY
 
     run_dir = Path(run_dir)
-    annotated = annotate_param_boundary_pairs(param_boundary_pairs, tau=tau)
+    annotated = annotate_parameter_space_pairs(parameter_space_pairs, tau=tau)
     _win_kw = dict(
         conflict_window_s=conflict_window_s,
         conflict_window_before_s=float(conflict_window_before_s),
@@ -788,10 +1166,10 @@ def process_ic_pair_packs(
     )
 
     if scope is not None and len(scope) == 0:
-        print("  ⏭  IC-pair packs skipped")
+        print("  ⏭  Parameter-space pair packs skipped")
         return annotated
 
-    root = ic_pairs_root(run_dir)
+    root = parameter_space_pairs_root(run_dir)
     root.mkdir(parents=True, exist_ok=True)
 
     # Drop legacy flat LLM YAMLs only; pair folders are replaced per matched pair.
@@ -807,13 +1185,13 @@ def process_ic_pair_packs(
 
     built = 0
     for bp in annotated:
-        if not bp.get("ic_match"):
+        if not bp.get("parameter_space_match", bp.get("ic_match")):
             # Remove stale pack if a prior run materialised a far pair
             stale = pair_pack_dir(run_dir, bp["cluster_a"], bp["cluster_b"])
             if stale.is_dir():
                 shutil.rmtree(stale, ignore_errors=True)
             print(
-                f"  ⏭  IC pair c{bp['cluster_a']}↔c{bp['cluster_b']} "
+                f"  ⏭  Parameter-space pair c{bp['cluster_a']}↔c{bp['cluster_b']} "
                 f"param_dist={bp.get('param_dist')} > τ={tau} (skipped)"
             )
             continue
@@ -822,7 +1200,7 @@ def process_ic_pair_packs(
             continue
         ta, tb = str(bp["trial_a"]), str(bp["trial_b"])
         if ta not in trial_index_map or tb not in trial_index_map:
-            print(f"  ⚠️  IC pair {ta}/{tb} missing from index map — skipped")
+            print(f"  ⚠️  Parameter-space pair {ta}/{tb} missing from index map — skipped")
             continue
         ba, tia = trial_index_map[ta]
         bb, tib = trial_index_map[tb]
@@ -839,7 +1217,7 @@ def process_ic_pair_packs(
         right_dir = side_trial_dir(pack, cb, tib)
         role = str(bp.get("card_role") or "primary")
         print(
-            f"  🔹 IC-pair [{role}] c{ca}↔c{cb} param_dist={bp.get('param_dist'):.4f} "
+            f"  🔹 Parameter-space pair [{role}] c{ca}↔c{cb} param_dist={bp.get('param_dist'):.4f} "
             f"→ {pack.relative_to(run_dir)}"
         )
 
@@ -854,6 +1232,7 @@ def process_ic_pair_packs(
             trial_events=_events(ta),
             contact_clearance_m=contact_clearance_m,
             conflict_relevance_m=conflict_relevance_m,
+            thin_parameter_space_side=True,
             **_win_kw,
         )
         ok_r = process_trial_to_dir(
@@ -867,87 +1246,12 @@ def process_ic_pair_packs(
             trial_events=_events(tb),
             contact_clearance_m=contact_clearance_m,
             conflict_relevance_m=conflict_relevance_m,
+            thin_parameter_space_side=True,
             **_win_kw,
         )
         if not (ok_l and ok_r):
             print("    ⚠️  side pack failed — pair incomplete")
             continue
-
-        for side_dir, cl, peer, tid, bi, ti in (
-            (left_dir, ca, cb, ta, ba, tia),
-            (right_dir, cb, ca, tb, bb, tib),
-        ):
-            action_path = resolve_path(side_dir, "action.yaml", must_exist=True)
-            action_data = None
-            selection = None
-            clip_s: Optional[float] = None
-            traj_path = resolve_path(side_dir, "trajectory.csv", must_exist=True)
-            if traj_path and Path(traj_path).is_file():
-                try:
-                    import pandas as pd
-
-                    clip_s = estimate_clip_start_from_esmini_df(pd.read_csv(traj_path))
-                except Exception:
-                    clip_s = None
-            if action_path and action_path.is_file():
-                try:
-                    action_data = _yaml.safe_load(
-                        action_path.read_text(encoding="utf-8")
-                    )
-                except Exception:
-                    action_data = None
-                df = get_csv_road_data(bi, ti)
-                if df is not None and not df.empty:
-                    try:
-                        selection = select_action_frames(
-                            df,
-                            action_yaml_path=str(action_path),
-                            time_steps=unique_time_steps(df),
-                            **_win_kw,
-                        )
-                    except Exception:
-                        selection = None
-            write_ic_trial_context_md(
-                side_dir,
-                cluster=cl,
-                payload_trial_id=tid,
-                trial_index=ti,
-                action_data=action_data,
-                selection=selection,
-                card_role=role,
-                peer_cluster=peer,
-                clip_start_s=clip_s,
-                **_win_kw,
-            )
-            # Persist selection metrics even when per-trial JPGs are skipped
-            # (synced_bev is the visual product).
-            if selection is not None:
-                from cluster_paths import snapshots_dir
-
-                snap_dir = snapshots_dir(side_dir)
-                snap_dir.mkdir(parents=True, exist_ok=True)
-                try:
-                    names = [
-                        f"trial_{ti}_t_{fr.t:.2f}_{fr.title_event()}.jpg"
-                        if hasattr(fr, "title_event")
-                        else (
-                            f"trial_{ti}_t_{fr.t:.2f}_{fr.concise_slug()}.jpg"
-                            if hasattr(fr, "concise_slug")
-                            else f"trial_{ti}_t_{fr.t:.2f}.jpg"
-                        )
-                        for fr in (selection.frames or [])
-                    ]
-                    # Pad/truncate to frames length for zip in to_llm_json
-                    while len(names) < len(selection.frames or []):
-                        names.append(f"trial_{ti}_frame_{len(names)}.jpg")
-                    doc = selection.to_llm_json(
-                        file_prefix=f"trial_{ti}", filenames=names
-                    )
-                    (snap_dir / "llm_snapshots.json").write_text(
-                        json.dumps(doc, indent=2), encoding="utf-8"
-                    )
-                except Exception:
-                    pass
 
         left_df = get_csv_road_data(ba, tia)
         right_df = get_csv_road_data(bb, tib)
@@ -966,7 +1270,7 @@ def process_ic_pair_packs(
             and right_action
         ):
             try:
-                paths = render_synced_ic_pair_bevs(
+                paths = render_synced_parameter_space_pair_bevs(
                     left_df=left_df,
                     right_df=right_df,
                     left_action_yaml=left_action,
@@ -1016,10 +1320,19 @@ def process_ic_pair_packs(
         (pack / "pair.json").write_text(
             json.dumps(pair_doc, indent=2), encoding="utf-8"
         )
+        # Pair-level process/ + output/ (LLM contrast lands in output/).
+        (pack / "output").mkdir(parents=True, exist_ok=True)
+        ctx_path = write_pair_process_context_md(
+            pack,
+            left_cluster=ca,
+            right_cluster=cb,
+            pair_doc=pair_doc,
+        )
+        print(f"    ✓ pair context → {ctx_path.relative_to(pack)}")
         built += 1
 
     removed = remove_legacy_param_boundary_dirs(run_dir)
     if removed:
         print(f"  🧹 Removed {len(removed)} legacy param_boundary folder(s)")
-    print(f"  ✓ Built {built} IC-pair pack(s) under {root}")
+    print(f"  ✓ Built {built} Parameter-space pair pack(s) under {root}")
     return annotated

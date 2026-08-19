@@ -1,6 +1,7 @@
 import type {
   ClusterAnalysisContext,
   ClusterHighlightRole,
+  IcPairInterpretation,
 } from "@/app/batch/[id]/_tabs/explore/redux/slices/batch";
 
 /** Lower = higher priority for the single caption box per cluster window. */
@@ -9,8 +10,8 @@ export const CAPTION_ROLE_PRIORITY: Record<
   number
 > = {
   medoid: 0,
-  boundary: 1, // Closest pair (emb)
-  param_boundary: 2, // Closest pair (IC)
+  boundary: 1, // Closest pair (trajectory projection)
+  param_boundary: 2, // Closest pair (parameter space)
   outlier: 3,
   trial: 4,
 };
@@ -25,11 +26,14 @@ export type ReplayerClusterCaption = {
   trialId: string;
   role: ReplayerCaptionRole;
   /**
-   * Medoid LLM ego timeline only. Empty for pair / outlier / plain trial
-   * so the box shows kinematics without event text.
+   * Timed event list for EgoTimelineBox.
+   * Medoid: decision_timeline. Parameter-space pair: contrast_timeline phases.
    */
   summary: unknown;
+  /** Long-form narrative button body (motive_summary or contrast_explanation). */
   motiveSummary: string | null;
+  /** Button / dialog label: medoid motive vs IC contrast. */
+  narrativeKind: "motive" | "contrast" | null;
 };
 
 function clusterName(
@@ -70,6 +74,59 @@ function pairOtherCluster(
   return null;
 }
 
+/** Canonical pack folder ``c{lo}-c{hi}`` for an IC boundary trial. */
+export function icPairFolderForTrial(
+  clusterLabel: string,
+  trialId: string,
+  pairs: Array<{
+    cluster_a: number | string;
+    trial_a: string;
+    cluster_b: number | string;
+    trial_b: string;
+  }>,
+): string | null {
+  const label = String(clusterLabel);
+  const tid = String(trialId);
+  for (const bp of pairs) {
+    const a = Number(bp.cluster_a);
+    const b = Number(bp.cluster_b);
+    if (
+      (String(bp.trial_a) === tid && String(bp.cluster_a) === label) ||
+      (String(bp.trial_b) === tid && String(bp.cluster_b) === label)
+    ) {
+      const lo = Math.min(a, b);
+      const hi = Math.max(a, b);
+      return `c${lo}-c${hi}`;
+    }
+  }
+  return null;
+}
+
+/** Map contrast_timeline phases → EgoTimelineBox events (use t_start). */
+export function contrastTimelineToSummary(raw: unknown): unknown[] {
+  if (!Array.isArray(raw)) return [];
+  const out: unknown[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const o = entry as Record<string, unknown>;
+    const tStart = o.t_start ?? o.timestamp ?? o.t;
+    const tEnd = o.t_end;
+    const interp = o.interpretation ?? o.description ?? o.text;
+    if (tStart == null || interp == null) continue;
+    const tNum = Number(tStart);
+    if (!Number.isFinite(tNum)) continue;
+    const range =
+      tEnd != null && Number.isFinite(Number(tEnd))
+        ? `t=${tNum}–${Number(tEnd)}`
+        : `t=${tNum}`;
+    out.push({
+      timestamp: tNum,
+      description: `${range}: ${String(interp).trim()}`,
+    });
+  }
+  return out;
+}
+
 function primaryRole(
   roles: ClusterHighlightRole[] | undefined,
 ): ClusterHighlightRole | "trial" {
@@ -97,8 +154,8 @@ function buildTitle(
       ctx?.boundaryPairs ?? [],
     );
     return other != null
-      ? `${base}, Closest pair c${clusterLabel} to c${other}`
-      : `${base}, Closest pair (emb)`;
+      ? `${base}, Closest pair (trajectory projection) c${clusterLabel} to c${other}`
+      : `${base}, Closest pair (trajectory projection)`;
   }
   if (role === "param_boundary") {
     const other = pairOtherCluster(
@@ -107,8 +164,8 @@ function buildTitle(
       ctx?.paramBoundaryPairs ?? [],
     );
     return other != null
-      ? `${base}, Closest pair (IC) c${clusterLabel} to c${other}`
-      : `${base}, Closest pair (IC)`;
+      ? `${base}, Closest pair (parameter space) c${clusterLabel} to c${other}`
+      : `${base}, Closest pair (parameter space)`;
   }
   if (role === "outlier") {
     return `${base}, Outlier`;
@@ -120,11 +177,12 @@ function buildTitle(
  * Pick one caption per cluster window.
  *
  * Priority (if several selected trials fall in this cluster):
- *   medoid > Closest pair (emb) > Closest pair (IC) > Outlier > other trial
+ *   medoid > Closest pair (trajectory projection) > Closest pair (parameter space) > Outlier > other trial
  *
  * - Highlight mode: only trials with roles (or in selection) for this cluster.
  * - Non-highlight multi-select: first selected trial that belongs to this cluster.
- * - Event / motive text only for medoid (LLM summary).
+ * - Event / narrative text for medoid (decision_timeline) and Parameter-space pair
+ *   (contrast_timeline / contrast_explanation).
  */
 export function resolveReplayerClusterCaption(args: {
   clusterLabel: string;
@@ -187,19 +245,59 @@ export function resolveReplayerClusterCaption(args: {
   );
 
   const interp = ctx?.interpretations?.[clusterLabel];
-  const isMedoid = winner.role === "medoid";
+
+  if (winner.role === "medoid") {
+    const motive =
+      typeof interp?.motive_summary === "string" && interp.motive_summary.trim()
+        ? interp.motive_summary
+        : null;
+    return {
+      label: clusterLabel,
+      title,
+      trialId: winner.trialId,
+      role: winner.role,
+      summary: interp?.ego_perspective_summary ?? [],
+      motiveSummary: motive,
+      narrativeKind: motive ? "motive" : null,
+    };
+  }
+
+  if (winner.role === "param_boundary") {
+    const folder = icPairFolderForTrial(
+      clusterLabel,
+      winner.trialId,
+      ctx?.paramBoundaryPairs ?? [],
+    );
+    const ic: IcPairInterpretation | undefined = folder
+      ? ctx?.icPairInterpretations?.[folder]
+      : undefined;
+    const summary = contrastTimelineToSummary(ic?.contrast_timeline);
+    const explanation =
+      typeof ic?.contrast_explanation === "string" &&
+      ic.contrast_explanation.trim()
+        ? ic.contrast_explanation
+        : typeof ic?.separation_reason === "string" &&
+            ic.separation_reason.trim()
+          ? ic.separation_reason
+          : null;
+    return {
+      label: clusterLabel,
+      title,
+      trialId: winner.trialId,
+      role: winner.role,
+      summary,
+      motiveSummary: explanation,
+      narrativeKind: explanation ? "contrast" : null,
+    };
+  }
 
   return {
     label: clusterLabel,
     title,
     trialId: winner.trialId,
     role: winner.role,
-    summary: isMedoid ? (interp?.ego_perspective_summary ?? []) : [],
-    motiveSummary:
-      isMedoid &&
-      typeof interp?.motive_summary === "string" &&
-      interp.motive_summary.trim()
-        ? interp.motive_summary
-        : null,
+    summary: [],
+    motiveSummary: null,
+    narrativeKind: null,
   };
 }

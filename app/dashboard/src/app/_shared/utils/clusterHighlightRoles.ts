@@ -14,9 +14,9 @@ export const CLUSTER_HIGHLIGHT_STYLE: Record<
   }
 > = {
   medoid: { label: "Medoid", color: "#FFD54F", shape: "circle" },
-  boundary: { label: "Closest pair (emb)", color: "#0659cc", shape: "diamond" },
+  boundary: { label: "Closest pair (trajectory projection)", color: "#0659cc", shape: "diamond" },
   param_boundary: {
-    label: "Closest pair (IC)",
+    label: "Closest pair (parameter space)",
     color: "#186b1b",
     shape: "square",
   },

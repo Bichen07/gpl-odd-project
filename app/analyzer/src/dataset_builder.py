@@ -5,7 +5,7 @@ Auto-ensures shared map assets under ``results/map/`` (via ``map_assets``), then
 for each cluster medoid generates nested pack layout::
 
   clusterN/raw/{trajectory.csv,cluster.json}
-  clusterN/processed/{action.yaml,description.txt,context.md,snapshots/,map_overview.jpg}
+  clusterN/processed/{action.yaml,description.txt,context_medoid.md,context_cluster.md,snapshots/,map_overview.jpg}
   clusterN/output/   # LLM YAMLs (medoid_trial / cluster_summary / shim)
 
 Examples::
@@ -14,6 +14,7 @@ Examples::
   python3 app/analyzer/src/dataset_builder.py --batch-id 2 --k 4
   python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only
   python3 app/analyzer/src/dataset_builder.py --batch-id 2 --from-run results/batch2/4_cluster
+  python3 app/analyzer/src/dataset_builder.py --rebuild-context-texts results/batch8/3_cluster_s=0.8032
 
 Output: results/batch<id>/<k>_cluster_s=<silhouette>/cluster<label>/
 """
@@ -61,6 +62,68 @@ PROJECT_ROOT = REPO_ROOT
 
 # Payload API endpoint (Note: docker-compose maps container port 3000 to host port 3020)
 PAYLOAD_API = os.getenv("PAYLOAD_API_URL", "http://localhost:3020")
+
+
+CSV_INDEX_SIDECAR = (
+    PROJECT_ROOT / "simulation/ros/.cache/scenario_search/records/trial_csv_index_map.json"
+)
+
+
+def _load_csv_index_sidecar() -> Dict[str, Tuple[int, int]]:
+    """Load trialId → (batch_id, csv_index) written by the paper materializer.
+
+    Payload appends ``-N`` to an uploaded filename when it collides with an
+    existing one, so ``esminiDat.filename`` alone cannot identify a trial's CSV:
+    in Case Study 3, 3869 trials carry only 2129 distinct embedded indices. The
+    materializer therefore allocates a unique index per trial and records it
+    here; this map takes precedence over parsing the filename.
+    """
+    if not CSV_INDEX_SIDECAR.is_file():
+        return {}
+    try:
+        raw = json.loads(CSV_INDEX_SIDECAR.read_text())
+    except Exception as exc:
+        print(f"  ⚠️  Could not read {CSV_INDEX_SIDECAR.name}: {exc}")
+        return {}
+    out: Dict[str, Tuple[int, int]] = {}
+    for batch_id, entries in (raw or {}).items():
+        if not isinstance(entries, dict):
+            continue
+        for tid, idx in entries.items():
+            try:
+                out[str(tid)] = (int(batch_id), int(idx))
+            except (TypeError, ValueError):
+                continue
+    return out
+
+
+def _build_trial_index_map(trials_meta: Dict[str, Any]) -> Dict[str, Tuple[int, int]]:
+    """Resolve trialId → (batch_id, csv_index) for every trial we can place.
+
+    Sidecar entries win; trials absent from it fall back to an unsuffixed
+    ``esmini_<batch>_<index>.dat`` filename, which is unambiguous by definition.
+    """
+    dat_pat = re.compile(r"esmini_(\d+)_(\d+)\.dat$")
+    sidecar = _load_csv_index_sidecar()
+    out: Dict[str, Tuple[int, int]] = {}
+    n_sidecar = 0
+    for tid, t_info in (trials_meta or {}).items():
+        tid = str(tid)
+        if tid in sidecar:
+            out[tid] = sidecar[tid]
+            n_sidecar += 1
+            continue
+        if not isinstance(t_info, dict):
+            continue
+        edat = t_info.get("esminiDat")
+        if not isinstance(edat, dict):
+            continue
+        m = dat_pat.match(str(edat.get("filename") or ""))
+        if m:
+            out[tid] = (int(m.group(1)), int(m.group(2)))
+    if n_sidecar:
+        print(f"  Resolved {n_sidecar} trial→CSV indices from {CSV_INDEX_SIDECAR.name}")
+    return out
 
 
 def _build_csv_trial_mapping() -> Dict[str, Tuple[int, int]]:
@@ -914,22 +977,11 @@ def load_clustering_from_payload_save(
             if len(candidates) > 1:
                 print(f"  ({len(candidates)} candidates with k={k} evaluated)")
 
-    # 7. Build trial_index_map from esminiDat.filename
-    _DAT_PAT = re.compile(r"esmini_(\d+)_(\d+)\.dat")
-    trial_index_map: Dict[str, Tuple[int, int]] = {}
+    # 7. Build trial_index_map (sidecar first, then unsuffixed esminiDat.filename)
     trials_meta = ego_data.get("trials", {})
-    for tid, t_info in trials_meta.items():
-        if not isinstance(t_info, dict):
-            continue
-        edat = t_info.get("esminiDat")
-        if not isinstance(edat, dict):
-            continue
-        fname = edat.get("filename", "")
-        m = _DAT_PAT.match(fname)
-        if m:
-            trial_index_map[str(tid)] = (int(m.group(1)), int(m.group(2)))
+    trial_index_map = _build_trial_index_map(trials_meta)
 
-    print(f"  Built trial→CSV map for {len(trial_index_map)} trials from esminiDat filenames.")
+    print(f"  Built trial→CSV map for {len(trial_index_map)} of {len(trials_meta)} trials.")
 
     # 8. Shape return values to match load_clustering_data() contract
     embeddings_data = {"embeddings": scores}
@@ -1069,7 +1121,7 @@ def compute_intra_variance_and_boundaries(
         intra_by_cluster: label_str → {mean_dist_to_medoid, std_dist_to_medoid,
                                         max_dist_to_medoid, outlier_trial_ids,
                                         outlier_collision, boundary_neighbors, n_members}
-        boundary_pairs:   sorted list of {cluster_a, trial_a, …, cluster_b, trial_b,
+        trajectory_projection_pairs:   sorted list of {cluster_a, trial_a, …, cluster_b, trial_b,
                                            …, embedding_dist} dicts (closest first)
     """
     embeddings_dict = embeddings_data.get("embeddings", {})
@@ -1133,7 +1185,7 @@ def compute_intra_variance_and_boundaries(
 
     # Cross-cluster boundary pairs: for each (A, B) find the nearest trial pair
     # across the cluster boundary (smallest L2 distance in embedding space).
-    boundary_pairs: List[Dict[str, Any]] = []
+    trajectory_projection_pairs: List[Dict[str, Any]] = []
     processed: set = set()
 
     for a in unique_labels:
@@ -1158,7 +1210,7 @@ def compute_intra_variance_and_boundaries(
             dist_a = round(float(np.linalg.norm(X_a[ia] - cluster_centroids[a])), 4)
             dist_b = round(float(np.linalg.norm(X_b[ib] - cluster_centroids[b])), 4)
 
-            boundary_pairs.append({
+            trajectory_projection_pairs.append({
                 "cluster_a": a,
                 "trial_a": ta,
                 "dist_a_to_centroid": dist_a,
@@ -1172,12 +1224,12 @@ def compute_intra_variance_and_boundaries(
             intra_by_cluster[str(a)]["boundary_neighbors"][str(b)] = ta
             intra_by_cluster[str(b)]["boundary_neighbors"][str(a)] = tb
 
-    boundary_pairs.sort(key=lambda p: p["embedding_dist"])
+    trajectory_projection_pairs.sort(key=lambda p: p["embedding_dist"])
 
-    n_bp = len(boundary_pairs)
+    n_bp = len(trajectory_projection_pairs)
     print(f"  📐 Intra-variance computed for {len(unique_labels)} clusters, "
           f"{n_bp} boundary pair(s)")
-    return intra_by_cluster, boundary_pairs
+    return intra_by_cluster, trajectory_projection_pairs
 
 
 def _build_trial_parameter_matrix(
@@ -1266,7 +1318,7 @@ def compute_parameter_space_boundaries(
     """Closest cross-cluster trial pairs in Parameter Space (initial conditions).
 
     Distance is L2 on z-scored scenario parameters (e.g. OncomingStartDelay,
-    OncomingSpeed). Separate from MFPCA embedding ``boundary_pairs``.
+    OncomingSpeed). Separate from MFPCA embedding ``trajectory_projection_pairs``.
     """
     trial_ids, X, labels_arr, param_names = _build_trial_parameter_matrix(
         trials_meta, result_data, ego_scenario_params=ego_scenario_params,
@@ -1325,13 +1377,13 @@ def compute_parameter_space_boundaries(
 
 def attach_param_boundary_neighbors(
     intra_by_cluster: Dict[str, Dict[str, Any]],
-    param_boundary_pairs: List[Dict[str, Any]],
+    parameter_space_pairs: List[Dict[str, Any]],
 ) -> None:
-    """Write ``param_boundary_neighbors`` for IC-matched pairs only."""
+    """Write ``param_boundary_neighbors`` for parameter-space-matched pairs only."""
     for iv in intra_by_cluster.values():
         iv.setdefault("param_boundary_neighbors", {})
-    for bp in param_boundary_pairs:
-        if bp.get("ic_match") is False:
+    for bp in parameter_space_pairs:
+        if bp.get("parameter_space_match", bp.get("ic_match")) is False:
             continue
         a, b = str(bp["cluster_a"]), str(bp["cluster_b"])
         if a in intra_by_cluster:
@@ -1346,15 +1398,15 @@ def attach_param_boundary_neighbors(
 
 def patch_cluster_json_param_neighbors(
     run_dir: Path,
-    param_boundary_pairs: List[Dict[str, Any]],
+    parameter_space_pairs: List[Dict[str, Any]],
 ) -> int:
     """Update existing cluster.json files with param_boundary_neighbors (aux-only rebuilds).
 
     Returns the number of cluster.json files patched.
     """
     neighbors: Dict[str, Dict[str, str]] = {}
-    for bp in param_boundary_pairs:
-        if bp.get("ic_match") is False:
+    for bp in parameter_space_pairs:
+        if bp.get("parameter_space_match", bp.get("ic_match")) is False:
             continue
         a, b = str(bp["cluster_a"]), str(bp["cluster_b"])
         neighbors.setdefault(a, {})[b] = str(bp["trial_a"])
@@ -1382,8 +1434,8 @@ def build_run_manifest(
     medoids: List[Dict[str, Any]],
     run_id: str,
     batch_id: Optional[int] = None,
-    boundary_pairs: Optional[List[Dict[str, Any]]] = None,
-    param_boundary_pairs: Optional[List[Dict[str, Any]]] = None,
+    trajectory_projection_pairs: Optional[List[Dict[str, Any]]] = None,
+    parameter_space_pairs: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
     """Create the top-level manifest.json for this run."""
     manifest: Dict[str, Any] = {
@@ -1404,10 +1456,10 @@ def build_run_manifest(
             for m in medoids
         ],
     }
-    if boundary_pairs is not None:
-        manifest["boundary_pairs"] = boundary_pairs
-    if param_boundary_pairs is not None:
-        manifest["param_boundary_pairs"] = param_boundary_pairs
+    if trajectory_projection_pairs is not None:
+        manifest["trajectory_projection_pairs"] = trajectory_projection_pairs
+    if parameter_space_pairs is not None:
+        manifest["parameter_space_pairs"] = parameter_space_pairs
     return manifest
 
 
@@ -1509,6 +1561,72 @@ def cluster_in_scope(label: Any, scope: Optional[Set[str]]) -> bool:
     return str(label) in scope
 
 
+def write_cluster_context_md(
+    cluster_dir: Path,
+    cluster_doc: Optional[Dict[str, Any]],
+) -> str:
+    """Cluster-level facts for summary later — not fed to the medoid LLM."""
+    cd = cluster_doc or {}
+    c = cd.get("cluster", {}) or {}
+    m = cd.get("medoid", {}) or {}
+    s = cd.get("scene", {}) or {}
+    label = c.get("label", cluster_dir.name.replace("cluster", ""))
+    sil = c.get("silhouette")
+    sil_str = f"{sil:.4f}" if isinstance(sil, (int, float)) else "n/a"
+    lines: List[str] = [
+        f"# Cluster {label} (cluster-level)",
+        "",
+        "This file is cluster-wide evidence for `--products summary`. "
+        "The medoid LLM reads `context_medoid.md` (this trial's timeline), not this file.",
+        "",
+        f"- **Size**: {c.get('size', c.get('n_trials', '?'))} trials "
+        f"(k={c.get('n_clusters', '?')}, silhouette={sil_str})",
+    ]
+    if c.get("collision_rate") is not None:
+        lines.append(
+            f"- **Collisions**: {c.get('collision_count')}/{c.get('n_trials')} trials "
+            f"({c.get('collision_rate')}%)"
+        )
+    if c.get("mean_ttc") is not None:
+        lines.append(
+            f"- **TTC**: mean={c.get('mean_ttc')} s, min={c.get('min_ttc')} s"
+        )
+    if c.get("mean_spret") is not None:
+        lines.append(f"- **SPRET mean**: {c.get('mean_spret')} s")
+    pr = c.get("parameter_ranges") or {}
+    if pr:
+        bits = []
+        for name, rng in pr.items():
+            if isinstance(rng, (list, tuple)) and len(rng) >= 2:
+                bits.append(f"{name} [{rng[0]}, {rng[1]}]")
+            else:
+                bits.append(f"{name}={rng}")
+        lines.append(f"- **Scenario parameter ranges**: {'; '.join(bits)}")
+    iv = c.get("intra_variance") or {}
+    if iv.get("mean_dist_to_medoid") is not None:
+        lines.append(
+            f"- **Intra-cluster distance to medoid**: mean={iv.get('mean_dist_to_medoid')}, "
+            f"std={iv.get('std_dist_to_medoid')}, max={iv.get('max_dist_to_medoid')}"
+        )
+    lines.append(
+        f"- **Medoid pointer**: trial id={m.get('trial_id', '?')}, "
+        f"batch={m.get('batch_id', '?')}, esmini index={m.get('trial_index', '?')}"
+        + ("" if m.get("is_exact_medoid", True) else f" (nearest available, rank {m.get('medoid_rank')})")
+        + (f", collided={m.get('collided')}" if "collided" in m else "")
+    )
+    loc = s.get("location")
+    if loc:
+        lines.append(
+            f"- **Map**: {loc}, duration {s.get('duration_seconds', '?')}s, "
+            f"{s.get('frame_count', '?')} frames"
+        )
+    lines.append(
+        "- **Timeline**: see `context_medoid.md` (single-trial; not cluster-wide)."
+    )
+    lines.append("")
+    return "\n".join(lines)
+
+
 def write_context_md(
     cluster_dir: Path,
     cluster_doc: Optional[Dict[str, Any]],
@@ -1518,40 +1636,33 @@ def write_context_md(
     traj_df: Any = None,
     map_tracks_csv: Optional[str] = None,
 ) -> None:
-    """Write LLM ``processed/context.md``: header + unified conflict timeline.
+    """Write ``context_medoid.md`` + ``context_cluster.md`` (and a medoid alias).
 
-    Same-lane TURN_LEFT/RIGHT live in ``action.yaml`` and appear in the
-    timeline (not a separate heading section). Agent-action tables stay in
-    human ``description.txt``. ``traj_df`` is accepted for API compatibility.
+    Medoid LLM input is the trial timeline only. Cluster stats live in
+    ``context_cluster.md`` for the later summary product. ``context.md`` is
+    kept as a copy of the medoid file so older readers still resolve.
     """
     from conflict_frame_selector import format_conflict_timeline_sentences
 
     cd = cluster_doc or {}
-    c = cd.get("cluster", {})
-    m = cd.get("medoid", {})
-    s = cd.get("scene", {})
+    m = cd.get("medoid", {}) or {}
+    s = cd.get("scene", {}) or {}
+    label = (cd.get("cluster") or {}).get(
+        "label", cluster_dir.name.replace("cluster", "")
+    )
 
-    lines: List[str] = []
-    label = c.get("label", cluster_dir.name.replace("cluster", ""))
-    sil = c.get("silhouette")
-    sil_str = f"{sil:.4f}" if isinstance(sil, (int, float)) else "n/a"
-    lines.append(f"# Cluster {label}")
-    lines.append("")
-    lines.append(
-        f"- **Representativeness**: medoid of {c.get('size', '?')} similar trials "
-        f"(k={c.get('n_clusters', '?')}, silhouette={sil_str})"
-    )
-    lines.append(
-        f"- **Medoid trial**: id={m.get('trial_id', '?')}, batch={m.get('batch_id', '?')}, "
+    medoid_lines: List[str] = [
+        f"# Medoid trial — cluster {label}",
+        "",
+        f"- **Trial**: id={m.get('trial_id', '?')}, batch={m.get('batch_id', '?')}, "
         f"esmini index={m.get('trial_index', '?')}"
-        + ("" if m.get("is_exact_medoid", True) else f" (nearest available, rank {m.get('medoid_rank')})")
-    )
-    if c.get("collision_rate") is not None:
-        lines.append(
-            f"- **Collisions**: {c.get('collision_count')}/{c.get('n_trials')} trials "
-            f"({c.get('collision_rate')}%)"
+        + ("" if m.get("is_exact_medoid", True) else f" (nearest available, rank {m.get('medoid_rank')})"),
+    ]
+    if "collided" in m:
+        medoid_lines.append(
+            f"- **This trial outcome**: {'collision' if m.get('collided') else 'safe'}"
         )
-    lines.append(
+    medoid_lines.append(
         f"- **Map**: {s.get('location', '?')}, duration {s.get('duration_seconds', '?')}s, "
         f"{s.get('frame_count', '?')} frames"
     )
@@ -1560,11 +1671,11 @@ def write_context_md(
         ag_str = ", ".join(
             f"{a.get('name')} ({a.get('class')})" for a in agents
         )
-        lines.append(f"- **Agents**: {ag_str}")
-    lines.append("")
+        medoid_lines.append(f"- **Agents**: {ag_str}")
+    medoid_lines.append("")
 
     if selection is not None and getattr(selection, "frames", None):
-        lines.append(
+        medoid_lines.append(
             format_conflict_timeline_sentences(
                 selection,
                 filenames=snap_filenames,
@@ -1573,10 +1684,112 @@ def write_context_md(
                 map_tracks_csv=map_tracks_csv,
             ).rstrip()
         )
-        lines.append("")
+        medoid_lines.append("")
 
-    write_path(cluster_dir, "context.md").write_text(
-        "\n".join(lines), encoding="utf-8"
+    medoid_text = "\n".join(medoid_lines)
+    write_path(cluster_dir, "context_medoid.md").write_text(
+        medoid_text, encoding="utf-8"
+    )
+    write_path(cluster_dir, "context.md").write_text(medoid_text, encoding="utf-8")
+    write_path(cluster_dir, "context_cluster.md").write_text(
+        write_cluster_context_md(cluster_dir, cluster_doc), encoding="utf-8"
+    )
+
+
+def rebuild_processed_context_texts(run_dir: Path) -> None:
+    """Rewrite medoid/cluster/pair context markdown from existing snapshots.
+
+    Does not re-render BEVs and does not call the LLM. Requires
+    ``processed/snapshots/llm_snapshots.json`` + ``action.yaml`` + ``cluster.json``.
+    """
+    from conflict_frame_selector import selection_from_llm_snapshots
+    from parameter_space_pair_packs import write_pair_process_context_md
+
+    run_dir = Path(run_dir)
+    if not run_dir.is_dir():
+        raise FileNotFoundError(f"run dir not found: {run_dir}")
+
+    map_tracks_csv: Optional[str] = None
+    try:
+        from dataset_config import map_tracks_path_for_dataset
+
+        for ds in ("dataset3", "dataset1"):
+            p = map_tracks_path_for_dataset(ds)
+            if p.is_file():
+                map_tracks_csv = str(p)
+                break
+    except Exception:
+        map_tracks_csv = None
+
+    n_cluster = 0
+    for cluster_dir in sorted(run_dir.glob("cluster*")):
+        if not cluster_dir.is_dir() or not re.fullmatch(r"cluster\d+", cluster_dir.name):
+            continue
+        snap_path = processed_dir(cluster_dir) / "snapshots" / "llm_snapshots.json"
+        cluster_json = resolve_path(cluster_dir, "cluster.json", must_exist=True)
+        action_yaml = resolve_path(cluster_dir, "action.yaml", must_exist=True)
+        if not snap_path.is_file() or cluster_json is None:
+            print(f"  ⏭  {cluster_dir.name}: missing snapshots or cluster.json")
+            continue
+        doc = json.loads(snap_path.read_text(encoding="utf-8"))
+        selection = selection_from_llm_snapshots(doc)
+        filenames = [
+            str(s.get("file") or "") for s in (doc.get("snapshots") or [])
+        ]
+        cluster_doc = json.loads(cluster_json.read_text(encoding="utf-8"))
+        action_data = None
+        if action_yaml is not None:
+            action_data = yaml.safe_load(action_yaml.read_text(encoding="utf-8")) or {}
+        traj_df = None
+        traj_path = resolve_path(cluster_dir, "trajectory.csv", must_exist=True)
+        if traj_path is not None:
+            try:
+                traj_df = pd.read_csv(traj_path)
+            except Exception:
+                traj_df = None
+        write_context_md(
+            cluster_dir,
+            cluster_doc,
+            action_data,
+            selection=selection,
+            snap_filenames=filenames,
+            traj_df=traj_df,
+            map_tracks_csv=map_tracks_csv,
+        )
+        print(f"  ✓ {cluster_dir.name}: context_medoid.md + context_cluster.md")
+        n_cluster += 1
+
+    n_pair = 0
+    pair_root = run_dir / "parameter_space_pairs"
+    if not pair_root.is_dir() and (run_dir / "ic_pairs").is_dir():
+        pair_root = run_dir / "ic_pairs"
+    if pair_root.is_dir():
+        for pack in sorted(pair_root.glob("c*-c*")):
+            if not pack.is_dir():
+                continue
+            pair_path = pack / "pair.json"
+            pair_doc = None
+            if pair_path.is_file():
+                pair_doc = json.loads(pair_path.read_text(encoding="utf-8"))
+            name = pack.name
+            try:
+                left_s, right_s = name.split("-", 1)
+                left_c = int(left_s.lstrip("c"))
+                right_c = int(right_s.lstrip("c"))
+            except Exception:
+                print(f"  ⏭  {name}: cannot parse cluster ids")
+                continue
+            write_pair_process_context_md(
+                pack,
+                left_cluster=left_c,
+                right_cluster=right_c,
+                pair_doc=pair_doc,
+            )
+            print(f"  ✓ {name}: process/context.md")
+            n_pair += 1
+
+    print(
+        f"Rebuilt context texts: {n_cluster} cluster pack(s), {n_pair} pair pack(s)"
     )
 
 
@@ -1892,7 +2105,7 @@ def process_medoid(
             traj_df=traj_for_desc,
             map_tracks_csv=map_tracks_for_ctx,
         )
-        print(f"  ✓ Saved context.md")
+        print(f"  ✓ Saved context_medoid.md + context_cluster.md")
     except Exception as e:
         print(f"  ⚠️  Failed to write context.md: {e}")
 
@@ -1929,20 +2142,30 @@ def process_trial_to_dir(
     conflict_window_s: Optional[float] = None,
     conflict_window_before_s: float = 15.0,
     conflict_window_after_s: float = 8.0,
+    thin_parameter_space_side: bool = False,
 ) -> bool:
     """Generate nested pack artifacts for one aux trial under *out_dir*.
 
     Mirrors the core of ``process_medoid`` but writes only per-trial artifacts
     (no cluster.json / context.md). Used for outlier and boundary trials.
+
+    When ``thin_parameter_space_side=True`` (Parameter-space pair packs): write only ``raw/trajectory.csv``
+    + ``processed/action.yaml`` needed to rebuild synced BEVs. Skip description,
+    per-trial snapshots, context.md, and ``output/`` — those live at the pack
+    root (``process/``, ``synced_bev/``, ``output/``).
     """
     from map_plotter import DEFAULT_BEV_TYPOGRAPHY
+    from cluster_paths import ensure_thin_parameter_space_side_layout
 
     if typography is None:
         typography = DEFAULT_BEV_TYPOGRAPHY
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    migrate_flat_to_nested(out_dir)
-    ensure_layout(out_dir)
+    if thin_parameter_space_side:
+        ensure_thin_parameter_space_side_layout(out_dir)
+    else:
+        migrate_flat_to_nested(out_dir)
+        ensure_layout(out_dir)
 
     if not csv_exists(batch_id, trial_index):
         print(f"    ❌ CSV missing for batch {batch_id} trial {trial_index} — skipped")
@@ -1980,7 +2203,7 @@ def process_trial_to_dir(
     action_data = None
     traj_for_desc = None
     action_yaml_path = write_path(out_dir, "action.yaml")
-    desc_path = write_path(out_dir, "description.txt")
+    desc_path = None if thin_parameter_space_side else write_path(out_dir, "description.txt")
     try:
         from labeller import label_trajectory, save_action_yaml
         from description import build_description, save_description_txt
@@ -1999,18 +2222,29 @@ def process_trial_to_dir(
             conflict_relevance_m=conflict_relevance_m,
         )
         save_action_yaml(action_data, action_yaml_path)
-        traj_for_desc = pd.read_csv(trajectory_path)
-        map_tracks_csv = map_tracks_path_for_dataset(dataset_name)
-        save_description_txt(
-            build_description(
-                action_data,
-                traj_df=traj_for_desc,
-                map_tracks_csv=str(map_tracks_csv) if map_tracks_csv.is_file() else None,
-            ),
-            desc_path,
-        )
+        if not thin_parameter_space_side:
+            traj_for_desc = pd.read_csv(trajectory_path)
+            map_tracks_csv = map_tracks_path_for_dataset(dataset_name)
+            save_description_txt(
+                build_description(
+                    action_data,
+                    traj_df=traj_for_desc,
+                    map_tracks_csv=str(map_tracks_csv) if map_tracks_csv.is_file() else None,
+                ),
+                desc_path,
+            )
     except Exception as e:
         print(f"    ⚠️  Action/description failed: {e}")
+
+    if thin_parameter_space_side:
+        # IC sides: action.yaml + trajectory only. Pack-level synced_bev /
+        # process/context.md / output/ are written by parameter_space_pair_packs.
+        try:
+            meta_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+        del df
+        return True
 
     snaps_out = nested_snapshots_dir(out_dir)
     selection_bundle: list = []
@@ -2089,7 +2323,7 @@ def process_trial_to_dir(
 def process_auxiliary_trials(
     run_dir: Path,
     intra_by_cluster: Dict[str, Dict[str, Any]],
-    boundary_pairs: List[Dict[str, Any]],
+    trajectory_projection_pairs: List[Dict[str, Any]],
     trial_index_map: Dict[str, Tuple[int, int]],
     collision_flags: Optional[Dict[str, bool]],
     trials_meta: Optional[Dict[str, Any]],
@@ -2108,14 +2342,14 @@ def process_auxiliary_trials(
     conflict_window_after_s: float = 8.0,
     outlier_scope: Optional[Set[str]] = None,
     boundary_scope: Optional[Set[str]] = None,
-    param_boundary_pairs: Optional[List[Dict[str, Any]]] = None,
+    parameter_space_pairs: Optional[List[Dict[str, Any]]] = None,
     param_boundary_scope: Optional[Set[str]] = None,
 ) -> None:
     """Build full trial artifacts for outlier and boundary trials.
 
     Outlier → ``cluster<N>/highlight_trials/outlier_trials/trial_<id>/``
-    Embedding boundary → ``cluster<N>/highlight_trials/boundary_c<M>/trial_<id>/``
-    Param (IC) boundary → ``<run>/ic_pairs/cA-cB/`` (gated by param_dist ≤ τ)
+    Trajectory-projection → ``<run>/trajectory_projection_pairs/cA-cB/`` (trajectory-projection closest pairs)
+    Param (IC) boundary → ``<run>/parameter_space_pairs/cA-cB/`` (gated by param_dist ≤ τ)
 
     ``outlier_scope`` / ``boundary_scope`` / ``param_boundary_scope``:
     None=all, empty=skip, else cluster labels.
@@ -2127,64 +2361,6 @@ def process_auxiliary_trials(
     def _trial_events(tid: str):
         info = (trials_meta or {}).get(str(tid))
         return info.get("events") if isinstance(info, dict) else None
-
-    def _build_boundary_dirs(
-        pairs: List[Dict[str, Any]],
-        scope: Optional[Set[str]],
-        folder_prefix: str,
-        dist_key: str,
-        label: str,
-    ) -> None:
-        if scope is not None and len(scope) == 0:
-            print(f"  ⏭  {label} skipped")
-            return
-        processed: set = set()
-        for bp in pairs:
-            ca, ta = bp["cluster_a"], bp["trial_a"]
-            cb, tb = bp["cluster_b"], bp["trial_b"]
-            dist = bp.get(dist_key)
-            dist_s = f"{float(dist):.3f}" if isinstance(dist, (int, float)) else "?"
-            for (src_label, tgt_label, tid) in [(ca, cb, ta), (cb, ca, tb)]:
-                if not cluster_in_scope(src_label, scope):
-                    continue
-                key = (src_label, tgt_label, str(tid))
-                if key in processed:
-                    continue
-                processed.add(key)
-                b, ti = _resolve(str(tid))
-                if b is None:
-                    print(f"  ⚠️  {label} trial {tid} not in index map — skipped")
-                    continue
-                collided = bool((collision_flags or {}).get(str(tid), False))
-                out_dir = (
-                    highlight_subdir(
-                        run_dir / f"cluster{src_label}",
-                        folder_prefix,
-                        target_cluster=tgt_label,
-                    )
-                    / f"trial_{ti}"
-                )
-                print(
-                    f"  🔹 {label} c{src_label}↔c{tgt_label}: trial {tid} "
-                    f"(batch {b}, idx {ti}, {dist_key}={dist_s})"
-                    f"{' COLLISION' if collided else ''}"
-                )
-                process_trial_to_dir(
-                    b, ti, str(tid), out_dir, xodr_path, parser_xodr,
-                    dataset_name=dataset_name,
-                    snapshot_output_px=snapshot_output_px,
-                    snapshot_border_frac=snapshot_border_frac,
-                    typography=typography,
-                    max_snapshots=max_snapshots,
-                    collided=collided,
-                    trial_events=_trial_events(str(tid)),
-                    ego_zoom_radius=ego_zoom_radius,
-                    contact_clearance_m=contact_clearance_m,
-                    conflict_relevance_m=conflict_relevance_m,
-                    conflict_window_s=conflict_window_s,
-                    conflict_window_before_s=conflict_window_before_s,
-                    conflict_window_after_s=conflict_window_after_s,
-                )
 
     # --- outlier trials ---
     if outlier_scope is not None and len(outlier_scope) == 0:
@@ -2225,24 +2401,42 @@ def process_auxiliary_trials(
                 conflict_window_after_s=conflict_window_after_s,
             )
 
-    # --- embedding-space closest pairs ---
-    _build_boundary_dirs(
-        boundary_pairs,
-        boundary_scope,
-        folder_prefix="boundary_c",
-        dist_key="embedding_dist",
-        label="Emb-boundary",
-    )
+    # --- trajectory-projection closest pairs → trajectory_projection_pairs/cA-cB/ ---
+    if boundary_scope is not None and len(boundary_scope) == 0:
+        print("  ⏭  Trajectory-projection pair packs skipped (--emb-boundaries none)")
+    elif trajectory_projection_pairs:
+        from trajectory_projection_pair_packs import process_trajectory_projection_pair_packs
 
-    # --- parameter-space (initial condition) closest pairs → ic_pairs/cA-cB/ ---
-    if param_boundary_scope is not None and len(param_boundary_scope) == 0:
-        print("  ⏭  IC-pair packs skipped (--param-boundaries none)")
-    elif param_boundary_pairs:
-        from ic_pair_packs import process_ic_pair_packs
-
-        process_ic_pair_packs(
+        process_trajectory_projection_pair_packs(
             run_dir=run_dir,
-            param_boundary_pairs=param_boundary_pairs,
+            trajectory_projection_pairs=trajectory_projection_pairs,
+            trial_index_map=trial_index_map,
+            collision_flags=collision_flags,
+            trials_meta=trials_meta,
+            xodr_path=xodr_path,
+            parser_xodr=parser_xodr,
+            dataset_name=dataset_name,
+            snapshot_output_px=snapshot_output_px,
+            snapshot_border_frac=snapshot_border_frac,
+            typography=typography,
+            ego_zoom_radius=ego_zoom_radius if ego_zoom_radius else 25.0,
+            contact_clearance_m=contact_clearance_m,
+            conflict_relevance_m=conflict_relevance_m,
+            conflict_window_s=conflict_window_s,
+            conflict_window_before_s=conflict_window_before_s,
+            conflict_window_after_s=conflict_window_after_s,
+            scope=boundary_scope,
+        )
+
+    # --- parameter-space (initial condition) closest pairs → parameter_space_pairs/cA-cB/ ---
+    if param_boundary_scope is not None and len(param_boundary_scope) == 0:
+        print("  ⏭  Parameter-space pair packs skipped (--param-boundaries none)")
+    elif parameter_space_pairs:
+        from parameter_space_pair_packs import process_parameter_space_pair_packs
+
+        process_parameter_space_pair_packs(
+            run_dir=run_dir,
+            parameter_space_pairs=parameter_space_pairs,
             trial_index_map=trial_index_map,
             collision_flags=collision_flags,
             trials_meta=trials_meta,
@@ -2351,6 +2545,12 @@ def main():
              "(e.g. results/batch2/4_cluster_s=0.6945), without rebuilding BEV. Needs --batch-id.",
     )
     parser.add_argument(
+        "--rebuild-context-texts",
+        metavar="RUN_DIR",
+        help="Rewrite context_medoid.md / context_cluster.md / pair process/context.md "
+             "from existing llm_snapshots.json + action.yaml (no BEV, no LLM).",
+    )
+    parser.add_argument(
         "--duration-mode",
         default="full",
         help="MFPCA duration key in the saved analysis (default: full)",
@@ -2429,9 +2629,9 @@ def main():
     parser.add_argument(
         "--panel-label-font-size",
         type=float,
-        default=12.0,
+        default=8.0,
         help="Font size (pt) for dual-panel captions 'pair zoom' / 'ego ±Nm' / "
-             "'whole scene' (default: 9)",
+             "'whole scene' (default: 8.0)",
     )
     parser.add_argument(
         "--scale-bar-font-size",
@@ -2478,8 +2678,8 @@ def main():
     parser.add_argument(
         "--title-font-size",
         type=float,
-        default=8.0,
-        help="Font size (pt) for map_overview title (default: 7.0)",
+        default=10.0,
+        help="Font size (pt) for map_overview title (default: 10.0)",
     )
     parser.add_argument(
         "--from-run",
@@ -2529,15 +2729,15 @@ def main():
         default="none",
         dest="emb_boundaries",
         metavar="SCOPE",
-        help="Embedding-space closest pairs → clusterN/highlight_trials/boundary_cM/: "
-             "'all' (default), 'none', or labels e.g. '1'.",
+        help="Trajectory-projection closest pairs → results/.../trajectory_projection_pairs/cA-cB/: "
+             "'all', 'none' (default), or labels e.g. '1'.",
     )
     parser.add_argument(
         "--param-boundaries",
         type=str,
         default="none",
         metavar="SCOPE",
-        help="IC closest pairs → results/.../ic_pairs/cA-cB/ (param_dist≤0.1 only): "
+        help="Parameter-space closest pairs → results/.../parameter_space_pairs/cA-cB/ (param_dist≤0.1 only): "
              "'all', 'none' (default), or labels e.g. '1'. Distance is z-scored "
              "OncomingSpeed / OncomingStartDelay L2.",
     )
@@ -2591,6 +2791,10 @@ def main():
     )
 
     args = parser.parse_args()
+
+    if args.rebuild_context_texts:
+        rebuild_processed_context_texts(Path(args.rebuild_context_texts))
+        sys.exit(0)
 
     # --- Map-only mode: ensure results/map/ then exit ---
     if args.map_only:
@@ -2748,20 +2952,9 @@ def main():
                       f"({n_coll} collided)")
                 # Enable outlier / boundary aux trials (same as fresh payload-save).
                 embeddings_data = {"embeddings": scores}
-                _DAT_PAT = re.compile(r"esmini_(\d+)_(\d+)\.dat")
-                trial_index_map = {}
-                for tid, t_info in trials_meta.items():
-                    if not isinstance(t_info, dict):
-                        continue
-                    edat = t_info.get("esminiDat")
-                    if not isinstance(edat, dict):
-                        continue
-                    fname = edat.get("filename", "")
-                    m = _DAT_PAT.match(fname)
-                    if m:
-                        trial_index_map[str(tid)] = (int(m.group(1)), int(m.group(2)))
+                trial_index_map = _build_trial_index_map(trials_meta)
                 print(f"  Built trial→CSV map for {len(trial_index_map)} trials "
-                      f"(enables outlier_trials / boundary_c* / param_boundary_c*)")
+                      f"(enables outlier_trials / trajectory_projection_pairs/ / parameter_space_pairs/)")
             else:
                 print("  ⚠️  Could not fetch Payload analysis — cluster collision stats may be incomplete")
                 print("  ⚠️  Without embeddings, outlier/boundary aux trials will be skipped")
@@ -3000,10 +3193,10 @@ def main():
 
     # --- Intra-cluster variance + cross-cluster boundary detection (Phase A/H) ---
     intra_by_cluster: Dict[str, Dict[str, Any]] = {}
-    boundary_pairs_data: List[Dict[str, Any]] = []
+    trajectory_projection_pairs_data: List[Dict[str, Any]] = []
     if result_data is not None and embeddings_data is not None:
         try:
-            intra_by_cluster, boundary_pairs_data = compute_intra_variance_and_boundaries(
+            intra_by_cluster, trajectory_projection_pairs_data = compute_intra_variance_and_boundaries(
                 embeddings_data,
                 result_data,
                 trial_index_map=trial_index_map,
@@ -3013,22 +3206,22 @@ def main():
             print(f"  ⚠️  Intra-variance/boundary computation failed: {exc}")
 
     # --- Parameter-space (initial condition) closest pairs ---
-    param_boundary_pairs: List[Dict[str, Any]] = []
+    parameter_space_pairs: List[Dict[str, Any]] = []
     if result_data is not None and trials_meta:
         try:
             print("\n📐 Computing parameter-space (IC) closest pairs...")
-            param_boundary_pairs = compute_parameter_space_boundaries(
+            parameter_space_pairs = compute_parameter_space_boundaries(
                 trials_meta,
                 result_data,
                 collision_flags=collision_flags,
                 ego_scenario_params=ego_scenario_params or None,
             )
-            from ic_pair_packs import annotate_param_boundary_pairs
+            from parameter_space_pair_packs import annotate_parameter_space_pairs
 
-            param_boundary_pairs = annotate_param_boundary_pairs(
-                param_boundary_pairs
+            parameter_space_pairs = annotate_parameter_space_pairs(
+                parameter_space_pairs
             )
-            for bp in param_boundary_pairs:
+            for bp in parameter_space_pairs:
                 role = bp.get("card_role", "?")
                 print(
                     f"  IC-boundary [{role}] c{bp['cluster_a']}↔c{bp['cluster_b']}: "
@@ -3045,11 +3238,11 @@ def main():
     outlier_scope = parse_cluster_scope(args.outliers)
     # Only attach IC neighbors when those folders will be materialized.
     if (
-        param_boundary_pairs
+        parameter_space_pairs
         and intra_by_cluster
         and not (param_boundary_scope is not None and len(param_boundary_scope) == 0)
     ):
-        attach_param_boundary_neighbors(intra_by_cluster, param_boundary_pairs)
+        attach_param_boundary_neighbors(intra_by_cluster, parameter_space_pairs)
     print(
         f"  Build scope: medoids={args.medoids}, "
         f"emb-boundaries={args.emb_boundaries}, "
@@ -3096,19 +3289,19 @@ def main():
     if (
         medoid_scope is not None
         and len(medoid_scope) == 0
-        and param_boundary_pairs
+        and parameter_space_pairs
         and not (
             param_boundary_scope is not None and len(param_boundary_scope) == 0
         )
     ):
-        patched = patch_cluster_json_param_neighbors(run_dir, param_boundary_pairs)
+        patched = patch_cluster_json_param_neighbors(run_dir, parameter_space_pairs)
         if patched:
             print(f"\n📝 Patched {patched} cluster.json file(s) with IC neighbors")
 
     # --- Step 7a: Auxiliary trials (outlier + emb/IC boundaries) ---
     do_aux = (
         trial_index_map
-        and (intra_by_cluster or boundary_pairs_data or param_boundary_pairs)
+        and (intra_by_cluster or trajectory_projection_pairs_data or parameter_space_pairs)
         and not (
             (outlier_scope is not None and len(outlier_scope) == 0)
             and (boundary_scope is not None and len(boundary_scope) == 0)
@@ -3121,7 +3314,7 @@ def main():
             process_auxiliary_trials(
                 run_dir=run_dir,
                 intra_by_cluster=intra_by_cluster,
-                boundary_pairs=boundary_pairs_data,
+                trajectory_projection_pairs=trajectory_projection_pairs_data,
                 trial_index_map=trial_index_map,
                 collision_flags=collision_flags,
                 trials_meta=trials_meta,
@@ -3140,19 +3333,19 @@ def main():
                 conflict_window_after_s=args.conflict_window_after_s,
                 outlier_scope=outlier_scope,
                 boundary_scope=boundary_scope,
-                param_boundary_pairs=param_boundary_pairs,
+                parameter_space_pairs=parameter_space_pairs,
                 param_boundary_scope=param_boundary_scope,
             )
         except Exception as exc:
             print(f"  ⚠️  Auxiliary trial processing failed: {exc}")
-    elif trial_index_map and (intra_by_cluster or boundary_pairs_data or param_boundary_pairs):
+    elif trial_index_map and (intra_by_cluster or trajectory_projection_pairs_data or parameter_space_pairs):
         print(
             "  ⏭  Auxiliary trials skipped "
             "(--outliers none --emb-boundaries none --param-boundaries none)"
         )
 
     # --- Step 7b: Create manifest ---
-    # Preserve existing IC pairs when --param-boundaries none (aux-only emb rebuilds).
+    # Preserve existing Parameter-space pairs when --param-boundaries none (aux-only emb rebuilds).
     existing_manifest: Dict[str, Any] = {}
     manifest_path = run_dir / "manifest.json"
     if manifest_path.is_file():
@@ -3164,15 +3357,15 @@ def main():
             existing_manifest = {}
 
     if param_boundary_scope is not None and len(param_boundary_scope) == 0:
-        manifest_param_pairs = existing_manifest.get("param_boundary_pairs")
+        manifest_param_pairs = existing_manifest.get("parameter_space_pairs")
     else:
-        manifest_param_pairs = param_boundary_pairs or None
+        manifest_param_pairs = parameter_space_pairs or None
 
     manifest = build_run_manifest(
         dataset_name, n_clusters, medoids, run_id,
         batch_id=batch_id_out,
-        boundary_pairs=boundary_pairs_data or None,
-        param_boundary_pairs=manifest_param_pairs,
+        trajectory_projection_pairs=trajectory_projection_pairs_data or None,
+        parameter_space_pairs=manifest_param_pairs,
     )
     with manifest_path.open("w") as f:
         json.dump(manifest, f, indent=2)

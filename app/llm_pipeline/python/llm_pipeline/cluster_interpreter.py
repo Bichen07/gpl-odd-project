@@ -132,7 +132,7 @@ class ClusterInterpreter:
         raise RuntimeError(
             "analyze_cluster() mega-YAML path removed. "
             "Use: python -m llm_pipeline.cli cluster-interpret "
-            "--products medoid,summary,ic-pairs"
+            "--products medoid,summary,parameter-space-pairs"
         )
 
     def _load_prompt(self, filename: str) -> Optional[str]:

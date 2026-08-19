@@ -12,7 +12,7 @@ Medoid / trial packs under `results/batch*/…/clusterN/` use nested layout:
 ```text
 clusterN/
   raw/          trajectory.csv, cluster.json
-  processed/    action.yaml, description.txt, context.md, snapshots/, map_overview.jpg
+  processed/    action.yaml, description.txt, context_medoid.md, context_cluster.md, snapshots/, map_overview.jpg
   output/       medoid_trial*.yaml, cluster_summary*, cluster_interpretation*
   highlight_trials/
     outlier_trials/trial_*/
@@ -29,7 +29,8 @@ esmini CSV
   → conflict_frame_selector.select_action_frames
        (timestamps ⊆ action.yaml only; noise filter may drop stamps, never invent)
   → tier2_renderer + map_plotter      → processed/snapshots/*.jpg
-  → format_conflict_timeline_sentences → processed/context.md  [LLM sentence timeline]
+  → format_conflict_timeline_sentences → processed/context_medoid.md  [medoid LLM timeline]
+  → write_cluster_context_md            → processed/context_cluster.md [summary product]
 ```
 
 **BEV timestamps:** action.yaml boundaries + interaction key times, plus burst

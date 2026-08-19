@@ -11,7 +11,7 @@ import { readYamlDoc } from "../_lib/readYaml";
  * available clustering configurations, assigns ranks (by final_score desc), and
  * returns the sorted array along with per-config cluster intra-variance data.
  *
- * Also returns boundary_pairs from each config's manifest.json.
+ * Also returns trajectory_projection_pairs from each config's manifest.json.
  */
 
 function findProjectRoot(start: string): string {
@@ -119,7 +119,7 @@ export async function GET(req: NextRequest) {
       ...quality,
       folder: entry.name,
       cross_cluster_eval: crossEval,
-      boundary_pairs: (manifest as Record<string, unknown> | null)?.boundary_pairs ?? [],
+      trajectory_projection_pairs: (manifest as Record<string, unknown> | null)?.trajectory_projection_pairs ?? [],
       cluster_intra: clusterIntra,
     });
   }

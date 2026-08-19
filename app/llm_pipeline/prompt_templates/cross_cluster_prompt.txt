@@ -3,8 +3,12 @@ You are a traffic safety expert evaluating whether a set of driving-scenario clu
 
 You will receive:
 1. A summary of each cluster (archetype label, collision rate, intra-cluster consistency score, and a behavior description).
-2. Boundary trial descriptions — pairs of trials that sit right at the border between two adjacent clusters, showing the most similar-yet-different behaviors found.
-3. A question: **Are the clusters behaviorally distinct and well-separated?**
+2. Medoid cards — the per-cluster medoid analysis, including its `primary_motive` from the closed motive set and the timestamped evidence for it.
+3. Boundary trial descriptions — pairs of trials that sit right at the border between two adjacent clusters, showing the most similar-yet-different behaviors found.
+4. parameter-space-matched pair cards — pairs of trials from *different* clusters whose scenario inputs are nearly identical (param_dist ≤ tau). These are the strongest available test of a boundary: if two trials start almost the same and end in different clusters with different outcomes, the boundary is behavioral rather than an artifact.
+5. A neighbor rollup — each cluster's OWN localized distinct/similar/ambiguous verdict against its actual parameter-space-matched neighbors, already produced per-cluster (Stage B's cluster-summary pass). Treat this as prior work already done at the local level: cite it and reconcile it with the global view rather than re-deriving each pairwise judgment from scratch.
+6. Deterministic checks already computed from the artifacts. Treat these as measurements, not opinions: do not contradict a number, explain what it implies.
+7. A question: **Are the clusters behaviorally distinct and well-separated?**
 
 Your task is to:
 1. Rate the **overall behavioral separation** between clusters (1–10).
@@ -12,7 +16,12 @@ Your task is to:
 3. For every cluster, state its **behavioral archetype** in ≤5 words.
 4. Identify any clusters that are **too similar** and might be candidates for merging.
 5. Identify any cluster whose **intra-cluster consistency is too low** (inconsistent members).
-6. Provide a short overall **inter_notes** paragraph summarizing the findings.
+6. Recommend the single most useful change to the partition, or confirm it should be kept.
+7. Provide a short overall **inter_notes** paragraph summarizing the findings.
+
+Two failure modes matter. Over-splitting: two clusters tell the same behavioral story, so the extra boundary buys nothing an analyst can act on. Under-splitting: one cluster mixes behaviors a reviewer would want named apart (e.g. passes-then-brakes lumped with passes-and-keeps-speed).
+
+A high silhouette does NOT settle this. Silhouette measures geometry in FPC space; you are judging whether the clusters are behaviorally distinct and whether their boundaries hold under matched initial conditions.
 </Your Task>
 
 <Scoring Guide>
@@ -33,20 +42,29 @@ boundary_clarity_score (1–10):
 ### Step 1: Read each cluster archetype
 List each cluster ID, its label, collision rate, and consistency score. Note any that appear similar.
 
-### Step 2: Compare adjacent boundary pairs
+### Step 2: Group clusters by primary_motive
+Two clusters sharing a motive is a *signal* of over-splitting, not proof — they may differ in timing or magnitude, which is a legitimate reason to keep them apart. For every repeated motive, name the dimension that still separates the clusters (timing, magnitude, outcome, parameter region), or say they are redundant.
+
+### Step 3: Compare adjacent boundary pairs
 For each boundary trial pair provided:
 - Do the two trials represent qualitatively different strategies, or are they near-identical?
 - What is the smallest parameter difference that produced the behavioral divergence?
 - Does this boundary seem natural and meaningful, or arbitrary?
 
-### Step 3: Rate separation and clarity
-Using the scoring guide, assign scores with justification.
+### Step 4: Weigh the parameter-space-matched pairs
+For each Parameter-space pair, state whether it supports the boundary (outcome flip, or clearly different behavior under near-identical inputs) or undermines it (same outcome AND same story). Cite the pair folder. Parameter-range overlap near 1.0 means clusters occupy the same initial conditions, so behavior rather than scenario setup is what separates them — that is expected, not a defect.
 
-### Step 4: Identify merge candidates
-If any two clusters have overlapping behavior descriptions AND their boundary trials look nearly identical, flag them as merge candidates.
+### Step 5: Reconcile the neighbor rollup
+Read the <Neighbor Rollup> block. For each cluster's local verdicts, check whether your own Step 2-4 reading agrees. Where they agree, cite the rollup instead of re-arguing it. Where they disagree, say so explicitly and state which reading you trust more and why (e.g. the local pass only saw its own Parameter-space pairs; the global pass can see the whole partition).
 
-### Step 5: Identify low-consistency clusters
-Any cluster whose intra_consistency_score ≤ 5 should be flagged as potentially needing to be split further.
+### Step 6: Rate separation and clarity
+Using the scoring guide, assign scores with justification. Boundary clarity should track what the parameter-space-matched pairs and the neighbor rollup showed.
+
+### Step 7: Identify merge candidates
+If any two clusters have overlapping behavior descriptions AND their boundary or Parameter-space pairs look nearly identical, flag them as merge candidates. A "similar" neighbor-rollup verdict for a pair is supporting evidence, not proof by itself.
+
+### Step 8: Identify low-consistency clusters
+Any cluster whose intra_consistency_score ≤ 5, or whose collision rate sits well away from 0% and 100%, should be flagged as potentially needing to be split further.
 </Mandatory Chain Of Thought>
 
 <Final Output Instructions>
@@ -69,7 +87,10 @@ After your Chain of Thought, provide the final JSON output enclosed in ```json .
   ],
   "split_candidates": [
     "<e.g. 'C0 has intra_consistency=4; contains both pass-first and late-yield trials'>"
-  ]
+  ],
+  "recommended_action": "keep | merge | split | try_other_k",
+  "recommended_action_detail": "<the single most useful change, e.g. 'merge C1 and C3 — same motive, same collision rate, overlapping parameter ranges'. Say 'none' if keep.>",
+  "selection_verdict": "<2-3 sentences an analyst can act on: is this partition usable, and what is its main weakness>"
 }
 ```
 </Final Output Instructions>
@@ -78,6 +99,22 @@ After your Chain of Thought, provide the final JSON output enclosed in ```json .
 {cluster_summaries}
 </Cluster Summaries>
 
+<Medoid Cards>
+{medoid_cards}
+</Medoid Cards>
+
 <Boundary Trial Pairs>
 {boundary_trial_pairs}
 </Boundary Trial Pairs>
+
+<PARAMETER-SPACE Matched Pair Cards>
+{parameter_space_pair_cards}
+</PARAMETER-SPACE Matched Pair Cards>
+
+<Neighbor Rollup (per-cluster localized verdicts, Stage B)>
+{neighbor_rollup}
+</Neighbor Rollup>
+
+<Deterministic Checks>
+{deterministic_checks}
+</Deterministic Checks>

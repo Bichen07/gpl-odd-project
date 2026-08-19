@@ -721,7 +721,7 @@ Sampling (/initialize, /suggest, /register)
 | MFPCA / HDBSCAN | Analyzer `:9010` | `app/analyzer/src/controller.py` |
 | Select / save clustering | Dashboard Explore | `app/dashboard` → Payload `savedTrajectoryAnalysis` |
 | Build medoid / BEV / labels | Analyzer dataset builder | `app/analyzer/src/dataset_builder.py` |
-| LLM cards (medoid / summary / IC pairs) | LLM pipeline | `app/llm_pipeline/` → `scripts/run_cluster_analyze.sh` |
+| LLM cards (medoid / summary / Parameter-space pairs) | LLM pipeline | `app/llm_pipeline/` → `scripts/run_cluster_analyze.sh` |
 
 **Authoritative trajectory:** local CSV `simulation/ros/.cache/scenario_search/records/esmini_<batch>_<index>.csv`.  
 **Clustering source for builds:** Payload saved analysis (not legacy `alldatasets/` / `old_alldatasets/`).
@@ -792,8 +792,8 @@ results/map/                         # shared (auto-ensured)
   hct_6_no_930.xodr / _tracks.csv / .yaml / .jpg …
 results/batch2/3_cluster_s=0.7036/
 ├── clustering/selectedClusteringResult.json
-├── manifest.json                    # medoids + boundary_pairs + param_boundary_pairs
-├── ic_pairs/pair_c{A}_c{B}.yaml
+├── manifest.json                    # medoids + trajectory_projection_pairs + parameter_space_pairs
+├── parameter_space_pairs/pair_c{A}_c{B}.yaml
 └── clusterN/
     ├── raw/                         # trajectory.csv, cluster.json
     ├── processed/                   # action, description, context, snapshots, …
@@ -801,7 +801,7 @@ results/batch2/3_cluster_s=0.7036/
     └── highlight_trials/
         ├── outlier_trials/trial_<idx>/
         ├── boundary_c<M>/trial_<idx>/   # MFPCA embedding closest pair
-        └── param_boundary_c<M>/trial_<idx>/  # IC closest pair
+        └── param_boundary_c<M>/trial_<idx>/  # parameter-space closest pair
 ```
 
 **Auxiliary trial scopes** (same CLI — rebuild selectively with `--from-run`):
@@ -810,7 +810,7 @@ results/batch2/3_cluster_s=0.7036/
 | ---- | ------- | -------------- |
 | `--medoids` | `all` | Medoid pack under `clusterN/` |
 | `--emb-boundaries` (`--boundaries`) | `all` | Embedding closest pairs → `highlight_trials/boundary_c*` |
-| `--param-boundaries` | `none` | IC closest pairs → `highlight_trials/param_boundary_c*` (z-scored OncomingSpeed / OncomingStartDelay) |
+| `--param-boundaries` | `none` | Parameter-space closest pairs → `highlight_trials/param_boundary_c*` (z-scored OncomingSpeed / OncomingStartDelay) |
 | `--outliers` | `all` | Top outlier → `highlight_trials/outlier_trials/` |
 
 ```bash
@@ -869,7 +869,7 @@ injects it into the env for `scripts/run_cluster_analyze.sh` only (never written
 
 #### 2. Run interpretation
 
-Default products: **medoid**, **summary**, **ic-pairs**.  
+Default products: **medoid**, **summary**, **parameter-space-pairs**.  
 `--products legacy` = alias for `medoid,summary` (thin `cluster_interpretation.yaml` pointer).
 
 ```bash
@@ -880,7 +880,7 @@ export GOOGLE_API_KEY="your-gemini-key-here"
 
 python3 -m llm_pipeline.cli cluster-interpret \
   --results-dir results/batch2/3_cluster_s=0.7036 --batch-id 2 \
-  --products medoid,summary,ic-pairs --no-review
+  --products medoid,summary,parameter-space-pairs --no-review
 ```
 
 #### 3. Outputs (roles)
@@ -890,7 +890,7 @@ python3 -m llm_pipeline.cli cluster-interpret \
 | `clusterN/cluster_aggregate.json` | Deterministic TTC/IC digests (from Payload KPIs) |
 | `clusterN/medoid_trial.yaml` | **Trial** card — motive timeline (canonical) |
 | `clusterN/cluster_summary.yaml` | **Cluster** card — caption + risk over digests |
-| `ic_pairs/pair_c{A}_c{B}.yaml` | IC closest-pair contrast |
+| `parameter_space_pairs/pair_c{A}_c{B}.yaml` | Parameter-space closest-pair contrast |
 | `clusterN/cluster_interpretation.yaml` | Thin pointer (label/risk/caption only — **no** timeline duplicate) |
 
 Analyze → **Split cards** is the report viewer. Explore Replayer loads the timeline from

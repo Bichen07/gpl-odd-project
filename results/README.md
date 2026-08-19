@@ -11,15 +11,11 @@ results/
     └── <k>_cluster_s=<silhouette>/   # e.g. 4_cluster_s=0.6945
         ├── manifest.json
         ├── clustering/selectedClusteringResult.json
+        ├── ic_pairs/cA-cB/           # ParameterSpace / IC closest pairs
+        ├── boundary_pairs/cA-cB/     # MFPCA embedding closest pairs
         └── cluster<N>/
-            ├── cluster.json
-            ├── context.md
-            ├── action.yaml
-            ├── description.txt
-            ├── trajectory.csv
-            ├── map_overview.jpg
-            ├── snapshots/              # conflict-centered BEV keyframes
-            └── cluster_interpretation.yaml   (after LLM step)
+            ├── …
+            └── highlight_trials/outlier_trials/   # (optional)
 ```
 
 ## How to generate

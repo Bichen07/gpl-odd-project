@@ -61,8 +61,9 @@ export function clusterArtifactExists(
 }
 
 /**
- * Resolve aux highlight folder (outlier_trials / boundary_cM / param_boundary_cM).
+ * Resolve aux highlight folder (outlier_trials / legacy boundary_cM).
  * Prefers ``highlight_trials/<name>``, then legacy ``clusterDir/<name>``.
+ * MFPCA pairs now live under ``trajectory_projection_pairs/cA-cB/`` (see dataset_builder).
  */
 export function resolveHighlightSubdir(
   clusterDir: string,

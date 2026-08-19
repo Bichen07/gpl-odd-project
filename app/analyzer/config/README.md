@@ -22,7 +22,7 @@ Batch1/3 never hit road 92 (different routes). Their points live under `batch_ov
 
 ## Consumers
 
-- Python: `app/analyzer/src/clip_conditions.py` → `ic_pair_packs.py`, `cluster_aggregates.py`
+- Python: `app/analyzer/src/clip_conditions.py` → `parameter_space_pair_packs.py`, `cluster_aggregates.py`
 - Dashboard: `app/dashboard/src/app/api/_lib/clipConditions.ts` → `/api/esmini-trajectory`
 - Replayer: `USE_ANALYSIS_CLIP_CSV` toggle in `Replayer/index.tsx`
 

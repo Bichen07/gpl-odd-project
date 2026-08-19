@@ -76,7 +76,9 @@ def create_interpretation_llm(
     api_key: Optional[str] = None,
     temperature: float = 0.1,
     top_p: float = 0.95,
-    max_tokens: int = 8192,
+    # Headroom for the feature-scan + motive-evidence CoT; 8192 truncated before
+    # the closing YAML fence on longer conflict timelines.
+    max_tokens: int = 12288,
 ) -> Any:
     """Build a LangChain chat model for multimodal cluster interpretation."""
     name = normalize_model_name(model_name)

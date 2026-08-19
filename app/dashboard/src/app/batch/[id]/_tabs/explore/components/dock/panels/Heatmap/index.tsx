@@ -78,6 +78,9 @@ import { Document } from "@/app/_shared/graphql/__generated__/graphql";
 import { heatmapOrdering } from "@/app/_shared/api/heatmapOrdering";
 
 const DEG2RAD = 3.14159265 / 180;
+// Case-study fullheatmaps are height = trialOrder.length * 3 (e.g. 3000→9000).
+// Analyzer's Python default is resolution=4 for newly generated heatmaps; if a
+// loaded PNG's height is not divisible by trialOrder*3, crop clamps OOB rows.
 const resolution = 3;
 // const resolution = 7;
 const metricBarWidth = 2;
@@ -301,7 +304,8 @@ export default function TrajectoryHeatmap() {
     console.log("DOCKLAYOUT TRIGGER HEATMAP");
   }, [dockLayout]);
 
-  const [timer, setTimer] = useState<number | null>(null);
+  // Playhead is driven via DOM (not React state) so the 20–50 Hz clip clock
+  // does not re-render the entire heatmap tree every tick.
   const [hoverInfo, setHoverInfo] = useState<{
     trialId: string;
     index: number;
@@ -313,19 +317,44 @@ export default function TrajectoryHeatmap() {
   }>({});
   const isBaseline = useAppSelector((state) => state.batch.baselineMode);
   const timeOrS = useAppSelector((state) => state.batch.timeOrS);
+  const playheadLayoutRef = useRef({
+    timeOrS,
+    heatmapClipOffsetSec,
+    framePeriod: framePeriod as number | undefined,
+    fullImageWidth,
+  });
+  playheadLayoutRef.current = {
+    timeOrS,
+    heatmapClipOffsetSec,
+    framePeriod: framePeriod as number | undefined,
+    fullImageWidth,
+  };
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      setTimer(
-        Number(
-          document.getElementById("clip-time-typography")?.textContent ?? 0
-        )
+    const syncPlayhead = () => {
+      const t = Number(
+        document.getElementById("clip-time-typography")?.textContent ?? 0
       );
-      let sRatio = Number(
+      const sRatio = Number(
         document.getElementById("clip-s-typography")?.textContent ?? 0
       );
       globalStroage.sRatio = sRatio;
-    }, 10);
+      const layout = playheadLayoutRef.current;
+      const x =
+        layout.timeOrS === "time"
+          ? ((t + layout.heatmapClipOffsetSec) /
+              (layout.framePeriod ?? 1)) *
+            resolution
+          : sRatio * layout.fullImageWidth;
+      // CSS var survives React re-renders; avoids 100 Hz setState on the panel.
+      document.documentElement.style.setProperty(
+        "--heatmap-playhead-x",
+        `${x}px`
+      );
+    };
+    // 20 Hz is enough for a scrubber line; former 100 Hz setState starved React.
+    const interval = setInterval(syncPlayhead, 50);
+    syncPlayhead();
     return () => clearInterval(interval);
   }, []);
 
@@ -488,18 +517,23 @@ export default function TrajectoryHeatmap() {
 
       const result: { [egoName: string]: { [label: string]: string[] } } = {};
 
-      let trialOrder: string[] = [];
-
       for (const egoName of Object.keys(trajectoryAnalysis)) {
         if (filteredTrialIds.length === 0) {
+          // No filter: keep label→trialOrder from the selected clustering when
+          // available, else a single bucket with the MFPCA trialOrder. Previously
+          // this branch only set a local variable and never filled `result`, so
+          // orderedTrialIds stayed {} after loading a save.
           if (clusteringResult && clusteringResult[egoName]) {
-            for (const labelOrder of Object.values(
-              clusteringResult[egoName].trialOrder ?? {}
+            result[egoName] = {};
+            for (const [label, labelOrder] of Object.entries(
+              clusteringResult[egoName].trialOrder ?? {},
             )) {
-              trialOrder = [...labelOrder, ...trialOrder];
+              result[egoName][label] = [...(labelOrder as string[])];
             }
           } else {
-            trialOrder = [...(mfpca[egoName].trialOrder ?? [])];
+            result[egoName] = {
+              "0": [...(mfpca[egoName].trialOrder ?? [])],
+            };
           }
           continue;
         }
@@ -507,7 +541,7 @@ export default function TrajectoryHeatmap() {
         const body: { [label: string]: { [trialId: string]: number[] } } = {};
         if (clusteringResult) {
           for (const [trialId, item] of Object.entries(
-            clusteringResult[egoName]?.data ?? {}
+            clusteringResult[egoName]?.data ?? {},
           )) {
             if (
               !filteredTrialIds.includes(trialId) &&
@@ -523,7 +557,11 @@ export default function TrajectoryHeatmap() {
           }
           result[egoName] = await heatmapOrdering(body);
         } else {
-          result[egoName] = { "0": trialOrder };
+          result[egoName] = {
+            "0": [...(mfpca[egoName].trialOrder ?? [])].filter((trialId) =>
+              filteredTrialIds.includes(trialId),
+            ),
+          };
         }
       }
 
@@ -532,13 +570,12 @@ export default function TrajectoryHeatmap() {
       }
     }
 
-    console.log("loading true 3");
     setLoading(true);
-    run();
+    void run();
     return () => {
       cancelled = true;
     };
-  }, [clusteringResult, mfpca, filteredTrialIds]);
+  }, [clusteringResult, mfpca, filteredTrialIds, trajectoryAnalysis]);
 
   let viewerTrialIds = useMemo(() => {
     setSelected({});
@@ -707,12 +744,16 @@ export default function TrajectoryHeatmap() {
         ?.attributes ?? [];
 
     dispatch(batchSlice.actions.setAttributes(attributes));
+    // Fixed default for every batch: ego kinematics + parking distance only.
+    // Users can add other partners (Opposite / CuttingIn / …) via Sort & Filter.
     const preferred = [
       "EgoSpeed",
       "EgoAcceleration",
-      "OppositeRelativeDistance",
+      "ParkingRelativeDistance",
     ];
-    const preferredFiltered = preferred.filter((name) => attributes.includes(name));
+    const preferredFiltered = preferred.filter((name) =>
+      attributes.includes(name),
+    );
     let filteredAttributes =
       preferredFiltered.length > 0
         ? preferredFiltered
@@ -820,72 +861,95 @@ export default function TrajectoryHeatmap() {
   }, [selectedTrialIds, viewerTrialIds]);
 
   useEffect(() => {
+    // Must wait for Pixi `heatmapDrawing` — without it in the dependency list,
+    // attributes can update first, this effect bails early, and full heatmap
+    // images never load (blank Heatmap panel after loading a save).
     if (trajectoryAnalysis == null || heatmapDrawing == null || mfpca == null) {
-      console.log(trajectoryAnalysis);
-      console.log(heatmapDrawing);
-      console.log(mfpca);
       return;
     }
 
-    console.log("loading true");
+    let cancelled = false;
     setLoading(true);
 
     const newHeatmapImages: typeof fullHeatmapImages = {};
 
-    const createEgoImages = async () => {
-      for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
-        console.log(egoName);
-        console.log(attributes);
-        newHeatmapImages[egoName] = {};
-        const createImages = async () => {
-          for (const [attrIndex, attribute] of attributes.entries()) {
-            console.log(attribute);
-            const key = attribute;
-            const imageName = isBaseline
-              ? `${egoName}_baseline_${params["id"]}-${trajectoryAnalysis[egoName].id}-${key}_fullheatmap`
-              : `${egoName}_${params["id"]}-${trajectoryAnalysis[egoName].id}-${key}_fullheatmap`;
-
-            newHeatmapImages[egoName][attribute] = [];
-
-            const imageUrl =
-              trajectoryAnalysis[egoName].fullHeatmaps.find(
-                (i) =>
-                  (i.filename?.includes(attribute) ||
-                    i.url?.includes(attribute)) &&
-                  (i.filename?.includes("_" + timeOrS + "_") ||
-                    i.url?.includes("_" + timeOrS + "_")),
-              )?.url;
-
-            console.log(imageUrl);
-            if (imageUrl) {
-              console.log(
-                `Batch images already have this fullimage ${imageName}`
-              );
-              try {
-                const img = await loadImageAsync(imageUrl);
-                newHeatmapImages[egoName][attribute].push(img);
-
-                if (attrIndex === 0) {
-                  setFullImageWidth(img.width);
-                  console.log(img.width);
-                }
-              } catch (err) {
-                console.warn(`failed to load fullHeatmap ${imageUrl}`, err);
-              }
-              continue;
-            }
-          }
-        };
-
-        await createImages();
+    const toLoadableUrl = (url: string) => {
+      // Prefer same-origin proxy so canvas/crossOrigin works even when the
+      // Payload host is unreachable from the browser or omits CORS headers.
+      if (!url || url.startsWith("/") || url.startsWith("blob:")) return url;
+      try {
+        const payloadHost = new URL(
+          process.env.NEXT_PUBLIC_PAYLOAD_API_ADDRESS ?? "",
+        ).host;
+        if (payloadHost && new URL(url).host === payloadHost) {
+          return `/api/payload-file?url=${encodeURIComponent(url)}`;
+        }
+      } catch {
+        /* keep original url */
       }
-
-      console.log(newHeatmapImages);
-      setFullHeatmapImages(newHeatmapImages);
+      return url;
     };
 
-    createEgoImages();
-  }, [selectedMetric, timeOrS, attributes]);
+    const createEgoImages = async () => {
+      // Load every attribute that might be shown; crop step filters to
+      // filteredAttributes. Prefer filtered first so the visible columns appear
+      // sooner when many fullheatmaps exist.
+      const attrOrder = [
+        ...filteredAttributes,
+        ...attributes.filter((a) => !filteredAttributes.includes(a)),
+      ];
+
+      for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+        if (cancelled) return;
+        newHeatmapImages[egoName] = {};
+        for (const [attrIndex, attribute] of attrOrder.entries()) {
+          if (cancelled) return;
+          newHeatmapImages[egoName][attribute] = [];
+
+          const rawUrl =
+            trajectoryAnalysis[egoName].fullHeatmaps.find(
+              (i) =>
+                (i.filename?.includes(attribute) ||
+                  i.url?.includes(attribute)) &&
+                (i.filename?.includes("_" + timeOrS + "_") ||
+                  i.url?.includes("_" + timeOrS + "_")),
+            )?.url;
+
+          if (!rawUrl) continue;
+          const imageUrl = toLoadableUrl(rawUrl);
+          try {
+            const img = await loadImageAsync(imageUrl);
+            if (cancelled) return;
+            newHeatmapImages[egoName][attribute].push(img);
+            if (attrIndex === 0) {
+              setFullImageWidth(img.width);
+            }
+          } catch (err) {
+            console.warn(`failed to load fullHeatmap ${imageUrl}`, err);
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setFullHeatmapImages(newHeatmapImages);
+      }
+    };
+
+    void createEgoImages();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    selectedMetric,
+    timeOrS,
+    attributes,
+    filteredAttributes,
+    heatmapDrawing,
+    trajectoryAnalysis,
+    mfpca,
+    isBaseline,
+    params,
+  ]);
 
   useEffect(() => {
     if (
@@ -952,28 +1016,56 @@ export default function TrajectoryHeatmap() {
         out: Record<string, HTMLImageElement>,
         key: string
       ) => {
-        const usedIndices = trialIds.map((id) => trialIdToIndex[id]);
+        // Prefer exact match to trialOrder; fall back to the panel constant.
+        // Wrong Payload PNGs (short height) used to make every crop OOB.
+        let rowRes = resolution;
+        if (trialOrder.length > 0 && fullImage.height % trialOrder.length === 0) {
+          rowRes = fullImage.height / trialOrder.length;
+        } else if (
+          trialOrder.length > 0 &&
+          Math.abs(fullImage.height / trialOrder.length - resolution) < 0.01
+        ) {
+          rowRes = resolution;
+        }
+        const maxRows = Math.max(1, Math.floor(fullImage.height / rowRes));
+        const usedIndices = trialIds
+          .map((id) => trialIdToIndex[id])
+          .filter(
+            (idx): idx is number =>
+              typeof idx === "number" &&
+              Number.isFinite(idx) &&
+              idx >= 0 &&
+              idx < maxRows,
+          );
 
-        if (fullImage == null) {
+        if (fullImage == null || usedIndices.length === 0) {
+          console.warn(
+            `heatmap crop skipped for ${key}: ${usedIndices.length} in-range rows ` +
+              `(image ${fullImage.width}x${fullImage.height}, rowRes=${rowRes}, ` +
+              `trialOrder=${trialOrder.length}, clusterTrials=${trialIds.length})`,
+          );
           return;
         }
 
+        // Cap canvas height — drawing thousands of OOB rows used to hang the
+        // tab (toDataURL on a multi-thousand-px canvas) when no clustering was
+        // selected yet and trialOrder >> fullheatmap rows.
         canvas.width = fullImage.width;
-        canvas.height = usedIndices.length * resolution;
+        canvas.height = usedIndices.length * rowRes;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         for (let i = 0; i < usedIndices.length; i++) {
-          const y = usedIndices[i] * resolution;
+          const y = usedIndices[i] * rowRes;
           ctx.drawImage(
             fullImage,
             0,
             y,
             fullImage.width,
-            resolution,
+            rowRes,
             0,
-            i * resolution,
+            i * rowRes,
             fullImage.width,
-            resolution
+            rowRes
           );
         }
 
@@ -1027,13 +1119,18 @@ export default function TrajectoryHeatmap() {
     };
 
     const cropMergeImages = async () => {
-      for (const label of labels) {
-        await cropOneLabel(label);
+      try {
+        for (const label of labels) {
+          await cropOneLabel(label);
+        }
+      } catch (err) {
+        console.warn("heatmap crop failed", err);
+      } finally {
+        setHeatmapImages(newHeatmapImages);
+        setLoading(false);
       }
-      setHeatmapImages(newHeatmapImages);
-      setLoading(false);
     };
-    cropMergeImages();
+    void cropMergeImages();
   }, [
     viewerTrialIds,
     filteredAttributes,
@@ -1374,11 +1471,21 @@ export default function TrajectoryHeatmap() {
                                     }
                                     const trialId =
                                       viewerTrialIds[egoName][label][index];
-                                    setHoverInfo({
-                                      y,
-                                      trialId,
-                                      index,
-                                      label,
+                                    setHoverInfo((prev) => {
+                                      if (
+                                        prev != null &&
+                                        prev.trialId === trialId &&
+                                        prev.index === index &&
+                                        prev.label === label
+                                      ) {
+                                        return prev;
+                                      }
+                                      return {
+                                        y,
+                                        trialId,
+                                        index,
+                                        label,
+                                      };
                                     });
                                   }}
                                   onClick={() => {
@@ -1537,14 +1644,10 @@ export default function TrajectoryHeatmap() {
                                       width: `${resolution}px`,
                                       height: "100%",
                                       top: `-0.5px`,
-                                      left: `calc(${timeOrS === "time"
-                                          ? (((timer ?? 0) +
-                                              heatmapClipOffsetSec) /
-                                            (framePeriod ?? 1)) *
-                                          resolution
-                                          : (globalStroage.sRatio ?? 0) *
-                                          fullImageWidth
-                                        }px - 0.5px)`,
+                                      // Playhead x is a CSS var updated outside React
+                                      // (avoids re-rendering the whole heatmap at clip rate).
+                                      left: `calc(var(--heatmap-playhead-x, 0px) - 0.5px)`,
+                                      pointerEvents: "none",
                                     }}
                                   />
                                   {/* Mask heatmap columns before analysis clip (Payload origin → new t=0). */}

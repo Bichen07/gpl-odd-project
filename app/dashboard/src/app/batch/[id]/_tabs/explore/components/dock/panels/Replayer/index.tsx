@@ -580,12 +580,18 @@ const Replayer = () => {
               const data = await resp.json();
               if (data?.trajectory == null || !Array.isArray(data?.time)) continue;
               // Skip replace when clip start unchanged (avoids setTrajectories loop).
+              // Use Object.is so missing clipStart (NaN) still compares equal —
+              // `NaN === NaN` is false and used to re-fetch forever.
               if (
                 existing.source === "esmini" &&
-                Number(data.clipStartEsminiS ?? NaN) ===
-                  Number(existing.clipStartEsminiS ?? NaN) &&
-                Number(data.heatmapClipOffsetSec ?? 0) ===
-                  Number(existing.heatmapClipOffsetSec ?? 0)
+                Object.is(
+                  Number(data.clipStartEsminiS ?? NaN),
+                  Number(existing.clipStartEsminiS ?? NaN),
+                ) &&
+                Object.is(
+                  Number(data.heatmapClipOffsetSec ?? 0),
+                  Number(existing.heatmapClipOffsetSec ?? 0),
+                )
               ) {
                 noteOffset(trialId, data);
                 continue;
@@ -651,10 +657,14 @@ const Replayer = () => {
                   }
                   if (
                     existing.source === "esmini" &&
-                    Number(data.clipStartEsminiS ?? NaN) ===
-                      Number(existing.clipStartEsminiS ?? NaN) &&
-                    Number(data.heatmapClipOffsetSec ?? 0) ===
-                      Number(existing.heatmapClipOffsetSec ?? 0)
+                    Object.is(
+                      Number(data.clipStartEsminiS ?? NaN),
+                      Number(existing.clipStartEsminiS ?? NaN),
+                    ) &&
+                    Object.is(
+                      Number(data.heatmapClipOffsetSec ?? 0),
+                      Number(existing.heatmapClipOffsetSec ?? 0),
+                    )
                   ) {
                     noteOffset(trialId, data);
                     return;
@@ -727,6 +737,9 @@ const Replayer = () => {
       }
 
       if (!cancelled) {
+        // Only write when something actually changed — otherwise replacing the
+        // trajectories object every pass re-triggers this effect (trajectories
+        // is in the dependency list) and floods /api/esmini-trajectory.
         dispatch(batchSlice.actions.setHeatmapClipOffsetSec(chosenOffset));
         if (changed) {
           setTrajectories(patched);
@@ -877,8 +890,9 @@ const Replayer = () => {
     [clusterCounter, selectedClusterLabelsByEgo],
   );
 
-  // Re-init the Pixi viewers whenever the visible-window set changes so the
-  // remaining windows get resized correctly.
+  // Identity of the currently visible cluster-window set. Used to resize
+  // existing Pixi apps after CSS show/hide — NOT to destroy/recreate them
+  // (that was the main source of highlight/medoid choppiness).
   const visibleClusterKey = useMemo(() => {
     if (selectedClusterLabelsByEgo == null) return "all";
     return Object.entries(selectedClusterLabelsByEgo)
@@ -887,6 +901,27 @@ const Replayer = () => {
       .join("|");
   }, [selectedClusterLabelsByEgo]);
 
+  // After highlight toggles hide/show panes via display:none, resize the
+  // remaining WebGL canvases to the new layout without a full rebuild.
+  useEffect(() => {
+    if (viewers == null) return;
+    const handle = requestAnimationFrame(() => {
+      for (const egoName of Object.keys(viewers)) {
+        for (const [label, viewer] of Object.entries(viewers[egoName] ?? {})) {
+          if (!isClusterWindowVisible(egoName, label)) continue;
+          const container = document.getElementById(
+            `replayer-${egoName}-cluster${label}-canvas-container`,
+          );
+          if (container == null || viewer?.app == null) continue;
+          const { width, height } = container.getBoundingClientRect();
+          if (width <= 0 || height <= 0) continue;
+          viewer.app.renderer.resize(width, height);
+          viewer.viewport?.resize(width, height);
+        }
+      }
+    });
+    return () => cancelAnimationFrame(handle);
+  }, [visibleClusterKey, viewers, isClusterWindowVisible]);
   useEffect(() => {
     if (redrawHandled) {
       console.log("REDRAW Replayer Already, Return");
@@ -1085,12 +1120,20 @@ const Replayer = () => {
   }, [redrawHandled]);
 
   useEffect(() => {
-    // if (clusterInfo != null) {
-    //   console.log("set redrawhandled false");
-    // }
+    // Clustering / filter changes need a full Pixi rebuild. Highlight-driven
+    // visibleClusterKey changes do NOT — those only toggle display:none and
+    // resize via the effect above.
     setRedrawHandled(false);
-  }, [clusterInfo, filteredTrialIds, visibleClusterKey]);
+  }, [clusterInfo, filteredTrialIds]);
 
+  useEffect(() => {
+    // Switching time↔s mode needs a rebuild once. Do NOT rebuild on every
+    // selectedTrialIds change — that made medoid/highlight toggles destroy
+    // WebGL and redraw all agents.
+    if (timeOrS === "s") {
+      setRedrawHandled(false);
+    }
+  }, [timeOrS]);
   useEffect(() => {
     const handleKeyPress = (event: KeyboardEvent) => {
       if (event.code === "Space") {
@@ -1570,12 +1613,6 @@ const Replayer = () => {
   ]);
 
   useEffect(() => {
-    if (timeOrS === "s" && selectedTrialIds.value.length > 0) {
-      setRedrawHandled(false);
-    }
-  }, [timeOrS, selectedTrialIds]);
-
-  useEffect(() => {
     if (trajectoryAnalysis == null || viewerData == null) {
       return;
     }
@@ -1895,7 +1932,9 @@ const Replayer = () => {
                             pointerEvents: "auto",
                           }}
                         >
-                          Motive summary
+                          {panelCaption.narrativeKind === "contrast"
+                            ? "Contrast explanation"
+                            : "Motive summary"}
                         </Button>
                       )}
                     </>
@@ -1959,7 +1998,9 @@ const Replayer = () => {
                   zIndex: 21,
                 }}
               >
-                Motive summary
+                {firstActiveCaption.narrativeKind === "contrast"
+                  ? "Contrast explanation"
+                  : "Motive summary"}
               </Button>
             )}
           </>

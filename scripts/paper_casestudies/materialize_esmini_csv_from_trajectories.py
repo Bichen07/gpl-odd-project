@@ -24,24 +24,83 @@ from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 REPO = Path(__file__).resolve().parents[2]
 CACHE = REPO / "simulation/ros/.cache/scenario_search/records"
-_DAT_PAT = re.compile(r"esmini_(\d+)_(\d+)\.dat")
+_DAT_PAT = re.compile(r"esmini_(\d+)_(\d+)(?:-\d+)?\.dat$")
+_DAT_CLEAN_PAT = re.compile(r"esmini_(\d+)_(\d+)\.dat$")
+SIDECAR = CACHE / "trial_csv_index_map.json"
 
 
 def _load_trial_index_map(analysis_zip: Path, ego: str = "ITRI") -> Dict[str, Tuple[int, int]]:
+    """Assign every trial a unique ``(batch_id, csv_index)``.
+
+    Payload appends ``-N`` when an uploaded filename collides with an existing
+    one, so the index embedded in ``esminiDat.filename`` is *not* unique: in
+    Case Study 3, 3869 trials share only 2129 distinct embedded indices. Trials
+    with an unsuffixed filename keep their embedded index (those match the CSVs
+    already on disk); the rest are allocated fresh indices above the highest one
+    in use. Allocation is ordered by trial id so it is stable across runs.
+    """
     with zipfile.ZipFile(analysis_zip) as zf:
         doc = json.loads(zf.read(zf.namelist()[0]))
     trials = (doc.get(ego) or {}).get("trials") or {}
-    out: Dict[str, Tuple[int, int]] = {}
+
+    names: Dict[str, str] = {}
     for tid, info in trials.items():
         if not isinstance(info, dict):
             continue
         edat = info.get("esminiDat")
         if not isinstance(edat, dict):
             continue
-        m = _DAT_PAT.match(str(edat.get("filename") or ""))
+        names[str(tid)] = str(edat.get("filename") or "")
+
+    def _tid_sort(tid: str) -> int:
+        return int(tid) if tid.isdigit() else 0
+
+    out: Dict[str, Tuple[int, int]] = {}
+    claimed: Dict[int, Set[int]] = {}
+    for tid in sorted(names, key=_tid_sort):
+        m = _DAT_CLEAN_PAT.match(names[tid])
         if m:
-            out[str(tid)] = (int(m.group(1)), int(m.group(2)))
+            batch_id, idx = int(m.group(1)), int(m.group(2))
+            out[tid] = (batch_id, idx)
+            claimed.setdefault(batch_id, set()).add(idx)
+
+    next_free: Dict[int, int] = {b: max(s) + 1 for b, s in claimed.items()}
+    n_alloc = 0
+    for tid in sorted(names, key=_tid_sort):
+        if tid in out:
+            continue
+        m = _DAT_PAT.match(names[tid])
+        if not m:
+            continue
+        batch_id, idx = int(m.group(1)), int(m.group(2))
+        taken = claimed.setdefault(batch_id, set())
+        if idx in taken:
+            idx = next_free.get(batch_id, 1)
+            while idx in taken:
+                idx += 1
+            next_free[batch_id] = idx + 1
+            n_alloc += 1
+        taken.add(idx)
+        out[tid] = (batch_id, idx)
+
+    if n_alloc:
+        print(f"  allocated {n_alloc} fresh CSV indices for collided Payload filenames")
     return out
+
+
+def _write_sidecar(index_map: Dict[str, Tuple[int, int]]) -> None:
+    """Persist the map so dataset_builder resolves the same trial→CSV pairing."""
+    data: Dict[str, Dict[str, int]] = {}
+    if SIDECAR.is_file():
+        try:
+            data = json.loads(SIDECAR.read_text())
+        except Exception:
+            data = {}
+    for tid, (batch_id, idx) in index_map.items():
+        data.setdefault(str(batch_id), {})[str(tid)] = idx
+    SIDECAR.parent.mkdir(parents=True, exist_ok=True)
+    SIDECAR.write_text(json.dumps(data, indent=1, sort_keys=True) + "\n")
+    print(f"  wrote {SIDECAR.relative_to(REPO)} ({sum(len(v) for v in data.values())} entries)")
 
 
 def _needed_trial_ids(results_dir: Path) -> Set[str]:
@@ -135,6 +194,7 @@ def materialize(
 ) -> int:
     index_map = _load_trial_index_map(analysis_zip, ego=ego)
     print(f"trial→esmini map: {len(index_map)} from {analysis_zip.name}")
+    _write_sidecar(index_map)
 
     if results_dir and results_dir.is_dir():
         needed = _needed_trial_ids(results_dir)

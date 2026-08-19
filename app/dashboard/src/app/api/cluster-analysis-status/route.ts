@@ -62,7 +62,7 @@ type ParamBoundaryPair = {
   trial_b: string;
   param_dist?: number;
   param_names?: string[];
-  ic_match?: boolean;
+  parameter_space_match?: boolean;
   card_role?: string;
 };
 
@@ -71,14 +71,14 @@ type FolderStatus = {
   has_preprocess: boolean;
   has_medoid_trial: boolean;
   has_cluster_summary: boolean;
-  has_ic_pairs: boolean;
+  has_parameter_space_pairs: boolean;
   medoids: Record<string, string>;
   /** Primary (materialized) outlier trial per cluster */
   outliers: Record<string, string>;
   boundary_trials: Record<string, string[]>;
-  boundary_pairs: BoundaryPair[];
+  trajectory_projection_pairs: BoundaryPair[];
   param_boundary_trials: Record<string, string[]>;
-  param_boundary_pairs: ParamBoundaryPair[];
+  parameter_space_pairs: ParamBoundaryPair[];
   /** HDBSCAN task from clustering/selectedClusteringResult.json */
   task: Record<string, unknown> | null;
   interpretations: Record<
@@ -87,6 +87,16 @@ type FolderStatus = {
       cluster_label?: string;
       ego_perspective_summary?: unknown;
       motive_summary?: string;
+    }
+  >;
+  /** folder ``cA-cB`` → contrast card for Replayer IC timeline */
+  parameter_space_pair_interpretations: Record<
+    string,
+    {
+      contrast_timeline?: unknown;
+      contrast_explanation?: string;
+      separation_call?: string;
+      separation_reason?: string;
     }
   >;
 };
@@ -125,35 +135,52 @@ function checkPreprocessComplete(
 
     const neighbors = (intra.boundary_neighbors ?? {}) as Record<string, string>;
     for (const tgt of Object.keys(neighbors)) {
-      const bd = resolveHighlightSubdir(clusterDir, `boundary_c${tgt}`);
-      if (!bd || !hasTrialSubdirs(bd)) return false;
+      const a = Number(name.replace(/^cluster/, ""));
+      const b = Number(tgt);
+      if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
+      const lo = Math.min(a, b);
+      const hi = Math.max(a, b);
+      const pack = path.join(runDir, "trajectory_projection_pairs", `c${lo}-c${hi}`);
+      if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
+      const sides = fs
+        .readdirSync(pack, { withFileTypes: true })
+        .filter((e) => e.isDirectory() && /^c\d+_trial_/.test(e.name));
+      if (sides.length < 2) return false;
     }
   }
 
-  // Every declared closest-pair must have both side folders on disk.
+  // Every declared trajectory-projection closest-pair must have trajectory_projection_pairs/cA-cB/ on disk.
   for (const bp of boundaryPairs) {
-    const a = String(bp.cluster_a);
-    const b = String(bp.cluster_b);
-    const ab = resolveHighlightSubdir(path.join(runDir, `cluster${a}`), `boundary_c${b}`);
-    const ba = resolveHighlightSubdir(path.join(runDir, `cluster${b}`), `boundary_c${a}`);
-    if (!ab || !hasTrialSubdirs(ab)) return false;
-    if (!ba || !hasTrialSubdirs(ba)) return false;
-  }
-
-  // IC matched pairs live under ic_pairs/cA-cB/ (gated by param_dist).
-  for (const bp of paramBoundaryPairs) {
-    const matched = (bp as ParamBoundaryPair & { ic_match?: boolean }).ic_match;
-    if (matched === false) continue;
     const a = Number(bp.cluster_a);
     const b = Number(bp.cluster_b);
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
-    const pack = path.join(runDir, "ic_pairs", `c${lo}-c${hi}`);
+    const pack = path.join(runDir, "trajectory_projection_pairs", `c${lo}-c${hi}`);
     if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
     const sides = fs
       .readdirSync(pack, { withFileTypes: true })
       .filter((e) => e.isDirectory() && /^c\d+_trial_/.test(e.name));
     if (sides.length < 2) return false;
+  }
+
+  // Parameter-space matched pairs live under parameter_space_pairs/cA-cB/ (gated by param_dist).
+  // Preprocess ready when process/context.md + synced_bev exist.
+  for (const bp of paramBoundaryPairs) {
+    const matched = (bp as ParamBoundaryPair & { parameter_space_match?: boolean }).parameter_space_match;
+    if (matched === false) continue;
+    const a = Number(bp.cluster_a);
+    const b = Number(bp.cluster_b);
+    const lo = Math.min(a, b);
+    const hi = Math.max(a, b);
+    const pack = path.join(runDir, "parameter_space_pairs", `c${lo}-c${hi}`);
+    if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
+    if (!fs.existsSync(path.join(pack, "process", "context.md"))) return false;
+    const synced = path.join(pack, "synced_bev");
+    if (!fs.existsSync(synced) || !fs.statSync(synced).isDirectory()) return false;
+    const bevs = fs
+      .readdirSync(synced)
+      .filter((n) => /\.(jpg|jpeg|png)$/i.test(n));
+    if (bevs.length === 0) return false;
   }
 
   return true;
@@ -189,7 +216,9 @@ export async function GET(req: NextRequest) {
     }
 
     const boundaryPairs = (
-      (manifest?.boundary_pairs ?? []) as BoundaryPair[]
+      ((manifest?.trajectory_projection_pairs
+        ?? (manifest as Record<string, unknown> | null)?.boundary_pairs
+        ?? []) as BoundaryPair[])
     ).map((bp) => ({
       cluster_a: bp.cluster_a,
       trial_a: String(bp.trial_a),
@@ -200,8 +229,18 @@ export async function GET(req: NextRequest) {
     }));
 
     const paramBoundaryPairs = (
-      (manifest?.param_boundary_pairs ?? []) as ParamBoundaryPair[]
-    ).map((bp) => ({
+      ((manifest?.parameter_space_pairs
+        ?? (manifest as Record<string, unknown> | null)?.param_boundary_pairs
+        ?? []) as ParamBoundaryPair[])
+    ).map((bp) => {
+      const legacyMatch = (bp as ParamBoundaryPair & { ic_match?: boolean }).ic_match;
+      const match =
+        typeof bp.parameter_space_match === "boolean"
+          ? bp.parameter_space_match
+          : typeof legacyMatch === "boolean"
+            ? legacyMatch
+            : undefined;
+      return {
       cluster_a: bp.cluster_a,
       trial_a: String(bp.trial_a),
       cluster_b: bp.cluster_b,
@@ -211,14 +250,15 @@ export async function GET(req: NextRequest) {
       param_names: Array.isArray(bp.param_names)
         ? bp.param_names.map(String)
         : undefined,
-      ic_match: typeof bp.ic_match === "boolean" ? bp.ic_match : undefined,
+      parameter_space_match: match,
       card_role: typeof bp.card_role === "string" ? bp.card_role : undefined,
-    }));
+    };});
 
     const outliers: Record<string, string> = {};
     const boundaryTrials: Record<string, string[]> = {};
     const paramBoundaryTrials: Record<string, string[]> = {};
     const interpretations: FolderStatus["interpretations"] = {};
+    const icPairInterpretations: FolderStatus["parameter_space_pair_interpretations"] = {};
     let hasAnalysis = false;
 
     const savedClustering = readJsonSafe(
@@ -331,18 +371,46 @@ export async function GET(req: NextRequest) {
         hasAnalysis = true;
       }
     }
-    const icPairsDir = path.join(runDir, "ic_pairs");
-    const hasIcPairs =
-      fs.existsSync(icPairsDir) &&
-      fs.readdirSync(icPairsDir).some((f) => {
+    const icPairsDir = path.join(runDir, "parameter_space_pairs");
+    let hasIcPairs = false;
+    if (fs.existsSync(icPairsDir)) {
+      for (const f of fs.readdirSync(icPairsDir).sort()) {
         const p = path.join(icPairsDir, f);
-        if (f.endsWith(".yaml") && fs.statSync(p).isFile()) return true;
-        return (
-          fs.statSync(p).isDirectory() &&
-          fs.existsSync(path.join(p, "contrast.yaml"))
-        );
-      });
-    if (hasIcPairs) hasAnalysis = true;
+        if (f.endsWith(".yaml") && fs.statSync(p).isFile()) {
+          hasIcPairs = true;
+          continue;
+        }
+        if (!fs.statSync(p).isDirectory()) continue;
+        const contrastNested = path.join(p, "output", "contrast.yaml");
+        const contrastLegacy = path.join(p, "contrast.yaml");
+        const contrastPath = fs.existsSync(contrastNested)
+          ? contrastNested
+          : fs.existsSync(contrastLegacy)
+            ? contrastLegacy
+            : null;
+        if (!contrastPath) continue;
+        hasIcPairs = true;
+        hasAnalysis = true;
+        const meta = metaFromYamlPath(contrastPath);
+        const parsed = (meta?.parsed as Record<string, unknown> | undefined) ?? null;
+        if (!parsed) continue;
+        icPairInterpretations[f] = {
+          contrast_timeline: parsed.contrast_timeline,
+          contrast_explanation:
+            typeof parsed.contrast_explanation === "string"
+              ? parsed.contrast_explanation
+              : undefined,
+          separation_call:
+            typeof parsed.separation_call === "string"
+              ? parsed.separation_call
+              : undefined,
+          separation_reason:
+            typeof parsed.separation_reason === "string"
+              ? parsed.separation_reason
+              : undefined,
+        };
+      }
+    }
 
     const hasPreprocess = checkPreprocessComplete(
       runDir,
@@ -356,15 +424,16 @@ export async function GET(req: NextRequest) {
       has_preprocess: hasPreprocess,
       has_medoid_trial: hasMedoidTrial,
       has_cluster_summary: hasClusterSummary,
-      has_ic_pairs: hasIcPairs,
+      has_parameter_space_pairs: hasIcPairs,
       medoids,
       outliers,
       boundary_trials: boundaryTrials,
-      boundary_pairs: boundaryPairs,
+      trajectory_projection_pairs: boundaryPairs,
       param_boundary_trials: paramBoundaryTrials,
-      param_boundary_pairs: paramBoundaryPairs,
+      parameter_space_pairs: paramBoundaryPairs,
       task: savedTask,
       interpretations,
+      parameter_space_pair_interpretations: icPairInterpretations,
     };
   }
 

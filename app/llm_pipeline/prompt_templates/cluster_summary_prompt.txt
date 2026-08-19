@@ -1,48 +1,105 @@
 <Your Task>
-Write a short CLUSTER AGGREGATE caption for the WHOLE cluster (not one medoid).
-Input is a numeric digest for gpl-odd oncoming scenarios on an urban/suburban
-mapped network — not highway free-flow.
+Write a CLUSTER behavior summary for the WHOLE cluster (not one medoid journey)
+AND judge whether it separates well from its parameter-space-matched neighbors.
+
+Primary inputs (required upstream):
+1. This cluster's `output/medoid_trial.yaml` — archetype behavior.
+2. Parameter-space pair contrast files that touch this cluster (`parameter_space_pairs/c*-c*/output/contrast.yaml`)
+   — boundary evidence under matched initial conditions.
+3. Optional `processed/context_cluster.md` — cluster size, collision rate, parameter ranges
+   (not a single-trial timeline).
+
+Decide whether neighbors look mergeable, whether the medoid is unlike boundary
+cases (finer split?), or whether the cluster is well separated.
 </Your Task>
 
-<How to read the numbers>
-- collision_rate is the primary risk signal.
-- TTC here is a Payload polygon look-ahead KPI (mostly longitudinal). The same
-  absolute TTC does NOT mean the same thing on highway vs urban roads, and a
-  lateral pass-by / near-miss can show a "small" TTC while still being a
-  successful yield. Prefer collide-vs-survive TTC splits and cross-cluster
-  comparison over absolute claims like "3 s is safe".
-- Do not invent MTTC, joint lateral–longitudinal predictors, or other metrics
-  not present in the digest. If longitudinal TTC understates lateral risk,
-  say that as a limitation — do not fabricate numbers.
-- IC OncomingSpeed / OncomingStartDelay: descriptive ranges only — not safe/risky
-  bounds.
-- Embedding spread / outliers: outcome homogeneity vs geometric spread.
-</How to read the numbers>
-
 <Mandatory Workflow & Chain Of Thought>
-1. Outcome mix: collision_rate, n_trials; collide vs survive TTC if both exist.
-2. Conflict tightness: within this ODD, is the survivor TTC distribution tight or
-   wide? Compare p10 vs p90 — do not import highway headway lore.
-3. IC digests: restate mean/p10/p90; descriptive only.
-4. Consistency: does embedding spread contradict outcome homogeneity?
+1. Medoid first: restate this cluster's primary_motive, outcome, and 1–2 timeline
+   concludes from `medoid_trial.yaml`.
+2. Neighbor-by-neighbor: for EACH Parameter-space pair block touching this cluster:
+   - Prefer the contrast YAML (separation_call, critical_divergence, motives).
+   - Upstream hard-gates missing contrasts — expect a full contrast file per
+     neighbor. If a block still lacks contrast, verdict=`ambiguous`.
+   - Else `distinct` if outcomes differ and/or motives/paths differ under matched parameter-space.
+   - Else `similar` if same outcome AND same/overlapping motive + over_fine/weak divergence.
+3. Compare medoid vs boundary: does the Parameter-space pair story match the medoid archetype,
+   or do boundary trials look different (signal for finer split / unclean cluster)?
+4. Roll up `neighborhood_separation`:
+   - `well_separated` — neighbors mostly distinct; medoid story coherent with boundaries.
+   - `merge_candidates` — neighbors mostly similar (same motive+outcome) → combine.
+   - `needs_finer_split` — medoid clearly unlike parameter-space boundary partners, or internal
+     inconsistency (medoid vs boundary disagree on the behavioral story).
+   - `ambiguous` — missing medoid_trial.yaml / contrast.yaml or conflicting evidence.
+5. `distinct_from_neighbors` = true only if every neighbor_comparison is `distinct`.
+6. Label (deterministic, closed vocabulary — do NOT freehand prose): look up the
+   medoid's `interaction_resolution` (preferred) or `primary_motive` in
+   common_sense's Resolution class table to get PASS / YIELD / OTHER, pick at most
+   one Modifier from `control_response` / the medoid's decision_timeline
+   intensity/timing, then append the Collision / Near-miss suffix using this
+   cluster's collision-rate dominance (numeric digest / medoid outcome). Compose
+   `label` ONLY from the building blocks in common_sense's "Cluster label building
+   blocks" so names match the paper Case Study vocabulary — e.g. "Pass-First",
+   "Smooth Pass", "Pass-Slowdown", "Proactive Yield", "Late Yield", "Yield",
+   "Yield-Stop Collision", "Brake Rear-end", "Cut-in Collision". If resolution
+   maps to OTHER and the cluster is collision-dominant, name the partner
+   (e.g. "Cut-in Collision", "Opposite Collision", "Parked Collision").
 </Mandatory Workflow & Chain Of Thought>
 
-<Numeric digest (authoritative)>
-{numeric_digest}
-</Numeric digest>
+<Caption & verdict guide>
+`caption` (3–5 short paragraphs, blank line between):
+1. Medoid archetype (motive + outcome + key action).
+2. What parameter-space boundary pairs say about neighbors (cite folder names / separation_call).
+3. Whether the cluster is coherent vs neighbors (merge / keep / split signal).
+
+`neighborhood_separation` must be one of the four closed codes above.
+
+EXAMPLE (illustrative; match density, not facts):
+
+Medoid cluster0 shows late_reaction / yield_to_partner into a cut-in with collisions.
+Parameter-space pair c0-c4 is separation_call=justified: under matched parameter-space, c0 holds speed longer
+while c4 brakes earlier — different paths, not a duplicate label. Neighbor c0-c5
+still lacks contrast → ambiguous for that edge only. Overall
+neighborhood_separation=well_separated (keep), with one missing parameter-space contrast flagged
+rather than guessed.
+</Caption & verdict guide>
+
+<This cluster's medoid trial (`output/medoid_trial.yaml` extract)>
+{medoid_trial}
+</This cluster's medoid trial>
+
+<This cluster's cluster-level context (`processed/context_cluster.md`)>
+{cluster_context}
+</This cluster's cluster-level context>
+
+<Neighbor parameter-space packs (pair.json + contrast.yaml + neighbor medoid_trial.yaml extracts)>
+{neighbor_cards}
+</Neighbor parameter-space packs>
 
 <Output>
 After CoT, ONE YAML fence:
 
 ```yaml
 cluster_id: <int>
-label: "<2-5 words>"
+label: "<Resolution>[ Modifier][ Collision|Near-miss]"  # closed blocks ONLY — see
+  # common_sense §Cluster label building blocks; 2-4 words, Title Case, e.g.
+  # "Pass-First", "Smooth Pass", "Pass-Slowdown", "Proactive Yield", "Late Yield",
+  # "Yield", "Yield-Stop Collision", "Brake Rear-end", "Cut-in Collision".
+  # No freehand prose.
 risk_level: "low" | "medium" | "high"
 confidence: "high" | "medium" | "low"
 caption: |
-  3-5 short paragraphs. Lead with collision_rate. Cite TTC/IC only with the
-  caveats above. Blank line between paragraphs.
+  3-5 short paragraphs. Lead with medoid motive + parameter-space boundary evidence.
+  Blank line between paragraphs.
 consistency_note: |
   Embedding spread vs outcome homogeneity in one short note.
+motive_consistency_note: |
+  Does this caption agree with the medoid's primary_motive? Empty if nothing to flag.
+neighbor_comparison:
+  - neighbor_cluster: <int>
+    parameter_space_pair_folder: "<e.g. c0-c4>"
+    verdict: "distinct" | "similar" | "ambiguous"
+    reason: "<one line, cite contrast separation_call / motive / missing card>"
+distinct_from_neighbors: <bool>   # true only if every entry above is "distinct"
+neighborhood_separation: "well_separated" | "merge_candidates" | "needs_finer_split" | "ambiguous"
 ```
 </Output>

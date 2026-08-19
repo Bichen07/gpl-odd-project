@@ -18,6 +18,8 @@ _ARTIFACTS: dict[str, tuple[Kind, str]] = {
     "action.yaml": ("processed", "action.yaml"),
     "description.txt": ("processed", "description.txt"),
     "context.md": ("processed", "context.md"),
+    "context_medoid.md": ("processed", "context_medoid.md"),
+    "context_cluster.md": ("processed", "context_cluster.md"),
     "cluster_aggregate.json": ("processed", "cluster_aggregate.json"),
     "map_overview.jpg": ("processed", "map_overview.jpg"),
     "meta.yaml": ("processed", "meta.yaml"),
@@ -39,7 +41,7 @@ def output_dir(cluster_dir: Union[str, Path]) -> Path:
 
 
 def highlight_trials_dir(cluster_dir: Union[str, Path]) -> Path:
-    """Parent for outlier / emb-boundary / IC-boundary trial packs."""
+    """Parent for outlier / trajectory-projection / IC-boundary trial packs."""
     return Path(cluster_dir) / "highlight_trials"
 
 
@@ -52,6 +54,17 @@ def ensure_layout(cluster_dir: Union[str, Path]) -> None:
     """Create raw / processed / output (and snapshots) directories."""
     root = Path(cluster_dir)
     for d in (raw_dir(root), processed_dir(root), output_dir(root), snapshots_dir(root)):
+        d.mkdir(parents=True, exist_ok=True)
+
+
+def ensure_thin_parameter_space_side_layout(cluster_dir: Union[str, Path]) -> None:
+    """Parameter-space pair side dirs: raw/ + processed/ only (no output/, no snapshots/).
+
+    Synced dual-panel BEVs and the unified pair context live at the pack root
+    (``parameter_space_pairs/cA-cB/{synced_bev,process,output}/``), not under each trial.
+    """
+    root = Path(cluster_dir)
+    for d in (raw_dir(root), processed_dir(root)):
         d.mkdir(parents=True, exist_ok=True)
 
 

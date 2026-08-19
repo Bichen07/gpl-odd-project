@@ -29,12 +29,19 @@ def main() -> None:
     ci.add_argument(
         "--products",
         default="medoid",
-        help="Comma list: medoid[,summary][,ic-pairs]. Default is medoid only "
-             "(one YAML: output/medoid_trial.yaml). Use 'all' for all products.",
+        help="Comma list: medoid[,summary][,parameter-space-pairs][,cross-eval]. Default is medoid "
+             "only (one YAML: output/medoid_trial.yaml). cross-eval grades the whole "
+             "partition from the medoid + Parameter-space pair cards. Use 'all' for all products.",
     )
     ci.add_argument("--api-key", default=None, help="API key (overrides env; ephemeral)")
     ci.add_argument("--clusters", default=None,
                     help="Comma list of cluster ids to run (default: all)")
+    ci.add_argument(
+        "--pairs",
+        default=None,
+        help="Comma list of Parameter-space pair folder names to run (e.g. c0-c4,c1-c2). "
+             "When set, only these packs are LLM'd (overrides cluster-touch filter).",
+    )
     ci.add_argument("--prompts-json", default=None,
                     help="Path to JSON with prompt overrides (system|common_sense|interaction|reviewer)")
     ci.add_argument("--images-json", default=None,
@@ -58,9 +65,23 @@ def main() -> None:
     cce.add_argument("--temperature", type=float, default=0.1)
     cce.add_argument("--dry-run", action="store_true")
 
+    # selection-eval: deterministic selection quality only — no LLM, no network
+    se = sub.add_parser("selection-eval")
+    se.add_argument("--run-dir", required=True,
+                    help="results/batch<id>/<k>_cluster_s=.../ directory to evaluate")
+
     args = parser.parse_args()
     source = _source_path()
-    if args.cmd == "cross-cluster-eval":
+    if args.cmd == "selection-eval":
+        from .cluster_selection_eval import write_eval
+
+        path = write_eval(Path(args.run_dir))
+        out = (
+            f"cluster_selection_eval written to {path}"
+            if path
+            else "selection-eval failed (no cluster dirs)"
+        )
+    elif args.cmd == "cross-cluster-eval":
         from .cross_cluster_evaluator import run_cross_cluster_eval
         from .clustering_quality_scorer import score_run_dir
 
@@ -105,6 +126,10 @@ def main() -> None:
         cl = getattr(args, "clusters", None)
         if cl:
             clusters = [int(x) for x in str(cl).split(",") if x.strip() != ""]
+        pairs = None
+        pr = getattr(args, "pairs", None)
+        if pr:
+            pairs = [x.strip() for x in str(pr).split(",") if x.strip()]
         max_snaps = getattr(args, "max_llm_snapshots", 10)
         products = getattr(args, "products", "medoid")
         result = run_split_analysis(
@@ -115,13 +140,14 @@ def main() -> None:
             api_key=getattr(args, "api_key", None),
             products=products,
             clusters=clusters,
+            pairs=pairs,
             dry_run=getattr(args, "dry_run", False),
             temperature=getattr(args, "temperature", 0.1),
             max_llm_snapshots=max_snaps if max_snaps and max_snaps > 0 else None,
         )
         out = (
             f"Split analysis done: clusters={list((result.get('clusters') or {}).keys())} "
-            f"ic_pairs={len(result.get('ic_pairs') or [])}"
+            f"parameter_space_pairs={len(result.get('parameter_space_pairs') or [])}"
         )
     else:
         parser.error(f"unknown command: {args.cmd}")  # type: ignore[unreachable]

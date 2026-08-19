@@ -104,7 +104,7 @@ python3 app/analyzer/src/dataset_builder.py \
 bash scripts/run_cluster_analyze.sh \
   --results-dir results/batch9/4_cluster_s=0.7482 \
   --batch-id 9 \
-  --products medoid,summary,ic-pairs --no-review
+  --products medoid,summary,parameter-space-pairs --no-review
 ```
 
 Or list candidates offline:

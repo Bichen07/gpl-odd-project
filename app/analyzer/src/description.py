@@ -143,7 +143,10 @@ def _format_collision_action_line(when: str, phrase: str, act: dict, role: str) 
     speed_txt = f" — {', '.join(speeds)}" if speeds else ""
     clearance = ""
     if attrs.get("min_clearance_m") is not None:
-        clearance = f" (clearance {attrs['min_clearance_m']} m)"
+        clearance = (
+            " (minimum distance between vehicle boundaries "
+            f"{attrs['min_clearance_m']} m)"
+        )
     return f"  {when}: {phrase}{target} {loc}{speed_txt}{clearance}"
 
 
@@ -157,11 +160,14 @@ def _partner_label(iv: Dict) -> str:
 def _format_interaction_detail(iv: Dict) -> str:
     det = []
     if iv.get("min_clearance_m") is not None:
-        det.append(f"min clearance {iv['min_clearance_m']} m")
+        det.append(
+            "minimum distance between vehicle boundaries "
+            f"{iv['min_clearance_m']} m"
+        )
     if iv.get("min_distance_m") is not None:
-        det.append(f"min distance {iv['min_distance_m']} m")
+        det.append(f"minimum center-to-center distance {iv['min_distance_m']} m")
     if iv.get("min_ttc_s") is not None:
-        det.append(f"min TTC {iv['min_ttc_s']} s")
+        det.append(f"minimum estimated time to collision {iv['min_ttc_s']} s")
     if iv.get("ego_reaction_accel") is not None:
         det.append(f"ego braking {iv['ego_reaction_accel']} m/s²")
     if iv.get("source"):
@@ -192,7 +198,10 @@ def _format_collision_structured(iv: Dict) -> List[str]:
             f"(x={partner.get('x')}, y={partner.get('y')})"
         )
     if iv.get("min_clearance_m") is not None:
-        lines.append(f"  contact: min clearance {iv['min_clearance_m']} m")
+        lines.append(
+            "  contact geometry: minimum distance between vehicle boundaries "
+            f"{iv['min_clearance_m']} m"
+        )
     if iv.get("source"):
         lines.append(f"  partner source: {iv['source']}")
     return lines

@@ -12,7 +12,7 @@ import math
 import os
 import tempfile
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -413,6 +413,22 @@ def unique_time_steps(df: pd.DataFrame) -> List[float]:
     return sorted(df["time"].unique().tolist())
 
 
+def _ego_initial_yaw_deg(df: pd.DataFrame) -> Optional[float]:
+    """First-frame ego heading in degrees (Replayer fixed orientation)."""
+    names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
+    ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
+    if ego_name is None:
+        return None
+    ego = (
+        df[df["name"].astype(str).str.strip() == ego_name]
+        .sort_values("time")
+        .reset_index(drop=True)
+    )
+    if ego.empty or "h" not in ego.columns:
+        return None
+    return float(_heading_to_degrees(float(ego.iloc[0]["h"])))
+
+
 def _ego_position_lookup(df: pd.DataFrame):
     """Return f(t) → (ego_x, ego_y) using the nearest esmini frame, or None."""
     names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
@@ -461,12 +477,12 @@ def _agent_position_lookup(df: pd.DataFrame, name: Optional[str] = None, track_i
     return _at
 
 
-def _metric_chip_text(d_m, ttc_s) -> Optional[str]:
+def _metric_chip_text(d, ttc) -> Optional[str]:
     parts = []
-    if d_m is not None:
-        parts.append(f"d={d_m:.1f}m")
-    if ttc_s is not None:
-        parts.append(f"TTC={ttc_s:.1f}s")
+    if d is not None:
+        parts.append(f"d={d:.1f}m")
+    if ttc is not None:
+        parts.append(f"ttc={ttc:.1f}s")
     return "  ".join(parts) if parts else None
 
 
@@ -689,9 +705,10 @@ class Tier2BevRenderer:
         self.snapshot_output_px = snapshot_output_px
         self.snapshot_border_frac = snapshot_border_frac
         self.typography = typography
-        # Right panel of each snapshot zooms to ±radius metres around the ego.
-        # 0/None disables the composite (whole-scene only).
+        # Legacy radius kept for callers; medoid snapshots now use adaptive
+        # ego–partner + 2 m framing instead of a fixed dual-panel zoom.
         self.ego_zoom_radius = ego_zoom_radius
+        self.fixed_view_yaw_deg: Optional[float] = None
         if not Path(map_tracks_csv).is_file():
             raise FileNotFoundError(
                 f"Map tracks CSV not found: {map_tracks_csv}\n"
@@ -821,6 +838,8 @@ class Tier2BevRenderer:
             )
 
             ego_xy_at = _ego_position_lookup(df)
+            if self.fixed_view_yaw_deg is None:
+                self.fixed_view_yaw_deg = _ego_initial_yaw_deg(df)
             partner_name = selection.partner_name if selection else None
             partner_xy_at = (
                 _agent_position_lookup(df, name=partner_name)
@@ -847,7 +866,7 @@ class Tier2BevRenderer:
                     slug = fr.title_event()
                     use_whole = bool(fr.use_whole_scene)
                     draw_road = bool(fr.draw_agent_road_labels)
-                    chip = _metric_chip_text(fr.d_m, fr.ttc_s)
+                    chip = _metric_chip_text(fr.d, fr.ttc)
                     label_for_title = slug
                 else:
                     slug = _slug_label(label)[:60]
@@ -876,6 +895,7 @@ class Tier2BevRenderer:
                     draw_agent_road_labels=draw_road,
                     metric_chip=chip,
                     extra_pair_xy=extra,
+                    frame=fr,
                 )
                 snapshots.append(BevSnapshot(timestep=t, label=label_for_title, path=out_path))
                 filenames.append(out_name)
@@ -915,7 +935,14 @@ class Tier2BevRenderer:
         label_anchors: Optional[List[Tuple[float, float]]] = None,
         metric_chip: Optional[str] = None,
         label_avoid_xy: Optional[List[Tuple[float, float]]] = None,
+        view_yaw_deg: Optional[float] = None,
+        view_center: Optional[Tuple[float, float]] = None,
     ) -> None:
+        yaw = view_yaw_deg if view_yaw_deg is not None else self.fixed_view_yaw_deg
+        center = view_center
+        if center is None and view_bounds is not None:
+            xmin, xmax, ymin, ymax = view_bounds
+            center = ((xmin + xmax) / 2.0, (ymin + ymax) / 2.0)
         self._plotter.render_scene(
             self.map_tracks_csv,
             out_path,
@@ -940,6 +967,8 @@ class Tier2BevRenderer:
             draw_ref_lines=True,
             draw_ref_arrows=False,
             max_road_labels=5,
+            view_rotation_deg=yaw,
+            view_rotation_center=center if yaw is not None else None,
         )
 
     def _render_snapshot(
@@ -959,11 +988,14 @@ class Tier2BevRenderer:
         draw_agent_road_labels: bool = False,
         metric_chip: Optional[str] = None,
         extra_pair_xy: Optional[List[Tuple[float, float]]] = None,
+        frame: Optional[Any] = None,
     ) -> None:
-        """Render dual-panel BEV: whole|ego or pair|ego depending on frame role."""
-        from conflict_frame_selector import pair_zoom_bounds
+        """Render a single ego-centered adaptive BEV (ego–partner + 2 m)."""
+        from conflict_frame_selector import (
+            adaptive_half_extent,
+            ego_centered_square_bounds,
+        )
 
-        radius = self.ego_zoom_radius or 0.0
         anchors: Optional[List[Tuple[float, float]]] = None
         avoid: Optional[List[Tuple[float, float]]] = None
         if ego_xy is not None:
@@ -975,56 +1007,11 @@ class Tier2BevRenderer:
         if draw_agent_road_labels and ego_xy is not None:
             anchors = list(avoid) if avoid else [ego_xy]
 
-        if radius <= 0 or ego_xy is None:
-            self._render_one_panel(
-                out_path, traj_csv=traj_csv, meta_yaml=meta_yaml,
-                highlight=highlight, view_bounds=vbounds, t=t,
-                time_label=f"t = {t:.2f}s — {label}",
-                draw_labels=draw_agent_road_labels,
-                label_anchors=anchors,
-                metric_chip=metric_chip,
-                label_avoid_xy=avoid,
-            )
-            return
-
-        ex, ey = ego_xy
-        zoom_bounds = (ex - radius, ex + radius, ey - radius, ey + radius)
-        if use_whole_scene:
-            left_bounds = vbounds
-            left_label = "whole scene"
-        else:
-            left_bounds = pair_zoom_bounds(
-                ego_xy, partner_xy, extra_xy=extra_pair_xy
-            )
-            left_label = "pair zoom"
-
-        left_tmp = str(work / "panel_left.jpg")
-        zoom_tmp = str(work / "panel_zoom.jpg")
-        self._render_one_panel(
-            left_tmp, traj_csv=traj_csv, meta_yaml=meta_yaml,
-            highlight=highlight, view_bounds=left_bounds, t=t,
-            time_label=left_label,
-            draw_labels=draw_agent_road_labels,
-            label_anchors=anchors,
-            metric_chip=metric_chip,
-            label_avoid_xy=avoid,
-        )
-        self._render_one_panel(
-            zoom_tmp, traj_csv=traj_csv, meta_yaml=meta_yaml,
-            highlight=highlight, view_bounds=zoom_bounds, t=t,
-            time_label=f"ego \u00b1{radius:.0f}m",
-            draw_labels=draw_agent_road_labels,
-            label_anchors=anchors,
-            metric_chip=None,
-            label_avoid_xy=avoid,
-        )
-        # Dual title uses the same event token as the filename (concise_slug /
-        # title_event), including burst offsets like 0p5s_before_….
         short = label.split("+")[0] if label else ""
         if len(short) > 56:
             short = short[:53] + "…"
-        title = f"t = {t:.2f}s  —  {short}" if short else f"t = {t:.2f}s"
-        if not compose_dual_bev(left_tmp, zoom_tmp, out_path, title=title):
+
+        if ego_xy is None:
             self._render_one_panel(
                 out_path, traj_csv=traj_csv, meta_yaml=meta_yaml,
                 highlight=highlight, view_bounds=vbounds, t=t,
@@ -1034,6 +1021,34 @@ class Tier2BevRenderer:
                 metric_chip=metric_chip,
                 label_avoid_xy=avoid,
             )
+            return
+
+        d_m = None
+        if partner_xy is not None:
+            d_m = math.hypot(
+                float(partner_xy[0]) - float(ego_xy[0]),
+                float(partner_xy[1]) - float(ego_xy[1]),
+            )
+        elif frame is not None and getattr(frame, "d", None) is not None:
+            d_m = float(frame.d)
+        half = adaptive_half_extent(d_m)
+        bounds = ego_centered_square_bounds(ego_xy, half)
+        yaw = self.fixed_view_yaw_deg
+        caption = f"t = {t:.2f}s  {short}  ±{half:.0f}m".strip()
+        self._render_one_panel(
+            out_path, traj_csv=traj_csv, meta_yaml=meta_yaml,
+            highlight=highlight, view_bounds=bounds, t=t,
+            time_label=caption,
+            draw_labels=draw_agent_road_labels,
+            label_anchors=anchors,
+            metric_chip=metric_chip,
+            label_avoid_xy=avoid,
+            view_yaw_deg=yaw,
+            view_center=ego_xy,
+        )
+        if frame is not None:
+            frame.camera_half_m = round(float(half), 2)
+            frame.view_yaw_deg = round(float(yaw), 2) if yaw is not None else None
 
     def render_cluster_medoids(
         self,

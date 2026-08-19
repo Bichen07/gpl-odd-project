@@ -109,6 +109,14 @@ export interface ClusterInterpretationSummary {
   motive_summary?: string;
 }
 
+/** LLM contrast card fields for one Parameter-space pair folder (e.g. ``c0-c4``). */
+export interface IcPairInterpretation {
+  contrast_timeline?: unknown;
+  contrast_explanation?: string;
+  separation_call?: string;
+  separation_reason?: string;
+}
+
 export type ClusterHighlightRole =
   | "medoid"
   | "boundary"
@@ -156,6 +164,8 @@ export interface ClusterAnalysisContext {
     clusterSelectionMethod?: string;
   } | null;
   interpretations: Record<string, ClusterInterpretationSummary>;
+  /** folder ``cA-cB`` → contrast card fields for Replayer IC timeline */
+  icPairInterpretations: Record<string, IcPairInterpretation>;
 }
 
 export interface BatchState {
@@ -457,10 +467,13 @@ export const batchSlice = createSlice({
           for (const durationMode of Object.keys(
             trajectoryAnalysis.mfpca ?? {}
           )) {
-            const updated: ClusterInfo[] = [];
+            // Keep index alignment with mfpca.clustering (including null slots)
+            // so findIndex(result) matches clusterInfos[index].
+            const updated: Array<ClusterInfo | null> = [];
             const target = trajectoryAnalysis.mfpca[durationMode].clustering;
             for (const result of target ?? []) {
               if (result == null) {
+                updated.push(null);
                 continue;
               }
               const clusters: ClusterInfo = {};
@@ -497,13 +510,42 @@ export const batchSlice = createSlice({
               }
               updated.push(clusters);
             }
-            newClusterInfos[egoName][durationMode] = updated;
+            newClusterInfos[egoName][durationMode] = updated as ClusterInfo[];
           }
         }
 
         state.clusterInfos = newClusterInfos;
       };
       updateClusterInfos();
+
+      // Immediately pick the first clustering per ego so Heatmap / Projection /
+      // Replayer have labels before ClusteringSelection finishes its expensive
+      // unique-result filter (hundreds of HDBSCAN candidates).
+      {
+        const selectedResults: NonNullable<
+          typeof state.selectedClusteringResults
+        > = {};
+        const selectedInfos: NonNullable<typeof state.selectedClusterInfos> = {};
+        for (const egoName of Object.keys(state.trajectoryAnalysis ?? {})) {
+          const durationMode = state.durationMode;
+          const results =
+            state.trajectoryAnalysis![egoName]?.mfpca?.[durationMode]
+              ?.clustering ?? [];
+          const first = results.find((r) => r != null) ?? null;
+          const idx = first != null ? results.findIndex((r) => r === first) : -1;
+          selectedResults[egoName] = first;
+          selectedInfos[egoName] =
+            idx >= 0
+              ? state.clusterInfos?.[egoName]?.[durationMode]?.[idx] ?? null
+              : null;
+        }
+        state.selectedClusteringResults = selectedResults;
+        state.selectedClusterInfos = selectedInfos;
+        if (selectedResults["ITRI"] != null) {
+          state.selectedClusteringResult = selectedResults["ITRI"];
+          state.selectedClusterInfo = selectedInfos["ITRI"] ?? null;
+        }
+      }
 
       state.tree = {};
       state.treePoints = {};

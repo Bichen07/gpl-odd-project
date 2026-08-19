@@ -47,6 +47,9 @@ class CrossClusterEval:
     cluster_summaries: List[Dict[str, Any]] = field(default_factory=list)
     merge_candidates: List[str] = field(default_factory=list)
     split_candidates: List[str] = field(default_factory=list)
+    recommended_action: str = ""
+    recommended_action_detail: str = ""
+    selection_verdict: str = ""
     token_usage: Dict[str, int] = field(default_factory=dict)
     raw_json: str = ""
 
@@ -108,20 +111,24 @@ def _load_cluster_docs(run_dir: Path) -> List[Dict[str, Any]]:
     return docs
 
 
-def _load_boundary_pairs(run_dir: Path) -> List[Dict[str, Any]]:
-    """Load boundary_pairs from manifest.json."""
+def _load_trajectory_projection_pairs(run_dir: Path) -> List[Dict[str, Any]]:
+    """Load trajectory_projection_pairs from manifest.json."""
     manifest_path = run_dir / "manifest.json"
     if not manifest_path.is_file():
         return []
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        return manifest.get("boundary_pairs") or []
+        return (
+            manifest.get("trajectory_projection_pairs")
+            or manifest.get("boundary_pairs")
+            or []
+        )
     except Exception:
         return []
 
 
 def _boundary_description_text(run_dir: Path, bp: Dict[str, Any]) -> str:
-    """Read description.txt for both sides of a boundary pair."""
+    """Read description.txt for both sides of an embedding boundary pair."""
     ca, ta = bp.get("cluster_a"), bp.get("trial_a")
     cb, tb = bp.get("cluster_b"), bp.get("trial_b")
 
@@ -132,18 +139,27 @@ def _boundary_description_text(run_dir: Path, bp: Dict[str, Any]) -> str:
         if str(analyzer_src) not in sys.path:
             sys.path.insert(0, str(analyzer_src))
         from cluster_paths import resolve_highlight_subdir, resolve_path  # type: ignore
+        from trajectory_projection_pair_packs import find_trajectory_projection_pair_side_dir  # type: ignore
 
-        cdir = run_dir / f"cluster{cluster_label}"
-        tgt = cb if cluster_label == ca else ca
-        bdir = resolve_highlight_subdir(cdir, f"boundary_c{tgt}", must_exist=True)
-        for sub in sorted(bdir.glob("trial_*")) if bdir else []:
-            desc = resolve_path(sub, "description.txt", must_exist=True)
-            if desc is None:
-                desc = sub / "description.txt"
-                if not desc.is_file():
-                    continue
-            return desc.read_text(encoding="utf-8").strip()
-        return ""
+        peer = cb if cluster_label == ca else ca
+        side = find_trajectory_projection_pair_side_dir(run_dir, cluster_label, peer, str(trial_id))
+        if side is None:
+            # Legacy highlight_trials/boundary_c*
+            cdir = run_dir / f"cluster{cluster_label}"
+            bdir = resolve_highlight_subdir(
+                cdir, f"boundary_c{peer}", must_exist=True
+            )
+            for sub in sorted(bdir.glob("trial_*")) if bdir else []:
+                side = sub
+                break
+        if side is None:
+            return ""
+        desc = resolve_path(side, "description.txt", must_exist=True)
+        if desc is None:
+            desc = side / "description.txt"
+            if not desc.is_file():
+                return ""
+        return desc.read_text(encoding="utf-8").strip()
 
     text_a = _read(ca, ta)
     text_b = _read(cb, tb)
@@ -181,11 +197,11 @@ def _format_cluster_summaries(docs: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _format_boundary_pairs(run_dir: Path, boundary_pairs: List[Dict[str, Any]]) -> str:
-    if not boundary_pairs:
+def _format_trajectory_projection_pairs(run_dir: Path, trajectory_projection_pairs: List[Dict[str, Any]]) -> str:
+    if not trajectory_projection_pairs:
         return "(No boundary trial descriptions available)"
     parts = []
-    for bp in boundary_pairs:
+    for bp in trajectory_projection_pairs:
         parts.append(_boundary_description_text(run_dir, bp))
     return "\n\n".join(parts)
 
@@ -300,16 +316,42 @@ class CrossClusterEvaluator:
             print("[CrossClusterEvaluator] Need ≥2 clusters; found", len(docs))
             return None
 
-        boundary_pairs = _load_boundary_pairs(run_dir)
+        trajectory_projection_pairs = _load_trajectory_projection_pairs(run_dir)
         cluster_summaries_text = _format_cluster_summaries(docs)
-        boundary_pairs_text = _format_boundary_pairs(run_dir, boundary_pairs)
+        trajectory_projection_pairs_text = _format_trajectory_projection_pairs(run_dir, trajectory_projection_pairs)
+
+        # Medoid motives, parameter-space-matched pairs and the deterministic checks are what
+        # let the model grade the partition rather than re-describe the clusters.
+        try:
+            from .cluster_selection_eval import (
+                digest_for_prompt,
+                parameter_space_pair_digest,
+                medoid_digest,
+                neighbor_rollup_digest,
+            )
+
+            medoid_text = medoid_digest(run_dir)
+            parameter_space_pair_text = parameter_space_pair_digest(run_dir)
+            checks_text = digest_for_prompt(run_dir)
+            # Stage C: cite each cluster's own localized distinct/similar/
+            # ambiguous-vs-neighbor verdict (Stage B) instead of re-deriving
+            # it from the raw medoid/Parameter-space pair cards a second time.
+            neighbor_rollup_text = neighbor_rollup_digest(run_dir)
+        except Exception as exc:
+            print(f"[CrossClusterEvaluator] digest build failed: {exc}")
+            medoid_text = parameter_space_pair_text = checks_text = "(unavailable)"
+            neighbor_rollup_text = "(unavailable)"
 
         # Extract system context (everything before <Cluster Summaries>)
         system_text = prompt_tmpl.split("<Cluster Summaries>")[0].strip()
         full_prompt = self._safe_format(
             prompt_tmpl,
             cluster_summaries=cluster_summaries_text,
-            boundary_trial_pairs=boundary_pairs_text,
+            medoid_cards=medoid_text,
+            boundary_trial_pairs=trajectory_projection_pairs_text,
+            parameter_space_pair_cards=parameter_space_pair_text,
+            deterministic_checks=checks_text,
+            neighbor_rollup=neighbor_rollup_text,
         )
 
         messages = [
@@ -336,6 +378,9 @@ class CrossClusterEvaluator:
             cluster_summaries=list(parsed.get("cluster_summaries") or []),
             merge_candidates=list(parsed.get("merge_candidates") or []),
             split_candidates=list(parsed.get("split_candidates") or []),
+            recommended_action=str(parsed.get("recommended_action") or ""),
+            recommended_action_detail=str(parsed.get("recommended_action_detail") or ""),
+            selection_verdict=str(parsed.get("selection_verdict") or ""),
             token_usage=tokens,
             raw_json=raw,
         )
@@ -360,6 +405,15 @@ def run_cross_cluster_eval(
     run_dir = Path(run_dir)
     out_path = run_dir / _OUTPUT_FILE
 
+    # Deterministic half of the hybrid verdict — cheap, and useful even on the
+    # stub path where no LLM runs.
+    try:
+        from .cluster_selection_eval import write_eval
+
+        write_eval(run_dir)
+    except Exception as exc:
+        print(f"[CrossClusterEvaluator] selection eval failed: {exc}")
+
     model = normalize_model_name(model)
     if dry_run or not has_llm_credentials(model, api_key):
         reason = "dry_run" if dry_run else f"{api_key_env_hint(model)} not set"
@@ -370,6 +424,9 @@ def run_cross_cluster_eval(
             "cluster_summaries": [],
             "merge_candidates": [],
             "split_candidates": [],
+            "recommended_action": "",
+            "recommended_action_detail": "",
+            "selection_verdict": "",
             "stub": True,
         }
         out_path.write_text(json.dumps(stub, indent=2), encoding="utf-8")
@@ -391,6 +448,9 @@ def run_cross_cluster_eval(
         "cluster_summaries": result.cluster_summaries,
         "merge_candidates": result.merge_candidates,
         "split_candidates": result.split_candidates,
+        "recommended_action": result.recommended_action,
+        "recommended_action_detail": result.recommended_action_detail,
+        "selection_verdict": result.selection_verdict,
         "token_usage": result.token_usage,
     }
     out_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")

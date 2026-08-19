@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Rebuild gated IC-pair packs for an existing results run directory.
+"""Rebuild gated Parameter-space pair packs for an existing results run directory.
 
-Builds ``ic_pairs/cA-cB/`` (context.md + synced pair BEVs), updates manifest
+Builds ``parameter_space_pairs/cA-cB/`` (context.md + synced pair BEVs), updates manifest
 annotations, and removes legacy ``param_boundary_c*`` folders.
 
 Offline mode (default): reconstructs trial_index_map from existing
@@ -11,7 +11,7 @@ Example:
   conda activate analyzer
   cd gpl-odd-project
   PYTHONPATH=app/analyzer/src \\
-    python scripts/rebuild_ic_pairs.py \\
+    python scripts/rebuild_parameter_space_pairs.py \\
       --results-dir results/batch9/4_cluster_s=0.7482
 """
 from __future__ import annotations
@@ -44,7 +44,7 @@ def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
 
     # Prefer indices persisted on manifest pairs
     man = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
-    for bp in man.get("param_boundary_pairs") or []:
+    for bp in man.get("parameter_space_pairs") or []:
         ta, tb = str(bp.get("trial_a")), str(bp.get("trial_b"))
         if bp.get("trial_index_a") is not None:
             idx[ta] = (
@@ -58,7 +58,7 @@ def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
             )
 
     # New layout pair.json
-    for pj in (run_dir / "ic_pairs").glob("c*-*/pair.json"):
+    for pj in (run_dir / "parameter_space_pairs").glob("c*-*/pair.json"):
         try:
             doc = json.loads(pj.read_text(encoding="utf-8"))
         except Exception:
@@ -81,7 +81,7 @@ def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
         if not (m and m2 and m3):
             continue
         folder_ti[(m.group(1), m2.group(1))] = int(m3.group(1))
-    for bp in man.get("param_boundary_pairs") or []:
+    for bp in man.get("parameter_space_pairs") or []:
         ca, cb = str(bp["cluster_a"]), str(bp["cluster_b"])
         ta, tb = str(bp["trial_a"]), str(bp["trial_b"])
         if ta not in idx and (ca, cb) in folder_ti:
@@ -101,7 +101,7 @@ def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Rebuild gated ic_pairs/cA-cB packs")
+    ap = argparse.ArgumentParser(description="Rebuild gated parameter_space_pairs/cA-cB packs")
     ap.add_argument("--results-dir", required=True, type=Path)
     ap.add_argument("--dataset", default=None)
     ap.add_argument("--tau", type=float, default=0.1)
@@ -120,13 +120,13 @@ def main() -> None:
     if not manifest_path.is_file():
         raise SystemExit(f"manifest.json missing: {manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    pairs = manifest.get("param_boundary_pairs") or []
+    pairs = manifest.get("parameter_space_pairs") or []
     if not pairs:
-        raise SystemExit("manifest has no param_boundary_pairs")
+        raise SystemExit("manifest has no parameter_space_pairs")
 
     from dataset_config import dataset_for_batch_id, xodr_path_for_dataset
     from renderer import XodrParser
-    from ic_pair_packs import process_ic_pair_packs
+    from parameter_space_pair_packs import process_parameter_space_pair_packs
 
     dataset = args.dataset or manifest.get("dataset") or "dataset1"
     batch_id = args.batch_id or manifest.get("batch_id")
@@ -174,9 +174,9 @@ def main() -> None:
     xodr = xodr_path_for_dataset(dataset)
     parser = XodrParser(str(xodr))
 
-    annotated = process_ic_pair_packs(
+    annotated = process_parameter_space_pair_packs(
         run_dir=run_dir,
-        param_boundary_pairs=pairs,
+        parameter_space_pairs=pairs,
         trial_index_map=trial_index_map,
         collision_flags=collision_flags,
         trials_meta=trials_meta,
@@ -187,13 +187,13 @@ def main() -> None:
         scope=None,
     )
 
-    manifest["param_boundary_pairs"] = annotated
+    manifest["parameter_space_pairs"] = annotated
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     print(f"Updated {manifest_path}")
     kept = [
         f"c{p['cluster_a']}-c{p['cluster_b']} [{p.get('card_role')}]"
         for p in annotated
-        if p.get("ic_match")
+        if p.get("parameter_space_match")
     ]
     print("Matched packs:", kept)
 

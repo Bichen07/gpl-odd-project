@@ -18,6 +18,7 @@ from typing import List, Optional, Set, Tuple
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.transforms import Affine2D
 import pandas as pd
 import yaml
 
@@ -29,6 +30,23 @@ except ImportError:  # pragma: no cover
 # Replayer (dashboard ``map.svg`` layer ``non_accessibles``) fill — light gray blocks.
 _NON_ACCESSIBLE_FILL = "#e6e6e6"
 _NON_ACCESSIBLE_EDGE = "#e0e0e0"
+
+
+def _install_heading_up_rotation(
+    ax,
+    center: Tuple[float, float],
+    heading_deg: float,
+) -> float:
+    """Rotate data so ``heading_deg`` (0=+X world) points screen-up.
+
+    Applied once to ``ax.transData`` before artists are drawn. Overlays that
+    use ``transAxes`` / ``transFigure`` are unaffected. Returns the rotation
+    actually installed (90 − heading).
+    """
+    cx, cy = float(center[0]), float(center[1])
+    rot_deg = 90.0 - float(heading_deg)
+    ax.transData = Affine2D().rotate_deg_around(cx, cy, rot_deg) + ax.transData
+    return rot_deg
 
 
 def _coerce_highlight_road_ids(highlight_road_ids_list) -> Set[str]:
@@ -660,6 +678,8 @@ class MapPlotter:
         draw_ref_lines: bool = True,
         draw_ref_arrows: bool = False,
         max_road_labels: int = 5,
+        view_rotation_deg: Optional[float] = None,
+        view_rotation_center: Optional[Tuple[float, float]] = None,
     ) -> None:
         """Single render path for empty-map overviews and agent snapshots.
 
@@ -667,12 +687,21 @@ class MapPlotter:
         labels near ego/partner (conflict BEV overlays). ``metric_chip`` draws
         a short ``d=… TTC=…`` badge in the bottom-right corner.
         ``label_avoid_xy`` nudges labels away from agent centers.
+        ``view_rotation_deg`` is the world heading (0=+X) that should point
+        screen-up; rotation is applied once around ``view_rotation_center``.
 
         Visual defaults: off-road ``non_accessible`` fills only (no on-road
         gray lane slabs). Red OpenDRIVE reference lines are optional; start
         arrows stay off unless ``draw_ref_arrows`` is enabled.
         """
         fig = self._begin_figure(output_px, white_border_frac)
+        if (
+            view_rotation_deg is not None
+            and view_rotation_center is not None
+        ):
+            _install_heading_up_rotation(
+                plt.gca(), view_rotation_center, view_rotation_deg
+            )
         (
             all_lanes_info,
             processed_roads_data,

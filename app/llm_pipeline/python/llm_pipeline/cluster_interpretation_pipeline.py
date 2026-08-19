@@ -184,8 +184,8 @@ def build_cluster_stats(
 def action_log_from_description(cluster_dir: Path) -> str:
     """Preferred LLM text signal: the rule-based Labeller/Describer output.
 
-    Uses nested-then-flat `context.md` if present (sentence timeline + agent
-    digest), else `description.txt`, else `action.yaml` rendered compactly.
+    Uses nested-then-flat `context_medoid.md` (trial timeline), else legacy
+    `context.md`, else `description.txt`, else `action.yaml` rendered compactly.
     Returns "" when none are available (caller falls back to observations).
     """
     import sys
@@ -195,11 +195,12 @@ def action_log_from_description(cluster_dir: Path) -> str:
         sys.path.insert(0, str(analyzer_src))
     from cluster_paths import resolve_path  # type: ignore
 
-    context_md = resolve_path(cluster_dir, "context.md", must_exist=True)
-    if context_md is not None:
-        text = context_md.read_text(encoding="utf-8").strip()
-        if text:
-            return text
+    for artifact in ("context_medoid.md", "context.md"):
+        context_md = resolve_path(cluster_dir, artifact, must_exist=True)
+        if context_md is not None:
+            text = context_md.read_text(encoding="utf-8").strip()
+            if text:
+                return text
 
     description = resolve_path(cluster_dir, "description.txt", must_exist=True)
     if description is not None:

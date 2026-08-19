@@ -62,7 +62,7 @@ type ClusteringQuality = {
     merge_candidates?: string[];
     split_candidates?: string[];
   } | null;
-  boundary_pairs?: Array<{
+  trajectory_projection_pairs?: Array<{
     cluster_a: number; trial_a: string; collided_a: boolean;
     cluster_b: number; trial_b: string; collided_b: boolean;
     embedding_dist: number;
@@ -84,11 +84,34 @@ type SplitClusterCard = {
   summaryMeta?: Record<string, unknown> | null;
   medoidYaml: string;
   medoidMeta?: Record<string, unknown> | null;
+  touchingIcPairs?: string[];
+  missingIcContrasts?: string[];
+  readyForSummary?: boolean;
+};
+
+type IcPairEntry = {
+  name: string;
+  yaml: string;
+  folder?: string;
+  facts?: Record<string, unknown> | null;
+  syncedBev?: string[];
+  contrastMeta?: Record<string, unknown> | null;
+  mergedTimeline?: string;
+  processContext?: string;
+  hasProcessContext?: boolean;
+  hasSyncedBev?: boolean;
+  hasContrast?: boolean;
+  medoidReady?: boolean;
+  readyForLlm?: boolean;
+  missing?: string[];
 };
 
 type SplitAnalysis = {
   clusters: SplitClusterCard[];
-  icPairs: Array<{ name: string; yaml: string }>;
+  icPairs: IcPairEntry[];
+  crossEval?: Record<string, unknown> | null;
+  selectionEval?: Record<string, unknown> | null;
+  quality?: Record<string, unknown> | null;
 };
 
 type Config = {
@@ -106,8 +129,31 @@ const PROMPT_LABELS: Array<{ key: string; label: string; help: string }> = [
   { key: "common_sense", label: "Domain rules / glossary", help: "Metrics glossary + motive labels shared by all products." },
   { key: "medoid", label: "Medoid trial prompt", help: "Motive / decision timeline for one medoid trial." },
   { key: "summary", label: "Cluster summary prompt", help: "Caption over enriched TTC/IC digests." },
-  { key: "ic_pair", label: "IC closest-pair prompt", help: "Contrast two near-IC trials across clusters." },
+  { key: "parameter_space_pair", label: "Parameter-space closest-pair prompt", help: "Contrast two near-identical parameter-space trials across clusters." },
+  {
+    key: "cross_eval",
+    label: "Cross-cluster eval prompt",
+    help: "Grades the whole partition from the medoid + Parameter-space pair cards and the deterministic checks.",
+  },
 ];
+
+// Each tab shows only the prompts its own product actually sends, so the prompt
+// on screen is the prompt that runs.
+const PROMPT_GROUPS: Record<number, string[]> = {
+  0: ["system", "common_sense", "medoid"],
+  1: ["system", "common_sense", "parameter_space_pair"],
+  2: ["system", "common_sense", "summary"],
+};
+
+const TAB_PRODUCTS: Record<number, string> = {
+  0: "medoid",
+  1: "parameter-space-pairs",
+  2: "summary",
+};
+
+// Shared typography for contrast-card narrative fields.
+const CONTRAST_FIELD_LABEL_SX = { fontSize: 20, fontWeight: 700 };
+const CONTRAST_FIELD_BODY_SX = { whiteSpace: "pre-wrap", fontSize: 13, lineHeight: 1.7 };
 
 function snapshotLabel(name: string): string {
   return `t=${snapshotTimestamp(name)}s`;
@@ -369,6 +415,7 @@ export default function AnalyzeClient({
   // --- per-cluster image selection + which clusters to run ---
   const [selected, setSelected] = useState<Record<number, string[]>>({});
   const [runClusters, setRunClusters] = useState<Set<number>>(new Set());
+  const [selectedPairs, setSelectedPairs] = useState<Set<string>>(new Set());
   const [autoCount, setAutoCount] = useState<number>(10);
 
   // --- run state ---
@@ -377,11 +424,6 @@ export default function AnalyzeClient({
   const [results, setResults] = useState<ResultEntry[]>([]);
   const [splitAnalysis, setSplitAnalysis] = useState<SplitAnalysis | null>(null);
   const [splitSubTab, setSplitSubTab] = useState(0);
-  const [products, setProducts] = useState({
-    medoid: true,
-    summary: false,
-    "ic-pairs": false,
-  });
   const [logs, setLogs] = useState<string>("");
   const [logFile, setLogFile] = useState<string>("");
   const [runError, setRunError] = useState<string | null>(null);
@@ -404,6 +446,10 @@ export default function AnalyzeClient({
       setRunClusters(new Set(cfg.clusters.map((c) => c.cluster)));
       if (cfg.results?.length) setResults(cfg.results);
       setSplitAnalysis(cfg.splitAnalysis ?? null);
+      const readyPairs = (cfg.splitAnalysis?.icPairs ?? [])
+        .filter((p) => p.folder && p.readyForLlm)
+        .map((p) => p.folder as string);
+      setSelectedPairs(new Set(readyPairs));
     },
     [autoCount],
   );
@@ -648,12 +694,24 @@ export default function AnalyzeClient({
     });
   }, []);
 
-  const run = async (subset?: number[]) => {
+  const run = async (
+    subset: number[] | undefined,
+    productsSpec: string,
+    pairFolders?: string[],
+  ) => {
     if (!config || running) return;
+    const isIcPairs = productsSpec
+      .split(",")
+      .map((s) => s.trim())
+      .includes("parameter-space-pairs");
+    const pairsToRun =
+      isIcPairs && pairFolders && pairFolders.length > 0
+        ? [...pairFolders].sort()
+        : undefined;
     const clustersToRun = (subset && subset.length ? subset : [...runClusters]).sort(
       (a, b) => a - b,
     );
-    if (clustersToRun.length === 0) return;
+    if (!pairsToRun && clustersToRun.length === 0) return;
 
     setRunning(true);
     setActiveClusters(clustersToRun);
@@ -669,16 +727,14 @@ export default function AnalyzeClient({
         body: JSON.stringify({
           batchId,
           folder: config.folder,
-          clusters: clustersToRun,
+          clusters: pairsToRun ? undefined : clustersToRun,
+          pairs: pairsToRun,
           model,
           apiKey,
           temperature,
           review,
           dryRun,
-          products: Object.entries(products)
-            .filter(([, on]) => on)
-            .map(([k]) => k)
-            .join(","),
+          products: productsSpec,
           prompts,
           selectedImages,
         }),
@@ -689,7 +745,14 @@ export default function AnalyzeClient({
         const data = await res.json();
         if (Array.isArray(data.results)) mergeResults(data.results);
         setLogs(data.logs ?? data.error ?? "");
-        if (!data.ok) setRunError(`Run failed (code ${data.exitCode ?? "?"}).`);
+        if (!data.ok && data.error) {
+          const detail = Array.isArray(data.details)
+            ? `\n${data.details.join("\n")}`
+            : "";
+          setRunError(`${data.error}${detail}`);
+        } else if (!data.ok) {
+          setRunError(`Run failed (code ${data.exitCode ?? "?"}).`);
+        }
         try {
           await reloadConfig();
         } catch {
@@ -870,8 +933,22 @@ export default function AnalyzeClient({
 
   // Find quality entry for current folder
   const currentQuality = evalConfigs.find((c) => c.folder === config.folder);
-  const currentBoundaryPairs = currentQuality?.boundary_pairs ?? [];
+  const currentBoundaryPairs = currentQuality?.trajectory_projection_pairs ?? [];
   const currentCrossEval = currentQuality?.cross_cluster_eval;
+
+  // "Cluster analysis" prerequisites: medoid + every touching Parameter-space pair contrast.
+  const splitClustersForPrereq = splitAnalysis?.clusters ?? [];
+  const nClustersNoMedoid = splitClustersForPrereq.filter((c) => !c.medoidYaml).length;
+  const icPairsForPrereq = splitAnalysis?.icPairs ?? [];
+  const nIcPairsUnbuilt = icPairsForPrereq.filter((p) => !p.hasContrast && !p.yaml).length;
+  const clustersMissingIcContrasts = splitClustersForPrereq.filter(
+    (c) => (c.missingIcContrasts ?? []).length > 0,
+  );
+  const summaryBlocked =
+    nClustersNoMedoid === splitClustersForPrereq.length ||
+    (splitClustersForPrereq.length > 0 &&
+      splitClustersForPrereq.every((c) => !c.readyForSummary));
+  const anySummaryReady = splitClustersForPrereq.some((c) => c.readyForSummary);
 
   return (
     <Container maxWidth="xl" sx={{ py: 3 }}>
@@ -889,20 +966,167 @@ export default function AnalyzeClient({
       </Stack>
 
       <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }}>
-        <Tab label="Analysis" />
-        <Tab label={`Evaluation${currentQuality ? ` (score ${currentQuality.final_score?.toFixed(1)})` : ""}`} />
         <Tab
-          label={`Split cards${
-            splitAnalysis?.clusters?.length
-              ? ` (${splitAnalysis.clusters.length})`
+          label={`Medoid analysis${
+            splitAnalysis?.clusters?.length ? ` (${splitAnalysis.clusters.length})` : ""
+          }`}
+        />
+        <Tab
+          label={`Parameter-space pair analysis${
+            splitAnalysis?.icPairs?.length ? ` (${splitAnalysis.icPairs.length})` : ""
+          }`}
+        />
+        <Tab
+          label={`Cluster analysis${
+            currentQuality?.final_score != null
+              ? ` (score ${currentQuality.final_score.toFixed(1)})`
               : ""
           }`}
         />
       </Tabs>
 
-      {/* ===== EVALUATION TAB ===== */}
+      {/* ===== IC-PAIR ANALYSIS TAB ===== */}
       {activeTab === 1 && (
+        <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="flex-start">
+          <Stack spacing={2} sx={{ flex: 1, minWidth: 0, width: "100%" }}>
+            <PromptsCard
+              keys={PROMPT_GROUPS[1]}
+              prompts={prompts}
+              setPrompts={setPrompts}
+              productLabel="parameter-space-pairs"
+            />
+          </Stack>
+          <Stack spacing={2} sx={{ flex: 1.3, minWidth: 0, width: "100%" }}>
+            <Paper variant="outlined" sx={{ p: 2 }}>
+              <Typography variant="subtitle2" gutterBottom>
+                Select Parameter-space pairs to run
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1.5 }}>
+                {(splitAnalysis?.icPairs ?? []).map((p) => {
+                  const folder = p.folder ?? p.name;
+                  const ready = Boolean(p.readyForLlm);
+                  const checked = selectedPairs.has(folder);
+                  return (
+                    <Chip
+                      key={folder}
+                      label={`${folder}${p.hasContrast ? " ✓" : ""}${ready ? "" : " ⚠"}`}
+                      color={checked ? "primary" : "default"}
+                      variant={ready ? (checked ? "filled" : "outlined") : "outlined"}
+                      disabled={!ready}
+                      onClick={() => {
+                        if (!ready) return;
+                        setSelectedPairs((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(folder)) next.delete(folder);
+                          else next.add(folder);
+                          return next;
+                        });
+                      }}
+                      size="small"
+                    />
+                  );
+                })}
+              </Stack>
+              <Stack direction="row" spacing={1} sx={{ mb: 1.5 }}>
+                <Button
+                  size="small"
+                  onClick={() =>
+                    setSelectedPairs(
+                      new Set(
+                        (splitAnalysis?.icPairs ?? [])
+                          .filter((p) => p.folder && p.readyForLlm)
+                          .map((p) => p.folder as string),
+                      ),
+                    )
+                  }
+                >
+                  Select all ready
+                </Button>
+                <Button size="small" onClick={() => setSelectedPairs(new Set())}>
+                  Clear
+                </Button>
+              </Stack>
+              {(splitAnalysis?.icPairs ?? []).some((p) => !p.readyForLlm) && (
+                <Alert severity="warning" sx={{ mb: 1.5 }}>
+                  Pairs marked ⚠ need both endpoint medoids,{" "}
+                  <code>process/context.md</code>, and synced BEVs before LLM.
+                  {(splitAnalysis?.icPairs ?? [])
+                    .filter((p) => !p.readyForLlm && p.missing?.length)
+                    .slice(0, 3)
+                    .map((p) => (
+                      <Typography key={p.folder} variant="caption" display="block">
+                        {p.folder}: {(p.missing ?? []).join(", ")}
+                      </Typography>
+                    ))}
+                </Alert>
+              )}
+              <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
+                <Button
+                  variant="contained"
+                  disabled={
+                    running ||
+                    selectedPairs.size === 0 ||
+                    ![...selectedPairs].every((f) =>
+                      (splitAnalysis?.icPairs ?? []).some(
+                        (p) => p.folder === f && p.readyForLlm,
+                      ),
+                    )
+                  }
+                  onClick={() =>
+                    run(undefined, TAB_PRODUCTS[1], [...selectedPairs])
+                  }
+                  startIcon={running ? <CircularProgress size={16} color="inherit" /> : undefined}
+                >
+                  {running
+                    ? "Analyzing…"
+                    : `Run Parameter-space pair contrast (${selectedPairs.size})`}
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  Requires medoid cards for both clusters. Writes{" "}
+                  <code>parameter_space_pairs/cA-cB/output/contrast.yaml</code>.
+                </Typography>
+              </Stack>
+              {runError && (
+                <Alert severity="error" sx={{ mt: 2 }}>
+                  {runError}
+                </Alert>
+              )}
+            </Paper>
+            <IcPairPanel
+              pairs={splitAnalysis?.icPairs ?? []}
+              folder={config.folder}
+              batchId={batchId}
+              splitClusters={splitAnalysis?.clusters ?? []}
+            />
+          </Stack>
+        </Stack>
+      )}
+
+      {/* ===== EVALUATION (inside cluster analysis) ===== */}
+      {activeTab === 2 && (
         <Stack spacing={2}>
+          {(nClustersNoMedoid > 0 || nIcPairsUnbuilt > 0) && (
+            <Alert severity="warning">
+              {nClustersNoMedoid > 0 && (
+                <Typography variant="body2">
+                  {nClustersNoMedoid} of {splitClustersForPrereq.length} clusters have no medoid
+                  card yet — run Medoid analysis first.
+                </Typography>
+              )}
+              {nIcPairsUnbuilt > 0 && (
+                <Typography variant="body2">
+                  {nIcPairsUnbuilt} of {icPairsForPrereq.length} Parameter-space pairs have no contrast card
+                  yet — run Parameter-space pair analysis before cluster summary
+                  {clustersMissingIcContrasts.length
+                    ? ` (blocked for clusters ${clustersMissingIcContrasts
+                        .map((c) => c.cluster)
+                        .join(", ")})`
+                    : ""}
+                  .
+                </Typography>
+              )}
+            </Alert>
+          )}
           {/* Run button */}
           <Paper variant="outlined" sx={{ p: 2 }}>
             <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
@@ -1059,10 +1283,71 @@ export default function AnalyzeClient({
               crossEval={currentCrossEval}
             />
           )}
+
+          <Divider />
+
+          {/* Selection quality: deterministic checks + the LLM verdict */}
+          <SelectionQualityPanel
+            selectionEval={splitAnalysis?.selectionEval ?? null}
+            crossEval={splitAnalysis?.crossEval ?? null}
+            quality={splitAnalysis?.quality ?? null}
+          />
+
+          <Paper variant="outlined" sx={{ p: 2 }}>
+            <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
+              <Button
+                variant="contained"
+                disabled={running || config.clusters.length === 0 || !anySummaryReady}
+                onClick={() => {
+                  const ready = (splitAnalysis?.clusters ?? [])
+                    .filter((c) => c.readyForSummary)
+                    .map((c) => c.cluster);
+                  run(
+                    ready.length ? ready : config.clusters.map((c) => c.cluster),
+                    TAB_PRODUCTS[2],
+                  );
+                }}
+                startIcon={running ? <CircularProgress size={16} color="inherit" /> : undefined}
+              >
+                {running ? "Analyzing…" : "Run cluster summaries"}
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Runs <code>--products summary</code>. Hard-requires medoid cards and{" "}
+                <code>output/contrast.yaml</code> for every touching Parameter-space pair pack.
+              </Typography>
+            </Stack>
+            {summaryBlocked && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                Cluster summary is blocked until medoid + Parameter-space pair contrasts are built for the
+                selected clusters.
+              </Alert>
+            )}
+            {runError && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {runError}
+              </Alert>
+            )}
+          </Paper>
+
+          <PromptsCard
+            keys={PROMPT_GROUPS[2]}
+            prompts={prompts}
+            setPrompts={setPrompts}
+            productLabel="summary"
+          />
+
+          <SplitCardsPanel
+            split={splitAnalysis}
+            folder={config.folder}
+            batchId={batchId}
+            subTab={splitSubTab}
+            onSubTab={setSplitSubTab}
+            mode="summary"
+          />
         </Stack>
       )}
 
-      {/* ===== ANALYSIS TAB (existing content) ===== */}
+      {/* ===== MEDOID ANALYSIS TAB ===== */}
       {activeTab === 0 && (
       <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="flex-start">
         {/* LEFT: model + prompts */}
@@ -1116,61 +1401,18 @@ export default function AnalyzeClient({
                   label="Dry run (stub)"
                 />
               </Stack>
-              <Box>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Products
-                </Typography>
-                <Stack direction="row" spacing={1} flexWrap="wrap">
-                  {(
-                    [
-                      ["medoid", "Medoid"],
-                      ["summary", "Summary"],
-                      ["ic-pairs", "IC pairs"],
-                    ] as const
-                  ).map(([key, label]) => (
-                    <FormControlLabel
-                      key={key}
-                      control={
-                        <Checkbox
-                          size="small"
-                          checked={products[key]}
-                          onChange={(e) =>
-                            setProducts((p) => ({ ...p, [key]: e.target.checked }))
-                          }
-                        />
-                      }
-                      label={label}
-                    />
-                  ))}
-                </Stack>
-              </Box>
+              <Typography variant="caption" color="text.secondary">
+                Model setup applies to every tab. Each tab runs only its own product.
+              </Typography>
             </Stack>
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Prompts
-            </Typography>
-            {PROMPT_LABELS.map(({ key, label, help }) => (
-              <Accordion key={key} disableGutters elevation={0} square>
-                <AccordionSummary expandIcon={<ExpandMore />}>
-                  <Typography fontSize={14}>{label}</Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <TextField
-                    multiline
-                    fullWidth
-                    minRows={5}
-                    maxRows={18}
-                    value={prompts[key] ?? ""}
-                    onChange={(e) => setPrompts((p) => ({ ...p, [key]: e.target.value }))}
-                    helperText={help}
-                    slotProps={{ htmlInput: { style: { fontFamily: "monospace", fontSize: 12 } } }}
-                  />
-                </AccordionDetails>
-              </Accordion>
-            ))}
-          </Paper>
+          <PromptsCard
+            keys={PROMPT_GROUPS[0]}
+            prompts={prompts}
+            setPrompts={setPrompts}
+            productLabel="medoid"
+          />
         </Stack>
 
         {/* RIGHT: clusters + BEV selection + run + results */}
@@ -1242,7 +1484,7 @@ export default function AnalyzeClient({
                         size="small"
                         variant="outlined"
                         disabled={running || (selected[c.cluster] ?? []).length === 0}
-                        onClick={() => run([c.cluster])}
+                        onClick={() => run([c.cluster], TAB_PRODUCTS[0])}
                         startIcon={
                           running && activeClusters.length === 1 && activeClusters[0] === c.cluster ? (
                             <CircularProgress size={14} color="inherit" />
@@ -1320,12 +1562,12 @@ export default function AnalyzeClient({
               <Button
                 variant="contained"
                 disabled={running || runClusters.size === 0}
-                onClick={() => run()}
+                onClick={() => run(undefined, TAB_PRODUCTS[0])}
                 startIcon={running ? <CircularProgress size={16} color="inherit" /> : undefined}
               >
                 {running
                   ? "Analyzing…"
-                  : `Run all selected (${runClusters.size} cluster${runClusters.size === 1 ? "" : "s"})`}
+                  : `Run medoid cards (${runClusters.size} cluster${runClusters.size === 1 ? "" : "s"})`}
               </Button>
               <Typography variant="caption" color="text.secondary">
                 Tip: use a cluster&apos;s <strong>Analyze</strong> button to run one at a time and save API quota.
@@ -1400,19 +1642,19 @@ export default function AnalyzeClient({
           {results.map((r) => (
             <ResultCard key={r.cluster} r={r} onDownload={downloadYaml} />
           ))}
+
+          <SplitCardsPanel
+            split={splitAnalysis}
+            folder={config.folder}
+            batchId={batchId}
+            subTab={splitSubTab}
+            onSubTab={setSplitSubTab}
+            mode="medoid"
+          />
         </Stack>
       </Stack>
       )}
 
-      {activeTab === 2 && (
-        <SplitCardsPanel
-          split={splitAnalysis}
-          folder={config?.folder ?? ""}
-          batchId={batchId}
-          subTab={splitSubTab}
-          onSubTab={setSplitSubTab}
-        />
-      )}
     </Container>
   );
 }
@@ -1464,12 +1706,15 @@ function SplitCardsPanel({
   batchId,
   subTab,
   onSubTab,
+  mode,
 }: {
   split: SplitAnalysis | null;
   folder: string;
   batchId: string;
   subTab: number;
   onSubTab: (v: number) => void;
+  /** Which saved card to show. Omit for the legacy three-tab viewer. */
+  mode?: "medoid" | "summary";
 }) {
   const clusters = split?.clusters ?? [];
   const [clusterIdx, setClusterIdx] = useState(0);
@@ -1483,29 +1728,40 @@ function SplitCardsPanel({
   const icPairs = split?.icPairs ?? [];
   const pair = icPairs[Math.min(pairIdx, Math.max(0, icPairs.length - 1))] ?? null;
 
+  // When scoped to one product, pin the sub-tab instead of showing the picker.
+  const effectiveSubTab = mode === "medoid" ? 1 : mode === "summary" ? 0 : subTab;
+
   if (!split || (clusters.length === 0 && icPairs.length === 0)) {
     return (
       <Alert severity="info">
-        No split-analysis artifacts yet for this folder. Run with products Medoid / Summary / IC
-        pairs, then open this tab.
+        No saved cards yet for this folder. Run the product above, then reopen this tab.
       </Alert>
     );
   }
 
   return (
     <Stack spacing={2}>
-      <Typography variant="body2" color="text.secondary">
-        Numbers-first report for batch {batchId} · {folder}. Explore Highlight stays the trial
-        picker; this tab is the saved card viewer.
-      </Typography>
+      {mode == null && (
+        <Typography variant="body2" color="text.secondary">
+          Numbers-first report for batch {batchId} · {folder}. Explore Highlight stays the trial
+          picker; this tab is the saved card viewer.
+        </Typography>
+      )}
 
-      <Tabs value={subTab} onChange={(_, v) => onSubTab(v)}>
-        <Tab label="Summary" />
-        <Tab label="Medoid" />
-        <Tab label={`IC pairs${icPairs.length ? ` (${icPairs.length})` : ""}`} />
-      </Tabs>
+      {mode == null && (
+        <Tabs value={subTab} onChange={(_, v) => onSubTab(v)}>
+          <Tab label="Summary" />
+          <Tab label="Medoid" />
+          <Tab label={`Parameter-space pairs${icPairs.length ? ` (${icPairs.length})` : ""}`} />
+        </Tabs>
+      )}
+      {mode != null && (
+        <Typography variant="h6">
+          {mode === "medoid" ? "Saved medoid cards" : "Saved cluster summary cards"}
+        </Typography>
+      )}
 
-      {(subTab === 0 || subTab === 1) && clusters.length > 0 && (
+      {(effectiveSubTab === 0 || effectiveSubTab === 1) && clusters.length > 0 && (
         <Stack direction="row" spacing={1} flexWrap="wrap">
           {clusters.map((c, i) => (
             <Chip
@@ -1519,7 +1775,7 @@ function SplitCardsPanel({
         </Stack>
       )}
 
-      {subTab === 0 && card && (
+      {effectiveSubTab === 0 && card && (
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }} flexWrap="wrap">
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
@@ -1546,7 +1802,7 @@ function SplitCardsPanel({
             title="TTC (survive)"
             digest={agg?.ttc_survive as Record<string, unknown>}
           />
-          {agg?.ic && typeof agg.ic === "object" && (
+          {typeof agg?.ic === "object" && agg?.ic !== null && (
             <Box sx={{ mb: 2 }}>
               <Typography variant="subtitle2" gutterBottom>
                 Initial conditions
@@ -1593,6 +1849,53 @@ function SplitCardsPanel({
               {String(summaryParsed.consistency_note)}
             </Typography>
           )}
+          {summaryParsed?.motive_consistency_note != null &&
+            String(summaryParsed.motive_consistency_note).trim() !== "" && (
+              <Alert severity="warning" sx={{ mt: 1 }}>
+                {String(summaryParsed.motive_consistency_note)}
+              </Alert>
+            )}
+          {Array.isArray(summaryParsed?.neighbor_comparison) &&
+            (summaryParsed!.neighbor_comparison as any[]).length > 0 && (
+              <Box sx={{ mt: 1.5 }}>
+                <Typography variant="subtitle2" gutterBottom>
+                  vs. parameter-space-matched neighbors
+                  {summaryParsed?.distinct_from_neighbors != null && (
+                    <Chip
+                      size="small"
+                      sx={{ ml: 1 }}
+                      color={summaryParsed.distinct_from_neighbors ? "success" : "warning"}
+                      label={
+                        summaryParsed.distinct_from_neighbors
+                          ? "distinct from all neighbors"
+                          : "not distinct from every neighbor"
+                      }
+                    />
+                  )}
+                </Typography>
+                <Stack spacing={0.5}>
+                  {(summaryParsed!.neighbor_comparison as any[]).map((nc, i) => (
+                    <Stack key={i} direction="row" spacing={1} alignItems="baseline" flexWrap="wrap">
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={`${nc.parameter_space_pair_folder ?? `cluster${nc.neighbor_cluster}`}: ${nc.verdict ?? "?"}`}
+                        color={
+                          nc.verdict === "distinct"
+                            ? "success"
+                            : nc.verdict === "similar"
+                              ? "warning"
+                              : "default"
+                        }
+                      />
+                      <Typography variant="caption" color="text.secondary">
+                        {nc.reason}
+                      </Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              </Box>
+            )}
           {!summaryParsed && card.summaryYaml && (
             <Box
               component="pre"
@@ -1604,19 +1907,20 @@ function SplitCardsPanel({
         </Paper>
       )}
 
-      {subTab === 1 && card && (
+      {effectiveSubTab === 1 && card && (
         <Paper variant="outlined" sx={{ p: 2 }}>
           <Typography variant="h6" gutterBottom>
             Medoid trial
             {medoidParsed?.trial_id != null ? ` ${String(medoidParsed.trial_id)}` : ""}
           </Typography>
-          {(medoidParsed?.conflict_metrics || medoidParsed?.outcome) && (
+          {medoidParsed != null &&
+            (medoidParsed.conflict_metrics != null || medoidParsed.outcome != null) && (
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
               {medoidParsed.outcome != null && (
                 <Chip size="small" label={`outcome: ${String(medoidParsed.outcome)}`} />
               )}
-              {medoidParsed.conflict_metrics &&
-                typeof medoidParsed.conflict_metrics === "object" &&
+              {typeof medoidParsed.conflict_metrics === "object" &&
+                medoidParsed.conflict_metrics !== null &&
                 Object.entries(medoidParsed.conflict_metrics as Record<string, unknown>).map(
                   ([k, v]) => (
                     <Chip
@@ -1647,6 +1951,11 @@ function SplitCardsPanel({
                     <Box key={i} sx={{ pl: 1, borderLeft: "2px solid", borderColor: "divider" }}>
                       <Typography variant="caption" color="text.secondary">
                         t={fmtNum(ev.timestamp ?? ev.t, 2)}s
+                        {ev.motive != null &&
+                        String(ev.motive) !== "" &&
+                        String(ev.motive) !== "null"
+                          ? ` · ${String(ev.motive)}`
+                          : ""}
                       </Typography>
                       <Typography variant="body2">{String(ev.description ?? "")}</Typography>
                     </Box>
@@ -1686,10 +1995,10 @@ function SplitCardsPanel({
         </Paper>
       )}
 
-      {subTab === 2 && (
+      {effectiveSubTab === 2 && (
         <Paper variant="outlined" sx={{ p: 2 }}>
           {icPairs.length === 0 ? (
-            <Alert severity="info">No IC pair YAMLs under ic_pairs/ yet.</Alert>
+            <Alert severity="info">No Parameter-space pair YAMLs under parameter_space_pairs/ yet.</Alert>
           ) : (
             <>
               <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
@@ -1725,6 +2034,562 @@ function SplitCardsPanel({
         </Paper>
       )}
     </Stack>
+  );
+}
+
+// ─── Per-tab prompt viewer/editor ───────────────────────────────────────────
+
+function PromptsCard({
+  keys,
+  prompts,
+  setPrompts,
+  productLabel,
+}: {
+  keys: string[];
+  prompts: Record<string, string>;
+  setPrompts: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  productLabel: string;
+}) {
+  const entries = PROMPT_LABELS.filter((p) => keys.includes(p.key));
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        Prompts sent by this analysis
+      </Typography>
+      <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+        These are the exact templates <code>--products {productLabel}</code> sends, in order.
+        Edits apply to the next run from this tab only.
+      </Typography>
+      {entries.map(({ key, label, help }) => (
+        <Accordion key={key} disableGutters elevation={0} square>
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography fontSize={14}>{label}</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <TextField
+              multiline
+              fullWidth
+              minRows={5}
+              maxRows={18}
+              value={prompts[key] ?? ""}
+              onChange={(e) => setPrompts((p) => ({ ...p, [key]: e.target.value }))}
+              helperText={help}
+              slotProps={{ htmlInput: { style: { fontFamily: "monospace", fontSize: 12 } } }}
+            />
+          </AccordionDetails>
+        </Accordion>
+      ))}
+    </Paper>
+  );
+}
+
+// ─── Parameter-space pair analysis panel ─────────────────────────────────────────────────
+
+function IcPairPanel({
+  pairs,
+  folder,
+  batchId,
+  splitClusters = [],
+}: {
+  pairs: IcPairEntry[];
+  folder: string;
+  batchId: string;
+  splitClusters?: SplitClusterCard[];
+}) {
+  const [idx, setIdx] = useState(0);
+  const [frame, setFrame] = useState(0);
+  const pair = pairs[Math.min(idx, Math.max(0, pairs.length - 1))] ?? null;
+  const facts = (pair?.facts ?? null) as Record<string, any> | null;
+  const frames = pair?.syncedBev ?? [];
+  const shown = frames[Math.min(frame, Math.max(0, frames.length - 1))];
+  const contrastParsed = (pair?.contrastMeta as Record<string, any> | null)?.parsed as
+    | Record<string, any>
+    | undefined;
+  const leftMotive = contrastParsed?.left?.primary_motive;
+  const rightMotive = contrastParsed?.right?.primary_motive;
+  const leftMedoid = splitClusters.find(
+    (c) => String(c.cluster) === String(facts?.cluster_a),
+  );
+  const rightMedoid = splitClusters.find(
+    (c) => String(c.cluster) === String(facts?.cluster_b),
+  );
+
+  if (pairs.length === 0) {
+    return (
+      <Alert severity="info">
+        No Parameter-space pair packs under <code>parameter_space_pairs/</code>. Rebuild the dataset with{" "}
+        <code>--param-boundaries all</code>. Packs only exist for cluster pairs whose closest
+        trials sit within the parameter caliper (param_dist ≤ tau).
+      </Alert>
+    );
+  }
+
+  return (
+    <Stack spacing={2}>
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
+          {pairs.map((p, i) => (
+            <Chip
+              key={p.name}
+              label={`${p.folder ?? p.name.replace(/\.yaml$/, "")}${
+                p.readyForLlm ? "" : " ⚠"
+              }`}
+              color={i === idx ? "primary" : "default"}
+              variant={p.hasContrast || p.yaml ? "filled" : "outlined"}
+              onClick={() => {
+                setIdx(i);
+                setFrame(0);
+              }}
+              size="small"
+            />
+          ))}
+        </Stack>
+        <Typography variant="caption" color="text.secondary">
+          Filled chips have an LLM contrast card; ⚠ = not ready for LLM (medoid / process /
+          BEV).
+        </Typography>
+        {pair && !pair.readyForLlm && (
+          <Alert severity="warning" sx={{ mt: 1 }}>
+            Not ready: {(pair.missing ?? []).join(", ") || "missing inputs"}
+          </Alert>
+        )}
+
+        {facts && (
+          <Table size="small" sx={{ mt: 2 }}>
+            <TableBody>
+              <TableRow>
+                <TableCell>clusters</TableCell>
+                <TableCell>
+                  cluster {String(facts.cluster_a)} vs cluster {String(facts.cluster_b)}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>param_dist</TableCell>
+                <TableCell>
+                  {fmtNum(facts.param_dist, 4)} (tau {String(facts.param_dist_tau)}) ·{" "}
+                  {String(facts.card_role)}
+                </TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell>outcomes</TableCell>
+                <TableCell>
+                  <Chip
+                    size="small"
+                    label={facts.collided_a ? "collision" : "safe"}
+                    color={facts.collided_a ? "error" : "success"}
+                    sx={{ mr: 1 }}
+                  />
+                  <Chip
+                    size="small"
+                    label={facts.collided_b ? "collision" : "safe"}
+                    color={facts.collided_b ? "error" : "success"}
+                  />
+                </TableCell>
+              </TableRow>
+              {(leftMotive || rightMotive) && (
+                <TableRow>
+                  <TableCell>primary_motive</TableCell>
+                  <TableCell>
+                    <Chip size="small" variant="outlined" label={`left: ${leftMotive ?? "?"}`} sx={{ mr: 1 }} />
+                    <Chip size="small" variant="outlined" label={`right: ${rightMotive ?? "?"}`} />
+                  </TableCell>
+                </TableRow>
+              )}
+              <TableRow>
+                <TableCell>trials</TableCell>
+                <TableCell>
+                  {String(facts.trial_a)} (idx {String(facts.trial_index_a)}) vs{" "}
+                  {String(facts.trial_b)} (idx {String(facts.trial_index_b)})
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        )}
+      </Paper>
+
+      {(leftMedoid?.medoidYaml || rightMedoid?.medoidYaml) && (
+        <Accordion disableGutters elevation={0} variant="outlined">
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography variant="subtitle2">Endpoint medoid cards (required inputs)</Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Stack spacing={1}>
+              {leftMedoid?.medoidYaml && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    cluster{String(facts?.cluster_a)} medoid
+                  </Typography>
+                  <Box
+                    component="pre"
+                    sx={{ m: 0, p: 1, bgcolor: "grey.50", fontSize: 11, maxHeight: 180, overflow: "auto", whiteSpace: "pre-wrap" }}
+                  >
+                    {leftMedoid.medoidYaml.slice(0, 1200)}
+                    {leftMedoid.medoidYaml.length > 1200 ? "\n…" : ""}
+                  </Box>
+                </Box>
+              )}
+              {rightMedoid?.medoidYaml && (
+                <Box>
+                  <Typography variant="caption" color="text.secondary">
+                    cluster{String(facts?.cluster_b)} medoid
+                  </Typography>
+                  <Box
+                    component="pre"
+                    sx={{ m: 0, p: 1, bgcolor: "grey.50", fontSize: 11, maxHeight: 180, overflow: "auto", whiteSpace: "pre-wrap" }}
+                  >
+                    {rightMedoid.medoidYaml.slice(0, 1200)}
+                    {rightMedoid.medoidYaml.length > 1200 ? "\n…" : ""}
+                  </Box>
+                </Box>
+              )}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+      )}
+
+      {(pair?.processContext || pair?.mergedTimeline) && (
+        <Accordion disableGutters elevation={0} variant="outlined">
+          <AccordionSummary expandIcon={<ExpandMore />}>
+            <Typography variant="subtitle2">
+              Pair context (process/context.md — shared clock)
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails>
+            <Box
+              component="pre"
+              sx={{
+                m: 0,
+                p: 1.5,
+                bgcolor: "grey.50",
+                borderRadius: 1,
+                fontSize: 12,
+                overflow: "auto",
+                whiteSpace: "pre-wrap",
+                maxHeight: 400,
+              }}
+            >
+              {pair.processContext ?? pair.mergedTimeline}
+            </Box>
+          </AccordionDetails>
+        </Accordion>
+      )}
+
+      {frames.length > 0 && pair?.folder && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            Synced BEV — left = cluster {String(facts?.cluster_a)}, right = cluster{" "}
+            {String(facts?.cluster_b)}, same shared clock
+          </Typography>
+          <Slider
+            size="small"
+            min={0}
+            max={frames.length - 1}
+            step={1}
+            value={Math.min(frame, frames.length - 1)}
+            onChange={(_, v) => setFrame(v as number)}
+            marks
+          />
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+            frame {Math.min(frame, frames.length - 1) + 1} / {frames.length} — {shown}
+          </Typography>
+          {shown && (
+            <Box
+              component="img"
+              src={`/api/cluster-analyze?batchId=${encodeURIComponent(batchId)}&folder=${encodeURIComponent(folder)}&icPair=${encodeURIComponent(pair.folder)}&file=${encodeURIComponent(shown)}`}
+              alt={shown}
+              sx={{ width: "100%", borderRadius: 1, border: "1px solid #eee" }}
+            />
+          )}
+        </Paper>
+      )}
+
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="subtitle2" gutterBottom sx={{ fontSize: 20, fontWeight: 700 }}>
+          Contrast card (output/contrast.yaml)
+        </Typography>
+        <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }}>
+          {contrastParsed?.motive_contrast && (
+            <Chip
+              size="small"
+              color={String(contrastParsed.motive_contrast) === "different" ? "warning" : "default"}
+              label={`motive_contrast: ${String(contrastParsed.motive_contrast)}`}
+            />
+          )}
+          {contrastParsed?.separation_call && (
+            <Chip
+              size="small"
+              color={
+                String(contrastParsed.separation_call) === "justified"
+                  ? "success"
+                  : String(contrastParsed.separation_call) === "over_fine"
+                    ? "warning"
+                    : "default"
+              }
+              label={`separation_call: ${String(contrastParsed.separation_call)}`}
+            />
+          )}
+        </Stack>
+        {Array.isArray(contrastParsed?.contrast_timeline) &&
+          (contrastParsed.contrast_timeline as unknown[]).length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="caption" color="text.secondary" display="block" gutterBottom sx={CONTRAST_FIELD_LABEL_SX}>
+                contrast_timeline
+              </Typography>
+              <Stack spacing={1}>
+                {(contrastParsed.contrast_timeline as Array<Record<string, unknown>>).map(
+                  (phase, i) => (
+                    <Box
+                      key={i}
+                      sx={{ p: 1, bgcolor: "grey.50", borderRadius: 1, border: "1px solid", borderColor: "divider" }}
+                    >
+                      <Typography variant="caption" fontWeight={600} display="block">
+                        t={String(phase.t_start ?? "?")}–{String(phase.t_end ?? "?")}
+                        {phase.bev_frame ? ` · ${String(phase.bev_frame)}` : ""}
+                      </Typography>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mt: 0.5 }}>
+                        {String(phase.interpretation ?? "")}
+                      </Typography>
+                    </Box>
+                  ),
+                )}
+              </Stack>
+            </Box>
+          )}
+        {contrastParsed?.critical_divergence && (
+          <Box sx={{ mb: 2 }}>
+            {contrastParsed.critical_divergence &&
+              typeof contrastParsed.critical_divergence === "object" && (
+                <Typography variant="body2" color="text.secondary" sx={{fontSize: 20, lineHeight: 2.5 }}>
+                  critical_divergence @ t=
+                  {String(
+                    (contrastParsed.critical_divergence as Record<string, unknown>).at ?? "?",
+                  )}
+                  :{" "}
+                  {String(
+                    (contrastParsed.critical_divergence as Record<string, unknown>).description ??
+                      "",
+                  )}
+                </Typography>
+              )}
+          </Box>
+        )}
+        {contrastParsed?.contrast_explanation && (
+          <Box sx={{ mb: 2 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+              gutterBottom
+              sx={CONTRAST_FIELD_LABEL_SX}
+            >
+              contrast_explanation
+            </Typography>
+            <Typography variant="body2" sx={CONTRAST_FIELD_BODY_SX}>
+              {String(contrastParsed.contrast_explanation)}
+            </Typography>
+          </Box>
+        )}
+        {contrastParsed?.separation_reason && (
+          <Box sx={{ mb: 2 }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              display="block"
+              gutterBottom
+              sx={CONTRAST_FIELD_LABEL_SX}
+            >
+              separation_reason
+            </Typography>
+            <Typography variant="body2" sx={CONTRAST_FIELD_BODY_SX}>
+              {String(contrastParsed.separation_reason)}
+            </Typography>
+          </Box>
+        )}
+        {pair?.yaml ? (
+          <Accordion disableGutters elevation={0} variant="outlined">
+            <AccordionSummary expandIcon={<ExpandMore />}>
+              <Typography variant="subtitle2" sx={{ fontSize: 15, fontWeight: 700 }}>Raw contrast.yaml</Typography>
+            </AccordionSummary>
+            <AccordionDetails>
+              <Box
+                component="pre"
+                sx={{
+                  m: 0,
+                  p: 1.5,
+                  bgcolor: "grey.50",
+                  borderRadius: 1,
+                  fontSize: 12,
+                  overflow: "auto",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {pair.yaml}
+              </Box>
+            </AccordionDetails>
+          </Accordion>
+        ) : (
+          <Alert severity="info">
+            No <code>output/contrast.yaml</code> yet for this pack — select it above and run
+            Parameter-space pair analysis.
+          </Alert>
+        )}
+      </Paper>
+    </Stack>
+  );
+}
+
+// ─── Cluster-selection quality panel ────────────────────────────────────────
+
+const SELECTION_COMPONENT_HELP: Record<string, string> = {
+  outcome_purity:
+    "Share of clusters whose collision rate sits at 0% or 100%. Mixed clusters usually hide two behaviors.",
+  motive_distinctness:
+    "Distinct primary_motive values divided by the number of captioned clusters. Repeats hint at over-splitting.",
+  parameter_space_pair_decisiveness:
+    "Share of near-identical-Parameter-space pairs whose outcome flips across the boundary. Low means the boundary rarely changes anything.",
+  no_merge_candidates:
+    "1.0 when no two clusters share a motive with similar collision rate and overlapping parameter ranges.",
+};
+
+function SelectionQualityPanel({
+  selectionEval,
+  crossEval,
+  quality,
+}: {
+  selectionEval: Record<string, unknown> | null;
+  crossEval: Record<string, unknown> | null;
+  quality: Record<string, unknown> | null;
+}) {
+  const sel = (selectionEval ?? null) as Record<string, any> | null;
+  const cross = (crossEval ?? null) as Record<string, any> | null;
+  const qual = (quality ?? null) as Record<string, any> | null;
+  const components = (sel?.components ?? {}) as Record<string, number | null>;
+  const findings = (sel?.findings ?? []) as string[];
+  const crossIsStub = cross?.stub === true;
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        Is this cluster selection good?
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        Two independent halves. The deterministic checks are measured from the artifacts on disk
+        and need no LLM; the cross-cluster verdict is the LLM reading the medoid and Parameter-space pair cards.
+        Silhouette is deliberately not the arbiter here — it scores geometry in FPC space, not
+        whether the clusters describe different behaviors.
+      </Typography>
+
+      <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mb: 2 }}>
+        <Chip
+          label={`deterministic ${sel?.selection_score ?? "n/a"}`}
+          color={sel?.selection_score != null ? "primary" : "default"}
+        />
+        <Chip
+          label={`LLM separation ${cross?.behavioral_separation_score ?? "n/a"}/10`}
+          color={cross?.behavioral_separation_score != null ? "primary" : "default"}
+        />
+        <Chip
+          label={`LLM boundary clarity ${cross?.boundary_clarity_score ?? "n/a"}/10`}
+          color={cross?.boundary_clarity_score != null ? "primary" : "default"}
+        />
+        <Chip
+          label={`composite ${qual?.final_score ?? "n/a"}`}
+          variant="outlined"
+        />
+      </Stack>
+
+      {!sel && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          No <code>cluster_selection_eval.json</code> yet. It is written by any pipeline run, or
+          standalone with <code>python -m llm_pipeline.cli selection-eval --run-dir …</code> (no
+          LLM required).
+        </Alert>
+      )}
+
+      {sel && (
+        <>
+          <Table size="small" sx={{ mb: 2 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>deterministic component</TableCell>
+                <TableCell>score</TableCell>
+                <TableCell>weight</TableCell>
+                <TableCell>what it measures</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {Object.entries(components).map(([key, value]) => (
+                <TableRow key={key}>
+                  <TableCell>{key}</TableCell>
+                  <TableCell>{value == null ? "n/a" : fmtNum(value, 3)}</TableCell>
+                  <TableCell>
+                    {fmtNum((sel.weights as Record<string, number>)?.[key], 2)}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="caption" color="text.secondary">
+                      {SELECTION_COMPONENT_HELP[key] ?? ""}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+
+          {findings.length > 0 && (
+            <Stack spacing={0.5} sx={{ mb: 2 }}>
+              {findings.map((f, i) => (
+                <Typography key={i} variant="body2">
+                  • {f}
+                </Typography>
+              ))}
+            </Stack>
+          )}
+
+          {(sel.merge_candidates ?? []).length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="body2" fontWeight="bold">
+                Merge candidates
+              </Typography>
+              {(sel.merge_candidates as Array<Record<string, any>>).map((m, i) => (
+                <Typography key={i} variant="caption" display="block">
+                  cluster{m.clusters?.[0]} + cluster{m.clusters?.[1]} — shared motive{" "}
+                  {m.shared_motive}, param overlap {m.param_overlap}
+                </Typography>
+              ))}
+            </Alert>
+          )}
+        </>
+      )}
+
+      <Divider sx={{ my: 2 }} />
+
+      <Typography variant="subtitle2" gutterBottom>
+        Cross-cluster verdict (LLM)
+      </Typography>
+      {!cross || crossIsStub ? (
+        <Alert severity="info">
+          {crossIsStub
+            ? `Stub only — ${String(cross?.inter_notes ?? "no LLM run yet")}.`
+            : "No cross_cluster_eval.json yet. Run the cluster analysis above."}
+        </Alert>
+      ) : (
+        <Stack spacing={1}>
+          {cross.selection_verdict && (
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+              {String(cross.selection_verdict)}
+            </Typography>
+          )}
+          {cross.recommended_action && (
+            <Typography variant="body2">
+              <strong>Recommended action:</strong> {String(cross.recommended_action)}
+              {cross.recommended_action_detail
+                ? ` — ${String(cross.recommended_action_detail)}`
+                : ""}
+            </Typography>
+          )}
+        </Stack>
+      )}
+    </Paper>
   );
 }
 

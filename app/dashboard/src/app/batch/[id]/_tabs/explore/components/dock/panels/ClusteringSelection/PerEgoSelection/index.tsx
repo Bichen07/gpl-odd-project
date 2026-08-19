@@ -65,7 +65,7 @@ interface AnalysisStatusEntry {
   medoids: Record<string, string>;
   outliers: Record<string, string>;
   boundary_trials: Record<string, string[]>;
-  boundary_pairs: Array<{
+  trajectory_projection_pairs: Array<{
     cluster_a: number | string;
     trial_a: string;
     cluster_b: number | string;
@@ -73,7 +73,7 @@ interface AnalysisStatusEntry {
     embedding_dist?: number;
   }>;
   param_boundary_trials: Record<string, string[]>;
-  param_boundary_pairs: Array<{
+  parameter_space_pairs: Array<{
     cluster_a: number | string;
     trial_a: string;
     cluster_b: number | string;
@@ -85,6 +85,15 @@ interface AnalysisStatusEntry {
   interpretations: Record<
     string,
     { cluster_label?: string; ego_perspective_summary?: unknown; motive_summary?: string }
+  >;
+  parameter_space_pair_interpretations?: Record<
+    string,
+    {
+      contrast_timeline?: unknown;
+      contrast_explanation?: string;
+      separation_call?: string;
+      separation_reason?: string;
+    }
   >;
 }
 
@@ -254,11 +263,12 @@ export default function PerEgoSelection({
         medoids: st.medoids ?? {},
         outliers: st.outliers ?? {},
         boundaryTrials: st.boundary_trials ?? {},
-        boundaryPairs: st.boundary_pairs ?? [],
+        boundaryPairs: st.trajectory_projection_pairs ?? [],
         paramBoundaryTrials: st.param_boundary_trials ?? {},
-        paramBoundaryPairs: st.param_boundary_pairs ?? [],
+        paramBoundaryPairs: st.parameter_space_pairs ?? [],
         task: st.task ?? null,
         interpretations: st.interpretations ?? {},
+        icPairInterpretations: st.parameter_space_pair_interpretations ?? {},
       };
     },
     [analysisStatus, resultFolderKey, requestTaskForIndex],
@@ -469,7 +479,7 @@ export default function PerEgoSelection({
         next,
         selectedParamPairKeys,
         selectedOutlierLabels,
-        "clustering_result_list.toggle_boundary_pair",
+        "clustering_result_list.toggle_trajectory_projection_pair",
       );
     },
     [
@@ -495,7 +505,7 @@ export default function PerEgoSelection({
       next,
       selectedParamPairKeys,
       selectedOutlierLabels,
-      "clustering_result_list.select_all_boundary_pairs",
+      "clustering_result_list.select_all_trajectory_projection_pairs",
     );
   }, [
     currentAnalysis,
@@ -517,7 +527,7 @@ export default function PerEgoSelection({
         selectedPairKeys,
         next,
         selectedOutlierLabels,
-        "clustering_result_list.toggle_param_boundary_pair",
+        "clustering_result_list.toggle_parameter_space_pair",
       );
     },
     [
@@ -544,7 +554,7 @@ export default function PerEgoSelection({
       selectedPairKeys,
       next,
       selectedOutlierLabels,
-      "clustering_result_list.select_all_param_boundary_pairs",
+      "clustering_result_list.select_all_parameter_space_pairs",
     );
   }, [
     currentAnalysis,
@@ -852,7 +862,11 @@ export default function PerEgoSelection({
   ]);
 
   useEffect(() => {
-    if (sortedResults.length > 0 && trajectoryAnalysis != null) {
+    // Select immediately so Heatmap/Projection get a clustering before the
+    // expensive unique-result filter finishes (488 candidates can take many
+    // seconds). sortedResults then upgrades the selection when ready.
+    if (trajectoryAnalysis == null) return;
+    if (sortedResults.length > 0) {
       dispatch(
         batchSlice.actions.setSelectedClusteringResults({
           ...selectedClusteringResults,
@@ -882,27 +896,48 @@ export default function PerEgoSelection({
           "clustering_result_list" + ".select_clustering_result"
         )
       );
-    } else {
+      return;
+    }
+
+    const first = (results ?? []).find((v) => v != null) ?? null;
+    if (first != null) {
+      const index = results?.findIndex((v) => v === first) ?? -1;
       dispatch(
         batchSlice.actions.setSelectedClusteringResults({
           ...selectedClusteringResults,
-          [egoName]: null,
-        })
+          [egoName]: first,
+        }),
       );
+      const info =
+        infos != null && index >= 0 && index < infos.length ? infos[index] : null;
       dispatch(
         batchSlice.actions.setSelectedClusterInfos({
           ...selectedClusterInfos,
-          [egoName]: null,
-        })
-      );
-      dispatch(
-        batchSlice.actions.setClusterAnalysisByEgo({
-          ...(clusterAnalysisByEgo ?? {}),
-          [egoName]: null,
+          [egoName]: info,
         }),
       );
+      return;
     }
-  }, [sortedResults]);
+
+    dispatch(
+      batchSlice.actions.setSelectedClusteringResults({
+        ...selectedClusteringResults,
+        [egoName]: null,
+      })
+    );
+    dispatch(
+      batchSlice.actions.setSelectedClusterInfos({
+        ...selectedClusterInfos,
+        [egoName]: null,
+      })
+    );
+    dispatch(
+      batchSlice.actions.setClusterAnalysisByEgo({
+        ...(clusterAnalysisByEgo ?? {}),
+        [egoName]: null,
+      }),
+    );
+  }, [sortedResults, results, infos]);
 
   useEffect(() => {
     const newEditing: typeof editing = {};
@@ -1088,7 +1123,7 @@ export default function PerEgoSelection({
                         />
                       </Box>
                       <Typography fontSize={12} color="text.secondary">
-                        Closest pair (emb) ({roleCount(currentAnalysis, "boundary")})
+                        Closest pair (trajectory projection) ({roleCount(currentAnalysis, "boundary")})
                       </Typography>
                     </Stack>
                     <Button
@@ -1172,7 +1207,7 @@ export default function PerEgoSelection({
                         />
                       </Box>
                       <Typography fontSize={12} color="text.secondary">
-                        Closest pair (IC) (
+                        Closest pair (parameter space) (
                         {roleCount(currentAnalysis, "param_boundary")})
                       </Typography>
                     </Stack>

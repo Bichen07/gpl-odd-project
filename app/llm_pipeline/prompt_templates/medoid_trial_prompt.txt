@@ -1,52 +1,210 @@
 <Your Task>
 Analyze ONE medoid trial (representative of its cluster, not the whole cluster).
-Inputs: conflict_metrics (GT), trial context timeline, dual-panel BEV frames
-(left = pair zoom, right = ego ±25 m; titles include burst timing e.g.
-`0p5s_before_APPROACH_Opposite` — see common_sense BEV guide).
-Deduce ego motives near the oncoming conflict: why it slowed / sped up / braked /
-yielded / resumed / turned on the same lane. Ignore junction enter/exit filler.
+Inputs: trial context timeline (`processed/context_medoid.md`) and **single-panel** BEV
+frames (ego-centered, half-extent = ego–partner distance + 2 m, fixed initial-yaw
+up; titles include burst timing e.g. `0p5s_before_APPROACH_Opposite` — see
+common_sense BEV guide).
+First name **interaction_resolution** (pass_first / yield / unresolved) from
+the longitudinal relationship / partner position in Ego coordinates / paper
+FRONT→BEHIND. Then deduce ego
+motives near the conflict with the named partner: why it slowed / sped up /
+braked / yielded / resumed / turned on the same lane. Ignore junction enter/exit
+filler. Braking during a FRONT→BEHIND pass is control (`slowdown`/`brake`), not yield.
+
+If context shows a collision outcome, also nail the collision anatomy: who struck
+whom, from which side, at what speed — quote numbers from context/BEV. A collision
+entry that only says "Collision with partner X" is a FAILED output.
 </Your Task>
 
-<Mandatory Workflow & Chain Of Thought>
-Before YAML, for each salient ego motion near the conflict:
+<Collision anatomy (required when outcome: collision)>
+Read the collision / near-miss lines in the trial context and the final BEV frames.
+Use the full, precise metric descriptions written in context, including partner
+azimuth relative to Ego heading, both vehicle speeds, center-to-center distance,
+and its closing/opening rate.
+- `impact_type`: `rear-end` (FRONT*/BEHIND* sectors) or `side/lateral impact`
+  (LEFT/RIGHT — side-swipe or T-bone).
+- `striking_vehicle` / `struck_vehicle`: rear-end only (who closed the gap vs whose
+  rear absorbed it); both null for side/lateral.
+If context lacks geometry for a collision, say so in `open_questions`
+instead of guessing.
+</Collision anatomy>
 
-1. Action: precise lexicon verb + time window; quote speeds / Δheading from context.
-2. BEV: name frames (before/during/after); distance, azimuth, relative motion.
-3. Motive: yield / gap acceptance / late reaction / early brake / recovery;
-   check consistency with peak_t, d_min, ttc_min.
+<Mandatory Workflow & Chain Of Thought>
+Keep CoT terse — telegraphic bullets, no restating the inputs. The YAML fence MUST
+be reached; never end without it.
+
+Step 0 — Notable features (EXTRACT, do not invent). List 6-12 one-line bullets
+taken from trial context / BEV with their times:
+brake or decelerate onsets, speed rise/drop across the conflict window, partner
+center-to-center distance / estimated time to collision / distance trend at
+approach, same-lane TURN_*
+(Δheading + lateral_speed), partner
+LANE_CHANGE_* that forces ego response, outcome stamp, post-peak accelerate or turn.
+Tag each `pre-peak` / `post-peak` vs peak conflict time in context, or `setup` when
+the partner is still d ≳ 100 m (setup features must not become motives).
+
+Then walk the trial chronologically. **Before any motive**, state pass/yield
+order from the longitudinal relationship / partner position in Ego coordinates
+(paper relative-angle
+FRONT→BEHIND = pass_first).
+For each salient stamp that becomes a `decision_timeline` entry, one CoT bullet
+covering ALL of:
+1. Action — lexicon verb + intensity + quoted speed / Δheading.
+2. Situation — center-to-center distance / azimuth sector / distance trend /
+   estimated time to collision / longitudinal relationship / minimum distance
+   between vehicle boundaries from context;
+   confirm on BEV.
+3. Conclude — one CLOSED motive code (or null if partner-only / outcome stamp),
+   with the metric or stamp it rests on. Causal locality: evidence only at
+   t ≤ this stamp. Before defaulting to `unclear`, run common_sense's brake-release
+   / post-peak precedence check (`unresolved_brake_release`, `post_clear_adjustment`).
+   Only use `unclear` when evidence itself is contradictory or missing, and log it
+   in open_questions. Never assign `yield_to_partner` if the longitudinal
+   relationship becomes
+   partner behind while Ego continues through.
+
+If outcome is collision: the LAST CoT bullet states impact geometry from
+context/BEV and feeds `collision_detail` + the final timeline entry.
 </Mandatory Workflow & Chain Of Thought>
 
 <Lexicon>
+Longitudinal verbs (always pair with intensity + a quoted speed):
 - slow down / speed up / hard brake / maintain speed
 - intensity: lightly | moderately | severely
   (|Δv|≲2 / 2–5 / ≳5 m/s, or EMERGENCY_BRAKE ⇒ severely)
-- turn left/right (same lane) when context shows TURN_*; quote Δheading
-decision_timeline descriptions ≤18 words; no road IDs; no junction travelogue.
+
+Lateral / heading (only when context or BEV shows it):
+- turn left/right (same lane) — quote Δheading and lateral_speed effect (low/moderate/strong)
+- partner lane-change left/right — name the partner and direction; this is partner
+  motion, not an ego motive unless ego reacts to it
+
+Situation clause (REQUIRED on every non-trivial entry — quote from context_medoid.md):
+- partner name + distance band + sector, e.g. "CuttingIn near FRONT
+  (center-to-center distance=11.7 m)"
+- when near/very-close (<15 m) or at COLLISION: also quote v_partner and gap
+  closing/opening rate so "who is catching up" is explicit
+- optional TTC when the stamp provides it
+
+Conclude clause (end of every ego-action description; omit on partner-only /
+outcome-only stamps that carry no ego motive):
+- name the closed motive code in plain words once, e.g. "⇒ assertive_gap_acceptance
+  into a closing gap" / "⇒ late_reaction / yield_to_partner to the cut-in" /
+  "⇒ post_clear_recovery once partner is behind" / "⇒ unresolved_brake_release
+  (eases off before the conflict clears)" / "⇒ post_clear_adjustment (minor
+  follow-distance correction, partner not re-closing)" / "⇒ unclear (no closed
+  code fits)"
+- when it clarifies who resolves first, name it using common_sense's PASS/YIELD
+  resolution class, e.g. "⇒ assertive_gap_acceptance (PASS: ego proceeds before
+  CuttingIn)" — optional, only add this when several partners are in play.
+- before writing `unclear`, check common_sense's brake-release / post-peak
+  precedence rules — `unresolved_brake_release` and `post_clear_adjustment` cover
+  the two most common "doesn't feel assertive or recovery" cases.
+
+Collision phrasing (LAST entry only when outcome: collision):
+  "<partner> rear-ends Ego" | "Ego rear-ends <partner>" |
+  "<partner> side-swipes/T-bones Ego's <left/right>" — always name the struck
+  side and quote both speeds when context provides them.
+
+ONE timeline only — each entry is action + situation + conclude together:
+  [who] [lexicon verb + intensity] [speed/Δheading] [situation] [⇒ motive conclude].
+  Target 25–45 words. Dense and factual — not a paragraph, not a slogan.
+  BAD (too thin):  "Ego begins moderately speeding up."
+  BAD (unfocused): junction / road-ID travelogue.
+  GOOD: "Ego ends accelerating at 6.78 m/s while CuttingIn is near FRONT
+  (center-to-center distance=11.7 m,
+         v_CuttingIn=3.71 m/s, gap closing 2.93 m/s) ⇒ assertive_gap_acceptance
+         into a closing gap."
+No road IDs; no junction enter/exit filler.
 </Lexicon>
 
 <Output>
-After CoT, ONE YAML fence. Do NOT echo conflict_metrics (already provided as GT).
+After CoT, ONE YAML fence.
+There is NO separate motive_evidence list — motives live on the timeline entries.
 
 ```yaml
 trial_id: "<id>"
 outcome: "collision" | "near_miss" | "safe"
+interaction_resolution: "pass_first" | "yield" | "unresolved"
+control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "recovery" | "none"
+primary_motive: "<one closed motive code>"   # the single dominant ego motive across the arc
+secondary_motives: []                        # 0-2 other closed codes used on the timeline, else []
 decision_timeline:
-  - timestamp: <float>   # same clock as conflict_metrics / Replayer
-    description: "<lexicon phrase>"
-  # 6-10 events: approach → conflict → outcome; LAST = final outcome
+  - timestamp: <float>        # same clock as context_medoid.md / Replayer
+    description: "<action + speed/Δheading + situation + ⇒ motive conclude>"
+    motive: "<closed code | null>"
+  # 8-20 entries spanning approach → conflict → outcome.
+  # LAST entry = final outcome. If outcome: collision, LAST uses collision phrasing;
+  # set motive: null on that LAST collision anatomy entry.
+collision_detail:            # omit entirely (or null) when outcome != collision
+  impact_type: "<rear-end | side/lateral impact>"
+  striking_vehicle: "<Ego, partner name, or null>"
+  struck_vehicle: "<Ego, partner name, or null>"
+  narrative: "<1 sentence: who hit whom, from which side / az label, at what speed>"
 motive_summary: |
-  3-5 short paragraphs on WHY ego acted. Lexicon verbs. Blank line between paragraphs.
+  See <Motive summary guide> below. Follow the structure and density of the EXAMPLE.
 open_questions:
-  # Only real uncertainties (e.g. BEV vs metrics). Else [].
+  # Only real uncertainties (e.g. BEV vs context, or no closed code fits). Else [].
   - "<question>"
 ```
 </Output>
 
-<!-- Filled by the pipeline (INPUTS — not part of your YAML output) -->
-<Conflict metrics>
-{conflict_metrics}
-</Conflict metrics>
+<Motive summary guide>
+Write 1-3 short paragraphs (blank line between). This is the causal STORY that
+connects motives across time — it is NOT a re-listing of `decision_timeline`, and
+NOT a single vague sentence.
 
+**One phase = one paragraph.** A phase is a maximal run of consecutive timeline
+entries that share the same (or a tightly linked) motive code — e.g. four
+`assertive_gap_acceptance` accelerate entries are ONE phase. For a multi-entry
+phase, cite ONLY the first and last anchor values (time, speed, d, ttc) — do not
+enumerate every intermediate stamp; that is already in `decision_timeline`.
+Target ~25-45 words per paragraph (roughly 100-200 words total) — dense, not padded.
+
+Each paragraph covers, in order:
+1. WHEN — the phase's time range (first→last stamp of the phase, not every stamp).
+2. WHAT+WHY — the ego action(s) under this phase's motive, with intensity + the
+   anchor speeds, and WHY this closed code applies (causal locality). Phrase this
+   as behavior/intent ("holds speed into a closing gap because…"), not a bare
+   number dump.
+3. SITUATION — the anchor partner geometry only (start/end d, az, gap trend, ttc).
+4. LINK — how this phase sets up, changes, or fails relative to the next phase / outcome.
+
+Rules:
+- Name closed motive codes explicitly (`assertive_gap_acceptance`, `late_reaction`,
+  `unresolved_brake_release`, `post_clear_adjustment`, …). Prefer paper-compatible
+  phrasing for the arc (`pass-first`, `smooth-pass`, `late-yield`, `pass-slowdown`,
+  `yield-stop-collision`, `braking-rear-end`) alongside the closed codes.
+- State pass/yield order in the first paragraph (FRONT→BEHIND = pass-first).
+- Quote numbers from context / BEV — but only the anchors for the phase, not a
+  restatement of every decision_timeline row.
+- Do NOT invent actions absent from context/BEV. Do NOT narrate junction enter/exit.
+- The OUTCOME paragraph (collision OR near-miss) is never a one-line summary —
+  quote the terminal numbers (Ego speed, partner speed, center-to-center distance,
+  partner azimuth relative to Ego heading, and estimated time to collision at
+  peak_t) same as the
+  collision-anatomy requirement. "Ego yielded, preventing a collision" with no
+  numbers is a FAILED output.
+- If some ego action is `unclear`, first check common_sense's precedence rules
+  (`unresolved_brake_release` / `post_clear_adjustment`) — only call it `unclear`
+  if evidence is genuinely contradictory or missing, and mirror it in open_questions.
+
+Example (good style: concise, phase-based, minimal timestamps):
+
+Ego follows a pass-first arc: it keeps building speed while the partner remains
+ahead and the gap tightens, so the opening phase is `assertive_gap_acceptance`
+rather than yield. The key causal point is intent under closure: Ego commits to
+passing before any meaningful brake response.
+
+When overlap becomes very close on the left, Ego brakes only then, so the
+conflict response is `late_reaction`. The near-miss confirms the brake came late
+but still avoided contact in this trial.
+
+After clearance, a short slowdown plus a same-lane turn are post-conflict
+stabilization (`post_clear_adjustment` then `post_clear_recovery`), not a new
+evasive phase, because the partner stays behind and separation continues opening.
+</Motive summary guide>
+
+<!-- Filled by the pipeline from processed/context_medoid.md (INPUT — not part of YAML output) -->
 <Trial context>
 {trial_context}
 </Trial context>

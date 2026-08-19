@@ -100,6 +100,9 @@ export async function POST(req: NextRequest) {
   const review = body.review !== false; // default on
   const dryRun = body.dryRun === true;
   const clusters = Array.isArray(body.clusters) ? body.clusters.map((c) => Number(c)) : null;
+  const pairs = Array.isArray(body.pairs)
+    ? body.pairs.map((p) => String(p).trim()).filter(Boolean)
+    : null;
   const prompts = (body.prompts ?? {}) as Record<string, string>;
   const selectedImages = (body.selectedImages ?? {}) as Record<string, string[]>;
   const products =
@@ -115,6 +118,94 @@ export async function POST(req: NextRequest) {
   const resultsDir = path.join(projectRoot, "results", `batch${batchId}`, folder);
   if (!fs.existsSync(resultsDir)) {
     return Response.json({ error: `results dir not found: ${resultsDir}` }, { status: 404 });
+  }
+
+  // Hard-gate Parameter-space pairs: selected packs must be ready (medoids + process + BEV).
+  if (products.split(",").map((s) => s.trim()).includes("parameter-space-pairs") && pairs && pairs.length > 0) {
+    const notReady: string[] = [];
+    for (const folderName of pairs) {
+      const pack = path.join(resultsDir, "parameter_space_pairs", folderName);
+      const m = folderName.match(/^c(\d+)-c(\d+)$/);
+      if (!m || !fs.existsSync(pack)) {
+        notReady.push(`${folderName} (missing pack)`);
+        continue;
+      }
+      const missing: string[] = [];
+      for (const cid of [m[1], m[2]]) {
+        const medoid = resolveClusterArtifact(
+          path.join(resultsDir, `cluster${cid}`),
+          "medoid_trial.yaml",
+        );
+        if (!medoid) missing.push(`cluster${cid}/output/medoid_trial.yaml`);
+      }
+      if (!fs.existsSync(path.join(pack, "process", "context.md"))) {
+        missing.push("process/context.md");
+      }
+      const synced = path.join(pack, "synced_bev");
+      const hasBev =
+        fs.existsSync(synced) &&
+        fs.readdirSync(synced).some((n) => /\.(jpg|jpeg|png)$/i.test(n));
+      if (!hasBev) missing.push("synced_bev/");
+      if (missing.length) notReady.push(`${folderName}: ${missing.join(", ")}`);
+    }
+    if (notReady.length) {
+      return Response.json(
+        {
+          error: "Parameter-space pair packs not ready for LLM",
+          details: notReady,
+        },
+        { status: 400 },
+      );
+    }
+  }
+
+  // Hard-gate summary: every Parameter-space pair pack that touches a target cluster must
+  // already have output/contrast.yaml (plus the cluster's own medoid).
+  if (products.split(",").map((s) => s.trim()).includes("summary")) {
+    const targetClusters =
+      clusters && clusters.length > 0
+        ? clusters.map(String)
+        : fs
+            .readdirSync(resultsDir)
+            .filter((n) => /^cluster\d+$/.test(n))
+            .map((n) => n.replace("cluster", ""));
+    const blocked: string[] = [];
+    const icRoot = path.join(resultsDir, "parameter_space_pairs");
+    for (const cid of targetClusters) {
+      const medoid = resolveClusterArtifact(
+        path.join(resultsDir, `cluster${cid}`),
+        "medoid_trial.yaml",
+      );
+      if (!medoid) {
+        blocked.push(`cluster${cid}: missing output/medoid_trial.yaml`);
+        continue;
+      }
+      if (!fs.existsSync(icRoot)) continue;
+      for (const f of fs.readdirSync(icRoot)) {
+        const m = f.match(/^c(\d+)-c(\d+)$/);
+        if (!m) continue;
+        if (cid !== m[1] && cid !== m[2]) continue;
+        const pack = path.join(icRoot, f);
+        if (!fs.statSync(pack).isDirectory()) continue;
+        const hasContrast =
+          fs.existsSync(path.join(pack, "output", "contrast.yaml")) ||
+          fs.existsSync(path.join(pack, "contrast.yaml"));
+        if (!hasContrast) {
+          blocked.push(
+            `cluster${cid}: missing parameter_space_pairs/${f}/output/contrast.yaml — run Parameter-space pair analysis first`,
+          );
+        }
+      }
+    }
+    if (blocked.length) {
+      return Response.json(
+        {
+          error: "Cluster summary blocked — build Parameter-space pair contrasts first",
+          details: blocked,
+        },
+        { status: 400 },
+      );
+    }
   }
 
   // Write overrides to an ephemeral temp dir.
@@ -144,6 +235,7 @@ export async function POST(req: NextRequest) {
   if (!review) args.push("--no-review");
   if (dryRun) args.push("--dry-run");
   if (clusters && clusters.length > 0) args.push("--clusters", clusters.join(","));
+  if (pairs && pairs.length > 0) args.push("--pairs", pairs.join(","));
 
   // Inject API key into the correct provider env var (ephemeral). PYTHONUNBUFFERED
   // makes the child's progress prints stream live instead of buffering.
@@ -166,7 +258,12 @@ export async function POST(req: NextRequest) {
         }
       };
 
-      send({ type: "log", data: `▶ Running ${clusters && clusters.length ? `cluster(s) ${clusters.join(", ")}` : "all clusters"} with ${model}${dryRun ? " (dry run)" : ""}\n` });
+      const scopeMsg = pairs && pairs.length
+        ? `pair(s) ${pairs.join(", ")}`
+        : clusters && clusters.length
+          ? `cluster(s) ${clusters.join(", ")}`
+          : "all clusters";
+      send({ type: "log", data: `▶ Running ${scopeMsg} with ${model}${dryRun ? " (dry run)" : ""}\n` });
 
       const child = spawn("bash", args, { cwd: projectRoot, env });
       const timer = setTimeout(() => {
