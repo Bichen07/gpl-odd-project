@@ -1,8 +1,10 @@
 import chroma from "chroma-js";
 import { SxProps, useTheme } from "@mui/material/styles";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useParams } from "next/navigation";
 import { useAppDispatch, useAppSelector } from "../../../../../redux/hooks";
 import {
+  Alert,
   Box,
   Button,
   Checkbox,
@@ -22,10 +24,15 @@ import { toTitleSpaceCase } from "@/app/_shared/utils";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
 import { ClusteringResult } from "@/app/_shared/graphql/queries/clustering";
 import { Trial } from "@/app/_shared/graphql/queries/trials";
+import { computeBoundaries } from "../../../../../lib/boundaryExport";
 
 export default function Filtering() {
   const theme = useTheme();
   const dispatch = useAppDispatch();
+  const routeParams = useParams();
+  const batchIdParam = Array.isArray(routeParams?.id)
+    ? routeParams?.id[0]
+    : (routeParams?.id as string | undefined);
 
   const batch = useAppSelector((state) => state.batch.batch);
   const egos = useAppSelector((state) => state.batch.egos);
@@ -40,12 +47,23 @@ export default function Filtering() {
   const [onClusterBoundaryChecked, setOnClusterBoundaryChecked] =
     useState(false);
   const [loading, setLoading] = useState<boolean>(false);
-  const [kNN, setKNN] = useState(25);
+  // Default lowered 25 -> 10 (see implementation_plan.md §2.2 "S2 bugfix
+  // pass" for the border/boundary-instance-detection rationale — small k
+  // keeps the neighborhood local to the actual pass/fail surface).
+  const [kNN, setKNN] = useState(10);
   const [changeThreshold, setChangeThreshold] = useState(0);
 
   const [passFailChecked, setPassFailChecked] = useState<Set<string>>(
     new Set(),
   );
+
+  // S2 — ODD boundary export (odd_boundary_export.json).
+  const [exportStatus, setExportStatus] = useState<
+    | { kind: "idle" }
+    | { kind: "running" }
+    | { kind: "done"; message: string }
+    | { kind: "error"; message: string }
+  >({ kind: "idle" });
 
   // const trials = useAppSelector((state) => {
   //   let result: Trial[] = [];
@@ -412,6 +430,132 @@ export default function Filtering() {
     setLoading(false);
   }, [loading]);
 
+  // S2 — export odd_boundary_export.json using the exact tree/metric this
+  // panel's checkboxes already use, across ALL trials (not the current UI
+  // subset) so the file is reproducible on its own.
+  const exportBoundary = useCallback(() => {
+    if (!batchIdParam) {
+      setExportStatus({ kind: "error", message: "No batch id in route." });
+      return;
+    }
+    if (tree == null || treePoints == null) {
+      setExportStatus({
+        kind: "error",
+        message: "No parameter kd-tree yet — load a batch + clustering result first.",
+      });
+      return;
+    }
+    const egoClusterInfo = clusterInfo?.["ITRI"];
+    const egoClusteringResult = clusteringResult?.["ITRI"];
+    const silhouette = (
+      egoClusteringResult?.scores as Record<string, number> | undefined
+    )?.silhouetteScore;
+    const k = egoClusterInfo
+      ? "-1" in egoClusterInfo
+        ? Object.keys(egoClusterInfo).length - 1
+        : Object.keys(egoClusterInfo).length
+      : 0;
+    if (k < 1 || silhouette == null || egoClusteringResult == null) {
+      setExportStatus({
+        kind: "error",
+        message: "Select a clustering result with k/silhouette first.",
+      });
+      return;
+    }
+    if (boundaryMetric == null) {
+      setExportStatus({ kind: "error", message: "No boundary KPI selected." });
+      return;
+    }
+    const folder = `${k}_cluster_s=${silhouette.toFixed(4)}`;
+
+    // Payload parameterId (Mongo hash) -> human scenario parameter name, so
+    // the export is readable without cross-referencing the GraphQL schema.
+    // NOTE: trial.parameters[].parameterId does not match
+    // batch.scenario.parameters[].id in this dataset (stale/orphaned ids —
+    // see calculateDistance in redux/slices/batch.ts for the same finding).
+    // Match by array position instead, same fix, same assumption: both
+    // arrays are built in the same scenario-parameter order.
+    const paramNameById: Record<string, string> = {};
+    const firstTrialParams = Object.values(trials)[0]?.parameters ?? [];
+    const scenarioParams = batch?.scenario?.parameters ?? [];
+    firstTrialParams.forEach((tp, idx) => {
+      const name = scenarioParams[idx]?.name;
+      if (tp?.parameterId != null && name) {
+        paramNameById[String(tp.parameterId)] = name;
+      }
+    });
+
+    const labelByTrialId = (trialId: string): string | null => {
+      const label = egoClusteringResult.data[trialId]?.label;
+      return label != null ? String(label) : null;
+    };
+    const passedByTrialId = (trialId: string): boolean | null => {
+      const trial = trials[trialId];
+      const metric = trial?.testObjectives?.criticalityMetrics.find(
+        (m: any) =>
+          `${m.keyPerformanceIndicator.id}` === String(boundaryMetric.kpi.id),
+      );
+      return metric?.passed ?? null;
+    };
+
+    setExportStatus({ kind: "running" });
+    let result;
+    try {
+      result = computeBoundaries({
+        treePoints,
+        tree,
+        kNN,
+        paramNameById,
+        labelByTrialId,
+        passedByTrialId,
+      });
+    } catch (e) {
+      setExportStatus({ kind: "error", message: `Compute failed: ${String(e)}` });
+      return;
+    }
+
+    fetch("/api/odd-boundary-export", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        batchId: batchIdParam,
+        folder,
+        kNN,
+        kpi: boundaryMetric.kpi,
+        clustersIncluded: Object.keys(egoClusterInfo ?? {}).filter(
+          (l) => l !== "-1",
+        ),
+        nTrialsConsidered: result.n_trials_considered,
+        nTrialsWithoutClusterLabel: result.n_trials_without_cluster_label,
+        collision_boundary: result.collision_boundary,
+        cluster_boundary: result.cluster_boundary,
+        all_trials: result.all_trials,
+      }),
+    })
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) throw new Error(d?.error ?? `HTTP ${r.status}`);
+        return d;
+      })
+      .then(() => {
+        setExportStatus({
+          kind: "done",
+          message: `Saved ${folder}/odd_boundary_export.json (+ odd_all_trials.json, + .kNN${kNN} snapshot) — ${result!.collision_boundary.boundary_trials.length} collision-boundary, ${result!.cluster_boundary.boundary_trials.length} cluster-boundary trials (kNN=${kNN}). ${result!.n_trials_without_cluster_label} of ${result!.n_trials_considered} trials have no cluster label (not part of the clustering fit) and are excluded from collision-boundary matching.`,
+        });
+      })
+      .catch((e) => setExportStatus({ kind: "error", message: String(e) }));
+  }, [
+    batchIdParam,
+    batch,
+    tree,
+    treePoints,
+    clusterInfo,
+    clusteringResult,
+    boundaryMetric,
+    kNN,
+    trials,
+  ]);
+
   return (
     <Stack rowGap={1}>
       <Stack>
@@ -696,7 +840,7 @@ export default function Filtering() {
             K Nearest Neighbors: {kNN}
           </Typography>
           <Slider
-            defaultValue={3}
+            defaultValue={10}
             step={1}
             marks
             min={1}
@@ -708,6 +852,24 @@ export default function Filtering() {
             }}
           />
         </Stack>
+        <Button
+          size="small"
+          variant="outlined"
+          disabled={exportStatus.kind === "running"}
+          onClick={exportBoundary}
+        >
+          Export ODD boundary (odd_boundary_export.json)
+        </Button>
+        {exportStatus.kind === "done" && (
+          <Alert severity="success" sx={{ py: 0 }}>
+            {exportStatus.message}
+          </Alert>
+        )}
+        {exportStatus.kind === "error" && (
+          <Alert severity="error" sx={{ py: 0 }}>
+            {exportStatus.message}
+          </Alert>
+        )}
       </Stack>
       <Stack
         rowGap={1}

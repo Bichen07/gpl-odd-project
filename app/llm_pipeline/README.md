@@ -48,6 +48,10 @@ llm_pipeline.cli cluster-interpret   ← product order below
         ├─ 2) parameter-space-pairs → parameter_space_pairs/cA-cB/output/contrast.yaml   (needs both medoids)
         ├─ 3) summary  → clusterN/output/cluster_summary.yaml  (needs medoid + all touching parameter-space contrasts)
         └─ 4) cross-eval / selection-eval  (cross-eval deferred; selection-eval is deterministic)
+        │
+        ▼
+llm_pipeline.cli odd-export / odd-rules / odd-join / odd-briefing / odd-chat   ← S2-S5, see below
+        └─ boundary export, auditable parameter rules, boundary↔pair join, grounded Q&A briefing + chat
 ```
 
 | Want | Need first |
@@ -302,6 +306,237 @@ Used by dashboard evaluation endpoints to rank candidate runs.
 
 ---
 
+## S2–S5 — ODD boundary export, rules, join & Q&A
+
+These four steps run **after** medoid + parameter-space-pairs + summary (above) are done for a
+run. They never re-touch `medoid_trial.yaml` / `contrast.yaml` / `cluster_summary.yaml` — S2-S5
+only *read* those plus the raw clustering result, and write new files alongside them. Full
+design rationale: `implementation_plan.md` §6 (S2/S3), §7 (S5), §9 (build checklist).
+
+```text
+$RUN/clusterN/output/{medoid_trial.yaml, cluster_summary.yaml}   ← already exist (Products 1/3)
+$RUN/parameter_space_pairs/cA-cB/output/contrast.yaml             ← already exist (Product 2)
+        │
+        ▼
+S2  odd-export     (deterministic, needs the saved Payload analysis zip)
+        │            → $RUN/odd_boundary_export.json, odd_all_trials.json, odd_boundary_export.kNN<k>.json
+        ▼
+S3  odd-rules      (deterministic, sklearn CART, offline)
+        │            → $RUN/odd_parameter_rules.json
+        ▼
+S4  odd-join       (deterministic, offline — trial-id join only, never a distance-metric join)
+        │            → $RUN/odd_boundary_pairs_join.json
+        ▼
+S5a odd-briefing   (deterministic, offline — assembles the fixed knowledge base)
+        │            → $RUN/odd_chat_briefing.json
+        ▼
+S5b odd-chat       (ONE LLM call per question — the only step here that calls an LLM)
+        │            → prints {answer, citations, model, dry_run}; appends a line to
+        └─           $RUN/odd_chat_log.jsonl
+```
+
+Run all five for one folder:
+
+```bash
+conda activate analyzer
+export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
+RUN=results/batch8/3_cluster_s=0.8032
+
+python -m llm_pipeline.cli odd-export   --run-dir "$RUN" --kNN 10   # needs network (Payload zip) or --analysis-zip
+python -m llm_pipeline.cli odd-rules    --run-dir "$RUN"
+python -m llm_pipeline.cli odd-join     --run-dir "$RUN"
+python -m llm_pipeline.cli odd-briefing --run-dir "$RUN"
+python -m llm_pipeline.cli odd-chat --run-dir "$RUN" \
+  --question "What is the weakness of this AV system?"   # needs GOOGLE_API_KEY/OPENAI_API_KEY, or --dry-run
+```
+
+### S2 — `odd_export.py` (ODD boundary export)
+
+Python twin of the Explore "Filtering" panel's **Export ODD boundary** button
+(`app/dashboard/.../explore/lib/boundaryExport.ts`) — same algorithm, callable from a terminal
+with no browser. Builds a kd-tree over min-max-normalized scenario parameters (same metric as
+Explore's Filtering distance; **not** the z-scored L2 used by `parameter_space_pairs` — see
+`implementation_plan.md` §2.2 A2/A4) and finds each trial's `kNN` nearest neighbors.
+
+| Output | Meaning |
+| --- | --- |
+| `collision_boundary` | trial pairs whose KPI (`collision`) pass/fail differs, both trials clustered |
+| `cluster_boundary` | trial pairs whose cluster label differs, both trials clustered |
+| `n_trials_without_cluster_label` | trials in the saved analysis that never got a cluster label from HDBSCAN/MFPCA (e.g. below min trajectory-duration cutoff) |
+| `odd_all_trials.json` | every trial's scenario parameters + pass/fail + cluster label — the S3 CART training table |
+| `odd_boundary_export.kNN<k>.json` | dated snapshot, so re-exporting with a different `--kNN` doesn't destroy the previous sweep point |
+
+Key functions (`llm_pipeline/odd_export.py`): `fetch_ego_data` (reuses
+`dataset_builder._fetch_payload_analysis` — the live Payload `Trial` REST collection is empty
+for this dataset; trial parameters/KPIs only exist inside the saved analysis zip), `build_trial_table`,
+`compute_boundaries` (pure port of `boundaryExport.ts`), `export_run_dir` (writes all 3 files).
+
+```bash
+python -m llm_pipeline.cli odd-export --run-dir "$RUN" --kNN 10 [--analysis-zip path/to/x.zip]
+```
+
+### S3 — `odd_rules.py` (parameter rules)
+
+Fits a **shallow** (`max_depth=3` by default) `sklearn.tree.DecisionTreeClassifier` on
+`odd_all_trials.json` to predict `fail = not passed` from scenario parameters, then walks every
+root→leaf path into a human-readable AND-predicate. Deliberately shallow: the goal is an
+*auditable* rule an engineer can read, not maximum accuracy (XAI interpretable-by-design choice
+— see `implementation_plan.md` §6.4). A depth ablation (1–4) on `batch8/3_cluster_s=0.8032`
+confirmed depth 3 is the accuracy/readability sweet spot (§9 S3 "C2").
+
+These rules are **hypotheses about the sampled trials**, never presented as a certified SAE
+J3016 ODD boundary — every `odd_parameter_rules.json` carries an explicit `limitations` list
+saying so, and the chat system prompt (below) is instructed never to call them "the ODD".
+
+```bash
+python -m llm_pipeline.cli odd-rules --run-dir "$RUN" [--max-depth 3] [--min-samples-leaf 10]
+```
+
+### S4 — `odd_join.py` (boundary ↔ pairs join)
+
+Joins S2's boundary trial ids with `parameter_space_pairs/*/pair.json` **by trial id
+membership only** — never by comparing `odd_boundary_export.json`'s min-max distance against
+`pair.json`'s z-scored distance, which are different metrics over the same features (would be a
+silent unit error). Output: which pair packs have at least one endpoint that is also a boundary
+trial, and each pack's already-written `contrast.yaml` verdict if present.
+
+```bash
+python -m llm_pipeline.cli odd-join --run-dir "$RUN"
+```
+
+### S5a — `odd_briefing.py` (deterministic knowledge base)
+
+No LLM call. Reads every artifact above (`cluster.json`, `medoid_trial.yaml`,
+`cluster_summary.yaml`, `parameter_space_pairs/*/pair.json` + `contrast.yaml`,
+`odd_boundary_export.json`, `odd_parameter_rules.json`, `odd_boundary_pairs_join.json`,
+`cluster_selection_eval.json`) and assembles one compact JSON — `odd_chat_briefing.json` — that
+S5b's chat is only ever allowed to cite numbers/ids from. Long free-text fields (captions,
+consistency notes, contrast explanations) are truncated to ~320 chars each to keep the whole
+file in the ~8–15k token budget from `implementation_plan.md` §7.5 (measured 1.7–2.7k tokens on
+the three reference runs). Anything the builder could not find is recorded verbatim in a
+`missing: [...]` list (e.g. `"no odd_parameter_rules.json — run S3"`) — the chat system prompt
+is instructed to say "unknown, run step X" for anything covered by that list instead of guessing.
+
+```bash
+python -m llm_pipeline.cli odd-briefing --run-dir "$RUN"
+```
+
+### S5b — `odd_chat.py` (the ODD Q&A system) — detailed
+
+This is the part end users interact with (via the CLI above, or the dashboard panel described
+below). It answers natural-language questions like *"What is the weakness of this AV system?"*,
+*"Which condition leads to a high failure probability?"*, *"Which scenario should we test
+next?"*, *"Why keep these clusters separate?"* — grounded **only** in one run's
+`odd_chat_briefing.json`.
+
+**Is this full RAG?** No — it is *grounded prompting / "light RAG"*: one fixed, deterministically
+built JSON document is attached (a subset chosen by keyword routing, not vector search), not a
+retrieval index over a large corpus. See `implementation_plan.md` §2.4 for why this distinction
+must stay explicit in the thesis.
+
+**Do you need to log in to a ChatGPT / Gemini account?** **No.** There is no OAuth/browser login
+anywhere. The system calls the provider's API server-side, the same way Medoid/Pair/Summary
+analysis already does, via `llm_factory.py`. What it needs is an **API key**:
+
+| Where the key comes from | How |
+| --- | --- |
+| CLI | `--api-key <key>` flag, or `GOOGLE_API_KEY` / `OPENAI_API_KEY` env var already exported in the shell |
+| Dashboard panel | Optional "API key (ephemeral)" text field in the ODD Q&A section of the Run Report tab — sent to the server for that one request only (as a spawned-process env var), never written to disk or logged; if left blank, the dashboard server's own `GOOGLE_API_KEY`/`OPENAI_API_KEY` env var is used |
+| Neither set | `answer()` runs in **dry-run** mode automatically — no LLM call, returns a placeholder string naming which sources it *would* have cited, and still logs the turn (`dry_run: true`) |
+
+Model choice follows the model name prefix — `gemini-*` → `GOOGLE_API_KEY`, `gpt-*`/`o*` →
+`OPENAI_API_KEY` (same convention as `cluster-analyze/run`). Default model: `gemini-2.5-flash`.
+
+**What is fed to the LLM on every turn** (`odd_chat.py::build_messages`):
+
+1. `SYSTEM_PROMPT` — fixed role + hard rules: cite only the briefing, say "unknown" for
+   anything in `missing`, keep deterministic facts (collision_rate, support, precision) and
+   LLM-authored interpretation (motive, caption, separation_call) verbally distinguished, never
+   call the S3 rules "the ODD", always end with a `Sources: …` line.
+2. A **routed slice** of `odd_chat_briefing.json` — see router table below. Never the whole
+   file (keeps the prompt small and forces the router to actually pick relevant evidence).
+3. The last **8** dialog turns (configurable via `max_history_turns`), reconstructed as
+   alternating user/assistant messages.
+4. The new user question.
+
+It never sees raw trajectories, full BEV frames, or the full `context_medoid.md` / pair
+`process/context.md` timelines — those are summarized once already, at S1/Product-3 (`caption`)
+time; re-attaching raw text every chat turn would blow the token budget and reintroduce the
+self-reinforcement risk the whole pipeline was designed to avoid (`implementation_plan.md` §2.2).
+
+**Intent router** (`classify_intent` + `route`, keyword/regex v1 — embeddings intentionally not
+built, v1 scope said optional in §7.6):
+
+| Question mentions | Routed intent | Briefing sections attached |
+| --- | --- | --- |
+| `cluster N` / `cA-cB` | (direct reference) | that cluster + touching pairs only |
+| "weak", "failure mode", "worst", "problem" | `weakness` | top-3 clusters by collision rate + first 5 pairs |
+| "fail condition", "odd", "limit", "high probability" | `fail_conditions` | `rules` + `boundary` sections |
+| "test next", "what to test", "coverage" | `what_next` | `boundary`, `rules`, `merge_candidates`, `pairs_touching_boundary` |
+| "merge", "why cluster", "separat…" | `why_clustering` | cluster separation notes + pair `separation_call`s + `merge_candidates` |
+| (none of the above) | `other` | run header + all cluster ids/labels/collision rates |
+
+**Does the conversation have memory, and is it saved?**
+
+Yes to both, but the two are different mechanisms:
+
+- **Short-term dialog memory** (per the router above) — the last 8 turns are replayed to the LLM
+  every time so it can resolve "that cluster" / follow-ups, but the fixed briefing is
+  **re-attached fresh every turn** so an earlier hallucination can never silently become
+  "remembered fact" in a later turn.
+- **Persistent conversation log** — every call to `answer()` (CLI or dashboard, `log=True` by
+  default) appends one JSON line to `$RUN/odd_chat_log.jsonl`:
+
+  ```json
+  {"timestamp": "2026-08-21T07:40:12Z", "question": "...", "answer": "...",
+   "citations": ["cluster0/summary", "pair c0-c2"], "model": "gemini-2.5-flash",
+   "dry_run": false, "briefing_generated_at": "2026-08-21T07:12:03Z"}
+  ```
+
+  This file is a plain artifact in the run folder — not browser `localStorage`, not a database.
+  Opening the dashboard again later (even on a different machine that shares the same
+  `results/` folder, or from a plain terminal `odd-chat` call) reads the *same* file, so the
+  conversation is genuinely shared and persistent, not per-browser-tab.
+
+**Function-by-function reference** (`llm_pipeline/odd_chat.py`):
+
+| Function | Role |
+| --- | --- |
+| `load_briefing(run_dir)` | Reads `odd_chat_briefing.json`; raises with a clear "run S5a first" message if missing |
+| `classify_intent(question)` | Regex keyword match → one of `weakness` / `fail_conditions` / `what_next` / `why_clustering` / `other` |
+| `_extract_cluster_ids` / `_extract_pair_folders` | Pulls literal `cluster N` / `cA-cB` mentions out of the question text |
+| `route(question, briefing) -> RoutedContext` | Combines the above into the actual `{context, citations}` slice attached this turn |
+| `build_messages(briefing, question, history, max_history_turns=8)` | Assembles the full `[system, briefing, ...history, question]` message list + citations, ready for the LLM client |
+| `answer(run_dir, question, *, model, api_key, temperature, history, dry_run, log)` | Top-level entry point: loads briefing → builds messages → calls `llm_factory.create_interpretation_llm` (skipped if `dry_run` or no credentials) → optionally appends to the log → returns `{answer, citations, model, dry_run}` |
+| `_append_log(run_dir, question, result, briefing)` | Writes the one persisted JSONL line described above |
+
+**CLI:**
+
+```bash
+python -m llm_pipeline.cli odd-chat --run-dir "$RUN" \
+  --question "Which scenario should we test next?" \
+  --model gemini-2.5-flash \
+  [--api-key ...] [--history-json /path/to/turns.json] [--dry-run] [--no-log]
+```
+
+**Dashboard UI (Run Report tab → "ODD Q&A" section, bottom of the page):**
+
+- `GET /api/odd-chat?batchId=&folder=` — reads `odd_chat_briefing.json`'s `missing` list plus
+  `odd_chat_log.jsonl` back into a `history` array; the panel calls this on mount so previously
+  asked questions are shown immediately, before the user asks anything new.
+- `POST /api/odd-chat` — body `{batchId, folder, question, model?, apiKey?}`; the route
+  reconstructs the last-8-turn history straight from `odd_chat_log.jsonl` (so the browser never
+  has to manage conversation state itself), writes it to a temp file, then spawns
+  `scripts/run_odd_chat.sh` (same analyzer-conda-env pattern as `scripts/run_cluster_analyze.sh`)
+  → `python -m llm_pipeline.cli odd-chat`. The CLI process itself appends the new turn to
+  `odd_chat_log.jsonl` — the Next.js route never writes conversation state directly, so the
+  terminal and the browser can never disagree about what was asked.
+- `OddChatPanel` (in `AnalyzeClient.tsx`) — model dropdown, ephemeral API-key field, scrollable
+  message log with citation chips per answer, question box. Independent of the Medoid/Pair tabs'
+  model+key state (see `implementation_plan.md` §9.3 for why).
+
+---
+
 ## Rebuild deterministic context texts (no BEV, no LLM)
 
 Rewrites `context_medoid.md` / `context_cluster.md` and pair `process/context.md`
@@ -366,6 +601,13 @@ python -m llm_pipeline.cli cluster-interpret \
 | `cluster_selection_eval.py` | Selection score + neighbor digests |
 | Analyzer `parameter_space_pair_packs.py` | Slim packs + `write_pair_process_context_md` |
 | Analyzer `dataset_builder.py` | `thin_parameter_space_side` trial writer |
+| `odd_export.py` | S2 — kd-tree kNN boundary export (Python twin of Explore's Filtering button) |
+| `odd_rules.py` | S3 — shallow CART → auditable parameter rules |
+| `odd_join.py` | S4 — boundary-trial ↔ parameter-space-pair join (by trial id only) |
+| `odd_briefing.py` | S5a — deterministic `odd_chat_briefing.json` builder (no LLM) |
+| `odd_chat.py` | S5b — grounded Q&A over the briefing (one LLM call per question) + `odd_chat_log.jsonl` |
+| Dashboard `api/odd-chat/route.ts` | GET (history) / POST (ask) — thin wrapper around `scripts/run_odd_chat.sh` |
+| `scripts/run_odd_chat.sh` | Activates the `analyzer` conda env, `exec`s `python -m llm_pipeline.cli odd-chat` |
 
 ## TTC note
 

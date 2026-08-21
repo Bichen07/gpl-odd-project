@@ -983,6 +983,7 @@ export default function AnalyzeClient({
               : ""
           }`}
         />
+        <Tab label="Run report" />
       </Tabs>
 
       {/* ===== IC-PAIR ANALYSIS TAB ===== */}
@@ -1653,6 +1654,15 @@ export default function AnalyzeClient({
           />
         </Stack>
       </Stack>
+      )}
+
+      {/* ===== RUN REPORT TAB ===== */}
+      {activeTab === 3 && config && (
+        <RunReportTab
+          batchId={batchId}
+          folder={config.folder}
+          onNavigateTab={setActiveTab}
+        />
       )}
 
     </Container>
@@ -2735,6 +2745,885 @@ function BoundaryComparePanel({
             {crossEval.inter_notes}
           </Typography>
         </Box>
+      )}
+    </Paper>
+  );
+}
+
+// ─── Run Report Tab ─────────────────────────────────────────────────────────
+
+type RunReportData = {
+  header: {
+    batchId: string;
+    folder: string;
+    k: number | null;
+    silhouette: number | null;
+    qualityScore: number | null;
+    qualityRuleScore: number | null;
+    selectionScore: number | null;
+  };
+  clusters: Array<{
+    id: number;
+    label: string | null;
+    n: number;
+    collisionRate: number | null;
+    collisionCount: number | null;
+    parameterRanges: Record<string, [number, number]> | null;
+    neighborhoodSeparation: string | null;
+    medoidMotive: string | null;
+    medoidOutcome: string | null;
+    medoidResolution: string | null;
+    summaryCaption: string | null;
+    riskLevel: string | null;
+    consistencyNote: string | null;
+    hasMedoid: boolean;
+    hasSummary: boolean;
+  }>;
+  pairs: Array<{
+    folder: string;
+    clusters: [number, number];
+    paramDist: number | null;
+    outcomeFlip: boolean;
+    separationCall: string | null;
+    separationReason: string | null;
+    contrastExplanation: string | null;
+    hasContrast: boolean;
+  }>;
+  selectionFindings: string[];
+  mergeCandidates: Array<{
+    clusters: [number, number];
+    sharedMotive: string;
+    collisionRate: [number, number];
+    paramOverlap: number;
+  }>;
+  boundaryExport: {
+    generatedAt: string | null;
+    kNN: number | null;
+    kpiName: string | null;
+    clustersIncluded: string[];
+    nTrialsConsidered: number | null;
+    nTrialsWithoutClusterLabel: number | null;
+    collisionBoundaryCount: number;
+    clusterBoundaryCount: number;
+  } | null;
+  parameterRules: {
+    generatedAt: string | null;
+    maxDepth: number | null;
+    features: string[];
+    nTrialsUsed: number | null;
+    trainAcc: number | null;
+    cvAcc: number | null;
+    rules: Array<{
+      id: string;
+      predicate: string;
+      predicted: string;
+      support: number;
+      precision: number;
+      boundaryTrialHits: number | null;
+    }>;
+  } | null;
+  boundaryPairsJoin: {
+    nPairs: number;
+    nPairsTouchingBoundary: number;
+  } | null;
+};
+
+function RunReportTab({
+  batchId,
+  folder,
+  onNavigateTab,
+}: {
+  batchId: string;
+  folder: string;
+  onNavigateTab: (tab: number) => void;
+}) {
+  const [data, setData] = useState<RunReportData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    fetch(`/api/cluster-run-report?batchId=${batchId}&folder=${encodeURIComponent(folder)}`)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then((d) => setData(d as RunReportData))
+      .catch((e) => setError(String(e)))
+      .finally(() => setLoading(false));
+  }, [batchId, folder]);
+
+  if (loading) {
+    return (
+      <Stack alignItems="center" sx={{ py: 6 }}>
+        <CircularProgress />
+        <Typography sx={{ mt: 1 }}>Loading run report…</Typography>
+      </Stack>
+    );
+  }
+  if (error || !data) {
+    return <Alert severity="error">{error ?? "Failed to load report"}</Alert>;
+  }
+
+  const { header, clusters, pairs } = data;
+
+  // Motive histogram: count primary motives across high-collision clusters
+  const motiveCount: Record<string, number> = {};
+  for (const c of clusters) {
+    if (c.medoidMotive && (c.collisionRate ?? 0) > 5) {
+      motiveCount[c.medoidMotive] = (motiveCount[c.medoidMotive] ?? 0) + 1;
+    }
+  }
+  const sortedMotives = Object.entries(motiveCount).sort(([, a], [, b]) => b - a);
+
+  // Outcome-flip pairs
+  const flipPairs = pairs.filter((p) => p.outcomeFlip);
+  const justifiedPairs = pairs.filter((p) => p.separationCall === "justified");
+
+  // Next tests recommendations (deterministic)
+  const highFailNoContrast = clusters.filter(
+    (c) => (c.collisionRate ?? 0) > 10 && !pairs.some((p) => p.clusters.includes(c.id) && p.hasContrast),
+  );
+  const inconclusivePairs = pairs.filter(
+    (p) => p.separationCall === "inconclusive" || (p.hasContrast && !p.separationCall),
+  );
+
+  return (
+    <Stack spacing={3}>
+      {/* ── A. Header ─────────────────────────────────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Run Report
+        </Typography>
+        <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+          <Chip label={`batch ${header.batchId}`} size="small" />
+          <Chip label={header.folder} size="small" variant="outlined" />
+          {header.k != null && <Chip label={`k = ${header.k}`} size="small" />}
+          {header.silhouette != null && (
+            <Chip label={`silhouette = ${header.silhouette.toFixed(4)}`} size="small" />
+          )}
+        </Stack>
+        <Stack direction="row" spacing={1} flexWrap="wrap">
+          {header.selectionScore != null && (
+            <Chip
+              label={`selection score: ${header.selectionScore}`}
+              color="primary"
+              size="small"
+            />
+          )}
+          {header.qualityScore != null && (
+            <Chip
+              label={`quality: ${header.qualityScore.toFixed(1)}`}
+              size="small"
+              variant="outlined"
+            />
+          )}
+        </Stack>
+        <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+          Selection score measures behavioral usefulness of this partition, not geometric correctness alone.
+        </Typography>
+      </Paper>
+
+      {/* ── B. Risk Table ─────────────────────────────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Cluster Risk Overview
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Sorted by collision rate (descending). Click a cluster to view its analysis.
+        </Typography>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Cluster</TableCell>
+              <TableCell>Label</TableCell>
+              <TableCell>n</TableCell>
+              <TableCell>Collision Rate</TableCell>
+              <TableCell>Medoid Motive</TableCell>
+              <TableCell>Outcome</TableCell>
+              <TableCell>Risk</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {clusters.map((c) => (
+              <TableRow
+                key={c.id}
+                hover
+                sx={{ cursor: "pointer" }}
+                onClick={() => onNavigateTab(0)}
+              >
+                <TableCell>
+                  <Chip label={`C${c.id}`} size="small" />
+                </TableCell>
+                <TableCell>{c.label ?? "—"}</TableCell>
+                <TableCell>{c.n}</TableCell>
+                <TableCell>
+                  <Chip
+                    label={c.collisionRate != null ? `${c.collisionRate.toFixed(1)}%` : "—"}
+                    color={
+                      (c.collisionRate ?? 0) > 50
+                        ? "error"
+                        : (c.collisionRate ?? 0) > 10
+                          ? "warning"
+                          : "success"
+                    }
+                    size="small"
+                  />
+                </TableCell>
+                <TableCell>
+                  <Chip
+                    label={c.medoidMotive ?? "—"}
+                    size="small"
+                    variant="outlined"
+                  />
+                </TableCell>
+                <TableCell>{c.medoidOutcome ?? "—"}</TableCell>
+                <TableCell>
+                  {c.riskLevel ? (
+                    <Chip
+                      label={c.riskLevel}
+                      color={riskColor(c.riskLevel)}
+                      size="small"
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Paper>
+
+      {/* ── C. Failure Modes ──────────────────────────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Behavioral Failure Modes
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Primary motives ranked by frequency across clusters with collision rate &gt; 5%.
+        </Typography>
+        {sortedMotives.length > 0 ? (
+          <Stack spacing={1}>
+            {sortedMotives.map(([motive, count]) => (
+              <Stack key={motive} direction="row" spacing={1} alignItems="center">
+                <Box
+                  sx={{
+                    width: `${Math.min(100, (count / clusters.length) * 100 * 2)}%`,
+                    minWidth: 40,
+                    height: 24,
+                    bgcolor: "error.main",
+                    borderRadius: 1,
+                    opacity: 0.7 + 0.3 * (count / Math.max(...sortedMotives.map(([, c]) => c))),
+                  }}
+                />
+                <Typography variant="body2" fontWeight={600}>
+                  {motive}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  ({count} cluster{count > 1 ? "s" : ""})
+                </Typography>
+              </Stack>
+            ))}
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            No high-collision clusters with motives found.
+          </Typography>
+        )}
+      </Paper>
+
+      {/* ── D. Pair Evidence ──────────────────────────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Matched-Parameter ODD Evidence
+        </Typography>
+        <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap">
+          <Chip
+            label={`${flipPairs.length} outcome flip${flipPairs.length !== 1 ? "s" : ""}`}
+            color={flipPairs.length > 0 ? "warning" : "default"}
+            size="small"
+          />
+          <Chip
+            label={`${justifiedPairs.length} justified separation${justifiedPairs.length !== 1 ? "s" : ""}`}
+            color={justifiedPairs.length > 0 ? "success" : "default"}
+            size="small"
+          />
+          <Chip label={`${pairs.length} total pair${pairs.length !== 1 ? "s" : ""}`} size="small" variant="outlined" />
+        </Stack>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Near-identical scenario parameters with different outcomes → candidate ODD edge.
+        </Typography>
+        {pairs.length > 0 ? (
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>Pack</TableCell>
+                <TableCell>Param Distance</TableCell>
+                <TableCell>Outcome Flip</TableCell>
+                <TableCell>Separation</TableCell>
+                <TableCell>Explanation</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {pairs.map((p) => (
+                <TableRow
+                  key={p.folder}
+                  hover
+                  sx={{ cursor: "pointer" }}
+                  onClick={() => onNavigateTab(1)}
+                >
+                  <TableCell>
+                    <Chip label={p.folder} size="small" variant="outlined" />
+                  </TableCell>
+                  <TableCell>{p.paramDist != null ? p.paramDist.toFixed(4) : "—"}</TableCell>
+                  <TableCell>
+                    <Chip
+                      label={p.outcomeFlip ? "Yes" : "No"}
+                      color={p.outcomeFlip ? "warning" : "default"}
+                      size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    {p.separationCall ? (
+                      <Chip
+                        label={p.separationCall}
+                        color={
+                          p.separationCall === "justified"
+                            ? "success"
+                            : p.separationCall === "over_fine"
+                              ? "warning"
+                              : "default"
+                        }
+                        size="small"
+                      />
+                    ) : (
+                      "—"
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                        maxWidth: 400,
+                      }}
+                    >
+                      {p.contrastExplanation ?? (p.hasContrast ? "(see contrast)" : "Not yet analyzed")}
+                    </Typography>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : (
+          <Alert severity="info">No parameter-space pairs in this run.</Alert>
+        )}
+      </Paper>
+
+      {/* ── E. Rules / Boundary (S2 + S3 + S4) ──────────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          ODD Boundary Export &amp; Parameter Rules
+        </Typography>
+        {data.boundaryExport ? (
+          <>
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 1 }}>
+              <Chip size="small" label={`kNN = ${data.boundaryExport.kNN ?? "—"}`} />
+              {data.boundaryExport.kpiName && (
+                <Chip size="small" variant="outlined" label={`KPI: ${data.boundaryExport.kpiName}`} />
+              )}
+              <Chip
+                size="small"
+                color="warning"
+                label={`${data.boundaryExport.collisionBoundaryCount} on collision boundary`}
+              />
+              <Chip
+                size="small"
+                color="info"
+                label={`${data.boundaryExport.clusterBoundaryCount} on cluster boundary`}
+              />
+              {data.boundaryExport.nTrialsConsidered != null && (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`n=${data.boundaryExport.nTrialsConsidered} trials considered`}
+                />
+              )}
+              {data.boundaryExport.nTrialsWithoutClusterLabel != null &&
+                data.boundaryExport.nTrialsWithoutClusterLabel > 0 && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    color="default"
+                    label={`${data.boundaryExport.nTrialsWithoutClusterLabel} trials outside clustering fit`}
+                  />
+                )}
+              {data.boundaryPairsJoin && (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={`${data.boundaryPairsJoin.nPairsTouchingBoundary}/${data.boundaryPairsJoin.nPairs} pairs touch the boundary`}
+                />
+              )}
+            </Stack>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+              From <code>odd_boundary_export.json</code>
+              {data.boundaryExport.generatedAt
+                ? ` (generated ${new Date(data.boundaryExport.generatedAt).toLocaleString()})`
+                : ""}
+              . Same min–max normalized kd-tree metric as Explore &rsquo;s Filtering panel — not
+              comparable to parameter-space pair z-score distances. Can be (re)written from a
+              terminal via <code>python -m llm_pipeline.cli odd-export --run-dir …</code> instead
+              of the Explore UI button.
+            </Typography>
+          </>
+        ) : (
+          <Alert severity="info" sx={{ mb: 1 }}>
+            <Typography variant="body2">
+              <strong>Not yet exported.</strong> Open Explore → Filtering and click &ldquo;Export
+              ODD boundary&rdquo;, or run{" "}
+              <code>python -m llm_pipeline.cli odd-export --run-dir …</code> from a terminal.
+            </Typography>
+          </Alert>
+        )}
+
+        {data.parameterRules && data.parameterRules.rules.length > 0 ? (
+          <>
+            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2, mb: 1 }}>
+              <Chip size="small" label={`CART depth ≤ ${data.parameterRules.maxDepth ?? "—"}`} />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`n=${data.parameterRules.nTrialsUsed ?? "—"} trials trained on`}
+              />
+              {data.parameterRules.trainAcc != null && (
+                <Chip size="small" variant="outlined" label={`train acc ${data.parameterRules.trainAcc}`} />
+              )}
+              {data.parameterRules.cvAcc != null && (
+                <Chip size="small" variant="outlined" label={`cv acc ${data.parameterRules.cvAcc}`} />
+              )}
+            </Stack>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Rule</TableCell>
+                  <TableCell>Predicate</TableCell>
+                  <TableCell>Predicts</TableCell>
+                  <TableCell align="right">Support</TableCell>
+                  <TableCell align="right">Precision</TableCell>
+                  <TableCell align="right">Boundary hits</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.parameterRules.rules.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      <Chip size="small" label={r.id} />
+                    </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" component="code" sx={{ fontSize: "0.8rem" }}>
+                        {r.predicate}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        color={r.predicted === "collision" ? "error" : "success"}
+                        label={r.predicted}
+                      />
+                    </TableCell>
+                    <TableCell align="right">{r.support}</TableCell>
+                    <TableCell align="right">{r.precision}</TableCell>
+                    <TableCell align="right">{r.boundaryTrialHits ?? "—"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 1 }}>
+              From <code>odd_parameter_rules.json</code>
+              {data.parameterRules.generatedAt
+                ? ` (generated ${new Date(data.parameterRules.generatedAt).toLocaleString()})`
+                : ""}
+              . Auditable hypotheses about the sampled trials only — not a certified SAE J3016 ODD
+              boundary. Trained via <code>python -m llm_pipeline.cli odd-rules --run-dir …</code>.
+            </Typography>
+          </>
+        ) : (
+          <Alert severity="info" sx={{ mt: 2 }}>
+            <Typography variant="body2">
+              <strong>Parameter rules not yet available (S3).</strong> Run{" "}
+              <code>python -m llm_pipeline.cli odd-rules --run-dir …</code> (needs S2&rsquo;s{" "}
+              <code>odd_all_trials.json</code> first) to get auditable predicates like
+              &ldquo;OncomingSpeed &gt; 12.4 AND OncomingStartDelay &lt; 0.8 →
+              collision&rdquo; with precision/support.
+            </Typography>
+          </Alert>
+        )}
+      </Paper>
+
+      {/* ── F. Merge / Split Advice ───────────────────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Clustering Trust
+        </Typography>
+        {data.mergeCandidates.length > 0 ? (
+          <>
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              <Typography variant="body2" fontWeight={600}>
+                Merge candidates detected
+              </Typography>
+              {data.mergeCandidates.map((mc, i) => (
+                <Typography key={i} variant="caption" display="block">
+                  cluster{mc.clusters[0]} + cluster{mc.clusters[1]} — shared motive{" "}
+                  <strong>{mc.sharedMotive}</strong>, param overlap {mc.paramOverlap.toFixed(2)}
+                </Typography>
+              ))}
+            </Alert>
+          </>
+        ) : (
+          <Alert severity="success" sx={{ mb: 1 }}>
+            No merge candidates — all clusters appear sufficiently distinct.
+          </Alert>
+        )}
+        {data.selectionFindings.length > 0 && (
+          <Stack spacing={0.5} sx={{ mt: 1 }}>
+            {data.selectionFindings.map((f, i) => (
+              <Typography key={i} variant="body2">
+                • {f}
+              </Typography>
+            ))}
+          </Stack>
+        )}
+        <Button
+          variant="text"
+          size="small"
+          sx={{ mt: 1 }}
+          onClick={() => onNavigateTab(2)}
+        >
+          View detailed cluster analysis →
+        </Button>
+      </Paper>
+
+      {/* ── G. Recommended Next Tests ─────────────────────────────────── */}
+      <Paper variant="outlined" sx={{ p: 2 }}>
+        <Typography variant="h6" gutterBottom>
+          Recommended Next Tests
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Deterministic priorities based on current analysis gaps.
+        </Typography>
+        <Stack spacing={1}>
+          {highFailNoContrast.length > 0 && (
+            <Alert severity="warning">
+              <Typography variant="body2">
+                <strong>High-collision clusters without pair contrast:</strong>{" "}
+                {highFailNoContrast.map((c) => `cluster${c.id} (${c.collisionRate?.toFixed(1)}%)`).join(", ")}
+              </Typography>
+              <Typography variant="caption">
+                These clusters have high failure rates but no parameter-space pair analysis yet.
+              </Typography>
+            </Alert>
+          )}
+          {inconclusivePairs.length > 0 && (
+            <Alert severity="info">
+              <Typography variant="body2">
+                <strong>Inconclusive pair separations:</strong>{" "}
+                {inconclusivePairs.map((p) => p.folder).join(", ")}
+              </Typography>
+              <Typography variant="caption">
+                Re-examine these pairs — the current analysis could not determine if the separation is justified.
+              </Typography>
+            </Alert>
+          )}
+          {highFailNoContrast.length === 0 && inconclusivePairs.length === 0 && (
+            <Alert severity="success">
+              All high-collision clusters have pair contrasts and all separations are resolved.
+            </Alert>
+          )}
+        </Stack>
+      </Paper>
+
+      {/* ── Captions (per-cluster expandable) ─────────────────────────── */}
+      {clusters.some((c) => c.summaryCaption) && (
+        <Paper variant="outlined" sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Cluster Summaries
+          </Typography>
+          {clusters.map((c) =>
+            c.summaryCaption ? (
+              <Accordion key={c.id} disableGutters elevation={0} variant="outlined" sx={{ mb: 0.5 }}>
+                <AccordionSummary expandIcon={<ExpandMore />}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Chip label={`C${c.id}`} size="small" />
+                    <Typography variant="subtitle2">{c.label ?? `Cluster ${c.id}`}</Typography>
+                    {c.riskLevel && (
+                      <Chip label={c.riskLevel} color={riskColor(c.riskLevel)} size="small" />
+                    )}
+                  </Stack>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Typography
+                    variant="body2"
+                    sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}
+                  >
+                    {c.summaryCaption}
+                  </Typography>
+                  {c.consistencyNote && (
+                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
+                      Consistency: {c.consistencyNote}
+                    </Typography>
+                  )}
+                </AccordionDetails>
+              </Accordion>
+            ) : null,
+          )}
+        </Paper>
+      )}
+
+      {/* ── H. ODD Q&A (S5 part 2) ────────────────────────────────────── */}
+      <OddChatPanel batchId={batchId} folder={folder} />
+    </Stack>
+  );
+}
+
+// ─── ODD Q&A panel (S5 part 2) ─────────────────────────────────────────────
+//
+// Thin UI over POST/GET /api/odd-chat, which itself shells out to the exact
+// same `python -m llm_pipeline.cli odd-chat` CLI documented in
+// implementation_plan.md §7 / §9.1 and app/llm_pipeline/README.md — there is
+// intentionally only one place the grounded-chat logic lives. Conversation
+// history is NOT component/browser state: every turn is appended by the CLI
+// to `odd_chat_log.jsonl` inside the run folder, and this panel simply reads
+// it back on mount — so re-opening the dashboard (even in a different
+// browser) shows the same history, and the same history is shared with
+// anyone asking questions from a terminal.
+type ChatTurn = {
+  timestamp?: string;
+  question: string;
+  answer: string;
+  citations: string[];
+  model: string;
+  dry_run?: boolean;
+};
+
+const CHAT_MODEL_OPTIONS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-pro",
+  "gemini-2.5-flash-lite",
+  "gpt-4o",
+  "gpt-4o-mini",
+  "gpt-4-turbo",
+];
+
+function OddChatPanel({ batchId, folder }: { batchId: string; folder: string }) {
+  const [history, setHistory] = useState<ChatTurn[]>([]);
+  const [briefingAvailable, setBriefingAvailable] = useState<boolean | null>(null);
+  const [missing, setMissing] = useState<string[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
+  const [question, setQuestion] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [askError, setAskError] = useState<string | null>(null);
+  const [chatModel, setChatModel] = useState("gemini-2.5-flash");
+  const [chatApiKey, setChatApiKey] = useState("");
+  const logRef = useRef<HTMLDivElement>(null);
+
+  const loadHistory = useCallback(() => {
+    setLoadingHistory(true);
+    fetch(`/api/odd-chat?batchId=${batchId}&folder=${encodeURIComponent(folder)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setBriefingAvailable(Boolean(d.briefingAvailable));
+        setMissing(d.missing ?? []);
+        setHistory(d.history ?? []);
+      })
+      .catch(() => setBriefingAvailable(false))
+      .finally(() => setLoadingHistory(false));
+  }, [batchId, folder]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [history]);
+
+  const ask = async () => {
+    const q = question.trim();
+    if (!q || asking) return;
+    setAsking(true);
+    setAskError(null);
+    try {
+      const res = await fetch("/api/odd-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchId: Number(batchId),
+          folder,
+          question: q,
+          model: chatModel,
+          apiKey: chatApiKey || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setHistory((h) => [
+        ...h,
+        {
+          timestamp: new Date().toISOString(),
+          question: q,
+          answer: data.answer,
+          citations: data.citations ?? [],
+          model: data.model ?? chatModel,
+          dry_run: Boolean(data.dry_run),
+        },
+      ]);
+      setQuestion("");
+    } catch (e) {
+      setAskError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: 2 }}>
+      <Typography variant="h6" gutterBottom>
+        ODD Q&amp;A
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        Ask a question about this one run (e.g. &ldquo;What is the weakness of this AV
+        system?&rdquo;, &ldquo;Which condition leads to high failure probability?&rdquo;,
+        &ldquo;Why keep these clusters separate?&rdquo;). Answers are grounded only in this
+        run&rsquo;s deterministic stats + LLM-authored cluster/pair products (
+        <code>odd_chat_briefing.json</code>) — never invented. History below is stored in{" "}
+        <code>odd_chat_log.jsonl</code> in the run folder, so it is still here next time this
+        dashboard is opened (by anyone), and is shared with the same command run from a terminal.
+      </Typography>
+
+      {loadingHistory ? (
+        <Stack alignItems="center" sx={{ py: 2 }}>
+          <CircularProgress size={22} />
+        </Stack>
+      ) : !briefingAvailable ? (
+        <Alert severity="info">
+          <Typography variant="body2">
+            <strong>Not available yet.</strong> Build the briefing first (needs S2 boundary
+            export):
+          </Typography>
+          <Typography variant="body2" component="pre" sx={{ fontSize: "0.78rem", mt: 0.5 }}>
+            {`python -m llm_pipeline.cli odd-export --run-dir results/batch${batchId}/${folder}\npython -m llm_pipeline.cli odd-rules --run-dir results/batch${batchId}/${folder}\npython -m llm_pipeline.cli odd-join --run-dir results/batch${batchId}/${folder}\npython -m llm_pipeline.cli odd-briefing --run-dir results/batch${batchId}/${folder}`}
+          </Typography>
+        </Alert>
+      ) : (
+        <>
+          {missing.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 1 }}>
+              <Typography variant="body2">
+                Briefing has gaps — the chat will say &ldquo;unknown&rdquo; rather than guess for:{" "}
+                {missing.join("; ")}
+              </Typography>
+            </Alert>
+          )}
+
+          <Box
+            ref={logRef}
+            sx={{
+              maxHeight: 380,
+              overflowY: "auto",
+              mb: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 1,
+              p: 1.5,
+            }}
+          >
+            {history.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No questions asked yet for this run.
+              </Typography>
+            ) : (
+              history.map((t, i) => (
+                <Box key={i} sx={{ mb: 2 }}>
+                  <Typography variant="subtitle2">You: {t.question}</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mt: 0.5 }}>
+                    {t.answer}
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                    {(t.citations ?? []).map((c, j) => (
+                      <Chip key={j} label={c} size="small" variant="outlined" />
+                    ))}
+                    {t.dry_run && (
+                      <Chip label="dry-run (no API key)" size="small" color="warning" />
+                    )}
+                    <Chip label={t.model} size="small" variant="outlined" />
+                  </Stack>
+                  {i < history.length - 1 && <Divider sx={{ mt: 1.5 }} />}
+                </Box>
+              ))
+            )}
+          </Box>
+
+          {askError && (
+            <Alert severity="error" sx={{ mb: 1 }}>
+              {askError}
+            </Alert>
+          )}
+
+          <Stack direction="row" spacing={1} sx={{ mb: 1 }} flexWrap="wrap">
+            <Select
+              size="small"
+              value={chatModel}
+              onChange={(e) => setChatModel(e.target.value)}
+              sx={{ minWidth: 190 }}
+            >
+              {CHAT_MODEL_OPTIONS.map((m) => (
+                <MenuItem key={m} value={m}>
+                  {m}
+                </MenuItem>
+              ))}
+            </Select>
+            <TextField
+              size="small"
+              label={`${chatModel.startsWith("gpt") || chatModel.startsWith("o") ? "OpenAI" : "Google"} API key (ephemeral)`}
+              type="password"
+              value={chatApiKey}
+              onChange={(e) => setChatApiKey(e.target.value)}
+              sx={{ flex: 1, minWidth: 220 }}
+              helperText="Sent only to this server process env for one call, never stored"
+            />
+          </Stack>
+
+          <Stack direction="row" spacing={1}>
+            <TextField
+              size="small"
+              fullWidth
+              placeholder='e.g. "Which scenario should we test next?"'
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  ask();
+                }
+              }}
+            />
+            <Button variant="contained" onClick={ask} disabled={asking || !question.trim()}>
+              {asking ? <CircularProgress size={18} /> : "Ask"}
+            </Button>
+          </Stack>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+            No key entered → server falls back to the <code>GOOGLE_API_KEY</code> /{" "}
+            <code>OPENAI_API_KEY</code> environment variables it was started with, or answers in
+            dry-run mode (no LLM call) if neither is set. No AI-provider account login is required
+            — only an API key.
+          </Typography>
+        </>
       )}
     </Paper>
   );

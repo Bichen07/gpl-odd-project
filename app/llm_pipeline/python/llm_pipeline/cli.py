@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json as _json
 from pathlib import Path
 
 
@@ -70,6 +71,44 @@ def main() -> None:
     se.add_argument("--run-dir", required=True,
                     help="results/batch<id>/<k>_cluster_s=.../ directory to evaluate")
 
+    # odd-export (S2 Python twin): deterministic, no LLM. Needs network (saved
+    # analysis zip) unless --analysis-zip is a local file.
+    oe = sub.add_parser("odd-export", help="S2 — write odd_boundary_export.json + odd_all_trials.json")
+    oe.add_argument("--run-dir", required=True, help="results/batch<id>/<k>_cluster_s=.../")
+    oe.add_argument("--kNN", type=int, default=10)
+    oe.add_argument("--ego-name", default="ITRI")
+    oe.add_argument("--duration-mode", default="full")
+    oe.add_argument("--save-doc-id", type=int, default=None,
+                     help="Specific savedTrajectoryAnalysis doc id (default: latest)")
+    oe.add_argument("--analysis-zip", default=None, help="Local zip path instead of Payload download")
+
+    # odd-rules (S3): deterministic, no LLM, no network.
+    orl = sub.add_parser("odd-rules", help="S3 — shallow CART -> odd_parameter_rules.json")
+    orl.add_argument("--run-dir", required=True)
+    orl.add_argument("--max-depth", type=int, default=3)
+    orl.add_argument("--min-samples-leaf", type=int, default=10)
+    orl.add_argument("--cv-folds", type=int, default=5)
+
+    # odd-join (S4): deterministic, no LLM, no network.
+    oj = sub.add_parser("odd-join", help="S4 — join boundary trials <-> parameter_space_pairs")
+    oj.add_argument("--run-dir", required=True)
+
+    # odd-briefing (S5 part 1): deterministic, no LLM, no network.
+    ob = sub.add_parser("odd-briefing", help="S5 — assemble odd_chat_briefing.json")
+    ob.add_argument("--run-dir", required=True)
+
+    # odd-chat (S5 part 2): one grounded Q&A turn. Needs an LLM call unless --dry-run.
+    oc = sub.add_parser("odd-chat", help="S5 — ask one grounded question over odd_chat_briefing.json")
+    oc.add_argument("--run-dir", required=True)
+    oc.add_argument("--question", required=True)
+    oc.add_argument("--model", default="gemini-2.5-flash")
+    oc.add_argument("--api-key", default=None)
+    oc.add_argument("--temperature", type=float, default=0.1)
+    oc.add_argument("--history-json", default=None,
+                     help="Path to a JSON list of {role, content} turns (role: user|assistant)")
+    oc.add_argument("--dry-run", action="store_true")
+    oc.add_argument("--no-log", action="store_true", help="Do not append to odd_chat_log.jsonl")
+
     args = parser.parse_args()
     source = _source_path()
     if args.cmd == "selection-eval":
@@ -97,8 +136,64 @@ def main() -> None:
             out = f"cross_cluster_eval written to {result_path}"
         else:
             out = "cross-cluster-eval failed"
+    elif args.cmd == "odd-export":
+        from .odd_export import export_run_dir
+
+        summary = export_run_dir(
+            Path(args.run_dir),
+            kNN=args.kNN,
+            ego_name=args.ego_name,
+            duration_mode=args.duration_mode,
+            save_doc_id=args.save_doc_id,
+            analysis_zip=args.analysis_zip,
+        )
+        out = _json.dumps(summary, indent=2)
+    elif args.cmd == "odd-rules":
+        from .odd_rules import train_rules
+
+        summary = train_rules(
+            Path(args.run_dir),
+            max_depth=args.max_depth,
+            min_samples_leaf=args.min_samples_leaf,
+            cv_folds=args.cv_folds,
+        )
+        out = _json.dumps(summary, indent=2)
+    elif args.cmd == "odd-join":
+        from .odd_join import join_run_dir
+
+        out = _json.dumps(join_run_dir(Path(args.run_dir)), indent=2)
+    elif args.cmd == "odd-briefing":
+        from .odd_briefing import build_briefing
+
+        doc = build_briefing(Path(args.run_dir))
+        out = _json.dumps(
+            {
+                "briefing_path": str(Path(args.run_dir) / "odd_chat_briefing.json"),
+                "n_clusters": len(doc.get("clusters") or []),
+                "n_pairs": len(doc.get("pairs") or []),
+                "n_rules": len(doc.get("rules") or []),
+                "missing": doc.get("missing"),
+            },
+            indent=2,
+        )
+    elif args.cmd == "odd-chat":
+        from .odd_chat import answer
+
+        history = None
+        if args.history_json and Path(args.history_json).is_file():
+            history = _json.loads(Path(args.history_json).read_text(encoding="utf-8"))
+        result = answer(
+            Path(args.run_dir),
+            args.question,
+            model=args.model,
+            api_key=args.api_key,
+            temperature=args.temperature,
+            history=history,
+            dry_run=args.dry_run,
+            log=not args.no_log,
+        )
+        out = _json.dumps(result, indent=2)
     elif args.cmd == "cluster-interpret":
-        import json as _json
         model = " ".join(getattr(args, "model", ["gemini-2.5-flash"]))
         dataset = getattr(args, "dataset", None)
         batch_id = getattr(args, "batch_id", None)

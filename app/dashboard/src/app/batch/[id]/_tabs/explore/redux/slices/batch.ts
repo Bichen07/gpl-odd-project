@@ -595,11 +595,19 @@ export const batchSlice = createSlice({
             b: { [key: string]: number }
           ) => {
             let sum = 0;
-            for (const usedParameter of trialArray[0].parameters) {
+            trialArray[0].parameters.forEach((usedParameter, paramIndex) => {
               const id = usedParameter.parameterId as string;
-              const parameter = batch.scenario.parameters.find(
-                (p) => p.id === id
-              );
+              // NOTE (2026-08-21 bugfix): trial.parameters[].parameterId is
+              // a stale/orphaned Mongo id — it does NOT match
+              // batch.scenario.parameters[].id for this dataset (different
+              // ObjectId epochs; confirmed via direct GraphQL query). The
+              // id-equality lookup this used to do (`p.id === id`) silently
+              // failed for every parameter, so distances were effectively
+              // *unnormalized* raw squared differences despite the min-max
+              // branch below existing in the code. Both arrays are built in
+              // the same scenario-parameter order, so match by position
+              // instead — this actually enables the normalization.
+              const parameter = batch.scenario.parameters[paramIndex];
               if (
                 parameter == null ||
                 parameter.min == null ||
@@ -612,7 +620,7 @@ export const batchSlice = createSlice({
                 const bValue = b[id] / (bound[1] - bound[0]);
                 sum += Math.pow(aValue - bValue, 2);
               }
-            }
+            });
 
             return Math.sqrt(sum);
           };
