@@ -10,7 +10,7 @@
 #       --results-dir results/batch2/4_cluster_s=0.6945 \
 #       --model gemini-2.5-flash --temperature 0.1 \
 #       --prompts-json /tmp/x/prompts.json --images-json /tmp/x/images.json \
-#       --clusters 0,2 [--no-review] [--dry-run]
+#       --clusters 0,2 [--dry-run]
 #
 # The API key is supplied via the GOOGLE_API_KEY / OPENAI_API_KEY env vars by
 # the caller (ephemeral; never written to disk by this script).

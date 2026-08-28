@@ -370,8 +370,11 @@ def medoid_card_block(cluster_dir: Path) -> Optional[str]:
             for e in ev
             if isinstance(e, dict)
         )
+    # Cluster tag only — never expose trial_id to LLM-facing digests.
+    cname = Path(cluster_dir).name  # e.g. cluster0
+    clab = cname.replace("cluster", "c") if cname.startswith("cluster") else cname
     return (
-        f"### {Path(cluster_dir).name} (medoid trial {doc.get('trial_id') or '?'})\n"
+        f"### [{clab}] cluster medoid\n"
         f"- interaction_resolution: {doc.get('interaction_resolution')}\n"
         f"- control_response: {doc.get('control_response')}\n"
         f"- primary_motive: {doc.get('primary_motive')}\n"
@@ -610,32 +613,36 @@ def neighbor_rollup_digest(run_dir: Path) -> str:
 
 
 def digest_for_prompt(run_dir: Path) -> str:
-    """Compact deterministic digest for LLM, excluding raw pair.json fields."""
-    run_dir = Path(run_dir)
-    clusters = _load_clusters(run_dir)
-    report = evaluate_run_dir(run_dir) or {}
-    lines: List[str] = ["## Clusters", ""]
-    for c in clusters:
-        rng = c.get("parameter_ranges") or {}
-        rng_txt = ", ".join(
-            f"{name}=[{float(v[0]):.2f}, {float(v[1]):.2f}]"
-            for name, v in rng.items()
-            if isinstance(v, (list, tuple)) and len(v) >= 2
-        )
-        lines.append(
-            f"- cluster{c['_label']}: n={c.get('n_trials')}, "
-            f"collision_rate={c.get('collision_rate')}%, "
-            f"mean_ttc={c.get('mean_ttc')}, "
-            f"primary_motive={c.get('_primary_motive') or 'n/a'}"
-            + (f", {rng_txt}" if rng_txt else "")
-        )
+    """Compact *derived* selection-eval digest for the LLM.
 
-    if report.get("findings"):
-        lines += ["", "## Deterministic checks", ""]
-        for f in report["findings"]:
+    Never dumps ``cluster.json`` raw rows (n_trials, collision_rate, mean_ttc,
+    parameter_ranges). Those stay rule-side in ``evaluate_run_dir`` /
+    ``cluster_selection_eval.json``; the LLM only sees scored findings.
+    """
+    run_dir = Path(run_dir)
+    report = evaluate_run_dir(run_dir) or {}
+    lines: List[str] = [
+        "## Deterministic selection-eval (rule-based; not raw cluster.json)",
+        "",
+        f"- selection_score = {report.get('selection_score')}",
+        f"- components = {report.get('components')}",
+        f"- evaluated_components = {report.get('evaluated_components')}",
+    ]
+    motives = report.get("primary_motives") or {}
+    if motives:
+        lines.append("- primary_motives (from medoid_trial.yaml): " + ", ".join(
+            f"c{lab}={m or 'n/a'}" for lab, m in sorted(motives.items(), key=lambda x: str(x[0]))
+        ))
+    merges = report.get("merge_candidates") or []
+    if merges:
+        lines.append("- merge_candidates:")
+        for mc in merges:
+            lines.append(f"  - {mc}")
+    findings = report.get("findings") or []
+    if findings:
+        lines += ["", "## Findings", ""]
+        for f in findings:
             lines.append(f"- {f}")
-        lines.append(
-            f"- deterministic selection_score = {report.get('selection_score')} "
-            f"(components: {report.get('components')})"
-        )
+    elif report.get("selection_score") is None:
+        lines.append("- (selection-eval empty — run medoid / packs first)")
     return "\n".join(lines) + "\n"

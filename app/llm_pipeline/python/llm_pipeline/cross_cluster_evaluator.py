@@ -1,9 +1,10 @@
 """cross_cluster_evaluator.py — Phase 6b: Cross-cluster behavioral comparison.
 
-Reads all per-cluster cluster.json + cluster_summary.yaml for one
-``<k>_cluster_s=<sil>/`` directory, optionally loads boundary trial
-descriptions, then asks the LLM to rate inter-cluster separation and
-boundary clarity.
+LLM inputs are **narrative cards only** (cluster_summary / medoid_trial /
+contrast / neighbor rollup / boundary descriptions) plus a *derived*
+selection-eval digest. ``cluster.json`` raw stats are used only offline
+(rule-based intra_score attach, selection-eval, clustering_quality) — never
+dumped into the prompt.
 
 Outputs:
   <run_dir>/cross_cluster_eval.json
@@ -167,34 +168,44 @@ def _boundary_description_text(run_dir: Path, bp: Dict[str, Any]) -> str:
 
     parts = [
         f"=== Boundary C{ca} ↔ C{cb} (embedding_dist={emb}) ===",
-        f"--- Trial from C{ca} (trial_id={ta}, collided={bp.get('collided_a', '?')}) ---",
+        f"--- Side C{ca} (collided={bp.get('collided_a', '?')}) ---",
         text_a or "(no description available)",
-        f"--- Trial from C{cb} (trial_id={tb}, collided={bp.get('collided_b', '?')}) ---",
+        f"--- Side C{cb} (collided={bp.get('collided_b', '?')}) ---",
         text_b or "(no description available)",
     ]
     return "\n".join(parts)
 
 
 def _format_cluster_summaries(docs: List[Dict[str, Any]]) -> str:
+    """Narrative-only cluster cards for the LLM.
+
+    Uses ``cluster_summary.yaml`` / ``medoid_trial.yaml`` fields from ``meta``.
+    Does **not** echo ``cluster.json`` raw stats (collision_rate, n_trials,
+    intra_variance, silhouette, parameter_ranges).
+    """
     lines: List[str] = []
     for d in docs:
-        c = d["cluster_doc"].get("cluster", {})
-        meta = d["meta"]
+        c = d["cluster_doc"].get("cluster", {}) or {}
+        meta = d.get("meta") or {}
         label = c.get("label", "?")
-        cr = c.get("collision_rate")
-        iv = c.get("intra_variance") or {}
-        consistency = meta.get("intra_consistency_score") or iv.get("intra_consistency_score")
         archetype = meta.get("cluster_label") or f"Cluster {label}"
-        desc = (meta.get("behavior_description") or "")[:300]
-        lines.append(
-            f"Cluster {label}: label={archetype!r}, "
-            f"collision_rate={cr}%, "
-            f"intra_consistency={consistency if consistency is not None else 'n/a'}, "
-            f"n_trials={c.get('n_trials', '?')}"
-        )
+        desc = (meta.get("behavior_description") or "")[:500]
+        conf = meta.get("confidence")
+        risk = None
+        sa = meta.get("safety_assessment")
+        if isinstance(sa, dict):
+            risk = sa.get("risk_level")
+        parts = [f"Cluster {label}: archetype={archetype!r}"]
+        if conf is not None:
+            parts.append(f"confidence={conf}")
+        if risk is not None:
+            parts.append(f"risk_level={risk}")
+        lines.append(", ".join(parts))
         if desc:
             lines.append(f"  Description: {desc}")
-    return "\n".join(lines)
+        elif not meta:
+            lines.append("  (no cluster_summary.yaml / medoid_trial.yaml narrative yet)")
+    return "\n".join(lines) if lines else "(no cluster narrative cards)"
 
 
 def _format_trajectory_projection_pairs(run_dir: Path, trajectory_projection_pairs: List[Dict[str, Any]]) -> str:
@@ -371,11 +382,32 @@ class CrossClusterEvaluator:
             print("[CrossClusterEvaluator] Could not parse JSON from LLM response")
             return None
 
+        # Attach intra_score from cluster artifacts (rule-based; not LLM).
+        score_by_id: Dict[Any, Any] = {}
+        for d in docs:
+            c = d["cluster_doc"].get("cluster", {}) or {}
+            meta = d.get("meta") or {}
+            iv = c.get("intra_variance") or {}
+            score = meta.get("intra_consistency_score") or iv.get("intra_consistency_score")
+            lab = c.get("label")
+            if lab is not None:
+                score_by_id[int(lab) if str(lab).isdigit() else lab] = score
+                score_by_id[str(lab)] = score
+        enriched: List[Dict[str, Any]] = []
+        for row in list(parsed.get("cluster_summaries") or []):
+            if not isinstance(row, dict):
+                continue
+            item = dict(row)
+            cid = item.get("cluster_id")
+            if "intra_score" not in item or item.get("intra_score") in (None, ""):
+                item["intra_score"] = score_by_id.get(cid, score_by_id.get(str(cid)))
+            enriched.append(item)
+
         result = CrossClusterEval(
             behavioral_separation_score=int(parsed.get("behavioral_separation_score", 5)),
             boundary_clarity_score=int(parsed.get("boundary_clarity_score", 5)),
             inter_notes=str(parsed.get("inter_notes", "")),
-            cluster_summaries=list(parsed.get("cluster_summaries") or []),
+            cluster_summaries=enriched,
             merge_candidates=list(parsed.get("merge_candidates") or []),
             split_candidates=list(parsed.get("split_candidates") or []),
             recommended_action=str(parsed.get("recommended_action") or ""),

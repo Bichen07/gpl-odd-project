@@ -47,7 +47,7 @@ llm_pipeline.cli cluster-interpret   ← product order below
         ├─ 1) medoid   → clusterN/output/medoid_trial.yaml
         ├─ 2) parameter-space-pairs → parameter_space_pairs/cA-cB/output/contrast.yaml   (needs both medoids)
         ├─ 3) summary  → clusterN/output/cluster_summary.yaml  (needs medoid + all touching parameter-space contrasts)
-        └─ 4) cross-eval / selection-eval  (cross-eval deferred; selection-eval is deterministic)
+        └─ 4) selection-eval (always, deterministic) → cross-eval (optional LLM product)
         │
         ▼
 llm_pipeline.cli odd-export / odd-rules / odd-join / odd-briefing / odd-chat   ← S2-S5, see below
@@ -59,7 +59,8 @@ llm_pipeline.cli odd-export / odd-rules / odd-join / odd-briefing / odd-chat   �
 | `medoid` | `clusterN/processed/` from `dataset_builder` |
 | `parameter-space-pairs` | both `cluster{A,B}/output/medoid_trial.yaml` + pack `process/context.md` + `synced_bev/` |
 | `summary` | this cluster’s medoid **and** `parameter_space_pairs/*/output/contrast.yaml` for every pack that touches the cluster (hard skip / API 400 if missing) |
-| `selection-eval` | medoids ± parameter-space packs (no API key) |
+| `selection-eval` | `cluster.json` at minimum; richer with medoids ± parameter-space packs (no API key) |
+| `cross-eval` | medoids (+ summaries preferred) + pair packs; API key unless `--dry-run` |
 
 Default CLI product is **`medoid` only**.
 
@@ -258,51 +259,312 @@ cluster is `readyForSummary` (medoid + all touching contrasts).
 
 ---
 
-### 4) Selection / cross-eval
+### 4) Selection / cross-eval / clustering-quality
 
-**`selection-eval`** — deterministic only (no LLM, no images). Writes `$RUN/cluster_selection_eval.json`
-from cluster stats, medoid motives, and parameter-space pair outcomes.
+Three related artifacts answer different questions about **the clustering itself**
+(not one trial). Silhouette alone is geometric; these layers judge *behavioral*
+partition quality. Design notes:
+[`docs/cluster_selection_evaluation.md`](docs/cluster_selection_evaluation.md).
 
-**`cross-eval`** / `cross_cluster_prompt.txt` — **deferred**. Intended later LLM inputs
-(not wired in the live product path yet): `{cluster_summaries}`, `{medoid_trial}` extracts,
-`{parameter_space_pair}` contrasts, plus deterministic rollups.
+#### What “Cross-cluster analysis” actually does
 
-**`clustering-quality`** — composite run score writer. Produces `$RUN/clustering_quality.json`
-for ranking/comparing clustering candidates. This file is **not** fed to medoid / pair / summary prompts.
+**One run folder = one clustering result** (one partition of the batch’s trials), e.g.
 
-```bash
-python -m llm_pipeline.cli selection-eval --run-dir "$RUN"
+```text
+results/batch8/6_cluster_s=0.6113/     ← this is ONE clustering config
+  cluster0/ … cluster5/                ← clusters *inside* that partition
 ```
 
-### `cluster_selection_eval.json` meaning and usage
+**Cross-cluster analysis** is **inter-cluster analysis inside that one folder**.
+It does **not** compare `6_cluster_s=0.6113` vs `3_cluster_s=0.8032`.
+It asks: *given this partition, are cluster0…cluster5 behaviorally distinct?*
+(merge / split / keep / try another *k*). Output: `$RUN/cross_cluster_eval.json`.
 
-- Purpose: deterministic behavioral quality check for one clustering run (no LLM call).
-- Main fields:
-  - `selection_score`: weighted aggregate (0-100)
-  - `components`: `outcome_purity`, `motive_distinctness`, `parameter_space_pair_decisiveness`, `no_merge_candidates`
-  - `primary_motives`: medoid primary motive by cluster id
-  - `merge_candidates`: clusters that may be duplicates under deterministic criteria
-  - `parameter_space_pairs`: per-pair outcome-flip summary
-  - `findings`: human-readable explanations
-- Output is consumed by dashboard analysis endpoints and by cross-eval deterministic rollups.
-- Outcome purity threshold in this file is `collision_rate <= 5%` or `>= 95%` (not strict 0/100).
+| Concept | Scope | Example |
+|---------|--------|---------|
+| **Cross-cluster eval** (this button) | **Same** clustering result; compare its clusters to each other | Inside `6_cluster_s=0.6113`, judge C0 vs C1 vs … C5 |
+| **“All Clustering Configurations (ranked)”** table | **Different** clustering results for the same batch | Rows = `6_cluster_s=0.5947`, `6_cluster_s=0.6113`, `3_cluster_s=0.8032` |
 
-### `clustering_quality.json` meaning and usage
+So the table is a **leaderboard of candidate partitions** (different `k` / silhouette /
+HDBSCAN settings → different trial groupings). Each row’s `final_score` comes from
+that folder’s `clustering_quality.json`. If you ran Cross-Cluster Eval on a folder,
+its LLM scores are blended into that row (`LLM Eval? = Yes`); other rows stay
+“Rule only” until you run eval there too.
 
-Composite run score for ranking/comparing clustering candidates (not fed to medoid/pair/summary LLM prompts).
+Example reading of the dashboard table:
 
-- `rule_score`: deterministic score from cluster stats
-- `llm_score`: from `cross_cluster_eval.json` (`null` when cross-eval not run)
-- `final_score`: blended score (`rule_score` when no LLM layer)
-- `sub_scores`:
-  - `silhouette_score`: normalized silhouette
-  - `collision_spread_score`: how separated cluster collision rates are
-  - `ttc_spread_score`: spread of mean TTC across clusters
-  - `param_nonoverlap_score`: how non-overlapping parameter ranges are
-  - `intra_consistency_score`: compactness/consistency proxy (from intra-variance)
-- `has_llm_eval`: whether LLM cross-eval contributed
+| Rank | Config | Meaning |
+|------|--------|---------|
+| #1 `6_cluster_s=0.5947` | Different partition than #2 (same *k*=6, different silhouette cut → different grouping). Rule-only so far. |
+| #2 `6_cluster_s=0.6113` | The folder you evaluated: rule 58.4 + LLM 50 → final 55. Cross-eval judged *its* six clusters (often “over-split collisions”). |
+| #3 `3_cluster_s=0.8032` | Yet another partition (*k*=3). Highest silhouette here ≠ automatically best behavioral score. |
 
-Used by dashboard evaluation endpoints to rank candidate runs.
+**Not the same as:** per-cluster summary (one cluster’s story) or Parameter-space pair
+contrast (one boundary pack). Cross-eval is the **whole-partition** verdict for the
+open `$RUN`.
+
+**Hard rule:** `cluster*/raw/cluster.json` is **rule-only**. It is never pasted into
+an LLM prompt. Rule code may *read* it to compute scores; the LLM only sees
+**narrative cards** (medoid / summary / contrast) plus **derived** selection-eval
+findings (score, components, findings text) — not the raw JSON fields.
+
+```text
+                    RULE-ONLY (no tokens)              LLM (needs API key / tokens)
+                    ─────────────────────              ────────────────────────────
+cluster.json ──┐
+medoid YAML ───┼─► selection-eval ──► cluster_selection_eval.json
+pair.json ─────┘         │                    │
+                         │ findings digest ───┼──► {deterministic_checks}
+medoid / summary /       │                    ├──► {medoid_cards}
+  contrast / neighbor ───┼────────────────────┼──► {cluster_summaries} (narrative only)
+  rollup / boundary ─────┘                    ├──► {parameter_space_pair_cards}
+                                              ├──► {neighbor_rollup}
+                                              └──► {boundary_trial_pairs}
+                                                         │
+                                                         ▼
+                                              cross_cluster_eval.json  (LLM)
+                                                         │
+cluster.json (again, rule) + optional LLM scores ──► clustering_quality.json
+                                                         │
+                         GET /api/cluster-evaluate       ▼
+              ranks ALL batch*/<k>_cluster_s=*/ folders by final_score
+              (dashboard “All Clustering Configurations”)
+```
+
+**What those two prompt slots mean**
+
+| Slot | Meaning |
+|------|---------|
+| `{deterministic_checks}` | Text digest from `digest_for_prompt()` over **already-computed** `cluster_selection_eval.json`: `selection_score`, component scores, `primary_motives`, `merge_candidates`, and `findings[]`. Rule numbers the LLM may cite — **not** a dump of `cluster.json` rows. |
+| `{neighbor_rollup}` | Text from `neighbor_rollup_digest()`: for every cluster that has `cluster_summary.yaml`, copy that summary’s local `neighbor_comparison[]` / `distinct_from_neighbors` / `motive_consistency_note`. Those verdicts were written earlier by the **summary** LLM product (Stage B); cross-eval cites them instead of re-judging every neighbor from scratch. Empty until summaries exist. |
+
+**All paths / context used in this stage** (under `$RUN/`, e.g. `results/batch8/6_cluster_s=0.6113/`):
+
+| Path | What it is | Used by | How used |
+|------|------------|---------|----------|
+| `clusterN/raw/cluster.json` | Analyzer cluster stats (size, `collision_rate`, TTC, param ranges, silhouette-related fields) | **Rule only:** selection-eval, clustering-quality; cross-eval loads it only to attach post-parse `intra_score` | **Never** pasted into the LLM prompt |
+| `clusterN/output/medoid_trial.yaml` | Medoid LLM card (motives, outcome, conflict metrics, timeline) | **Rule:** selection-eval (`primary_motive`); **LLM:** `{medoid_cards}`, and fallback narrative for `{cluster_summaries}` | Digest / narrative fields only |
+| `clusterN/output/cluster_summary.yaml` | Per-cluster summary LLM card (`label`, `caption`, `risk_level`, `neighbor_comparison[]`, …) | **LLM:** `{cluster_summaries}` narrative; `{neighbor_rollup}` | Narrative / neighbor verdicts only |
+| `parameter_space_pairs/cA-cB/pair.json` | Pack metadata (matched ICs, `collided_a`/`collided_b`, trial ids) | **Rule only:** selection-eval (pair flip / merge heuristics) | **Not** in cross-eval prompt |
+| `parameter_space_pairs/cA-cB/output/contrast.yaml` | Pair contrast LLM card (`separation_call`, motives, explanation) | **LLM:** `{parameter_space_pair_cards}` | Contrast fields only (no `pair.json` dump) |
+| `manifest.json` → `trajectory_projection_pairs` (legacy: `boundary_pairs`) | Index of MFPCA-near pairs across clusters | **LLM:** discovers which `{boundary_trial_pairs}` to load | Metadata + pointers |
+| `trajectory_projection_pairs/cA-cB/…/description.txt` (or legacy `clusterN/.../boundary_c*/…/description.txt`) | Deterministic text description of each boundary-side trial | **LLM:** `{boundary_trial_pairs}` body (+ collided flags from manifest) | Description text only |
+| `$RUN/cluster_selection_eval.json` | Rule output of selection-eval | Written by rule; **LLM** sees only its digest as `{deterministic_checks}` | Derived findings, not raw inputs |
+| `$RUN/cross_cluster_eval.json` | Cross-eval LLM (or stub) output | Written by LLM path; **Rule** clustering-quality may blend its scores | Output of this stage |
+| `$RUN/clustering_quality.json` | Rule ranking score (`rule_score` ± blend) | Written by `score_run_dir()` | Ranking / dashboard; not an LLM input |
+
+| Artifact | Kind | Tokens? | When it runs |
+|----------|------|---------|----------------|
+| `cluster_selection_eval.json` | **Rule** | no | End of every `cluster-interpret`; first step of `cross-eval` / CLI `selection-eval` |
+| `cross_cluster_eval.json` | **LLM** (stub if dry-run / no key) | **yes** (text-only; no images) | Product `cross-eval`; CLI `cross-cluster-eval`; dashboard **Run Cross-Cluster Eval** |
+| `clustering_quality.json` | **Rule** (+ optional blend of LLM scores already on disk) | no new LLM call | After dataset build; after `cross-eval` rescore; CLI `cross-cluster-eval` |
+
+None of these three files are fed into medoid / pair / summary prompts.
+
+```bash
+# Rule only — no API key
+python -m llm_pipeline.cli selection-eval --run-dir "$RUN"
+
+# LLM cross-eval (writes selection-eval first, then rescores clustering_quality.json)
+python -m llm_pipeline.cli cross-cluster-eval --run-dir "$RUN" --model gemini-2.5-flash
+
+python -m llm_pipeline.cli cluster-interpret \
+  --results-dir "$RUN" --batch-id 8 --products cross-eval
+```
+
+### `cluster_selection_eval.json` — **rule-based** behavioral check
+
+**Purpose:** countable “is this a good *behavioral* decomposition?”
+**No LLM, no API key, no images.**
+
+**Reads (rule-side only):**
+
+- `cluster*/raw/cluster.json` — `collision_rate`, `parameter_ranges`, sizes
+- `cluster*/output/medoid_trial.yaml` — `primary_motive` (ignores `unclear`)
+- `parameter_space_pairs/*/pair.json` — matched pairs + `collided_a` / `collided_b`
+
+**Components** (each in `[0,1]`, weighted → `selection_score` 0–100; missing → renormalize):
+
+| Component | Weight | Formula / rule |
+|-----------|--------|----------------|
+| `outcome_purity` | 0.30 | Fraction of clusters with `collision_rate ≤ 5%` or `≥ 95%` |
+| `motive_distinctness` | 0.30 | `#distinct primary_motive / #clusters with a usable motive` |
+| `parameter_space_pair_decisiveness` | 0.25 | Fraction of matched pairs whose collision outcomes **flip** |
+| `no_merge_candidates` | 0.15 | `1.0` unless same motive + rates within 10 pp + param Jaccard ≥ 0.8 |
+
+**Main fields:** `selection_score`, `components`, `weights`, `evaluated_components`,
+`primary_motives`, `mixed_outcome_clusters`, `merge_candidates`, `parameter_space_pairs`,
+`mean_param_overlap`, `findings`.
+
+**What the LLM may see later:** only `digest_for_prompt()` — score, components,
+findings, merge_candidates, primary_motives. **Not** a dump of `cluster.json`.
+
+### `cross_cluster_eval.json` — **LLM** partition verdict
+
+**Scope:** one `$RUN` only — **inter-cluster** (are *these* clusters distinct?),
+not a comparison across different `k_cluster_s=…` folders.
+
+**Implemented.** Product `cross-eval` (aliases `cross_eval`, `selection`).
+**Needs tokens** unless `--dry-run` / missing key (then stub with `stub: true`).
+
+**Always runs selection-eval first (rule), then one text-only LLM call.**
+
+| Prompt slot | Source (see path table above) | Raw `cluster.json`? |
+|-------------|--------------------------------|---------------------|
+| `{cluster_summaries}` | Narrative from `cluster_summary.yaml` (fallback medoid caption/label) | **no** |
+| `{medoid_cards}` | `medoid_digest` ← `medoid_trial.yaml` | no |
+| `{parameter_space_pair_cards}` | `contrast.yaml` digests | no |
+| `{neighbor_rollup}` | Per-cluster `neighbor_comparison` / `distinct_from_neighbors` from summaries | no |
+| `{boundary_trial_pairs}` | `manifest` pairs + side `description.txt` (+ collided flag) | no |
+| `{deterministic_checks}` | selection-eval findings digest (`selection_score`, components, findings, merges) | no (derived only) |
+
+**LLM output:** `behavioral_separation_score`, `boundary_clarity_score` (1–10),
+`inter_notes`, archetypes, merge/split lists, `recommended_action` ∈
+{`keep`,`merge`,`split`,`try_other_k`}, `selection_verdict`.
+Pipeline may attach rule-based `intra_score` **after** parse (from artifacts; not LLM).
+
+**Dashboard:** Cluster analysis → Cross-cluster analysis → Run Cross-Cluster Eval (LLM)
+on the **currently open** folder. The ranked table below that button is a separate
+view: all batch folders scored for picking *which* partition to use.
+
+**Is this enough without raw rates in the prompt?** Yes for a *behavioral* verdict:
+medoid motives/outcomes + summary captions + pair separation calls + neighbor rollup +
+selection-eval findings already encode purity/flips/merge signals. Raw silhouette /
+param ranges / TTC digests stay in rule scoring (`clustering_quality` /
+`selection-eval`), which the LLM is told not to recompute.
+
+### `clustering_quality.json` — **rule-based** ranking score (per folder)
+
+**Purpose:** one number **per** `$RUN` so the dashboard can rank **different**
+`k_cluster_s=…` candidates under the same batch (not inter-cluster labels).
+**No LLM call** here; may *read* that folder’s existing `cross_cluster_eval.json` to blend.
+
+**`rule_score` (0–100)** from `cluster.json` (weights sum to 1.0):
+
+| Sub-score | Weight | Idea |
+|-----------|--------|------|
+| `silhouette_score` | 0.25 | `(sil + 1) / 2` clipped to `[0,1]` |
+| `collision_spread_score` | 0.20 | std of cluster collision rates / 50 pp |
+| `ttc_spread_score` | 0.15 | std of mean TTC / 3 s |
+| `param_nonoverlap_score` | 0.15 | fraction of params with fully non-overlapping ranges |
+| `intra_consistency_score` | 0.25 | mean intra consistency (YAML if present, else `std_dist_to_medoid`) |
+
+**Optional blend** (only if non-stub cross-eval has both scores):
+
+```text
+llm_score   = mean(separation, clarity) * 10     # → 0–100  (from prior LLM file)
+final_score = 0.6 * rule_score + 0.4 * llm_score
+```
+
+Otherwise `final_score = rule_score`, `llm_score = null`, `has_llm_eval = false`.
+`rank` is filled by `GET /api/cluster-evaluate` when listing all folders for a batch
+(“All Clustering Configurations (ranked)”).
+
+---
+
+## Dashboard Report — panels E / F / G
+
+Analyze → **Report** tab (`panels/Report`) loads one read-only DTO from
+`GET /api/cluster-run-report?batchId=…&folder=…` (`app/dashboard/.../api/cluster-run-report/route.ts`).
+No LLM call in that request — it only aggregates files already on disk under `$RUN`.
+
+```text
+$RUN/
+├── cluster_selection_eval.json     → panel F (Clustering Trust)
+├── parameter_space_pairs/*/        → panels D + G (pair evidence + next tests)
+│     pair.json + output/contrast.yaml
+├── odd_boundary_export.json        → panel E chips (S2)
+├── odd_parameter_rules.json        → panel E rules table (S3)
+└── odd_boundary_pairs_join.json    → panel E “pairs touch the boundary” chip (S4)
+```
+
+### F — Clustering Trust
+
+**UI title:** “Clustering Trust” (comment in code still says “Merge / Split Advice”).
+
+**Data source:** `$RUN/cluster_selection_eval.json` (written by `selection-eval` /
+`cluster_selection_eval.write_eval` — see §4 above). The API maps:
+
+| API field | JSON field |
+|-----------|------------|
+| `mergeCandidates` | `merge_candidates` |
+| `selectionFindings` | `findings` |
+
+**What each line means** (matches your example):
+
+1. **“No merge candidates — all clusters appear sufficiently distinct.”**
+   `merge_candidates` is empty. A merge candidate is only emitted when two clusters share
+   the same medoid `primary_motive`, collision rates within 10 pp, **and** mean parameter-range
+   Jaccard overlap ≥ 0.8. Empty list → green success alert. Non-empty → warning listing each pair.
+
+2. **Bullet list (`selectionFindings`)** — verbatim `findings[]` strings from the deterministic
+   evaluator, e.g.:
+   - *“All 6 clusters are outcome-pure…”* → every cluster’s `collision_rate` is ≤5% or ≥95%
+     (`outcome_purity`).
+   - *“Repeated primary motives: assertive_gap_acceptance in clusters 1, 2, 5…”* →
+     `motive_distinctness` found the same medoid motive on multiple clusters (over-split signal,
+     not proof — medoid-only / LLM-noisy).
+   - *“5 of 9 near-identical-Parameter-space pairs flip outcome…”* →
+     `parameter_space_pair_decisiveness` counted outcome flips on matched packs.
+
+The button “View detailed cluster analysis →” jumps to the Cluster analysis tab (selection /
+cross-eval UI), not to a different file.
+
+### G — Recommended Next Tests
+
+**Pure client-side heuristics** on the report DTO — nothing new is written to disk. Computed in
+`Report` panel after fetch:
+
+```ts
+highFailNoContrast = clusters with collisionRate > 10%
+  AND no parameter_space_pairs pack that both touches this cluster AND has contrast.yaml
+
+inconclusivePairs = pairs where
+  contrast.separation_call === "inconclusive"
+  OR (hasContrast && separation_call is missing)
+```
+
+**What each line means** (matches your example):
+
+| Line | Meaning |
+|------|---------|
+| “Deterministic priorities based on current analysis gaps.” | Static subtitle — these rules are not LLM advice. |
+| **Inconclusive pair separations: c1-c5, c2-c5, …** | Folder names of packs whose `contrast.yaml` set `separation_call: inconclusive` (or has a contrast but no call). LLM could not decide justified vs over_fine. |
+| “Re-examine these pairs…” | Fixed caption under that alert — action hint for Parameter-space pair analysis. |
+| **High-collision clusters without pair contrast: …** (if shown) | Cluster collision rate &gt; 10% and no touching pack has a saved `contrast.yaml` yet. |
+| Green “All high-collision…” | Both lists empty. |
+
+`separation_call` itself comes from the pair LLM product (`contrast.yaml`), not from
+selection-eval. Re-run Parameter-space pair analysis (or edit/re-prompt) to change these rows.
+
+### E — ODD Boundary Export & Parameter Rules
+
+Surfaces **S2 + S3 + S4** artifacts (details in the next section). Still read-only via
+`cluster-run-report`.
+
+| UI element | Source file / field |
+|------------|---------------------|
+| `kNN = …` | `odd_boundary_export.json` → `kNN` |
+| `KPI: …` | `kpi.name` (usually collision) |
+| `N on collision boundary` | `len(collision_boundary.boundary_trials)` — neighbors differ in pass/fail |
+| `N on cluster boundary` | `len(cluster_boundary.boundary_trials)` — neighbors differ in cluster label |
+| `n=… trials considered` | `n_trials_considered` |
+| `… trials outside clustering fit` | `n_trials_without_cluster_label` |
+| `X/Y pairs touch the boundary` | `odd_boundary_pairs_join.json` → `n_pairs_touching_boundary` / `n_pairs` (S4) |
+| Rules table (predicate, predicts, support, precision, boundary hits) | `odd_parameter_rules.json` (S3 CART leaves) |
+
+**How to produce the files** (panel shows “Not yet exported” / “Parameter rules not yet
+available” until these exist):
+
+```bash
+python -m llm_pipeline.cli odd-export --run-dir "$RUN"   # or Explore → Filtering → Export ODD boundary
+python -m llm_pipeline.cli odd-rules  --run-dir "$RUN"   # needs odd_all_trials.json from S2
+python -m llm_pipeline.cli odd-join   --run-dir "$RUN"   # optional chip: pairs ∩ boundary trials
+```
+
+**Important metric note (also shown under the chips):** S2 distances use Explore’s
+**min–max normalized** kd-tree metric. Parameter-space pairs use **z-scored** L2. Do not
+compare those distance numbers to each other. S4 joins by **trial id**, never by distance.
 
 ---
 
@@ -441,7 +703,7 @@ analysis already does, via `llm_factory.py`. What it needs is an **API key**:
 | Where the key comes from | How |
 | --- | --- |
 | CLI | `--api-key <key>` flag, or `GOOGLE_API_KEY` / `OPENAI_API_KEY` env var already exported in the shell |
-| Dashboard panel | Optional "API key (ephemeral)" text field in the ODD Q&A section of the Run Report tab — sent to the server for that one request only (as a spawned-process env var), never written to disk or logged; if left blank, the dashboard server's own `GOOGLE_API_KEY`/`OPENAI_API_KEY` env var is used |
+| Dashboard panel | Optional "API key (ephemeral)" text field in the ODD Q&A tab — sent to the server for that one request only (as a spawned-process env var), never written to disk or logged; if left blank, the dashboard server's own `GOOGLE_API_KEY`/`OPENAI_API_KEY` env var is used |
 | Neither set | `answer()` runs in **dry-run** mode automatically — no LLM call, returns a placeholder string naming which sources it *would* have cited, and still logs the turn (`dry_run: true`) |
 
 Model choice follows the model name prefix — `gemini-*` → `GOOGLE_API_KEY`, `gpt-*`/`o*` →
@@ -519,7 +781,7 @@ python -m llm_pipeline.cli odd-chat --run-dir "$RUN" \
   [--api-key ...] [--history-json /path/to/turns.json] [--dry-run] [--no-log]
 ```
 
-**Dashboard UI (Run Report tab → "ODD Q&A" section, bottom of the page):**
+**Dashboard UI (ODD Q&A tab):**
 
 - `GET /api/odd-chat?batchId=&folder=` — reads `odd_chat_briefing.json`'s `missing` list plus
   `odd_chat_log.jsonl` back into a `history` array; the panel calls this on mount so previously

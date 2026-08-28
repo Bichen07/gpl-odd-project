@@ -1557,8 +1557,8 @@ def format_conflict_timeline_sentences(
     lines = [
         "## Conflict timeline",
         "",
-        "Chronological action and BEV stamps for this trial. Metric names are "
-        "defined in the domain glossary. Infer pass/yield from how the "
+        "Chronological action and BEV stamps for this cluster medoid. Metric names "
+        "are defined in the domain glossary. Infer pass/yield from how the "
         "longitudinal relationship changes over time — this header is not a "
         f"verdict.{clock_note}",
         "",
@@ -1656,7 +1656,11 @@ def format_conflict_timeline_sentences(
         sentence = "; ".join(parts) + "."
         lines.append(f"- {sentence}")
         if filenames is not None and i < len(filenames):
-            lines.append(f"  - frame: `{filenames[i]}`")
+            # Drop trial_<esmini>_ prefix in LLM-facing citations; BEV labels
+            # already use t=… — event (see ClusterInterpreter._snapshot_label).
+            raw_name = str(filenames[i])
+            display = re.sub(r"^trial_\d+_", "", Path(raw_name).name)
+            lines.append(f"  - frame: `{display}`")
     lines.append("")
     return "\n".join(lines)
 

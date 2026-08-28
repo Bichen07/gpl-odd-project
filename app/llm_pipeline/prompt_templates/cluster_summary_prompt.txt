@@ -23,14 +23,15 @@ cases (finer split?), or whether the cluster is well separated.
    - Else `distinct` if outcomes differ and/or motives/paths differ under matched parameter-space.
    - Else `similar` if same outcome AND same/overlapping motive + over_fine/weak divergence.
 3. Compare medoid vs boundary: does the Parameter-space pair story match the medoid archetype,
-   or do boundary trials look different (signal for finer split / unclean cluster)?
+   or do boundary sides look different (signal for finer split / unclean cluster)?
 4. Roll up `neighborhood_separation`:
    - `well_separated` — neighbors mostly distinct; medoid story coherent with boundaries.
    - `merge_candidates` — neighbors mostly similar (same motive+outcome) → combine.
    - `needs_finer_split` — medoid clearly unlike parameter-space boundary partners, or internal
      inconsistency (medoid vs boundary disagree on the behavioral story).
    - `ambiguous` — missing medoid_trial.yaml / contrast.yaml or conflicting evidence.
-5. `distinct_from_neighbors` = true only if every neighbor_comparison is `distinct`.
+5. `distinct_from_neighbors` is computed by the pipeline from neighbor_comparison
+   (true only if every verdict is `distinct`) — do not invent it.
 6. Label (deterministic, closed vocabulary — do NOT freehand prose): look up the
    medoid's `interaction_resolution` (preferred) or `primary_motive` in
    common_sense's Resolution class table to get PASS / YIELD / OTHER, pick at most
@@ -47,8 +48,8 @@ cases (finer split?), or whether the cluster is well separated.
 
 <Caption & verdict guide>
 `caption` (3–5 short paragraphs, blank line between):
-1. Medoid archetype (motive + outcome + key action).
-2. What parameter-space boundary pairs say about neighbors (cite folder names / separation_call).
+1. Medoid archetype (motive + outcome + key action). Name this cluster as `[cN]`.
+2. What parameter-space boundary pairs say about neighbors (cite folder names / separation_call / `[c*]`).
 3. Whether the cluster is coherent vs neighbors (merge / keep / split signal).
 
 `neighborhood_separation` must be one of the four closed codes above.
@@ -76,7 +77,9 @@ rather than guessed.
 </Neighbor parameter-space packs>
 
 <Output>
-After CoT, ONE YAML fence:
+After CoT, ONE YAML fence with **interpretation fields only**.
+(Pipeline attaches `cluster_id`, `risk_level` from collision rate, and
+`distinct_from_neighbors` from neighbor_comparison.)
 
 ```yaml
 cluster_id: <int>
@@ -85,7 +88,6 @@ label: "<Resolution>[ Modifier][ Collision|Near-miss]"  # closed blocks ONLY —
   # "Pass-First", "Smooth Pass", "Pass-Slowdown", "Proactive Yield", "Late Yield",
   # "Yield", "Yield-Stop Collision", "Brake Rear-end", "Cut-in Collision".
   # No freehand prose.
-risk_level: "low" | "medium" | "high"
 confidence: "high" | "medium" | "low"
 caption: |
   3-5 short paragraphs. Lead with medoid motive + parameter-space boundary evidence.
@@ -99,7 +101,6 @@ neighbor_comparison:
     parameter_space_pair_folder: "<e.g. c0-c4>"
     verdict: "distinct" | "similar" | "ambiguous"
     reason: "<one line, cite contrast separation_call / motive / missing card>"
-distinct_from_neighbors: <bool>   # true only if every entry above is "distinct"
 neighborhood_separation: "well_separated" | "merge_candidates" | "needs_finer_split" | "ambiguous"
 ```
 </Output>

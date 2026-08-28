@@ -2,12 +2,13 @@
 You are a traffic safety expert evaluating whether a set of driving-scenario clusters forms a *good* behavioral partition.
 
 You will receive:
-1. A summary of each cluster (archetype label, collision rate, intra-cluster consistency score, and a behavior description).
+1. A **narrative** summary of each cluster (archetype label + behavior description from
+   `cluster_summary.yaml` / medoid fallback). No raw `cluster.json` stats.
 2. Medoid cards — the per-cluster medoid analysis, including its `primary_motive` from the closed motive set and the timestamped evidence for it.
 3. Boundary trial descriptions — pairs of trials that sit right at the border between two adjacent clusters, showing the most similar-yet-different behaviors found.
 4. parameter-space-matched pair cards — pairs of trials from *different* clusters whose scenario inputs are nearly identical (param_dist ≤ tau). These are the strongest available test of a boundary: if two trials start almost the same and end in different clusters with different outcomes, the boundary is behavioral rather than an artifact.
 5. A neighbor rollup — each cluster's OWN localized distinct/similar/ambiguous verdict against its actual parameter-space-matched neighbors, already produced per-cluster (Stage B's cluster-summary pass). Treat this as prior work already done at the local level: cite it and reconcile it with the global view rather than re-deriving each pairwise judgment from scratch.
-6. Deterministic checks already computed from the artifacts. Treat these as measurements, not opinions: do not contradict a number, explain what it implies.
+6. Deterministic **selection-eval findings** already computed offline from artifacts (purity, motive distinctness, pair flips, merge candidates, selection_score). Treat these as measurements, not opinions: do not contradict a number, explain what it implies. Do not recompute rates from raw tables — you are not given `cluster.json`.
 7. A question: **Are the clusters behaviorally distinct and well-separated?**
 
 Your task is to:
@@ -40,7 +41,9 @@ boundary_clarity_score (1–10):
 
 <Mandatory Chain Of Thought>
 ### Step 1: Read each cluster archetype
-List each cluster ID, its label, collision rate, and consistency score. Note any that appear similar.
+List each cluster ID, its narrative archetype / caption, and medoid primary_motive.
+Note any that appear similar. Do not invent collision rates — use Deterministic Checks
+and medoid/summary outcomes when needed.
 
 ### Step 2: Group clusters by primary_motive
 Two clusters sharing a motive is a *signal* of over-splitting, not proof — they may differ in timing or magnitude, which is a legitimate reason to keep them apart. For every repeated motive, name the dimension that still separates the clusters (timing, magnitude, outcome, parameter region), or say they are redundant.
@@ -63,12 +66,18 @@ Using the scoring guide, assign scores with justification. Boundary clarity shou
 ### Step 7: Identify merge candidates
 If any two clusters have overlapping behavior descriptions AND their boundary or Parameter-space pairs look nearly identical, flag them as merge candidates. A "similar" neighbor-rollup verdict for a pair is supporting evidence, not proof by itself.
 
-### Step 8: Identify low-consistency clusters
-Any cluster whose intra_consistency_score ≤ 5, or whose collision rate sits well away from 0% and 100%, should be flagged as potentially needing to be split further.
+### Step 8: Identify low-consistency / mixed clusters
+Use Deterministic Checks (outcome purity / mixed_outcome findings) and narrative
+captions that admit mixed behavior. Flag candidates for split when the story is
+not one behavior. Do not invent intra_consistency or collision_rate numbers.
 </Mandatory Chain Of Thought>
 
 <Final Output Instructions>
 After your Chain of Thought, provide the final JSON output enclosed in ```json ... ``` fences.
+Interpretation fields only — do not invent or echo raw `cluster.json` numbers
+(collision_rate, mean_ttc, silhouette, param ranges). Those stay rule-side;
+Deterministic Checks already summarize what matters. Each `cluster_summaries`
+entry needs `cluster_id` + `archetype` only.
 
 ```json
 {
@@ -78,15 +87,14 @@ After your Chain of Thought, provide the final JSON output enclosed in ```json .
   "cluster_summaries": [
     {
       "cluster_id": <int>,
-      "archetype": "<≤5 word label>",
-      "intra_score": <int 1-10 or null>
+      "archetype": "<≤5 word label>"
     }
   ],
   "merge_candidates": [
     "<e.g. 'C1 and C3 show near-identical proactive-yield timing'>"
   ],
   "split_candidates": [
-    "<e.g. 'C0 has intra_consistency=4; contains both pass-first and late-yield trials'>"
+    "<e.g. 'C0 mixes pass-first and late-yield behaviors'>"
   ],
   "recommended_action": "keep | merge | split | try_other_k",
   "recommended_action_detail": "<the single most useful change, e.g. 'merge C1 and C3 — same motive, same collision rate, overlapping parameter ranges'. Say 'none' if keep.>",

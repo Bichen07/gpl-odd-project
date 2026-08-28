@@ -8,6 +8,7 @@ thin per-side trial dirs (raw + action.yaml) + pack-level ``process/context.md``
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -132,16 +133,23 @@ def write_pair_process_context_md(
         "",
     ]
     if isinstance(pair_doc, dict):
+        # LLM-facing text: cluster tags only — never trial / payload IDs
+        # (pipeline keeps those in pair.json / contrast.yaml machine fields).
+        param_names = list(pair_doc.get("param_names") or [])
+        # pair.json sometimes stores Payload ObjectIds; prefer human labels.
+        if param_names and all(
+            re.fullmatch(r"[0-9a-fA-F]{24}", str(n) or "") for n in param_names
+        ):
+            param_names = ["OncomingSpeed", "OncomingStartDelay"][: len(param_names)]
         header.extend(
             [
                 "- **normalized scenario-parameter distance**: "
                 f"{pair_doc.get('param_dist')}",
                 f"- **comparison role**: {pair_doc.get('card_role')}",
-                "- **matched scenario parameters**: "
-                f"{pair_doc.get('param_names')}",
-                f"- **left**: cluster={left_lab}, trial={pair_doc.get('trial_a')}, "
+                f"- **matched scenario parameters**: {param_names}",
+                f"- **left**: [{left_lab}], "
                 f"outcome={'collision' if pair_doc.get('collided_a') else 'safe'}",
-                f"- **right**: cluster={right_lab}, trial={pair_doc.get('trial_b')}, "
+                f"- **right**: [{right_lab}], "
                 f"outcome={'collision' if pair_doc.get('collided_b') else 'safe'}",
                 "",
             ]
@@ -467,15 +475,17 @@ def write_parameter_space_trial_context_md(
     )
     from cluster_paths import write_path
 
+    # Side context is process/debug material; keep cluster tags only so any
+    # accidental LLM use cannot copy trial / payload IDs into narrative.
+    # payload_trial_id / trial_index stay on disk under pair.json + folder names.
+    clab = f"c{int(cluster)}"
     lines: List[str] = [
-        f"# {heading} — cluster {cluster}",
+        f"# {heading} — [{clab}]",
         "",
-        f"- **Payload trial id**: {payload_trial_id}",
-        f"- **esmini index**: {trial_index}",
-        f"- **Folder**: {trial_dir.name}",
+        f"- **cluster**: [{clab}]",
     ]
     if peer_cluster is not None:
-        lines.append(f"- **Paired with cluster**: {peer_cluster}")
+        lines.append(f"- **Paired with**: [c{int(peer_cluster)}]")
     if card_role:
         lines.append(f"- **Card role**: {card_role}")
     if clip_start_s is not None:
@@ -737,21 +747,47 @@ def render_synced_parameter_space_pair_bevs(
         ego_zoom_radius=zoom_r,
     )
 
+    def _t0(df) -> Optional[float]:
+        if df is None or getattr(df, "empty", True) or "time" not in getattr(df, "columns", []):
+            return None
+        try:
+            import pandas as pd
+
+            return float(pd.to_numeric(df["time"], errors="coerce").min())
+        except Exception:
+            return None
+
     def _clip_from_labelled(traj_src: Optional[Path], df_n) -> float:
+        """Shared pair clock: StartValidCondition offset, or 0 if CSV is already clipped.
+
+        Paper casestudy packs write ``trajectory.csv`` that already starts at t=0
+        (past road 92). ``clip_conditions.yaml`` then returns None — that is not a
+        misaligned clock; subtracting a guessed offset would *create* misalignment.
+        """
         if traj_src is not None and Path(traj_src).is_file():
             try:
                 import pandas as pd
 
-                clip = estimate_clip_start_from_esmini_df(pd.read_csv(traj_src))
+                src_df = pd.read_csv(traj_src)
+                clip = estimate_clip_start_from_esmini_df(src_df)
                 if clip is not None:
                     return float(clip)
+                t0 = _t0(src_df)
+                if t0 is not None and t0 <= 1.0:
+                    return 0.0
             except Exception:
                 pass
         clip = estimate_clip_start_from_esmini_df(df_n)
-        if clip is None:
-            print("    ⚠️  clip_start unavailable — using esmini t=0 for this side")
+        if clip is not None:
+            return float(clip)
+        t0 = _t0(df_n)
+        if t0 is not None and t0 <= 1.0:
             return 0.0
-        return float(clip)
+        print(
+            "    ⚠️  clip_start unavailable and CSV is not 0-based "
+            f"(t0={t0}); pair times stay on this side's raw clock"
+        )
+        return 0.0
 
     def _panel_caption(label: str, half_m: float) -> str:
         return f"{label} ego \u00b1{half_m:.0f}m"

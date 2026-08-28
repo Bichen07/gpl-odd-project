@@ -20,6 +20,10 @@ export type ReplayerCaptionRole = ClusterHighlightRole | "trial";
 
 export type ReplayerClusterCaption = {
   label: string;
+  /** Stable id for per-cluster UI selection (independent across frames). */
+  optionId: string;
+  /** Short label for the selector menu (e.g. "Medoid", "Pair c0-c4"). */
+  optionLabel: string;
   /** Full title before " — t = …" */
   title: string;
   /** Trial whose trajectory drives velocity / accel */
@@ -173,68 +177,65 @@ function buildTitle(
   return `${base}, trial ${trialId}`;
 }
 
-/**
- * Pick one caption per cluster window.
- *
- * Priority (if several selected trials fall in this cluster):
- *   medoid > Closest pair (trajectory projection) > Closest pair (parameter space) > Outlier > other trial
- *
- * - Highlight mode: only trials with roles (or in selection) for this cluster.
- * - Non-highlight multi-select: first selected trial that belongs to this cluster.
- * - Event / narrative text for medoid (decision_timeline) and Parameter-space pair
- *   (contrast_timeline / contrast_explanation).
- */
-export function resolveReplayerClusterCaption(args: {
-  clusterLabel: string;
-  ctx: ClusterAnalysisContext | null | undefined;
-  selectedTrialIds: { by: string; value: string[] };
-  highlightRolesByTrialId: Record<string, ClusterHighlightRole[]>;
-  /** trialId → cluster label from clusteringResult */
-  trialClusterLabel: (trialId: string) => string | null;
-}): ReplayerClusterCaption | null {
-  const {
-    clusterLabel,
-    ctx,
-    selectedTrialIds,
-    highlightRolesByTrialId,
-    trialClusterLabel,
-  } = args;
+type CaptionCandidate = {
+  trialId: string;
+  role: ReplayerCaptionRole;
+  /** Stable order among equal priority: earlier in selection wins */
+  selectIndex: number;
+};
 
-  if (selectedTrialIds.value.length === 0) return null;
-
-  type Candidate = {
-    trialId: string;
-    role: ReplayerCaptionRole;
-    /** Stable order among equal priority: earlier in selection wins */
-    selectIndex: number;
-  };
-
-  const candidates: Candidate[] = [];
-  for (let i = 0; i < selectedTrialIds.value.length; i++) {
-    const trialId = String(selectedTrialIds.value[i]);
-    const membership = trialClusterLabel(trialId);
-    if (membership == null || String(membership) !== String(clusterLabel)) {
-      continue;
-    }
-
-    if (selectedTrialIds.by === "highlight") {
-      const role = primaryRole(highlightRolesByTrialId[trialId]);
-      candidates.push({ trialId, role, selectIndex: i });
-    } else {
-      candidates.push({ trialId, role: "trial", selectIndex: i });
-    }
+function optionMeta(
+  clusterLabel: string,
+  role: ReplayerCaptionRole,
+  trialId: string,
+  ctx: ClusterAnalysisContext | null | undefined,
+): { optionId: string; optionLabel: string } {
+  if (role === "medoid") {
+    return { optionId: `medoid:${clusterLabel}`, optionLabel: `Medoid c${clusterLabel}` };
   }
+  if (role === "param_boundary") {
+    const folder = icPairFolderForTrial(
+      clusterLabel,
+      trialId,
+      ctx?.paramBoundaryPairs ?? [],
+    );
+    return {
+      optionId: folder ? `param_boundary:${folder}` : `param_boundary:${trialId}`,
+      optionLabel: folder
+        ? `Pair ${folder} (parameter space)`
+        : `Pair trial ${trialId} (parameter space)`,
+    };
+  }
+  if (role === "boundary") {
+    const folder = icPairFolderForTrial(
+      clusterLabel,
+      trialId,
+      ctx?.boundaryPairs ?? [],
+    );
+    return {
+      optionId: folder ? `boundary:${folder}` : `boundary:${trialId}`,
+      optionLabel: folder
+        ? `Pair ${folder} (trajectory)`
+        : `Pair trial ${trialId} (trajectory)`,
+    };
+  }
+  if (role === "outlier") {
+    return {
+      optionId: `outlier:${trialId}`,
+      optionLabel: `Outlier ${trialId}`,
+    };
+  }
+  return {
+    optionId: `trial:${trialId}`,
+    optionLabel: `Trial ${trialId}`,
+  };
+}
 
-  if (candidates.length === 0) return null;
-
-  candidates.sort((a, b) => {
-    const pd =
-      CAPTION_ROLE_PRIORITY[a.role] - CAPTION_ROLE_PRIORITY[b.role];
-    if (pd !== 0) return pd;
-    return a.selectIndex - b.selectIndex;
-  });
-
-  const winner = candidates[0];
+function captionFromCandidate(
+  clusterLabel: string,
+  winner: CaptionCandidate,
+  ctx: ClusterAnalysisContext | null | undefined,
+): ReplayerClusterCaption {
   const name = clusterName(ctx, clusterLabel);
   const title = buildTitle(
     clusterLabel,
@@ -243,7 +244,12 @@ export function resolveReplayerClusterCaption(args: {
     winner.trialId,
     ctx,
   );
-
+  const { optionId, optionLabel } = optionMeta(
+    clusterLabel,
+    winner.role,
+    winner.trialId,
+    ctx,
+  );
   const interp = ctx?.interpretations?.[clusterLabel];
 
   if (winner.role === "medoid") {
@@ -253,6 +259,8 @@ export function resolveReplayerClusterCaption(args: {
         : null;
     return {
       label: clusterLabel,
+      optionId,
+      optionLabel,
       title,
       trialId: winner.trialId,
       role: winner.role,
@@ -282,6 +290,8 @@ export function resolveReplayerClusterCaption(args: {
           : null;
     return {
       label: clusterLabel,
+      optionId,
+      optionLabel,
       title,
       trialId: winner.trialId,
       role: winner.role,
@@ -293,6 +303,8 @@ export function resolveReplayerClusterCaption(args: {
 
   return {
     label: clusterLabel,
+    optionId,
+    optionLabel,
     title,
     trialId: winner.trialId,
     role: winner.role,
@@ -300,4 +312,101 @@ export function resolveReplayerClusterCaption(args: {
     motiveSummary: null,
     narrativeKind: null,
   };
+}
+
+function collectCaptionCandidates(args: {
+  clusterLabel: string;
+  selectedTrialIds: { by: string; value: string[] };
+  highlightRolesByTrialId: Record<string, ClusterHighlightRole[]>;
+  trialClusterLabel: (trialId: string) => string | null;
+}): CaptionCandidate[] {
+  const {
+    clusterLabel,
+    selectedTrialIds,
+    highlightRolesByTrialId,
+    trialClusterLabel,
+  } = args;
+
+  if (selectedTrialIds.value.length === 0) return [];
+
+  const candidates: CaptionCandidate[] = [];
+  for (let i = 0; i < selectedTrialIds.value.length; i++) {
+    const trialId = String(selectedTrialIds.value[i]);
+    const membership = trialClusterLabel(trialId);
+    if (membership == null || String(membership) !== String(clusterLabel)) {
+      continue;
+    }
+
+    if (selectedTrialIds.by === "highlight") {
+      const role = primaryRole(highlightRolesByTrialId[trialId]);
+      candidates.push({ trialId, role, selectIndex: i });
+    } else {
+      candidates.push({ trialId, role: "trial", selectIndex: i });
+    }
+  }
+
+  candidates.sort((a, b) => {
+    const pd =
+      CAPTION_ROLE_PRIORITY[a.role] - CAPTION_ROLE_PRIORITY[b.role];
+    if (pd !== 0) return pd;
+    return a.selectIndex - b.selectIndex;
+  });
+  return candidates;
+}
+
+/**
+ * All LLM / highlight captions available for one cluster window.
+ * Dedupes by optionId (e.g. one entry per parameter-space pair folder).
+ * Order: medoid > trajectory pair > parameter-space pair > outlier > trial.
+ */
+export function listReplayerClusterCaptions(args: {
+  clusterLabel: string;
+  ctx: ClusterAnalysisContext | null | undefined;
+  selectedTrialIds: { by: string; value: string[] };
+  highlightRolesByTrialId: Record<string, ClusterHighlightRole[]>;
+  trialClusterLabel: (trialId: string) => string | null;
+}): ReplayerClusterCaption[] {
+  const candidates = collectCaptionCandidates(args);
+  if (candidates.length === 0) return [];
+
+  const out: ReplayerClusterCaption[] = [];
+  const seen = new Set<string>();
+  for (const cand of candidates) {
+    const caption = captionFromCandidate(args.clusterLabel, cand, args.ctx);
+    if (seen.has(caption.optionId)) continue;
+    seen.add(caption.optionId);
+    out.push(caption);
+  }
+  return out;
+}
+
+/**
+ * Pick one caption per cluster window.
+ *
+ * Priority (if several selected trials fall in this cluster):
+ *   medoid > Closest pair (trajectory projection) > Closest pair (parameter space) > Outlier > other trial
+ *
+ * - Highlight mode: only trials with roles (or in selection) for this cluster.
+ * - Non-highlight multi-select: first selected trial that belongs to this cluster.
+ * - Event / narrative text for medoid (decision_timeline) and Parameter-space pair
+ *   (contrast_timeline / contrast_explanation).
+ * - When ``preferredOptionId`` is set and still available, that caption wins
+ *   (per-cluster independent UI choice).
+ */
+export function resolveReplayerClusterCaption(args: {
+  clusterLabel: string;
+  ctx: ClusterAnalysisContext | null | undefined;
+  selectedTrialIds: { by: string; value: string[] };
+  highlightRolesByTrialId: Record<string, ClusterHighlightRole[]>;
+  /** trialId → cluster label from clusteringResult */
+  trialClusterLabel: (trialId: string) => string | null;
+  preferredOptionId?: string | null;
+}): ReplayerClusterCaption | null {
+  const options = listReplayerClusterCaptions(args);
+  if (options.length === 0) return null;
+  if (args.preferredOptionId) {
+    const preferred = options.find((o) => o.optionId === args.preferredOptionId);
+    if (preferred) return preferred;
+  }
+  return options[0];
 }

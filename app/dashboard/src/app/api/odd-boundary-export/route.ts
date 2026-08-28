@@ -9,7 +9,7 @@ import path from "path";
  *   Body: { batchId, folder, kNN, kpi: {id, name}, clustersIncluded: string[],
  *           collision_boundary, cluster_boundary, all_trials? }
  *   Writes (all read-then-write only — no LLM call):
- *     - $RUN/odd_boundary_export.json            (latest — what Run report / S4 read)
+ *     - $RUN/odd_boundary_export.json            (latest — what report / S4 read)
  *     - $RUN/odd_boundary_export.kNN{k}.json     (dated snapshot, so re-exporting
  *       with a different kNN does not silently erase the previous one; useful
  *       for a kNN sensitivity check before trusting one value)
@@ -23,7 +23,7 @@ import path from "path";
  * The kNN / distance computation itself happens client-side in the Filtering
  * panel (it reuses the exact same kd-tree the "On Collision/Cluster Boundary"
  * checkboxes use — see explore/lib/boundaryExport.ts). This route only
- * persists the result so Run report / S3 / S5 can read it from disk.
+ * persists the result so report / S3 / S5 can read it from disk.
  */
 
 function findProjectRoot(start: string): string {

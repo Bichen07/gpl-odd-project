@@ -15,9 +15,15 @@ import { readYamlDoc } from "../_lib/readYaml";
  */
 
 function findProjectRoot(start: string): string {
-  let current = start;
-  for (let i = 0; i < 8; i++) {
-    if (path.basename(current) === "gpl-odd-project") return current;
+  // Prefer process.cwd(). __dirname under Next (.next/server/...) is too deep
+  // to reach gpl-odd-project within a short walk.
+  let current = path.resolve(start);
+  for (let i = 0; i < 16; i++) {
+    const named = path.basename(current) === "gpl-odd-project";
+    const marked =
+      fs.existsSync(path.join(current, "results")) &&
+      fs.existsSync(path.join(current, "app"));
+    if (named || marked) return current;
     const parent = path.dirname(current);
     if (parent === current) break;
     current = parent;
@@ -44,7 +50,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const root = findProjectRoot(__dirname);
+  const root = findProjectRoot(process.cwd());
   const batchDir = path.join(root, "results", `batch${batchId}`);
 
   if (!fs.existsSync(batchDir)) {

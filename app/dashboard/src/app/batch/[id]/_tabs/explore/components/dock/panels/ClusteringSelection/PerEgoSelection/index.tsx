@@ -1228,6 +1228,10 @@ export default function PerEgoSelection({
                         bp.param_names && bp.param_names.length > 0
                           ? ` · ${bp.param_names.join(", ")}`
                           : "";
+                      const pairFolder = `c${bp.cluster_a}-c${bp.cluster_b}`;
+                      const hasAnalysis = Boolean(
+                        currentAnalysis.icPairInterpretations[pairFolder],
+                      );
                       return (
                         <Button
                           key={`param-pair-${key}`}
@@ -1238,7 +1242,7 @@ export default function PerEgoSelection({
                             bp.param_dist != null
                               ? ` · IC dist ${bp.param_dist}`
                               : ""
-                          }${paramHint}`}
+                          }${paramHint}${hasAnalysis ? " · LLM contrast done" : ""}`}
                           sx={{
                             fontSize: "11px",
                             py: 0.25,
@@ -1263,6 +1267,15 @@ export default function PerEgoSelection({
                           }}
                         >
                           {formatBoundaryPairLabel(key)}
+                          {hasAnalysis && (
+                            <CheckCircle
+                              sx={{
+                                fontSize: 13,
+                                ml: 0.3,
+                                color: isSelected ? "#111" : "success.light",
+                              }}
+                            />
+                          )}
                         </Button>
                       );
                     })}

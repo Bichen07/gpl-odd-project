@@ -14,6 +14,7 @@ const ARTIFACTS: Record<string, { kind: Kind; name: string }> = {
   "action.yaml": { kind: "processed", name: "action.yaml" },
   "description.txt": { kind: "processed", name: "description.txt" },
   "context.md": { kind: "processed", name: "context.md" },
+  "context_medoid.md": { kind: "processed", name: "context_medoid.md" },
   "cluster_aggregate.json": { kind: "processed", name: "cluster_aggregate.json" },
   "map_overview.jpg": { kind: "processed", name: "map_overview.jpg" },
   "medoid_trial.yaml": { kind: "output", name: "medoid_trial.yaml" },

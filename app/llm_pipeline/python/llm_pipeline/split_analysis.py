@@ -236,6 +236,11 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
             "risk_level",
             "confidence",
             "contrast_explanation",
+            "contrast_timeline",
+            "critical_divergence",
+            "motive_contrast",
+            "separation_call",
+            "separation_reason",
             "hypothesis",
             "delta",
             "open_questions",
@@ -603,11 +608,16 @@ def run_split_analysis(
                 pack = rebase_conflict_pack(pack, clip_start)
                 print(
                     f"  clip_start_esmini_s={clip_start:.3f} "
-                    f"(medoid times rebased to Payload clock)"
+                    f"(medoid times rebased to analysis/Payload clock)"
                 )
             else:
+                # Not fatal: dataset_builder trajectory.csv is often already
+                # 0-based. Missing clip only means we cannot re-label absolute
+                # esmini seconds onto the Payload observation clock.
                 print(
-                    "  ⚠️  No Payload clip_start; medoid times stay absolute esmini"
+                    "  ⚠️  clip_start unresolved (no clip_time.json, esmini cache "
+                    "CSV missing or clip_conditions miss, Payload observations "
+                    "empty). Medoid YAML times stay on the pack trajectory clock."
                 )
             ctx = action_log_from_description(cluster_dir)
             # Truncate travelogue-heavy context for LLM
@@ -657,9 +667,19 @@ def run_split_analysis(
                         "motive_summary": "parse_failed",
                         "decision_timeline": [],
                     }
-                # Inject authoritative (already-rebased) metrics into OUTPUT only.
+                # Inject authoritative fields into OUTPUT only (never sent in the prompt).
                 parsed["conflict_metrics"] = pack
-                parsed["trial_id"] = parsed.get("trial_id") or medoid_tid
+                parsed["trial_id"] = medoid_tid
+                parsed["outcome"] = (
+                    "collision" if mblk.get("collided") else "safe"
+                )
+                # Optional LLM collision sentence → collision_detail.narrative
+                narr = parsed.pop("collision_narrative", None)
+                if isinstance(narr, str) and narr.strip():
+                    parsed["collision_detail"] = {
+                        **(parsed.get("collision_detail") or {}),
+                        "narrative": narr.strip(),
+                    }
                 if clip_start is not None:
                     parsed["clip_start_esmini_s"] = round(float(clip_start), 3)
                     parsed["time_origin"] = "payload_observation_clip"
@@ -868,7 +888,10 @@ def run_split_analysis(
                 "clusters": [int(ca), int(cb)],
                 "param_dist": bp.get("param_dist"),
                 "card_role": card_role,
-                "param_names": bp.get("param_names"),
+                "param_names": sorted(
+                    set(left_params.keys()) | set(right_params.keys())
+                )
+                or bp.get("param_names"),
                 "left": {
                     **left_ref,
                     "cluster": int(ca),
@@ -916,23 +939,72 @@ def run_split_analysis(
                         **base_doc,
                         "contrast_explanation": "parse_failed",
                         "separation_call": "inconclusive",
+                        "separation_reason": "parse_failed",
                     }
                 parsed.setdefault("left", {})
                 parsed.setdefault("right", {})
-                parsed["left"] = {**left_ref, **(parsed.get("left") or {})}
-                parsed["right"] = {**right_ref, **(parsed.get("right") or {})}
-                parsed["left"].update(left_ref)
-                parsed["right"].update(right_ref)
-                parsed["left"]["params"] = left_params
-                parsed["right"]["params"] = right_params
-                parsed["left"]["conflict_metrics"] = left_pack
-                parsed["right"]["conflict_metrics"] = right_pack
-                parsed["left"]["cluster"] = int(ca)
-                parsed["right"]["cluster"] = int(cb)
-                parsed["left"]["outcome"] = left_out
-                parsed["right"]["outcome"] = right_out
+                # Keep LLM motive fields; overwrite all ground-truth / machine keys.
+                llm_left = dict(parsed.get("left") or {})
+                llm_right = dict(parsed.get("right") or {})
+                parsed["left"] = {
+                    **left_ref,
+                    "cluster": int(ca),
+                    "outcome": left_out,
+                    "params": left_params,
+                    "conflict_metrics": left_pack,
+                    "interaction_resolution": llm_left.get(
+                        "interaction_resolution", "unresolved"
+                    ),
+                    "control_response": llm_left.get("control_response", "none"),
+                    "primary_motive": llm_left.get("primary_motive", "unclear"),
+                    "motive_evidence": llm_left.get("motive_evidence", ""),
+                }
+                parsed["right"] = {
+                    **right_ref,
+                    "cluster": int(cb),
+                    "outcome": right_out,
+                    "params": right_params,
+                    "conflict_metrics": right_pack,
+                    "interaction_resolution": llm_right.get(
+                        "interaction_resolution", "unresolved"
+                    ),
+                    "control_response": llm_right.get("control_response", "none"),
+                    "primary_motive": llm_right.get("primary_motive", "unclear"),
+                    "motive_evidence": llm_right.get("motive_evidence", ""),
+                }
+                parsed["clusters"] = [int(ca), int(cb)]
                 parsed["param_dist"] = bp.get("param_dist")
                 parsed["card_role"] = card_role
+                # Prefer human scenario-parameter names from resolved trial params
+                # (pair.json may still store Payload ObjectIds).
+                human_names = sorted(
+                    set(left_params.keys()) | set(right_params.keys())
+                )
+                parsed["param_names"] = human_names or bp.get("param_names")
+                parsed["delta"] = parsed.get("delta") if isinstance(parsed.get("delta"), dict) else {}
+
+                # critical_divergence: single narrative field = metric_delta
+                # (drop redundant description; fold it in if LLM only sent that).
+                cd = parsed.get("critical_divergence")
+                if isinstance(cd, dict):
+                    md = cd.get("metric_delta")
+                    desc = cd.get("description")
+                    if (not md or not str(md).strip()) and desc:
+                        md = desc
+                    cleaned = {
+                        "at": cd.get("at"),
+                        "metric_delta": md,
+                        "bev_frame": cd.get("bev_frame"),
+                    }
+                    parsed["critical_divergence"] = {
+                        k: v for k, v in cleaned.items() if v is not None
+                    }
+
+                if not parsed.get("separation_call"):
+                    print(
+                        f"  ⚠️  {folder}: LLM omitted separation_call "
+                        "(contrast saved without decision fields)"
+                    )
                 for key in (
                     "contrast_explanation",
                     "hypothesis",
@@ -1023,11 +1095,29 @@ def run_split_analysis(
                     parsed = {
                         "cluster_id": cid,
                         "label": f"Cluster {cid}",
-                        "risk_level": "medium",
                         "caption": "parse_failed",
+                        "neighborhood_separation": "ambiguous",
+                        "neighbor_comparison": [],
                     }
                 parsed["cluster_id"] = cid
                 parsed["numeric_digest_ref"] = True
+                # risk_level from cluster collision rate (rule-based GT).
+                rate = float(aggregate.get("collision_rate") or 0.0)
+                if rate > 50:
+                    parsed["risk_level"] = "high"
+                elif rate > 10:
+                    parsed["risk_level"] = "medium"
+                else:
+                    parsed["risk_level"] = "low"
+                # distinct_from_neighbors from neighbor_comparison verdicts.
+                comps = parsed.get("neighbor_comparison") or []
+                if isinstance(comps, list) and comps:
+                    parsed["distinct_from_neighbors"] = all(
+                        isinstance(c, dict) and c.get("verdict") == "distinct"
+                        for c in comps
+                    )
+                else:
+                    parsed["distinct_from_neighbors"] = False
                 if isinstance(parsed.get("caption"), str):
                     parsed["caption"] = _format_caption_paragraphs(parsed["caption"])
                 if isinstance(parsed.get("consistency_note"), str):

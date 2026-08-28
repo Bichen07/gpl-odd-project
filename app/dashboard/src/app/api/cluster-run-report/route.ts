@@ -5,8 +5,8 @@ import { resolveClusterArtifact } from "@/app/api/_lib/clusterPaths";
 import { readYamlDoc } from "@/app/api/_lib/readYaml";
 
 /**
- * Run Report API — assembles all existing analysis artifacts for one $RUN
- * into a single typed DTO for the Run Report tab.
+ * Report API — assembles all existing analysis artifacts for one $RUN
+ * into a single typed DTO for the Report tab.
  *
  * GET /api/cluster-run-report?batchId=8&folder=3_cluster_s=0.8032
  *
@@ -64,7 +64,7 @@ type ReportPair = {
   hasContrast: boolean;
 };
 
-type RunReportDTO = {
+type ReportDTO = {
   header: {
     batchId: string;
     folder: string;
@@ -317,7 +317,7 @@ export async function GET(req: NextRequest) {
 
   // ── Assemble DTO ──────────────────────────────────────────────────────
 
-  const dto: RunReportDTO = {
+  const dto: ReportDTO = {
     header: {
       batchId,
       folder,

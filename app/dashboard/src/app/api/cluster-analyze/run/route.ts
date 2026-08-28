@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { spawn } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
+import { randomUUID } from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -11,22 +12,55 @@ import { metaFromYamlPath } from "../../_lib/readYaml";
  *
  * Runs cluster interpretation on a builder results folder with UI overrides and
  * STREAMS progress back as NDJSON (one JSON object per line):
+ *   { "type": "start", "jobId": "..." }
  *   { "type": "log",  "data": "<chunk of stdout/stderr>" }
- *   { "type": "done", "ok": bool, "exitCode": n, "results": [...], "logFile": "..." }
+ *   { "type": "done", "ok": bool, "exitCode": n, "stopped"?: bool, "results": [...], "logFile": "..." }
+ *
+ * Stop a live run:
+ *   { action: "stop", jobId }
  *
  * Body: {
- *   batchId, folder, clusters?: number[], model, apiKey?, temperature?,
- *   review?: boolean, prompts?: {system,common_sense,interaction,reviewer},
+ *   batchId, folder, clusters?: number[], model, apiKey, temperature?,
+ *   prompts?: {system,common_sense,interaction,reviewer},
  *   selectedImages?: { [clusterId]: string[] }, dryRun?: boolean
  * }
  *
- * The API key is ephemeral: injected into the spawned process env only and
- * never written to disk or echoed back in logs.
+ * The API key MUST come from the dashboard (per-user, ephemeral). Server
+ * GOOGLE_API_KEY / OPENAI_API_KEY are stripped so another user's env key is
+ * never reused. The key is injected into the child env only — never written
+ * to disk or echoed in logs.
  */
 
 export const dynamic = "force-dynamic";
 
 const MAX_RUN_MS = 15 * 60 * 1000; // generous: multiple clusters x 2 LLM passes
+
+type AnalyzeJob = { child: ChildProcess; killed: boolean };
+const analyzeJobs = new Map<string, AnalyzeJob>();
+
+function killAnalyzeJob(job: AnalyzeJob) {
+  job.killed = true;
+  try {
+    if (job.child.pid) process.kill(-job.child.pid, "SIGTERM");
+  } catch {
+    try {
+      job.child.kill("SIGTERM");
+    } catch {
+      /* ignore */
+    }
+  }
+  setTimeout(() => {
+    try {
+      if (job.child.pid) process.kill(-job.child.pid, "SIGKILL");
+    } catch {
+      try {
+        job.child.kill("SIGKILL");
+      } catch {
+        /* ignore */
+      }
+    }
+  }, 2000);
+}
 
 // Taiwan (UTC+8) timestamp for log filenames + headers.
 function taipeiNow(): { stamp: string; human: string } {
@@ -69,16 +103,19 @@ function collectResults(
     if (clusters && clusters.length > 0 && !clusters.includes(cid)) continue;
     const clusterDir = path.join(resultsDir, entry.name);
     const medoidPath = resolveClusterArtifact(clusterDir, "medoid_trial.yaml");
-    const summaryPath = resolveClusterArtifact(clusterDir, "cluster_summary.yaml");
     const medoidMeta = metaFromYamlPath(medoidPath);
-    const summaryMeta = metaFromYamlPath(summaryPath);
-    const rawYaml = medoidPath
-      ? fs.readFileSync(medoidPath, "utf-8")
-      : summaryPath
-        ? fs.readFileSync(summaryPath, "utf-8")
-        : "";
-    const meta = medoidMeta ?? summaryMeta;
-    if (meta || rawYaml) results.push({ cluster: cid, meta, rawYaml });
+    const rawYaml = medoidPath ? fs.readFileSync(medoidPath, "utf-8") : "";
+    if (!medoidMeta && !rawYaml) continue;
+    const parsed = (medoidMeta?.parsed ?? null) as Record<string, unknown> | null;
+    const meta: Record<string, unknown> = {
+      ...(medoidMeta ?? {}),
+      product: "medoid",
+      behavior_description:
+        (typeof parsed?.motive_summary === "string" && parsed.motive_summary) || null,
+      ego_perspective_summary: parsed?.decision_timeline ?? null,
+    };
+    delete meta.cluster_label;
+    results.push({ cluster: cid, meta, rawYaml });
   }
   results.sort((a, b) => (a.cluster as number) - (b.cluster as number));
   return results;
@@ -92,12 +129,21 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "invalid JSON body" }, { status: 400 });
   }
 
+  if (body.action === "stop") {
+    const jobId = String(body.jobId ?? "");
+    const job = analyzeJobs.get(jobId);
+    if (!job) {
+      return Response.json({ ok: true, message: "no such job (already finished?)" });
+    }
+    killAnalyzeJob(job);
+    return Response.json({ ok: true, stopped: true, jobId });
+  }
+
   const batchId = String(body.batchId ?? "");
   const folder = String(body.folder ?? "");
   const model = String(body.model ?? "gemini-2.5-flash");
   const apiKey = typeof body.apiKey === "string" ? body.apiKey : "";
   const temperature = typeof body.temperature === "number" ? body.temperature : 0.1;
-  const review = body.review !== false; // default on
   const dryRun = body.dryRun === true;
   const clusters = Array.isArray(body.clusters) ? body.clusters.map((c) => Number(c)) : null;
   const pairs = Array.isArray(body.pairs)
@@ -118,6 +164,15 @@ export async function POST(req: NextRequest) {
   const resultsDir = path.join(projectRoot, "results", `batch${batchId}`, folder);
   if (!fs.existsSync(resultsDir)) {
     return Response.json({ error: `results dir not found: ${resultsDir}` }, { status: 404 });
+  }
+  if (!dryRun && !apiKey.trim()) {
+    return Response.json(
+      {
+        error:
+          "API key is required in the Analyze page. Server env keys are not used — they may belong to another user.",
+      },
+      { status: 400 },
+    );
   }
 
   // Hard-gate Parameter-space pairs: selected packs must be ready (medoids + process + BEV).
@@ -232,17 +287,18 @@ export async function POST(req: NextRequest) {
     "--products",
     products,
   ];
-  if (!review) args.push("--no-review");
   if (dryRun) args.push("--dry-run");
   if (clusters && clusters.length > 0) args.push("--clusters", clusters.join(","));
   if (pairs && pairs.length > 0) args.push("--pairs", pairs.join(","));
 
-  // Inject API key into the correct provider env var (ephemeral). PYTHONUNBUFFERED
-  // makes the child's progress prints stream live instead of buffering.
+  // Dashboard key only. Strip host env keys so they cannot leak into this run.
   const env: NodeJS.ProcessEnv = { ...process.env, PYTHONUNBUFFERED: "1" };
-  if (apiKey) {
-    if (model.startsWith("gpt") || model.startsWith("o")) env.OPENAI_API_KEY = apiKey;
-    else env.GOOGLE_API_KEY = apiKey;
+  delete env.GOOGLE_API_KEY;
+  delete env.OPENAI_API_KEY;
+  const trimmedKey = apiKey.trim();
+  if (trimmedKey) {
+    if (model.startsWith("gpt") || model.startsWith("o")) env.OPENAI_API_KEY = trimmedKey;
+    else env.GOOGLE_API_KEY = trimmedKey;
   }
 
   const encoder = new TextEncoder();
@@ -263,11 +319,23 @@ export async function POST(req: NextRequest) {
         : clusters && clusters.length
           ? `cluster(s) ${clusters.join(", ")}`
           : "all clusters";
+      const jobId = randomUUID();
+      send({ type: "start", jobId });
       send({ type: "log", data: `▶ Running ${scopeMsg} with ${model}${dryRun ? " (dry run)" : ""}\n` });
 
-      const child = spawn("bash", args, { cwd: projectRoot, env });
+      const child = spawn("bash", args, {
+        cwd: projectRoot,
+        env,
+        detached: true,
+      });
+      analyzeJobs.set(jobId, { child, killed: false });
+      req.signal.addEventListener("abort", () => {
+        const job = analyzeJobs.get(jobId);
+        if (job) killAnalyzeJob(job);
+      });
       const timer = setTimeout(() => {
-        child.kill("SIGKILL");
+        const job = analyzeJobs.get(jobId);
+        if (job) killAnalyzeJob(job);
         const msg = "[timeout] analysis exceeded time limit\n";
         allLogs.push(msg);
         send({ type: "log", data: msg });
@@ -283,6 +351,9 @@ export async function POST(req: NextRequest) {
 
       const finish = (exitCode: number) => {
         clearTimeout(timer);
+        const job = analyzeJobs.get(jobId);
+        const wasKilled = job?.killed === true;
+        analyzeJobs.delete(jobId);
         // Clean up ephemeral overrides.
         try {
           fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -303,9 +374,9 @@ export async function POST(req: NextRequest) {
           const header =
             `# LLM cluster analysis run\n` +
             `# time: ${human}\n` +
-            `# model: ${model} | temperature: ${temperature} | review: ${review} | dryRun: ${dryRun}\n` +
+            `# model: ${model} | temperature: ${temperature} | dryRun: ${dryRun}\n` +
             `# clusters: ${clusters && clusters.length ? clusters.join(", ") : "all"}\n` +
-            `# exitCode: ${exitCode}\n\n`;
+            `# exitCode: ${wasKilled ? -2 : exitCode}\n\n`;
           fs.writeFileSync(logFile, header + allLogs.join(""), "utf-8");
         } catch {
           logFile = "";
@@ -313,8 +384,9 @@ export async function POST(req: NextRequest) {
 
         send({
           type: "done",
-          ok: exitCode === 0,
-          exitCode,
+          ok: !wasKilled && exitCode === 0,
+          exitCode: wasKilled ? -2 : exitCode,
+          stopped: wasKilled,
           results,
           logFile: logFile ? path.relative(projectRoot, logFile) : "",
         });

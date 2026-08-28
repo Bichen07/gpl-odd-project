@@ -1272,7 +1272,12 @@ def _build_trial_parameter_matrix(
             if not isinstance(tp, dict):
                 continue
             pid = str(tp.get("parameterId", tp.get("id", "")))
-            name = param_id_to_name.get(pid) or tp.get("name") or (pid or "param")
+            # Prefer catalog / trial display name over bare Payload ObjectId.
+            cand = param_id_to_name.get(pid) or tp.get("name")
+            if cand and not re.fullmatch(r"[0-9a-fA-F]{24}", str(cand)):
+                name = str(cand)
+            else:
+                name = str(cand or pid or "param")
             try:
                 vals[str(name)] = float(tp.get("value", 0))
             except (TypeError, ValueError):
@@ -1571,13 +1576,15 @@ def write_cluster_context_md(
     m = cd.get("medoid", {}) or {}
     s = cd.get("scene", {}) or {}
     label = c.get("label", cluster_dir.name.replace("cluster", ""))
+    clab = f"c{label}"
     sil = c.get("silhouette")
     sil_str = f"{sil:.4f}" if isinstance(sil, (int, float)) else "n/a"
     lines: List[str] = [
-        f"# Cluster {label} (cluster-level)",
+        f"# Cluster [{clab}] (cluster-level)",
         "",
         "This file is cluster-wide evidence for `--products summary`. "
-        "The medoid LLM reads `context_medoid.md` (this trial's timeline), not this file.",
+        "The medoid LLM reads `context_medoid.md` (this cluster's medoid timeline), "
+        "not this file.",
         "",
         f"- **Size**: {c.get('size', c.get('n_trials', '?'))} trials "
         f"(k={c.get('n_clusters', '?')}, silhouette={sil_str})",
@@ -1608,12 +1615,14 @@ def write_cluster_context_md(
             f"- **Intra-cluster distance to medoid**: mean={iv.get('mean_dist_to_medoid')}, "
             f"std={iv.get('std_dist_to_medoid')}, max={iv.get('max_dist_to_medoid')}"
         )
-    lines.append(
-        f"- **Medoid pointer**: trial id={m.get('trial_id', '?')}, "
-        f"batch={m.get('batch_id', '?')}, esmini index={m.get('trial_index', '?')}"
-        + ("" if m.get("is_exact_medoid", True) else f" (nearest available, rank {m.get('medoid_rank')})")
-        + (f", collided={m.get('collided')}" if "collided" in m else "")
-    )
+    # Cluster tag only — never expose trial / payload / esmini IDs to the summary LLM.
+    nearest = "" if m.get("is_exact_medoid", True) else " (nearest available medoid)"
+    outcome_bit = ""
+    if "collided" in m:
+        outcome_bit = (
+            f", outcome={'collision' if m.get('collided') else 'safe'}"
+        )
+    lines.append(f"- **Medoid**: [{clab}] archetype{nearest}{outcome_bit}")
     loc = s.get("location")
     if loc:
         lines.append(
@@ -1621,7 +1630,7 @@ def write_cluster_context_md(
             f"{s.get('frame_count', '?')} frames"
         )
     lines.append(
-        "- **Timeline**: see `context_medoid.md` (single-trial; not cluster-wide)."
+        "- **Timeline**: see `context_medoid.md` (medoid archetype; not cluster-wide)."
     )
     lines.append("")
     return "\n".join(lines)
@@ -1636,11 +1645,10 @@ def write_context_md(
     traj_df: Any = None,
     map_tracks_csv: Optional[str] = None,
 ) -> None:
-    """Write ``context_medoid.md`` + ``context_cluster.md`` (and a medoid alias).
+    """Write ``context_medoid.md`` + ``context_cluster.md``.
 
     Medoid LLM input is the trial timeline only. Cluster stats live in
-    ``context_cluster.md`` for the later summary product. ``context.md`` is
-    kept as a copy of the medoid file so older readers still resolve.
+    ``context_cluster.md`` for the later summary product.
     """
     from conflict_frame_selector import format_conflict_timeline_sentences
 
@@ -1650,17 +1658,21 @@ def write_context_md(
     label = (cd.get("cluster") or {}).get(
         "label", cluster_dir.name.replace("cluster", "")
     )
+    clab = f"c{label}"
 
+    # LLM-facing: cluster tag only — trial / payload / esmini IDs stay in cluster.json.
     medoid_lines: List[str] = [
-        f"# Medoid trial — cluster {label}",
+        f"# Medoid — [{clab}]",
         "",
-        f"- **Trial**: id={m.get('trial_id', '?')}, batch={m.get('batch_id', '?')}, "
-        f"esmini index={m.get('trial_index', '?')}"
-        + ("" if m.get("is_exact_medoid", True) else f" (nearest available, rank {m.get('medoid_rank')})"),
+        f"- **Cluster**: [{clab}]",
     ]
     if "collided" in m:
         medoid_lines.append(
-            f"- **This trial outcome**: {'collision' if m.get('collided') else 'safe'}"
+            f"- **Medoid outcome**: {'collision' if m.get('collided') else 'safe'}"
+        )
+    if not m.get("is_exact_medoid", True):
+        medoid_lines.append(
+            f"- **Note**: nearest available medoid (rank {m.get('medoid_rank')})"
         )
     medoid_lines.append(
         f"- **Map**: {s.get('location', '?')}, duration {s.get('duration_seconds', '?')}s, "
@@ -1690,7 +1702,6 @@ def write_context_md(
     write_path(cluster_dir, "context_medoid.md").write_text(
         medoid_text, encoding="utf-8"
     )
-    write_path(cluster_dir, "context.md").write_text(medoid_text, encoding="utf-8")
     write_path(cluster_dir, "context_cluster.md").write_text(
         write_cluster_context_md(cluster_dir, cluster_doc), encoding="utf-8"
     )

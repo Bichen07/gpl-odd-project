@@ -77,6 +77,38 @@ def resolve_observation_clip_start(trial_id: str) -> Optional[float]:
         return None
 
 
+def _clip_from_local_trajectory(trial_dir: Path, batch_id: Optional[int]) -> Optional[float]:
+    """Clip start from the pack's own ``trajectory.csv`` (already written by dataset_builder).
+
+    Paper casestudy zips often store a different ``medoid.batch_id`` than the
+    esmini cache filename, so ``get_csv_road_data`` misses. The local CSV is
+    the ground-truth motion for this pack.
+    """
+    traj = _resolve(Path(trial_dir), "trajectory.csv")
+    if traj is None:
+        return None
+    try:
+        import pandas as pd
+        from parameter_space_pair_packs import estimate_clip_start_from_esmini_df  # type: ignore
+
+        df = pd.read_csv(traj)
+        if df is None or df.empty:
+            return None
+        clip = estimate_clip_start_from_esmini_df(df, batch_id=batch_id)
+        if clip is not None:
+            return clip
+        # Dataset-builder CSVs are often already cut at StartValidCondition,
+        # so t=0 *is* the analysis clock.
+        tcol = "time" if "time" in df.columns else None
+        if tcol is not None:
+            t0 = float(pd.to_numeric(df[tcol], errors="coerce").min())
+            if t0 <= 1.0:
+                return 0.0
+    except Exception:
+        return None
+    return None
+
+
 def estimate_clip_start_from_cluster_json(trial_dir: Path) -> Optional[float]:
     """Analysis clip start from medoid esmini CSV via ``clip_conditions.yaml``.
 
@@ -106,8 +138,9 @@ def estimate_clip_start_from_cluster_json(trial_dir: Path) -> Optional[float]:
 
 
 def load_clip_start(trial_dir: Path, trial_id: Optional[str] = None) -> Optional[float]:
-    """Load clip start from ``clip_time.json``, config+CSV, or Payload fallback."""
-    clip_path = Path(trial_dir) / "clip_time.json"
+    """Load clip start from ``clip_time.json``, config+CSV, local traj, or Payload."""
+    root = Path(trial_dir)
+    clip_path = root / "clip_time.json"
     if clip_path.is_file():
         try:
             data = json.loads(clip_path.read_text(encoding="utf-8"))
@@ -116,21 +149,30 @@ def load_clip_start(trial_dir: Path, trial_id: Optional[str] = None) -> Optional
         except Exception:
             pass
 
-    # Prefer shared clip_conditions.yaml + esmini CSV (analysis-stage clock).
-    from_csv = estimate_clip_start_from_cluster_json(Path(trial_dir))
+    med: Dict[str, Any] = {}
+    cj = _resolve(root, "cluster.json")
+    if cj is not None:
+        try:
+            med = json.loads(cj.read_text(encoding="utf-8")).get("medoid") or {}
+        except Exception:
+            med = {}
+    batch_id = None
+    try:
+        if med.get("batch_id") is not None:
+            batch_id = int(med["batch_id"])
+    except (TypeError, ValueError):
+        batch_id = None
+
+    # Prefer shared clip_conditions.yaml + esmini cache CSV (analysis-stage clock).
+    from_csv = estimate_clip_start_from_cluster_json(root)
     if from_csv is not None:
         return from_csv
 
-    tid = trial_id
-    if not tid:
-        cj = _resolve(Path(trial_dir), "cluster.json")
-        if cj is not None:
-            try:
-                med = (json.loads(cj.read_text(encoding="utf-8")).get("medoid") or {})
-                tid = med.get("trial_id")
-            except Exception:
-                tid = None
+    from_local = _clip_from_local_trajectory(root, batch_id)
+    if from_local is not None:
+        return from_local
 
+    tid = trial_id or med.get("trial_id")
     if tid:
         from_payload = resolve_observation_clip_start(str(tid))
         if from_payload is not None:

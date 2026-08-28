@@ -3,7 +3,7 @@
 No LLM call in this module. Assembles the fixed "knowledge base" that S5's
 chat (``odd_chat.py``) is only ever allowed to cite from, per
 implementation_plan.md §7.5. Mirrors the field extraction already used by
-``cluster-run-report/route.ts`` so the Run Report tab and the chat briefing
+``cluster-run-report/route.ts`` so the Report tab and the chat briefing
 never disagree about what a given YAML/JSON means.
 
 Truncates long free-text fields (caption / consistency_note / contrast

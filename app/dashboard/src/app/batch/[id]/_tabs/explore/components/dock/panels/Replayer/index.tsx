@@ -30,7 +30,7 @@ import {
   ToggleButtonGroup,
 } from "@mui/material";
 import { toggleButtonGroupClasses } from "@mui/material/ToggleButtonGroup";
-import { PlayArrow, Redo, Stop } from "@mui/icons-material";
+import { PlayArrow, Redo, Stop, ArrowDropDown } from "@mui/icons-material";
 import {
   useEffect,
   useMemo,
@@ -62,7 +62,10 @@ import { interactionSlice } from "../../../../redux/slices/interaction";
 import { ClusteringResult } from "@/app/_shared/graphql/queries/clustering";
 import EgoTimelineBox from "@/app/_shared/components/EgoTimelineBox";
 import { sampleEgoKinematicsAtTime } from "@/app/_shared/utils/egoTimeline";
-import { resolveReplayerClusterCaption } from "@/app/_shared/utils/replayerCaption";
+import {
+  listReplayerClusterCaptions,
+  resolveReplayerClusterCaption,
+} from "@/app/_shared/utils/replayerCaption";
 import { resolveReplayerFocusTrial } from "@/app/_shared/utils/replayerFocusTrial";
 
 const clusteringDuration = 5;
@@ -279,6 +282,16 @@ const Replayer = () => {
     title: string;
     text: string;
   } | null>(null);
+  /** Per cluster-frame LLM caption choice (`ego:label` → optionId). Independent across frames. */
+  const [captionChoiceByPanel, setCaptionChoiceByPanel] = useState<
+    Record<string, string>
+  >({});
+  const [captionMenu, setCaptionMenu] = useState<{
+    panelKey: string;
+    egoName: string;
+    clusterLabel: string;
+    anchor: HTMLElement;
+  } | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -295,36 +308,65 @@ const Replayer = () => {
     return () => observer.disconnect();
   }, []);
 
+  const captionTrialClusterLabel = useCallback(
+    (egoName: string, trialId: string) => {
+      const result = clusteringResult?.[egoName] ?? null;
+      const label = result?.data?.[trialId]?.label;
+      if (label == null) {
+        const alt =
+          result?.data?.[String(Number(trialId))]?.label ??
+          result?.data?.[String(trialId)]?.label;
+        return alt != null ? String(alt) : null;
+      }
+      return String(label);
+    },
+    [clusteringResult],
+  );
+
+  const listClusterCaptions = useCallback(
+    (egoName: string, clusterLabel: string) => {
+      if (selectedTrialIds.value.length === 0) return [];
+      const ctx = clusterAnalysisByEgo?.[egoName] ?? null;
+      return listReplayerClusterCaptions({
+        clusterLabel,
+        ctx,
+        selectedTrialIds,
+        highlightRolesByTrialId,
+        trialClusterLabel: (trialId: string) =>
+          captionTrialClusterLabel(egoName, trialId),
+      });
+    },
+    [
+      clusterAnalysisByEgo,
+      selectedTrialIds,
+      highlightRolesByTrialId,
+      captionTrialClusterLabel,
+    ],
+  );
+
   const getClusterCaption = useCallback(
     (egoName: string, clusterLabel: string) => {
       if (selectedTrialIds.value.length === 0) return null;
 
       const ctx = clusterAnalysisByEgo?.[egoName] ?? null;
-      const result = clusteringResult?.[egoName] ?? null;
+      const panelKey = `${egoName}:${clusterLabel}`;
 
       return resolveReplayerClusterCaption({
         clusterLabel,
         ctx,
         selectedTrialIds,
         highlightRolesByTrialId,
-        trialClusterLabel: (trialId: string) => {
-          const label = result?.data?.[trialId]?.label;
-          if (label == null) {
-            // Try numeric / string key variants.
-            const alt =
-              result?.data?.[String(Number(trialId))]?.label ??
-              result?.data?.[String(trialId)]?.label;
-            return alt != null ? String(alt) : null;
-          }
-          return String(label);
-        },
+        trialClusterLabel: (trialId: string) =>
+          captionTrialClusterLabel(egoName, trialId),
+        preferredOptionId: captionChoiceByPanel[panelKey] ?? null,
       });
     },
     [
       clusterAnalysisByEgo,
-      clusteringResult,
       selectedTrialIds,
       highlightRolesByTrialId,
+      captionTrialClusterLabel,
+      captionChoiceByPanel,
     ],
   );
 
@@ -1841,6 +1883,7 @@ const Replayer = () => {
                     : "none",
                   overflow: "hidden",
                   minHeight: 0,
+                  height: "100%",
                   position: "relative",
                 }}
                 alignItems="stretch"
@@ -1882,27 +1925,67 @@ const Replayer = () => {
                   }}
                 />
 
-                {/* Caption — top-right; Motive button — bottom-right (medoid only). */}
+                {/* Caption selector (top-right) + text box below; Motive button bottom-right.
+                    Size to content with maxHeight (do NOT pin top+bottom — that stretched a
+                    full-height overlay over the map/heatmap in short stacked frames). */}
                 {(() => {
+                  const panelKey = `${egoName}:${label}`;
+                  const captionOptions = listClusterCaptions(egoName, label);
                   const panelCaption = getClusterCaption(egoName, label);
                   if (!panelCaption || timeOrS !== "time") return null;
-                  const motiveKey = `${egoName}:${label}`;
+                  const motiveKey = panelKey;
+                  const hasSelector = captionOptions.length > 1;
+                  const hasMotive = Boolean(panelCaption.motiveSummary);
                   return (
                     <>
                       <Box
                         sx={{
                           position: "absolute",
-                          top: 20,
-                          right: 20,
+                          top: 10,
+                          right: 16,
                           width: 280,
-                          maxWidth: "55%",
-                          maxHeight: "calc(100% - 80px)",
+                          maxWidth: "48%",
+                          // Cap to this frame only; leave room for Motive / Contrast.
+                          maxHeight: hasMotive
+                            ? "calc(100% - 56px)"
+                            : "calc(100% - 12px)",
                           overflowY: "auto",
-                          zIndex: 20,
-                          // Allow wheel/drag scroll on the caption; map stays behind.
+                          overflowX: "hidden",
+                          zIndex: 22,
                           pointerEvents: "auto",
                         }}
                       >
+                        {hasSelector && (
+                          <Button
+                            size="small"
+                            variant="contained"
+                            endIcon={<ArrowDropDown />}
+                            onClick={(e) =>
+                              setCaptionMenu({
+                                panelKey,
+                                egoName,
+                                clusterLabel: label,
+                                anchor: e.currentTarget,
+                              })
+                            }
+                            sx={{
+                              mb: 0.75,
+                              position: "sticky",
+                              top: 0,
+                              zIndex: 1,
+                              width: "100%",
+                              justifyContent: "space-between",
+                              textTransform: "none",
+                              fontSize: 11,
+                              py: 0.25,
+                              bgcolor: "rgba(20,20,20,0.82)",
+                              color: "#fff",
+                              "&:hover": { bgcolor: "rgba(40,40,40,0.9)" },
+                            }}
+                          >
+                            {panelCaption.optionLabel}
+                          </Button>
+                        )}
                         <EgoTimelineBox
                           summary={panelCaption.summary}
                           timeSec={displayTimeSec}
@@ -1913,7 +1996,7 @@ const Replayer = () => {
                           {...egoKinematicsFor(egoName, panelCaption.trialId)}
                         />
                       </Box>
-                      {panelCaption.motiveSummary && (
+                      {hasMotive && (
                         <Button
                           size="small"
                           variant="contained"
@@ -1957,12 +2040,15 @@ const Replayer = () => {
             <Box
               sx={{
                 position: "absolute",
-                top: 20,
+                top: 16,
                 right: 20,
                 width: 400,
-                maxWidth: "65%",
-                maxHeight: "calc(100% - 80px)",
+                maxWidth: "48%",
+                maxHeight: firstActiveCaption.motiveSummary
+                  ? "calc(100% - 64px)"
+                  : "calc(100% - 16px)",
                 overflowY: "auto",
+                overflowX: "hidden",
                 zIndex: 20,
                 pointerEvents: "auto",
               }}
@@ -2119,6 +2205,42 @@ const Replayer = () => {
           )}
         </Stack>
       </Stack>
+
+      <Menu
+        anchorEl={captionMenu?.anchor ?? null}
+        open={captionMenu != null}
+        onClose={() => setCaptionMenu(null)}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
+        {(captionMenu
+          ? listClusterCaptions(captionMenu.egoName, captionMenu.clusterLabel)
+          : []
+        ).map((opt) => {
+          const selectedId =
+            (captionMenu && captionChoiceByPanel[captionMenu.panelKey]) ||
+            (captionMenu
+              ? getClusterCaption(captionMenu.egoName, captionMenu.clusterLabel)
+                  ?.optionId
+              : undefined);
+          return (
+            <MenuItem
+              key={opt.optionId}
+              selected={selectedId === opt.optionId}
+              onClick={() => {
+                if (!captionMenu) return;
+                setCaptionChoiceByPanel((prev) => ({
+                  ...prev,
+                  [captionMenu.panelKey]: opt.optionId,
+                }));
+                setCaptionMenu(null);
+              }}
+            >
+              {opt.optionLabel}
+            </MenuItem>
+          );
+        })}
+      </Menu>
 
       <Dialog
         open={motiveOpen != null}

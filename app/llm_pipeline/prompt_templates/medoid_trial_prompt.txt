@@ -1,6 +1,7 @@
 <Your Task>
-Analyze ONE medoid trial (representative of its cluster, not the whole cluster).
-Inputs: trial context timeline (`processed/context_medoid.md`) and **single-panel** BEV
+Analyze ONE cluster medoid (representative archetype of its cluster, not the whole
+cluster). Refer to it as `[cN]` / "this medoid" / Ego.
+Inputs: medoid context timeline (`processed/context_medoid.md`) and **single-panel** BEV
 frames (ego-centered, half-extent = ego–partner distance + 2 m, fixed initial-yaw
 up; titles include burst timing e.g. `0p5s_before_APPROACH_Opposite` — see
 common_sense BEV guide).
@@ -11,20 +12,19 @@ motives near the conflict with the named partner: why it slowed / sped up /
 braked / yielded / resumed / turned on the same lane. Ignore junction enter/exit
 filler. Braking during a FRONT→BEHIND pass is control (`slowdown`/`brake`), not yield.
 
-If context shows a collision outcome, also nail the collision anatomy: who struck
-whom, from which side, at what speed — quote numbers from context/BEV. A collision
-entry that only says "Collision with partner X" is a FAILED output.
+If context shows a collision outcome, describe the collision anatomy in the LAST
+`decision_timeline` entry and/or `collision_narrative` (who struck whom, side,
+speeds). Structured `collision_detail` fields and `outcome` are filled by the
+pipeline — do not invent them.
 </Your Task>
 
 <Collision anatomy (required when outcome: collision)>
-Read the collision / near-miss lines in the trial context and the final BEV frames.
+Read the collision / near-miss lines in the medoid context and the final BEV frames.
 Use the full, precise metric descriptions written in context, including partner
 azimuth relative to Ego heading, both vehicle speeds, center-to-center distance,
 and its closing/opening rate.
-- `impact_type`: `rear-end` (FRONT*/BEHIND* sectors) or `side/lateral impact`
-  (LEFT/RIGHT — side-swipe or T-bone).
-- `striking_vehicle` / `struck_vehicle`: rear-end only (who closed the gap vs whose
-  rear absorbed it); both null for side/lateral.
+Write one clear narrative sentence (striking/struck or side-swipe). Pipeline
+attaches impact_type / striking_vehicle / struck_vehicle from metrics.
 If context lacks geometry for a collision, say so in `open_questions`
 instead of guessing.
 </Collision anatomy>
@@ -34,7 +34,7 @@ Keep CoT terse — telegraphic bullets, no restating the inputs. The YAML fence 
 be reached; never end without it.
 
 Step 0 — Notable features (EXTRACT, do not invent). List 6-12 one-line bullets
-taken from trial context / BEV with their times:
+taken from medoid context / BEV with their times:
 brake or decelerate onsets, speed rise/drop across the conflict window, partner
 center-to-center distance / estimated time to collision / distance trend at
 approach, same-lane TURN_*
@@ -43,7 +43,7 @@ LANE_CHANGE_* that forces ego response, outcome stamp, post-peak accelerate or t
 Tag each `pre-peak` / `post-peak` vs peak conflict time in context, or `setup` when
 the partner is still d ≳ 100 m (setup features must not become motives).
 
-Then walk the trial chronologically. **Before any motive**, state pass/yield
+Then walk the medoid chronologically. **Before any motive**, state pass/yield
 order from the longitudinal relationship / partner position in Ego coordinates
 (paper relative-angle
 FRONT→BEHIND = pass_first).
@@ -64,7 +64,7 @@ covering ALL of:
    partner behind while Ego continues through.
 
 If outcome is collision: the LAST CoT bullet states impact geometry from
-context/BEV and feeds `collision_detail` + the final timeline entry.
+context/BEV and feeds the final timeline entry + optional `collision_narrative`.
 </Mandatory Workflow & Chain Of Thought>
 
 <Lexicon>
@@ -118,12 +118,12 @@ No road IDs; no junction enter/exit filler.
 </Lexicon>
 
 <Output>
-After CoT, ONE YAML fence.
+After CoT, ONE YAML fence with **interpretation fields only**.
 There is NO separate motive_evidence list — motives live on the timeline entries.
+(Pipeline attaches `trial_id`, `outcome`, `conflict_metrics`, structured
+`collision_detail`.)
 
 ```yaml
-trial_id: "<id>"
-outcome: "collision" | "near_miss" | "safe"
 interaction_resolution: "pass_first" | "yield" | "unresolved"
 control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "recovery" | "none"
 primary_motive: "<one closed motive code>"   # the single dominant ego motive across the arc
@@ -133,7 +133,7 @@ decision_timeline:
     description: "<action + speed/Δheading + situation + ⇒ motive conclude>"
     motive: "<closed code | null>"
   # 8-20 entries spanning approach → conflict → outcome.
-  # LAST entry = final outcome. If outcome: collision, LAST uses collision phrasing;
+  # LAST entry = final outcome. If collision, LAST uses collision phrasing;
   # set motive: null on that LAST collision anatomy entry.
 collision_detail:            # omit entirely (or null) when outcome != collision
   impact_type: "<rear-end | side/lateral impact>"
@@ -197,7 +197,7 @@ passing before any meaningful brake response.
 
 When overlap becomes very close on the left, Ego brakes only then, so the
 conflict response is `late_reaction`. The near-miss confirms the brake came late
-but still avoided contact in this trial.
+but still avoided contact for this medoid.
 
 After clearance, a short slowdown plus a same-lane turn are post-conflict
 stabilization (`post_clear_adjustment` then `post_clear_recovery`), not a new
@@ -205,6 +205,6 @@ evasive phase, because the partner stays behind and separation continues opening
 </Motive summary guide>
 
 <!-- Filled by the pipeline from processed/context_medoid.md (INPUT — not part of YAML output) -->
-<Trial context>
+<Medoid context>
 {trial_context}
-</Trial context>
+</Medoid context>

@@ -268,6 +268,7 @@ export async function GET(req: NextRequest) {
     intraVariance: unknown;
     snapshots: string[];
     defaultSnapshots: string[];
+    contextMedoid?: string;
   }> = [];
   for (const entry of fs.readdirSync(runDir, { withFileTypes: true })) {
     const m = entry.isDirectory() ? entry.name.match(/^cluster(\d+)$/) : null;
@@ -304,6 +305,11 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+    const contextMedoidPath = resolveClusterArtifact(clusterDir, "context_medoid.md");
+    const contextMedoid =
+      contextMedoidPath && fs.existsSync(contextMedoidPath)
+        ? fs.readFileSync(contextMedoidPath, "utf-8")
+        : "";
     clusters.push({
       cluster: parseInt(m[1], 10),
       stats,
@@ -317,6 +323,7 @@ export async function GET(req: NextRequest) {
         2,
         llmSnapshots,
       ),
+      contextMedoid: contextMedoid || undefined,
     });
   }
   clusters.sort((a, b) => a.cluster - b.cluster);
@@ -346,51 +353,30 @@ export async function GET(req: NextRequest) {
       summaryYamlPath && fs.existsSync(summaryYamlPath)
         ? fs.readFileSync(summaryYamlPath, "utf-8")
         : "";
+    const contextMedoidPath = resolveClusterArtifact(clusterDir, "context_medoid.md");
+    const contextMedoid =
+      contextMedoidPath && fs.existsSync(contextMedoidPath)
+        ? fs.readFileSync(contextMedoidPath, "utf-8")
+        : "";
 
-    // Card list prefers medoid narrative; fall back to summary caption.
-    if (medoidMeta || medoidYaml || summaryMeta || summaryYaml) {
-      const parsed = (medoidMeta?.parsed ?? summaryMeta?.parsed ?? null) as
-        | Record<string, unknown>
-        | null;
-      const cardMeta: Record<string, unknown> | null = medoidMeta
-        ? {
-            ...medoidMeta,
-            cluster_label:
-              (summaryMeta?.parsed as Record<string, unknown> | undefined)?.label ??
-              (parsed as Record<string, unknown> | null)?.label,
-            behavior_description:
-              (summaryMeta?.parsed as Record<string, unknown> | undefined)?.caption ??
-              (parsed as Record<string, unknown> | null)?.motive_summary,
-            ego_perspective_summary: (parsed as Record<string, unknown> | null)
-              ?.decision_timeline,
-            safety_assessment: {
-              risk_level: (summaryMeta?.parsed as Record<string, unknown> | undefined)
-                ?.risk_level,
-              failure_mode: (summaryMeta?.parsed as Record<string, unknown> | undefined)
-                ?.consistency_note,
-            },
-          }
-        : summaryMeta
-          ? {
-              ...summaryMeta,
-              cluster_label: (summaryMeta.parsed as Record<string, unknown> | undefined)
-                ?.label,
-              behavior_description: (
-                summaryMeta.parsed as Record<string, unknown> | undefined
-              )?.caption,
-              safety_assessment: {
-                risk_level: (summaryMeta.parsed as Record<string, unknown> | undefined)
-                  ?.risk_level,
-                failure_mode: (
-                  summaryMeta.parsed as Record<string, unknown> | undefined
-                )?.consistency_note,
-              },
-            }
-          : null;
+    // Medoid results for the Analyze → Medoid tab (do NOT mix in cluster_summary
+    // label/caption/risk — those belong to Cluster analysis).
+    if (medoidMeta || medoidYaml) {
+      const parsed = (medoidMeta?.parsed ?? null) as Record<string, unknown> | null;
+      const cardMeta: Record<string, unknown> = {
+        ...(medoidMeta ?? {}),
+        product: "medoid",
+        behavior_description:
+          (typeof parsed?.motive_summary === "string" && parsed.motive_summary) ||
+          null,
+        ego_perspective_summary: parsed?.decision_timeline ?? null,
+      };
+      // Explicitly drop any accidental summary fields.
+      delete cardMeta.cluster_label;
       results.push({
         cluster: cid,
         meta: cardMeta,
-        rawYaml: medoidYaml || summaryYaml,
+        rawYaml: medoidYaml,
       });
     }
 
@@ -401,6 +387,7 @@ export async function GET(req: NextRequest) {
       summaryMeta,
       medoidYaml,
       medoidMeta,
+      contextMedoid: contextMedoid || undefined,
     });
   }
   results.sort((a, b) => a.cluster - b.cluster);
