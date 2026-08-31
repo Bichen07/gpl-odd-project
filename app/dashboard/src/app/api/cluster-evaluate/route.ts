@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { resolveClusterArtifact } from "../_lib/clusterPaths";
 import { readYamlDoc } from "../_lib/readYaml";
+import { runArtifactPath, runSourceDir, runSourcePath } from "../_lib/runArtifactPaths";
 
 /**
  * GET /api/cluster-evaluate?batchId=2
@@ -69,9 +70,9 @@ export async function GET(req: NextRequest) {
 
   for (const entry of entries) {
     const runDir = path.join(batchDir, entry.name);
-    const qualityPath = path.join(runDir, "clustering_quality.json");
-    const crossPath = path.join(runDir, "cross_cluster_eval.json");
-    const manifestPath = path.join(runDir, "manifest.json");
+    const qualityPath = runArtifactPath(runDir, "quality");
+    const crossPath = runArtifactPath(runDir, "crossEval");
+    const manifestPath = runSourcePath(runDir, ["manifest.json"]);
 
     const quality = readJsonSafe(qualityPath);
     if (!quality) continue;
@@ -81,13 +82,14 @@ export async function GET(req: NextRequest) {
 
     // Collect per-cluster intra_variance from each cluster dir
     const clusterIntra: Record<string, unknown> = {};
+    const sourceDir = runSourceDir(runDir);
     for (const sub of fs
-      .readdirSync(runDir, { withFileTypes: true })
+      .readdirSync(sourceDir, { withFileTypes: true })
       .filter(
         (e) => e.isDirectory() && /^cluster\d+$/.test(e.name)
       )) {
       const cjPath = resolveClusterArtifact(
-        path.join(runDir, sub.name),
+        path.join(sourceDir, sub.name),
         "cluster.json",
       );
       const cj = cjPath ? readJsonSafe(cjPath) : null;
@@ -107,7 +109,7 @@ export async function GET(req: NextRequest) {
       }
 
       const summaryDoc = readYamlDoc(
-        resolveClusterArtifact(path.join(runDir, sub.name), "cluster_summary.yaml"),
+        resolveClusterArtifact(path.join(sourceDir, sub.name), "cluster_summary.yaml"),
       );
       if (summaryDoc) {
         const label = String(

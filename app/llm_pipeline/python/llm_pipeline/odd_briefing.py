@@ -19,6 +19,8 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
+from .paths import run_artifact_path, run_source_dir
+
 BRIEFING_FILENAME = "odd_chat_briefing.json"
 
 
@@ -69,14 +71,14 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
 
     missing: List[str] = []
 
-    quality = _read_json(run_dir / "clustering_quality.json")
-    selection = _read_json(run_dir / "cluster_selection_eval.json")
+    quality = _read_json(run_artifact_path(run_dir, "quality"))
+    selection = _read_json(run_artifact_path(run_dir, "selection_eval"))
     if selection is None:
         missing.append("no cluster_selection_eval.json — selection-eval not run")
 
     # ── Clusters ──────────────────────────────────────────────────────────
     clusters: List[Dict[str, Any]] = []
-    for cluster_dir in sorted(run_dir.glob("cluster*")):
+    for cluster_dir in sorted(run_source_dir(run_dir).glob("cluster*")):
         cm = re.match(r"cluster(\d+)$", cluster_dir.name)
         if not cm or not cluster_dir.is_dir():
             continue
@@ -114,7 +116,7 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
 
     # ── Parameter-space pairs ────────────────────────────────────────────
     pairs: List[Dict[str, Any]] = []
-    pairs_root = run_dir / "parameter_space_pairs"
+    pairs_root = run_source_dir(run_dir) / "parameter_space_pairs"
     if pairs_root.is_dir():
         for pack_dir in sorted(p for p in pairs_root.iterdir() if p.is_dir()):
             pair = _read_json(pack_dir / "pair.json")
@@ -142,7 +144,7 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
         missing.append("no parameter_space_pairs — pair contrast evidence unavailable")
 
     # ── S2/S3/S4 (may not exist yet) ──────────────────────────────────────
-    boundary_doc = _read_json(run_dir / "odd_boundary_export.json")
+    boundary_doc = _read_json(run_artifact_path(run_dir, "odd_boundary_export"))
     if boundary_doc is None:
         missing.append("no odd_boundary_export.json — run S2 (odd_export.export_run_dir)")
         boundary: Optional[Dict[str, Any]] = None
@@ -159,7 +161,7 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
             "top_edges_short": top_edges,
         }
 
-    rules_doc = _read_json(run_dir / "odd_parameter_rules.json")
+    rules_doc = _read_json(run_artifact_path(run_dir, "odd_rules"))
     if rules_doc is None:
         missing.append("no odd_parameter_rules.json — run S3 (odd_rules.train_rules)")
         rules: List[Dict[str, Any]] = []
@@ -169,7 +171,7 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
             for r in (rules_doc.get("rules") or [])
         ]
 
-    join_doc = _read_json(run_dir / "odd_boundary_pairs_join.json")
+    join_doc = _read_json(run_artifact_path(run_dir, "odd_join"))
     pairs_touching_boundary = join_doc.get("n_pairs_touching_boundary") if join_doc else None
 
     findings = (selection or {}).get("findings") or []
@@ -197,7 +199,7 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
         "missing": missing,
     }
 
-    out_path = run_dir / BRIEFING_FILENAME
+    out_path = run_artifact_path(run_dir, "odd_briefing", write=True)
     out_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     return doc
 
@@ -210,7 +212,7 @@ def _batch_id_from_run_dir(run_dir: Path) -> Optional[int]:
 def _harvest_open_questions(run_dir: Path) -> List[str]:
     """Best-effort scrape of any ``open_questions:`` list left by medoid/pair/summary YAML."""
     out: List[str] = []
-    for p in run_dir.glob("cluster*/output/*.yaml"):
+    for p in run_source_dir(run_dir).glob("cluster*/output/*.yaml"):
         doc = _read_yaml(p)
         if isinstance(doc, dict) and isinstance(doc.get("open_questions"), list):
             out.extend(str(q) for q in doc["open_questions"])

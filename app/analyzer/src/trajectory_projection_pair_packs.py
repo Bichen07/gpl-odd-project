@@ -10,6 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from cluster_paths import run_source_dir
 from parameter_space_pair_packs import (
     PARAMETER_SPACE_EGO_ZOOM_RADIUS_M,
     PARAMETER_SPACE_SNAPSHOT_OUTPUT_PX,
@@ -24,7 +25,7 @@ from parameter_space_pair_packs import (
 def trajectory_projection_pairs_root(run_dir: Path) -> Path:
     """Prefer ``trajectory_projection_pairs/``; fall back to legacy ``boundary_pairs/``."""
     run_dir = Path(run_dir)
-    new = run_dir / "trajectory_projection_pairs"
+    new = run_source_dir(run_dir, for_write=True) / "trajectory_projection_pairs"
     if new.is_dir():
         return new
     legacy = run_dir / "boundary_pairs"
@@ -61,7 +62,7 @@ def remove_legacy_trajectory_projection_dirs(run_dir: Path) -> List[str]:
     """Delete ``cluster*/highlight_trials/boundary_c*`` (and flat legacy)."""
     removed: List[str] = []
     run_dir = Path(run_dir)
-    for cluster_dir in sorted(run_dir.glob("cluster*")):
+    for cluster_dir in sorted(run_source_dir(run_dir).glob("cluster*")):
         if not cluster_dir.is_dir():
             continue
         for base in (cluster_dir / "highlight_trials", cluster_dir):

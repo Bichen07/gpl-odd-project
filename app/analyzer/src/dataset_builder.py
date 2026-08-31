@@ -46,6 +46,8 @@ from cluster_paths import (
     migrate_highlight_trials,
     processed_dir,
     resolve_path,
+    run_source_dir,
+    run_source_path,
     snapshots_dir as nested_snapshots_dir,
     write_path,
 )
@@ -56,6 +58,7 @@ if str(ANALYZER_SRC) not in sys.path:
 from renderer import XodrParser
 from csv_roadid_loader import csv_exists, get_csv_road_data
 from sim_labeller import assign_agent_road_id, build_meta_yaml, build_trajectory_csv
+from agent_labels import display_agent_name
 
 # Project root
 PROJECT_ROOT = REPO_ROOT
@@ -317,7 +320,7 @@ def _fetch_payload_analysis(
         zip_path = Path(analysis_zip)
         if not zip_path.is_file():
             print(f"❌ ERROR: --analysis-zip not found: {zip_path}")
-            return None
+        return None
         print(f"  Using local analysis zip: {zip_path}")
         try:
             content = zip_path.read_bytes()
@@ -503,7 +506,7 @@ def _cluster_metric_stats_from_ego(
 def _parse_silhouette_from_dirname(dirname: str) -> Optional[float]:
     m = re.search(r"_s=([\d.]+)", dirname)
     if not m:
-        return None
+                return None
     try:
         return float(m.group(1))
     except ValueError:
@@ -522,8 +525,8 @@ def _parse_k_from_run_dirname(dirname: str) -> Optional[int]:
 
 def _run_has_from_run_artifacts(run_dir: Path) -> bool:
     return (
-        (run_dir / "clustering" / "selectedClusteringResult.json").is_file()
-        and (run_dir / "manifest.json").is_file()
+        run_source_path(run_dir, "clustering", "selectedClusteringResult.json").is_file()
+        and run_source_path(run_dir, "manifest.json").is_file()
     )
 
 
@@ -568,7 +571,7 @@ def _batch_id_from_path(path: Path) -> Optional[int]:
         m = re.match(r"^batch(\d+)$", part)
         if m:
             return int(m.group(1))
-    return None
+        return None
 
 
 def _print_fresh_build_hint(path: Path, k: Optional[int] = None) -> None:
@@ -712,8 +715,10 @@ def load_from_reference_run(
 ) -> Optional[Tuple[Dict[str, Any], List[Dict[str, Any]], Optional[float]]]:
     """Load clustering assignments + medoid list from a prior ``results/`` run."""
     run_dir = Path(run_dir)
-    clustering_path = run_dir / "clustering" / "selectedClusteringResult.json"
-    manifest_path = run_dir / "manifest.json"
+    clustering_path = run_source_path(
+        run_dir, "clustering", "selectedClusteringResult.json"
+    )
+    manifest_path = run_source_path(run_dir, "manifest.json")
     if not clustering_path.is_file() or not manifest_path.is_file():
         print(f"❌ ERROR: --from-run needs clustering/selectedClusteringResult.json "
               f"and manifest.json under {run_dir}")
@@ -970,12 +975,12 @@ def load_clustering_from_payload_save(
             distinct_sils = sorted({round(c[0], 4) for c in candidates if c[0] is not None}, reverse=True)
             print(f"  (k={k} silhouettes available: {distinct_sils})")
         else:
-            candidates.sort(reverse=True)
-            best_sil, best_idx, selected = candidates[0]
-            print(f"  Selected best k={k} result: index={best_idx}, "
-                  f"silhouette={best_sil:.4f}, task={selected.get('task')}")
-            if len(candidates) > 1:
-                print(f"  ({len(candidates)} candidates with k={k} evaluated)")
+        candidates.sort(reverse=True)
+        best_sil, best_idx, selected = candidates[0]
+        print(f"  Selected best k={k} result: index={best_idx}, "
+              f"silhouette={best_sil:.4f}, task={selected.get('task')}")
+        if len(candidates) > 1:
+            print(f"  ({len(candidates)} candidates with k={k} evaluated)")
 
     # 7. Build trial_index_map (sidecar first, then unsuffixed esminiDat.filename)
     trials_meta = ego_data.get("trials", {})
@@ -1417,8 +1422,11 @@ def patch_cluster_json_param_neighbors(
         neighbors.setdefault(a, {})[b] = str(bp["trial_a"])
         neighbors.setdefault(b, {})[a] = str(bp["trial_b"])
     patched = 0
+    source_dir = run_source_dir(run_dir)
     for label, neigh in neighbors.items():
-        cj_path = resolve_path(run_dir / f"cluster{label}", "cluster.json", must_exist=True)
+        cj_path = resolve_path(
+            source_dir / f"cluster{label}", "cluster.json", must_exist=True
+        )
         if cj_path is None:
             continue
         try:
@@ -1681,7 +1689,7 @@ def write_context_md(
     agents = s.get("agents", [])
     if agents:
         ag_str = ", ".join(
-            f"{a.get('name')} ({a.get('class')})" for a in agents
+            f"{display_agent_name(a.get('name'))} ({a.get('class')})" for a in agents
         )
         medoid_lines.append(f"- **Agents**: {ag_str}")
     medoid_lines.append("")
@@ -1733,7 +1741,8 @@ def rebuild_processed_context_texts(run_dir: Path) -> None:
         map_tracks_csv = None
 
     n_cluster = 0
-    for cluster_dir in sorted(run_dir.glob("cluster*")):
+    source_dir = run_source_dir(run_dir)
+    for cluster_dir in sorted(source_dir.glob("cluster*")):
         if not cluster_dir.is_dir() or not re.fullmatch(r"cluster\d+", cluster_dir.name):
             continue
         snap_path = processed_dir(cluster_dir) / "snapshots" / "llm_snapshots.json"
@@ -1771,7 +1780,7 @@ def rebuild_processed_context_texts(run_dir: Path) -> None:
         n_cluster += 1
 
     n_pair = 0
-    pair_root = run_dir / "parameter_space_pairs"
+    pair_root = run_source_dir(run_dir, for_write=True) / "parameter_space_pairs"
     if not pair_root.is_dir() and (run_dir / "ic_pairs").is_dir():
         pair_root = run_dir / "ic_pairs"
     if pair_root.is_dir():
@@ -1842,7 +1851,7 @@ def process_medoid(
     
     print(f"\n🔹 Processing cluster {label} (batch {batch_id}, trial {trial_index})")
     
-    cluster_dir = run_dir / f"cluster{label}"
+    cluster_dir = run_source_dir(run_dir, for_write=True) / f"cluster{label}"
     cluster_dir.mkdir(parents=True, exist_ok=True)
     # Preserve any flat LLM YAMLs into output/ before rewriting raw/processed.
     moved = migrate_flat_to_nested(cluster_dir)
@@ -1852,7 +1861,7 @@ def process_medoid(
     if ht_moved:
         print(f"  ✓ Migrated highlight trials: {', '.join(ht_moved)}")
     ensure_layout(cluster_dir)
-
+    
     # 1. Check if CSV exists
     if not csv_exists(batch_id, trial_index):
         print(f"  ❌ CSV not found for batch {batch_id} trial {trial_index}")
@@ -2004,7 +2013,7 @@ def process_medoid(
             print("  ⚠️  BEV skipped — run dataset_builder.py --batch-id <n> --map-only")
     except Exception as e:
         print(f"  ⚠️  BEV generation failed: {e}")
-
+    
     # 7b. Human description: optional short BEV filename list (no metrics table).
     if action_data_for_ctx is not None:
         try:
@@ -2033,14 +2042,14 @@ def process_medoid(
                 f"  ✓ Updated description.txt"
                 + (" (with BEV frame index)" if evidence else "")
             )
-        except Exception as e:
+    except Exception as e:
             print(f"  ⚠️  description.txt failed: {e}")
     
     # 8. Consolidated cluster.json (merges old meta.yaml + medoid.json + stats.json).
     #    observations.json is no longer written — trajectory.csv is the single raw timeline.
     try:
-        from collision_partner import collision_interaction_to_medoid_doc
-
+        from collision_vehicle import collision_interaction_to_medoid_doc
+        
         duration = (observations[-1]["time"] - observations[0]["time"]) if observations else 0
         agent_names = [ag.name for ag in registry if ag.name != "Ego"]
         cc = cluster_collision_stats or {}
@@ -2083,7 +2092,7 @@ def process_medoid(
                 "dataset": "gpl-odd-simulated",
                 "location": location_for_meta,
                 "duration_seconds": round(float(duration), 3),
-                "frame_count": len(observations),
+            "frame_count": len(observations),
                 "agents": [
                     {
                         "track_id": a.track_id,
@@ -2125,7 +2134,7 @@ def process_medoid(
         meta_path.unlink(missing_ok=True)
     except Exception:
         pass
-
+    
     # Clean up dataframe
     del df
     
@@ -2390,7 +2399,10 @@ def process_auxiliary_trials(
                 continue
             collided = bool((collision_flags or {}).get(top_tid, False))
             out_dir = (
-                highlight_subdir(run_dir / f"cluster{label_str}", "outlier_trials")
+                highlight_subdir(
+                    run_source_dir(run_dir, for_write=True) / f"cluster{label_str}",
+                    "outlier_trials",
+                )
                 / f"trial_{ti}"
             )
             print(f"  🔸 Outlier cluster {label_str}: trial {top_tid} (batch {b}, idx {ti})"
@@ -2683,7 +2695,7 @@ def main():
         type=float,
         default=4.0,
         help="Nudge road/lane ID labels at least this many metres away from "
-             "ego/partner centers so agents do not cover them (default: 4). "
+             "ego/vehicle centers so agents do not cover them (default: 4). "
              "Set 0 to disable.",
     )
     parser.add_argument(
@@ -2764,7 +2776,7 @@ def main():
         "--contact-clearance-m",
         type=float,
         default=0.5,
-        help="Polygon gap (m) treated as vehicle contact for collision partner",
+        help="Polygon gap (m) treated as vehicle contact for collision vehicle",
     )
     parser.add_argument(
         "--conflict-relevance-m",
@@ -3130,7 +3142,7 @@ def main():
         sys.exit(1)
 
     # --- Step 5: Save clustering result snapshot ---
-    clustering_dir = run_dir / "clustering"
+    clustering_dir = run_source_dir(run_dir, for_write=True) / "clustering"
     clustering_dir.mkdir(exist_ok=True)
 
     if is_payload_save or args.from_run:
@@ -3162,13 +3174,13 @@ def main():
         print(f"✓ Using collision KPI from Payload analysis "
               f"({n_coll}/{len(collision_flags)} trials collided)")
     else:
-        collision_path = PROJECT_ROOT / "alldatasets" / dataset_name / "collision.json"
-        if collision_path.is_file():
-            try:
-                collision_flags = json.loads(collision_path.read_text(encoding="utf-8"))
-                print(f"✓ Loaded collision flags from {collision_path.name}")
-            except Exception as e:
-                print(f"⚠️  Could not load collision.json: {e}")
+    collision_path = PROJECT_ROOT / "alldatasets" / dataset_name / "collision.json"
+    if collision_path.is_file():
+        try:
+            collision_flags = json.loads(collision_path.read_text(encoding="utf-8"))
+            print(f"✓ Loaded collision flags from {collision_path.name}")
+        except Exception as e:
+            print(f"⚠️  Could not load collision.json: {e}")
 
     from pipeline_imports import ensure_llm_pipeline
 
@@ -3358,11 +3370,12 @@ def main():
     # --- Step 7b: Create manifest ---
     # Preserve existing Parameter-space pairs when --param-boundaries none (aux-only emb rebuilds).
     existing_manifest: Dict[str, Any] = {}
-    manifest_path = run_dir / "manifest.json"
-    if manifest_path.is_file():
+    existing_manifest_path = run_source_path(run_dir, "manifest.json")
+    manifest_path = run_source_path(run_dir, "manifest.json", for_write=True)
+    if existing_manifest_path.is_file():
         try:
             existing_manifest = json.loads(
-                manifest_path.read_text(encoding="utf-8")
+                existing_manifest_path.read_text(encoding="utf-8")
             )
         except Exception:
             existing_manifest = {}

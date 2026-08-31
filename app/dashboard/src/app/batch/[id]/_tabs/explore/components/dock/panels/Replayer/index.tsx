@@ -25,6 +25,7 @@ import {
   Typography,
   Menu,
   MenuItem,
+  Tooltip,
   useTheme,
   ToggleButton,
   ToggleButtonGroup,
@@ -61,8 +62,12 @@ import axios from "axios";
 import { interactionSlice } from "../../../../redux/slices/interaction";
 import { ClusteringResult } from "@/app/_shared/graphql/queries/clustering";
 import EgoTimelineBox from "@/app/_shared/components/EgoTimelineBox";
-import { sampleEgoKinematicsAtTime } from "@/app/_shared/utils/egoTimeline";
 import {
+  getTimedEvents,
+  sampleEgoKinematicsAtTime,
+} from "@/app/_shared/utils/egoTimeline";
+import {
+  contrastTimelineToSummary,
   listReplayerClusterCaptions,
   resolveReplayerClusterCaption,
 } from "@/app/_shared/utils/replayerCaption";
@@ -70,6 +75,14 @@ import { resolveReplayerFocusTrial } from "@/app/_shared/utils/replayerFocusTria
 
 const clusteringDuration = 5;
 const afterClusteringDuration = 3;
+const PARAMETER_PAIR_MARKER_COLORS = [
+  "#d81b60",
+  "#00897b",
+  "#6a1b9a",
+  "#ef6c00",
+  "#1565c0",
+  "#558b2f",
+];
 
 const StyledToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
   [`& .${toggleButtonGroupClasses.grouped}`]: {
@@ -443,6 +456,142 @@ const Replayer = () => {
       }
     | undefined
   >(undefined);
+
+  const timelineMaxSec = useMemo(() => {
+    let max = Number.isFinite(appData.timeMax) ? appData.timeMax : 0;
+    for (const egoTrajectories of Object.values(trajectories ?? {})) {
+      for (const trajectory of Object.values(egoTrajectories ?? {})) {
+        const times = trajectory?.time;
+        if (Array.isArray(times) && times.length > 0) {
+          const last = Number(times[times.length - 1]);
+          if (Number.isFinite(last)) max = Math.max(max, last);
+        }
+      }
+    }
+    return max;
+  }, [trajectories]);
+
+  const timelineMarkers = useMemo(() => {
+    if (timeOrS !== "time" || timelineMaxSec <= 0) return [];
+
+    const markers: {
+      key: string;
+      kind: "medoid" | "parameter-space";
+      egoName: string;
+      clusterLabel: string;
+      title: string;
+      legendLabel: string;
+      t: number;
+      text: string;
+      color: string;
+      shape: "circle" | "diamond";
+    }[] = [];
+    const selected = new Set(selectedTrialIds.value.map(String));
+    const selectedRoles = highlightRolesByTrialId;
+    const addedPairFolders = new Set<string>();
+
+    for (const [egoName, ctx] of Object.entries(clusterAnalysisByEgo ?? {})) {
+      if (!ctx) continue;
+      for (const [clusterLabel, trialId] of Object.entries(ctx.medoids ?? {})) {
+        if (!selected.has(String(trialId))) continue;
+        const summary = ctx.interpretations?.[clusterLabel]?.ego_perspective_summary;
+        const name = ctx.interpretations?.[clusterLabel]?.cluster_label;
+        const title = name
+          ? `Cluster ${clusterLabel}: ${name}`
+          : `Cluster ${clusterLabel}`;
+        const color =
+          clusterInfo?.[egoName]?.[clusterLabel]?.color ??
+          theme.palette.primary.main;
+
+        getTimedEvents(summary).forEach((event, index) => {
+          if (event.t < 0 || event.t > timelineMaxSec) return;
+          markers.push({
+            key: `${egoName}:${clusterLabel}:${trialId}:${event.t}:${index}`,
+            kind: "medoid",
+            egoName,
+            clusterLabel,
+            title,
+            legendLabel: `${egoName} C${clusterLabel}`,
+            t: event.t,
+            text: event.text,
+            color,
+            shape: "circle",
+          });
+        });
+      }
+
+      for (const pair of ctx.paramBoundaryPairs ?? []) {
+        const leftTrial = String(pair.trial_a);
+        const rightTrial = String(pair.trial_b);
+        const pairSelected = [leftTrial, rightTrial].some(
+          (trialId) =>
+            selected.has(trialId) &&
+            (selectedRoles[trialId] ?? []).includes("param_boundary"),
+        );
+        if (!pairSelected) continue;
+
+        const left = Number(pair.cluster_a);
+        const right = Number(pair.cluster_b);
+        if (!Number.isFinite(left) || !Number.isFinite(right)) continue;
+        const folder = `c${Math.min(left, right)}-c${Math.max(left, right)}`;
+        if (addedPairFolders.has(folder)) continue;
+
+        const pairInterpretation = ctx.icPairInterpretations?.[folder];
+        const pairSummary = contrastTimelineToSummary(
+          pairInterpretation?.contrast_timeline,
+        );
+        if (pairSummary.length === 0) continue;
+        addedPairFolders.add(folder);
+
+        let colorHash = 0;
+        for (const char of folder) colorHash = (colorHash * 31 + char.charCodeAt(0)) | 0;
+        const color =
+          PARAMETER_PAIR_MARKER_COLORS[
+            Math.abs(colorHash) % PARAMETER_PAIR_MARKER_COLORS.length
+          ];
+        getTimedEvents(pairSummary).forEach((event, index) => {
+          if (event.t < 0 || event.t > timelineMaxSec) return;
+          markers.push({
+            key: `parameter:${folder}:${event.t}:${index}`,
+            kind: "parameter-space",
+            egoName: "shared clock",
+            clusterLabel: folder,
+            title: `Parameter-space pair ${folder}`,
+            legendLabel: folder,
+            t: event.t,
+            text: event.text,
+            color,
+            shape: "diamond",
+          });
+        });
+      }
+    }
+
+    return markers.sort(
+      (a, b) =>
+        a.t - b.t ||
+        a.kind.localeCompare(b.kind) ||
+        a.clusterLabel.localeCompare(b.clusterLabel),
+    );
+  }, [
+    clusterAnalysisByEgo,
+    clusterInfo,
+    highlightRolesByTrialId,
+    selectedTrialIds,
+    theme.palette.primary.main,
+    timeOrS,
+    timelineMaxSec,
+  ]);
+
+  const timelineMarkerLegend = useMemo(() => {
+    const seen = new Set<string>();
+    return timelineMarkers.filter((marker) => {
+      const key = `${marker.kind}:${marker.legendLabel}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [timelineMarkers]);
 
   const egoKinematicsFor = useCallback(
     (egoName: string, medoidId: string | undefined) => {
@@ -1541,7 +1690,7 @@ const Replayer = () => {
         applyCameraFollow(0, null, { setInitialOrientation: true });
         viewport.setZoom(5);
 
-        const update = (ticker: Ticker) => {
+        const update = (ticker: Ticker, advanceTime = true) => {
           if (timeOrS === "s") {
             return;
           }
@@ -1557,7 +1706,7 @@ const Replayer = () => {
           lastTime = appData.lastTime[egoName + viewerName];
 
           const delta = ticker.deltaMS;
-          const time = lastTime + delta / 1000;
+          const time = advanceTime ? lastTime + delta / 1000 : lastTime;
           const agentsData = newViewerData[egoName][viewerName].agentsData;
           let i = 0;
           for (const [trialId, trialAgents] of Object.entries(agentsData)) {
@@ -1602,7 +1751,9 @@ const Replayer = () => {
           ) {
             appData.lastTime[egoName + viewerName] = appData.manualTimeOverride;
             appData.manualTimeChanged += 1;
-            update(ticker);
+            // Render the requested event time exactly. Advancing by one ticker
+            // frame here caused clicks at t to display t + ~0.017 seconds.
+            update(ticker, false);
           } else if (!appData.paused) {
             update(ticker);
           }
@@ -2135,34 +2286,124 @@ const Replayer = () => {
               durationMode == "full" || showFullTimeline ? "none" : "inherit",
           }}
         />
-        <Slider
-          ref={timeSliderRef}
-          // size="small"
-          defaultValue={0}
-          sx={{ width: "99%", p: 0, overflow: "hidden" }}
-          step={0.001}
-          max={99.5}
-          onChange={(event: any, value) => {
-            if (timeOrS === "time") {
-              const message = event.detail?.message;
-              if (message !== "auto-updated") {
-                dispatch(
-                  interactionSlice.actions.record(panelName + ".time_slider"),
-                );
-                dispatch(
-                  batchSlice.actions.setClipTimeManualOverride(
-                    ((value as number) / 100) * appData.timeMax,
-                    // (mfpca?.durationIndices != null && !showFullTimeline
-                    //   ? clusteringDuration + afterClusteringDuration
-                    //   : appData.timeMax),
-                  ),
-                );
+        <Box sx={{ position: "relative", width: "99%", minHeight: 28 }}>
+          <Slider
+            ref={timeSliderRef}
+            // size="small"
+            defaultValue={0}
+            sx={{ width: "100%", p: 0 }}
+            step={0.001}
+            max={99.5}
+            onChange={(event: any, value) => {
+              if (timeOrS === "time") {
+                const message = event.detail?.message;
+                if (message !== "auto-updated") {
+                  dispatch(
+                    interactionSlice.actions.record(panelName + ".time_slider"),
+                  );
+                  dispatch(
+                    batchSlice.actions.setClipTimeManualOverride(
+                      ((value as number) / 100) * appData.timeMax,
+                      // (mfpca?.durationIndices != null && !showFullTimeline
+                      //   ? clusteringDuration + afterClusteringDuration
+                      //   : appData.timeMax),
+                    ),
+                  );
+                }
+              } else {
+                setSliderSRatio((value as number) / 100);
               }
-            } else {
-              setSliderSRatio((value as number) / 100);
-            }
-          }}
-        />
+            }}
+          />
+          {timeOrS === "time" && timelineMaxSec > 0 && timelineMarkers.length > 0 && (
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                pointerEvents: "none",
+                zIndex: 2,
+              }}
+            >
+              {timelineMarkers.map((marker) => (
+                <Tooltip
+                  key={marker.key}
+                  title={`${marker.title} • ${marker.egoName} — t = ${marker.t.toFixed(2)} s\n${marker.text}`}
+                  placement="top"
+                >
+                  <Box
+                    component="button"
+                    type="button"
+                    aria-label={`${marker.title}, event at ${marker.t.toFixed(2)} seconds`}
+                    onClick={() => {
+                      dispatch(batchSlice.actions.setClipPaused(true));
+                      dispatch(
+                        batchSlice.actions.setClipTimeManualOverride(marker.t),
+                      );
+                    }}
+                    sx={{
+                      position: "absolute",
+                      left: `${Math.min(
+                        99,
+                        Math.max(0, (marker.t / timelineMaxSec) * 99),
+                      )}%`,
+                      top: "50%",
+                      width: 12,
+                      height: 12,
+                      p: 0,
+                      borderRadius: marker.shape === "circle" ? "50%" : "2px",
+                      border: "2px solid white",
+                      bgcolor: marker.color,
+                      boxShadow: "0 0 0 1px rgba(0,0,0,0.45)",
+                      cursor: "pointer",
+                      pointerEvents: "auto",
+                      "&:hover": {
+                        transform: `translate(-50%, -50%) ${
+                          marker.shape === "diamond" ? "rotate(45deg) " : ""
+                        }scale(1.35)`,
+                      },
+                      transform:
+                        marker.shape === "diamond"
+                          ? "translate(-50%, -50%) rotate(45deg)"
+                          : "translate(-50%, -50%)",
+                    }}
+                  />
+                </Tooltip>
+              ))}
+            </Box>
+          )}
+        </Box>
+        {timeOrS === "time" && timelineMarkerLegend.length > 0 && (
+          <Stack
+            direction="row"
+            spacing={1.25}
+            flexWrap="wrap"
+            sx={{ width: "99%", pl: 0.5, mt: -0.25 }}
+          >
+            {timelineMarkerLegend.map((marker) => (
+              <Typography
+                key={`${marker.kind}:${marker.legendLabel}`}
+                variant="caption"
+                sx={{ display: "inline-flex", alignItems: "center", gap: 0.4 }}
+              >
+                <Box
+                  component="span"
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: marker.shape === "circle" ? "50%" : "1px",
+                    bgcolor: marker.color,
+                    border: "1px solid rgba(0,0,0,0.35)",
+                    transform:
+                      marker.shape === "diamond" ? "rotate(45deg)" : undefined,
+                  }}
+                />
+                {marker.kind === "medoid"
+                  ? `${marker.egoName} C${marker.clusterLabel} medoid`
+                  : `Pair ${marker.legendLabel}`}
+              </Typography>
+            ))}
+          </Stack>
+        )}
         <Stack direction="row" alignItems="center" sx={{ width: "100%", pr: 1 }}>
           {timeOrS === "time" ? (
             <>

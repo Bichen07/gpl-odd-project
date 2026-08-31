@@ -511,7 +511,7 @@ def detect_interactions(df: pd.DataFrame) -> List[Dict]:
         npc = df[df["trackId"] == tid].sort_values("time").reset_index(drop=True)
         if len(npc) < 2:
             continue
-        # A near miss requires a *moving* partner. Parked / background cars the
+        # A near miss requires a *moving* vehicle. Parked / background cars the
         # ego merely drives past are not conflicts (they otherwise spam one
         # NEAR_MISS each, which also pollutes BEV keyframe selection).
         npc_moving = float(npc["velocity"].abs().max()) > Thresholds.STOPPED_SPEED
@@ -618,7 +618,7 @@ def label_trajectory(
     interactions = detect_interactions(df)
 
     if esmini_df is not None and not esmini_df.empty:
-        from collision_partner import augment_interactions
+        from collision_vehicle import augment_interactions
 
         interactions = augment_interactions(
             interactions,
@@ -629,7 +629,7 @@ def label_trajectory(
             contact_clearance_m=contact_clearance_m,
             conflict_relevance_m=conflict_relevance_m,
         )
-        from collision_partner import inject_collision_agent_actions
+        from collision_vehicle import inject_collision_agent_actions
 
         inject_collision_agent_actions(agents_out, interactions)
     else:

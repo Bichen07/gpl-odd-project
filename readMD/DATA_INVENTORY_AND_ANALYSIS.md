@@ -422,12 +422,12 @@ Checklist:
 
 | Action | Trigger | Recorded |
 |--------|---------|----------|
-| `NEAR_MISS` | partner is **moving** (max speed `> 0.3`) **and** any frame has `TTC < 2.5 s` while closing (`TTC_NEAR_MISS`) | `key_time` = absolute-min-distance moment, `min_distance_m`, `min_ttc_s`, `with_name` |
+| `NEAR_MISS` | vehicle is **moving** (max speed `> 0.3`) **and** any frame has `TTC < 2.5 s` while closing (`TTC_NEAR_MISS`) | `key_time` = absolute-min-distance moment, `min_distance_m`, `min_ttc_s`, `with_name` |
 | `DANGEROUS_CUT_IN` | NPC changes lane into the ego's exact `(road_id, lane_id)` within 30 m, **and** ego then brakes `≤ -1.5 m/s²` within 2 s (`CUT_IN_DECEL`, `CUT_IN_REACTION_S`) | `key_time`, `cut_in_time`, `ego_reaction_accel`, `min_distance_m` |
-| `COLLISION` | medoid `collided` KPI **or** Payload `events[].name = collisionWith{Name}` **or** polygon clearance `≤ CONTACT_CLEARANCE_M` (0.5 m) when KPI true | `key_time`, `with_name`, `min_clearance_m`, `source`, `ego_at_collision` / `partner_at_collision` (speed, road/lane, x/y) |
-| `CLOSEST_APPROACH` | moving NPC with polygon gap `< CONFLICT_RELEVANCE_M` (5 m), cap 2, excluding tier-A partners | `key_time`, `min_clearance_m`, `with_name` |
+| `COLLISION` | medoid `collided` KPI **or** Payload `events[].name = collisionWith{Name}` **or** polygon clearance `≤ CONTACT_CLEARANCE_M` (0.5 m) when KPI true | `key_time`, `with_name`, `min_clearance_m`, `source`, `ego_at_collision` / `vehicle_at_collision` (speed, road/lane, x/y) |
+| `CLOSEST_APPROACH` | moving NPC with polygon gap `< CONFLICT_RELEVANCE_M` (5 m), cap 2, excluding tier-A vehicles | `key_time`, `min_clearance_m`, `with_name` |
 
-`collision_partner.py` resolves the partner (GT first, polygon fallback). Spurious
+`collision_vehicle.py` resolves the vehicle (GT first, polygon fallback). Spurious
 `NEAR_MISS` rows with `min_distance_m > 5 m` are dropped. These `key_time`s are
 force-fed into BEV keyframe selection so the conflict moment is always rendered.
 
@@ -587,7 +587,7 @@ Legacy proximity heuristics (`ego closest to BackgroundParking*`) are **off** un
 **BEV titles (2026-06).** Each snapshot title/filename names the **agent** and the
 **phase**: interval actions render both boundaries (`ego start DECELERATE`,
 `ego end DECELERATE`; `Opposite end STOPPED`), instantaneous ones a single label
-(`ego ENTER_JUNCTION`), interactions name the partner (`NEAR_MISS with Opposite`,
+(`ego ENTER_JUNCTION`), interactions name the vehicle (`NEAR_MISS with Opposite`,
 `COLLISION with Parking`), using the **display id drawn on the car** when relevant.
 When many agents act on the same frame, `COLLISION` / `NEAR_MISS` labels are
 prioritised; filenames are length-capped for the filesystem.
@@ -736,11 +736,11 @@ Orchestrated by `dataset_builder.process_medoid()` for each medoid trial:
 |----------|--------------------|--------------------|-----------|---------|
 | `trajectory.csv` | `esmini_df_to_trajectory_csv` | esmini CSV (medoid) | `labeller`, `MapPlotter` trails | medoid timeline: `trackId,time,x,y,velocity,heading,road_id,lane_id,...` |
 | `meta.yaml` *(temp, deleted)* | `write_meta_yaml` | esmini CSV | `labeller` only | agent registry + duration (intermediate) |
-| `action.yaml` | `labeller.label_trajectory` + `collision_partner.augment_interactions` | esmini CSV + `trajectory.csv` + `meta.yaml` + map YAML + optional Payload `trial.events` | `tier2_renderer`, `description`, `context.md` | per-agent actions + `interactions:` (`NEAR_MISS`, `COLLISION`, `CLOSEST_APPROACH`, …) |
+| `action.yaml` | `labeller.label_trajectory` + `collision_vehicle.augment_interactions` | esmini CSV + `trajectory.csv` + `meta.yaml` + map YAML + optional Payload `trial.events` | `tier2_renderer`, `description`, `context.md` | per-agent actions + `interactions:` (`NEAR_MISS`, `COLLISION`, `CLOSEST_APPROACH`, …) |
 | `description.txt` | `description.py` | `action.yaml` | `context.md`, LLM | narration + structured **`Collision:`** block (when/where/speeds) + Critical moments |
 | `snapshots/*.jpg` | `tier2_renderer.render_trial_from_esmini_csv` | esmini CSV + `action.yaml` + map tracks | `context.md`, LLM (vision) | dual-panel BEV at each key frame (whole scene + ego ±R zoom) |
 | `map_overview.jpg` | `tier2_renderer.render_map_overview` | map tracks + view bounds | LLM (vision) | whole-map view with medoid roads highlighted |
-| `cluster.json` | `dataset_builder.process_medoid` | clustering result + Payload KPI + medoid + registry + collision partner | `cluster_interpretation_pipeline`, `context.md` | cluster stats (`collision_count`/`rate`, TTC, params) + `medoid.collided` + `medoid.collision{…}` |
+| `cluster.json` | `dataset_builder.process_medoid` | clustering result + Payload KPI + medoid + registry + collision vehicle | `cluster_interpretation_pipeline`, `context.md` | cluster stats (`collision_count`/`rate`, TTC, params) + `medoid.collided` + `medoid.collision{…}` |
 | `context.md` | `dataset_builder.write_context_md` | `cluster.json` + `description.txt` + `action.yaml` + snapshot list | **LLM (primary text)** | single consolidated card: header + description + action table + interactions table + snapshot index |
 
 ### Run-level + interpretation
@@ -799,7 +799,7 @@ For each `cluster<N>/`, `interpret_cluster_dir()` assembles **one multimodal req
 | Slot | Source (builder `results/` layout) | Notes |
 |------|------------------------------------|-------|
 | Cluster stats (text) | `cluster<N>/cluster.json` → `cluster` block | `n_trials`, `collision_rate`/`collision_count`, `mean_ttc` / `min_ttc` / `mean_spret` / `parameter_ranges` (populated at build time in payload-save mode from the per-trial `criticalityMetrics`; backfill existing folders with `--backfill-stats`). |
-| **Medoid (single-trajectory) outcome (text)** | `cluster.json` → `medoid.collided` + `medoid.collision` + `description.txt` **`Collision:`** block | Whether the medoid collided, **who** (`partner_name`), **when** (`time_s`), **where** (road/lane, x/y), and **speeds** at contact. Distinct from cluster-wide `collision_rate`. |
+| **Medoid (single-trajectory) outcome (text)** | `cluster.json` → `medoid.collided` + `medoid.collision` + `description.txt` **`Collision:`** block | Whether the medoid collided, **who** (`vehicle_name`), **when** (`time_s`), **where** (road/lane, x/y), and **speeds** at contact. Distinct from cluster-wide `collision_rate`. |
 | Medoid action log (text) | `cluster<N>/description.txt` (else `context.md`, else `action.yaml`) | Rule-based timeline of the medoid trial. Ends with structured collision info (if any), **Critical moments**, and **Interactions**. |
 | BEV snapshots (images) | `cluster<N>/snapshots/*.jpg` | The user's selection from the analyze page (or evenly-spaced default). Each frame is the medoid trial at a key `action.yaml` timestamp. **Each image is now labelled in the prompt with its timestamp + event** (parsed from the filename, e.g. `Snapshot 8 — t=27.71s — ... STOPPED`) so the LLM can anchor images temporally and describe the latest frames. |
 | Variation heatmap (image, optional) | `cluster<N>/trajectory_overlay.png` (else `mfpca_heatmap.png`, else `alldatasets/<dataset>/mfpca_heatmap_cluster<N>.png`) | A real per-cluster **ego-trajectory overlay** (all members faint, medoid highlighted) generated at build time / by `--backfill-stats`. If none exists the slot is **omitted** — we no longer reuse BEV[0] as a fake heatmap. |
@@ -989,7 +989,7 @@ Dataset is resolved automatically from the `batch<id>` component of the path (or
 | `controller.py` + `app.py` | Dashboard Analyze API (MFPCA → UMAP → HDBSCAN; metric heatmaps via KD-tree; collision fault typing via `TwoDimTTC.py`) |
 | `dataset_builder.py` | LLM dataset orchestration (`--source payload-save` or `--from-run`) |
 | `labeller.py` / `description.py` / `taxonomy.py` | Rule-based actions + narration |
-| `collision_partner.py` | Collision partner GT + polygon clearance + kinematics at impact |
+| `collision_vehicle.py` | Collision vehicle GT + polygon clearance + kinematics at impact |
 | `tier2_renderer.py` / `map_plotter.py` / `renderer.py` | BEV + XODR parsing |
 | `sim_labeller.py` / `csv_roadid_loader.py` | esmini CSV → `trajectory.csv` |
 | `predict.py` | GP surrogate helper (legacy heatmap path; grid uses KD-tree) |

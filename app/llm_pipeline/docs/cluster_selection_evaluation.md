@@ -92,7 +92,7 @@ strings; now they are one code, and repeated codes are a countable over-split si
 *Known weakness:* it compares only **medoids**, one trial per cluster, and the motive field
 carries LLM variance (documented in
 [`motive_schema_and_causal_locality.md`](motive_schema_and_causal_locality.md) §5.3 — the
-same trial was labelled `yield_to_partner` in one run and `assertive_gap_acceptance` in
+same trial was labelled `yield_to_vehicle` in one run and `assertive_gap_acceptance` in
 another). Treat a low value as "look here", not as a verdict. It is weighted equally with
 purity because over-splitting is the failure mode we are actually choosing between k for,
 but it is the component most in need of Phase 2 (code-emitted features).
@@ -130,9 +130,9 @@ report emits an explicit finding saying so. This matters immediately: batch8 k=3
 
 ---
 
-## 4. What it says about the packs we have
+## 4. Historical baseline and interpretation
 
-Run without any LLM call (`selection-eval`), on cards produced by earlier runs:
+The following is a historical baseline from cards produced by earlier runs:
 
 | pack | k | silhouette | score | purity | motive distinct | IC decisive | merge |
 |---|---|---|---|---|---|---|---|

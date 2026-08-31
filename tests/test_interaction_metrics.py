@@ -29,19 +29,19 @@ from conflict_frame_selector import (  # noqa: E402
     _normalize_traj_df,
     _pair_series,
 )
-from collision_partner import polygon_clearance  # noqa: E402
+from collision_vehicle import polygon_clearance  # noqa: E402
 from csv_roadid_loader import csv_exists, get_csv_road_data  # noqa: E402
 
 
 def test_ego_frame_xy_ahead_left():
-    # Ego at origin facing +X; partner 4 m forward, 3 m left (+Y).
+    # Ego at origin facing +X; vehicle 4 m forward, 3 m left (+Y).
     fwd, left = ego_frame_xy(0.0, 0.0, 0.0, 4.0, 3.0)
     assert fwd == pytest.approx(4.0, abs=1e-6)
     assert left == pytest.approx(3.0, abs=1e-6)
 
 
 def test_ego_frame_xy_behind_after_heading_90():
-    # Ego facing +Y (π/2); partner at world (−3, 1) relative to ego at origin
+    # Ego facing +Y (π/2); vehicle at world (−3, 1) relative to ego at origin
     # is left and slightly ahead in ego frame? ego +Y: fwd=world y, left=−world x
     fwd, left = ego_frame_xy(0.0, 0.0, math.pi / 2, -3.0, 1.0)
     assert fwd == pytest.approx(1.0, abs=1e-6)
@@ -49,14 +49,14 @@ def test_ego_frame_xy_behind_after_heading_90():
 
 
 def test_pass_state_bands():
-    assert pass_state_from_rel_long(8.0) == "partner_ahead"
+    assert pass_state_from_rel_long(8.0) == "vehicle_ahead"
     assert pass_state_from_rel_long(0.0) == "side_overlap"
-    assert pass_state_from_rel_long(-8.0) == "partner_behind"
+    assert pass_state_from_rel_long(-8.0) == "vehicle_behind"
     assert pass_state_from_rel_long(None) is None
 
 
 def _series_pass_through() -> pd.DataFrame:
-    """Partner starts ahead-left, Ego drives past → partner behind."""
+    """Vehicle starts ahead-left, Ego drives past → vehicle behind."""
     rows = []
     for i in range(21):
         t = i * 0.1
@@ -87,14 +87,14 @@ def _series_pass_through() -> pd.DataFrame:
 
 def test_pass_time_hysteresis_and_resolution_pass_first():
     series = _series_pass_through()
-    # Partner at x=12; ego crosses x=12+2.5 at t=1.45 → behind after hold 0.3 s
+    # Vehicle at x=12; ego crosses x=12+2.5 at t=1.45 → behind after hold 0.3 s
     pt = first_pass_time(series, hold_s=0.3)
     assert pt is not None
     assert pt == pytest.approx(1.45, abs=0.15)
     assert interaction_resolution_from_series(series, peak_t=1.8) == "pass_first"
 
 
-def test_resolution_yield_when_partner_stays_ahead():
+def test_resolution_yield_when_vehicle_stays_ahead():
     rows = []
     for i in range(11):
         t = float(i)
@@ -163,8 +163,8 @@ def test_pair_geometry_summary_late_clearance_split():
             "t_s": 8.0,
             "left_alive": True,
             "right_alive": True,
-            "left_pass_state": "partner_ahead",
-            "right_pass_state": "partner_ahead",
+            "left_pass_state": "vehicle_ahead",
+            "right_pass_state": "vehicle_ahead",
             "left_clearance_m": 2.0,
             "right_clearance_m": 1.95,
             "left_rel_lat_m": 3.2,
@@ -174,8 +174,8 @@ def test_pair_geometry_summary_late_clearance_split():
             "t_s": 10.0,
             "left_alive": True,
             "right_alive": True,
-            "left_pass_state": "partner_behind",
-            "right_pass_state": "partner_behind",
+            "left_pass_state": "vehicle_behind",
+            "right_pass_state": "vehicle_behind",
             "left_clearance_m": 0.52,
             "right_clearance_m": 0.26,
             "left_rel_lat_m": 3.26,
@@ -185,8 +185,8 @@ def test_pair_geometry_summary_late_clearance_split():
             "t_s": 10.3,
             "left_alive": True,
             "right_alive": True,
-            "left_pass_state": "partner_behind",
-            "right_pass_state": "partner_behind",
+            "left_pass_state": "vehicle_behind",
+            "right_pass_state": "vehicle_behind",
             "left_clearance_m": 0.517,
             "right_clearance_m": 0.266,
             "left_rel_lat_m": 3.26,
@@ -243,8 +243,8 @@ def test_c0_c2_pass_first_and_late_clearance_margin():
     t2 = _shared_t_to_esmini(df2, 10.27)
     m0 = _metrics_at(s0, t0, "CuttingIn", None, source_df=n0)
     m2 = _metrics_at(s2, t2, "CuttingIn", None, source_df=n2)
-    assert m0["pass_state"] == "partner_behind"
-    assert m2["pass_state"] == "partner_behind"
+    assert m0["pass_state"] == "vehicle_behind"
+    assert m2["pass_state"] == "vehicle_behind"
     # Signed geometry at the diagnosed stamp (plan: c0 fwd=-4.626/left=3.257).
     assert m0["rel_long_m"] == pytest.approx(-4.626, abs=0.05)
     assert m0["rel_lat_m"] == pytest.approx(3.257, abs=0.05)

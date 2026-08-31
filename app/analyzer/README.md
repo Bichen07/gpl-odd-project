@@ -24,7 +24,7 @@ Build order (xosc_gen Steps 1 → 2 → 2.5):
 
 ```text
 esmini CSV
-  → labeller.py (+ collision_partner) → processed/action.yaml  [single source of truth]
+  → labeller.py (+ collision_vehicle) → processed/action.yaml  [single source of truth]
   → description.py                    → processed/description.txt  [human prose]
   → conflict_frame_selector.select_action_frames
        (timestamps ⊆ action.yaml only; noise filter may drop stamps, never invent)

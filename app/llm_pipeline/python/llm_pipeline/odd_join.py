@@ -22,6 +22,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from .paths import run_artifact_path, run_source_dir
+
 try:
     import yaml
 except ImportError:  # pragma: no cover
@@ -53,7 +55,7 @@ def _read_contrast_call(pack_dir: Path) -> Optional[Dict[str, Any]]:
 
 def join_run_dir(run_dir: Path) -> Dict[str, Any]:
     run_dir = Path(run_dir)
-    export_path = run_dir / EXPORT_FILENAME
+    export_path = run_artifact_path(run_dir, "odd_boundary_export")
     if not export_path.is_file():
         raise FileNotFoundError(f"Missing {export_path} — run S2 first.")
     export_doc = json.loads(export_path.read_text(encoding="utf-8"))
@@ -65,7 +67,7 @@ def join_run_dir(run_dir: Path) -> Dict[str, Any]:
         t["trial_id"] for t in (export_doc.get("cluster_boundary") or {}).get("boundary_trials", [])
     }
 
-    pairs_root = run_dir / "parameter_space_pairs"
+    pairs_root = run_source_dir(run_dir) / "parameter_space_pairs"
     packs: List[Dict[str, Any]] = []
     if pairs_root.is_dir():
         for pack_dir in sorted(p for p in pairs_root.iterdir() if p.is_dir()):
@@ -122,7 +124,7 @@ def join_run_dir(run_dir: Path) -> Dict[str, Any]:
         "pairs": packs,
     }
 
-    out_path = run_dir / JOIN_FILENAME
+    out_path = run_artifact_path(run_dir, "odd_join", write=True)
     out_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     return {
         "join_path": str(out_path),

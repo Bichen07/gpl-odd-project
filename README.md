@@ -17,6 +17,8 @@ This project has **two very different use cases**. Decide which one you need bef
 
 > **If you are a new team member just getting started:** start with Goal A. The lab server already has **many simulation trials** stored (count grows over time; quick check: open `/api/trials?limit=1` and read `totalDocs` in the JSON).
 
+
+
 ### Where trials are stored (Payload CMS)
 
 Trials are **not** files on your laptop by default. Each simulation run creates:
@@ -39,6 +41,8 @@ curl -s "http://140.113.208.174:3020/api/trials?limit=1" | python3 -c "import js
 
 ---
 
+
+
 ## Table of Contents
 
 1. [How the System Works](#1-how-the-system-works)
@@ -54,6 +58,8 @@ curl -s "http://140.113.208.174:3020/api/trials?limit=1" | python3 -c "import js
 11. [Mission Control](#11-mission-control)
 
 ---
+
+
 
 ## 1. How the System Works
 
@@ -79,6 +85,8 @@ There are **3 existing scenarios** on the lab server:
 
 ---
 
+
+
 ## 2. Prerequisites
 
 Install these once:
@@ -88,11 +96,13 @@ Install these once:
 | ----------- | --------------------------------------------------------------------------------------------------------------------- |
 | Miniconda   | [https://docs.anaconda.com/miniconda/](https://docs.anaconda.com/miniconda/)                                          |
 | Node.js 18+ | [https://nodejs.org/](https://nodejs.org/)                                                                            |
-| Bun         | `curl -fsSL https://bun.sh/install | bash`                                                                            |
+| Bun         | `curl -fsSL [https://bun.sh/install](https://bun.sh/install)                                                          |
 | Docker      | [https://docs.docker.com/engine/install/](https://docs.docker.com/engine/install/) (only for Goal B or local Payload) |
 
 
 ---
+
+
 
 ## 3. Goal A — View Existing Data (Start Here)
 
@@ -155,22 +165,24 @@ So when the schema UI shows `#0 null` / `#1 number` under nested fields, it mean
 
 ---
 
+
+
 ### Terminal 2 — Start the Dashboard
 
 The Dashboard can run in **development** or **production** mode. Both use port **3000** — only one can run at a time.
 
 
-|                    | Development (`bun run dev`)     | Production (`bun run build` + `bun run start`)          |
-| ------------------ | ------------------------------- | ------------------------------------------------------- |
-| **When to use**    | Daily lab work, editing UI code | Deploy-like run, no hot reload                          |
-| **Needs `build`?** | No — compiles on the fly        | Yes — `bun run start` reads `.next/` from a prior build |
-| **Command**        | `bun run dev`                   | `bun run build` then `bun run start`                    |
-| **Hot reload**     | Yes                             | No                                                      |
+|                        | Development (`bun run dev`)     | Production (`bun run build` + `bun run start`)          |
+| ---------------------- | ------------------------------- | ------------------------------------------------------- |
+| **When to use**        | Daily lab work, editing UI code | Deploy-like run, no hot reload                          |
+| **Needs** `build`**?** | No — compiles on the fly        | Yes — `bun run start` reads `.next/` from a prior build |
+| **Command**            | `bun run dev`                   | `bun run build` then `bun run start`                    |
+| **Hot reload**         | Yes                             | No                                                      |
 
 
-**Why `localhost:3000` sometimes opens without you running anything:** `./scripts/start_dev_stack.sh` (or an old `bun run dev`) may already be listening on 3000. Check with `ss -tlnp \| grep 3000`. If something is there, use that URL or stop the old process before starting again.
+**Why** `localhost:3000` **sometimes opens without you running anything:** `./scripts/start_dev_stack.sh` (or an old `bun run dev`) may already be listening on 3000. Check with `ss -tlnp \| grep 3000`. If something is there, use that URL or stop the old process before starting again.
 
-**Why `bun run start` fails with “Could not find a production build”:** `start` is production mode. Run `bun run build` first (once per code change), or switch to dev mode below.
+**Why** `bun run start` **fails with “Could not find a production build”:** `start` is production mode. Run `bun run build` first (once per code change), or switch to dev mode below.
 
 #### Option A — Development mode (recommended for lab use)
 
@@ -190,6 +202,8 @@ You should see something like:
 ✓ Ready
 ```
 
+
+
 #### Option B — Production mode
 
 ```bash
@@ -207,11 +221,13 @@ You should see:
 
 Open **[http://localhost:3000](http://localhost:3000)** in your browser. This is the main dashboard.
 
-> **If `bun run build` fails**, see [ISSUES.md](./ISSUES.md) for the fix.
+> **If** `bun run build` **fails**, see [ISSUES.md](./ISSUES.md) for the fix.
 
-> **Port already in use (`EADDRINUSE`):** Another Dashboard is already running. Use the existing tab, or stop it (`kill $(lsof -ti :3000)` or close the terminal running `dev`/`start`), then start again.
+> **Port already in use (**`EADDRINUSE`**):** Another Dashboard is already running. Use the existing tab, or stop it (`kill $(lsof -ti :3000)` or close the terminal running `dev`/`start`), then start again.
 
 ---
+
+
 
 ### Navigate the Dashboard
 
@@ -223,6 +239,8 @@ Open **[http://localhost:3000](http://localhost:3000)** in your browser. This is
   - **Trajectory Projection Space** — UMAP / MFPCA projection of trajectories
   - **Replayer** — animate a selected trial
   - **Trajectory Heatmap** — spatial density on the map
+
+
 
 #### Why points look **black** instead of colourful clusters
 
@@ -256,6 +274,7 @@ So:
 ---
 
 
+
 ## 4. BEV & LLM Pipeline (Research)
 
 End-to-end path from **fresh simulation** → clustering → BEV pack → split LLM cards.
@@ -274,33 +293,39 @@ Sampling (/initialize, /suggest, /register)
   → Analyze UI (Split cards) / Explore Replayer (timeline from medoid_trial)
 ```
 
-| Stage | System | Primary code |
-| ----- | ------ | ------------ |
-| Simulate + record | esmini / ROS | `simulation/ros/src/scenario_search/…` |
-| Upload trials / KPIs | Sampler + Payload | `scenario_sampler.py`, Payload collections |
-| MFPCA / HDBSCAN | Analyzer `:9010` | `app/analyzer/src/controller.py` |
-| Select / save clustering | Dashboard Explore | `app/dashboard` → Payload `savedTrajectoryAnalysis` |
-| Build medoid / BEV / labels | Analyzer dataset builder | `app/analyzer/src/dataset_builder.py` |
-| LLM cards (medoid / summary / Parameter-space pairs) | LLM pipeline | `app/llm_pipeline/` → `scripts/run_cluster_analyze.sh` |
+
+| Stage                                                | System                   | Primary code                                           |
+| ---------------------------------------------------- | ------------------------ | ------------------------------------------------------ |
+| Simulate + record                                    | esmini / ROS             | `simulation/ros/src/scenario_search/…`                 |
+| Upload trials / KPIs                                 | Sampler + Payload        | `scenario_sampler.py`, Payload collections             |
+| MFPCA / HDBSCAN                                      | Analyzer `:9010`         | `app/analyzer/src/controller.py`                       |
+| Select / save clustering                             | Dashboard Explore        | `app/dashboard` → Payload `savedTrajectoryAnalysis`    |
+| Build medoid / BEV / labels                          | Analyzer dataset builder | `app/analyzer/src/dataset_builder.py`                  |
+| LLM cards (medoid / summary / Parameter-space pairs) | LLM pipeline             | `app/llm_pipeline/` → `scripts/run_cluster_analyze.sh` |
+
 
 **Authoritative trajectory:** local CSV `simulation/ros/.cache/scenario_search/records/esmini_<batch>_<index>.csv`.  
 **Clustering source for builds:** Payload saved analysis (not legacy `alldatasets/` / `old_alldatasets/`).
 
 Code layout:
 
-| Path | Role |
-| ---- | ---- |
-| `app/analyzer/src/dataset_builder.py` | Map ensure + medoid BEV / labels / context / closest pairs |
-| `app/analyzer/src/conflict_frame_selector.py` | Conflict keyframes; dual-panel pair-zoom \| ego-zoom |
-| `app/analyzer/src/tier2_renderer.py` | BEV rendering |
-| `app/llm_pipeline/python/llm_pipeline/` | Split-analysis products + CLI |
-| `app/llm_pipeline/prompt_templates/` | Active prompts (see `app/llm_pipeline/README.md`) |
+
+| Path                                          | Role                                                       |
+| --------------------------------------------- | ---------------------------------------------------------- |
+| `app/analyzer/src/dataset_builder.py`         | Map ensure + medoid BEV / labels / context / closest pairs |
+| `app/analyzer/src/conflict_frame_selector.py` | Conflict keyframes; dual-panel pair-zoom | ego-zoom        |
+| `app/analyzer/src/tier2_renderer.py`          | BEV rendering                                              |
+| `app/llm_pipeline/python/llm_pipeline/`       | Split-analysis products + CLI                              |
+| `app/llm_pipeline/prompt_templates/`          | Active prompts (see `app/llm_pipeline/README.md`)          |
+
 
 ```bash
 conda activate analyzer
 cd /path/to/gpl-odd-project
 export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
 ```
+
+
 
 ### Build LLM dataset (map + medoid BEV + labels)
 
@@ -336,11 +361,13 @@ python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only
 python3 app/analyzer/src/dataset_builder.py --batch-id 2 --map-only --force-map
 ```
 
-| Job | Command |
-| --- | ------- |
+
+| Job                        | Command                                                          |
+| -------------------------- | ---------------------------------------------------------------- |
 | **Create** complete folder | `python3 app/analyzer/src/dataset_builder.py --batch-id 2 --k 4` |
-| **Rebuild** BEV/labels | `… --batch-id 2 --from-run results/batch2/4_cluster` |
-| **Map only** | `… --batch-id 2 --map-only` |
+| **Rebuild** BEV/labels     | `… --batch-id 2 --from-run results/batch2/4_cluster`             |
+| **Map only**               | `… --batch-id 2 --map-only`                                      |
+
 
 > `--from-run` does **not** create a missing k. If `2_cluster_s=…` was never built,
 > use CREATE with `--k 2` instead.
@@ -366,12 +393,14 @@ results/batch2/3_cluster_s=0.7036/
 
 **Auxiliary trial scopes** (same CLI — rebuild selectively with `--from-run`):
 
-| Flag | Default | What it builds |
-| ---- | ------- | -------------- |
-| `--medoids` | `all` | Medoid pack under `clusterN/` |
-| `--emb-boundaries` (`--boundaries`) | `all` | Embedding closest pairs → `highlight_trials/boundary_c*` |
-| `--param-boundaries` | `none` | Parameter-space closest pairs → `highlight_trials/param_boundary_c*` (z-scored OncomingSpeed / OncomingStartDelay) |
-| `--outliers` | `all` | Top outlier → `highlight_trials/outlier_trials/` |
+
+| Flag                                | Default | What it builds                                                                                                     |
+| ----------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------ |
+| `--medoids`                         | `all`   | Medoid pack under `clusterN/`                                                                                      |
+| `--emb-boundaries` (`--boundaries`) | `all`   | Embedding closest pairs → `highlight_trials/boundary_c*`                                                           |
+| `--param-boundaries`                | `none`  | Parameter-space closest pairs → `highlight_trials/param_boundary_c*` (z-scored OncomingSpeed / OncomingStartDelay) |
+| `--outliers`                        | `all`   | Top outlier → `highlight_trials/outlier_trials/`                                                                   |
+
 
 ```bash
 # IC (Parameter Space) closest pairs only — keep existing medoids / emb pairs:
@@ -389,14 +418,16 @@ ParameterSpace (green square = IC) and ProjectionSpace (cyan diamond = emb).
 Left is always the ego–partner frustum (`pair_zoom_bounds`), not the whole map.
 Set `--ego-zoom-radius 0` for a single-panel fallback.
 
-| Flag | Default | What it controls |
-| ---- | ------- | ---------------- |
-| `--snapshot-size` | `1024` | Square BEV image resolution |
-| `--agent-id-size` | `10` | On-car agent ID font (pt) |
-| `--ego-zoom-radius` | `30` | Right-panel ego zoom (m); `0` = single panel |
-| `--road-label-size` / `--lane-label-size` | tuned | Road / lane ID fonts on snapshots |
-| `--max-snapshots` | uncapped | Cap BEV frames per medoid |
-| `--force-map` / `--skip-map` | off | Force / skip auto map ensure |
+
+| Flag                                      | Default  | What it controls                             |
+| ----------------------------------------- | -------- | -------------------------------------------- |
+| `--snapshot-size`                         | `1024`   | Square BEV image resolution                  |
+| `--agent-id-size`                         | `10`     | On-car agent ID font (pt)                    |
+| `--ego-zoom-radius`                       | `30`     | Right-panel ego zoom (m); `0` = single panel |
+| `--road-label-size` / `--lane-label-size` | tuned    | Road / lane ID fonts on snapshots            |
+| `--max-snapshots`                         | uncapped | Cap BEV frames per medoid                    |
+| `--force-map` / `--skip-map`              | off      | Force / skip auto map ensure                 |
+
 
 Code: `dataset_builder.py` → `map_assets.py` + `tier2_renderer` / `map_plotter` / `conflict_frame_selector`.
 
@@ -404,17 +435,19 @@ Code: `dataset_builder.py` → `map_assets.py` + `tier2_renderer` / `map_plotter
 
 After preprocess has produced `results/batch<id>/<k>_cluster_s=…/`, run interpretation
 from the **repo root** in the `analyzer` conda env. Product details, prompts, and
-dataflow: [`app/llm_pipeline/README.md`](app/llm_pipeline/README.md).
+dataflow: `[app/llm_pipeline/README.md](app/llm_pipeline/README.md)`.
 
 #### 1. API key (required for live LLM)
 
 The CLI reads the key from the **shell environment** (not from `app/analyzer/.env`
 or `app/dashboard/.env` — those are for Payload only).
 
-| Provider | Env var | Typical model |
-| -------- | ------- | ------------- |
+
+| Provider             | Env var          | Typical model      |
+| -------------------- | ---------------- | ------------------ |
 | **Gemini** (default) | `GOOGLE_API_KEY` | `gemini-2.5-flash` |
-| OpenAI | `OPENAI_API_KEY` | `gpt-4o` |
+| OpenAI               | `OPENAI_API_KEY` | `gpt-4o`           |
+
 
 ```bash
 # Prefer export in this terminal session (do not commit keys):
@@ -443,15 +476,19 @@ python3 -m llm_pipeline.cli cluster-interpret \
   --products medoid,summary,parameter-space-pairs --no-review
 ```
 
+
+
 #### 3. Outputs (roles)
 
-| File | Role |
-| ---- | ---- |
-| `clusterN/cluster_aggregate.json` | Deterministic TTC/IC digests (from Payload KPIs) |
-| `clusterN/medoid_trial.yaml` | **Trial** card — motive timeline (canonical) |
-| `clusterN/cluster_summary.yaml` | **Cluster** card — caption + risk over digests |
-| `parameter_space_pairs/pair_c{A}_c{B}.yaml` | Parameter-space closest-pair contrast |
-| `clusterN/cluster_interpretation.yaml` | Thin pointer (label/risk/caption only — **no** timeline duplicate) |
+
+| File                                        | Role                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------ |
+| `clusterN/cluster_aggregate.json`           | Deterministic TTC/IC digests (from Payload KPIs)                   |
+| `clusterN/medoid_trial.yaml`                | **Trial** card — motive timeline (canonical)                       |
+| `clusterN/cluster_summary.yaml`             | **Cluster** card — caption + risk over digests                     |
+| `parameter_space_pairs/pair_c{A}_c{B}.yaml` | Parameter-space closest-pair contrast                              |
+| `clusterN/cluster_interpretation.yaml`      | Thin pointer (label/risk/caption only — **no** timeline duplicate) |
+
 
 Analyze → **Split cards** is the report viewer. Explore Replayer loads the timeline from
 `medoid_trial` via the status API (not from a copied shim field).
@@ -468,6 +505,8 @@ More detail: `app/llm_pipeline/README.md`.
 
 ---
 
+
+
 ## 5. Unit Tests
 
 ```bash
@@ -483,7 +522,11 @@ All 30 tests should end with `OK`.
 
 ---
 
+
+
 ## 6. Branch & Git Strategy
+
+
 
 ### Senior repo (`ian-chiu/gpl-odd-project`) — three branches
 
@@ -495,7 +538,7 @@ All 30 tests should end with `OK`.
 | `**update**` | Senior WIP feature branch (content largely merged into `dev`)                              | `6e3a1de`     |
 
 
-**Which branch do we build from?** Lab fork work is on **`main`** (`origin/main`, default on `Bichen07/gpl-odd-project`). It contains the integrated lab-specific work (analyzer, Mission Control, LLM pipeline, cluster interpretation, etc.). Senior upstream default is `**dev**` on `ian-chiu/gpl-odd-project`.
+**Which branch do we build from?** Lab fork work is on `main` (`origin/main`, default on `Bichen07/gpl-odd-project`). It contains the integrated lab-specific work (analyzer, Mission Control, LLM pipeline, cluster interpretation, etc.). Senior upstream default is `**dev`** on `ian-chiu/gpl-odd-project`.
 
 ```
 ian-chiu/gpl-odd-project (upstream)
@@ -520,7 +563,11 @@ To refresh senior branches: `git fetch upstream` then compare with `git log --on
 
 ---
 
+
+
 ## 7. Debugging
+
+
 
 ### `[Errno 98] Address already in use` on port 9010
 
@@ -536,6 +583,8 @@ ss -tlnp | grep 9010
 **Fix:** Either keep using the existing analyzer only (do not start a second one), or stop the old one (`Ctrl+C` in its terminal, or `kill <pid>`), then start fresh.
 
 ---
+
+
 
 ### Dashboard “Analysis” never finishes or no clustering appears
 
@@ -589,6 +638,8 @@ curl http://localhost:9009/schema
 
 ---
 
+
+
 ## 8. Payload CMS Reference
 
 
@@ -617,6 +668,8 @@ curl http://localhost:9009/schema
 
 ---
 
+
+
 ## 9. Documentation layout
 
 Keep **both**:
@@ -631,6 +684,8 @@ Keep **both**:
 Do not delete the per-app READMEs — they complement this root overview.
 
 ---
+
+
 
 ## 10. Mission Control
 
@@ -659,8 +714,9 @@ clustering / BEV / split LLM cards.
 
 ---
 
-## Related Files
 
+
+## Related Files
 
 | `app/llm_pipeline/README.md`              | Split LLM products, prompts, dataflow                                               |
 | `HOW_TO_RUN.md`                           | Short quick-reference for commands                                                  |
@@ -672,5 +728,3 @@ clustering / BEV / split LLM cards.
 | `app/sampling/README.md`                  | Sampling server API reference                                                       |
 | `app/dashboard/README.md`                 | Dashboard build steps                                                               |
 | `app/payload/README.md`                   | Payload CMS local setup                                                             |
-
-

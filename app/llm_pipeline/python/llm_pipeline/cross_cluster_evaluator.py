@@ -28,7 +28,12 @@ from .llm_factory import (
     llm_api_key_for_model,
     normalize_model_name,
 )
-from .paths import PROMPT_TEMPLATES_DIR
+from .paths import (
+    PROMPT_TEMPLATES_DIR,
+    run_artifact_path,
+    run_source_dir,
+    run_source_path,
+)
 
 try:
     from langchain_community.callbacks.manager import get_openai_callback
@@ -89,7 +94,7 @@ def _load_cluster_docs(run_dir: Path) -> List[Dict[str, Any]]:
         sys.path.insert(0, str(analyzer_src))
     from cluster_paths import resolve_path  # type: ignore
 
-    for cdir in sorted(run_dir.glob("cluster*")):
+    for cdir in sorted(run_source_dir(run_dir).glob("cluster*")):
         if not (cdir.is_dir() and cdir.name[len("cluster"):].isdigit()):
             continue
         cj = resolve_path(cdir, "cluster.json", must_exist=True)
@@ -114,7 +119,7 @@ def _load_cluster_docs(run_dir: Path) -> List[Dict[str, Any]]:
 
 def _load_trajectory_projection_pairs(run_dir: Path) -> List[Dict[str, Any]]:
     """Load trajectory_projection_pairs from manifest.json."""
-    manifest_path = run_dir / "manifest.json"
+    manifest_path = run_source_path(run_dir, "manifest.json")
     if not manifest_path.is_file():
         return []
     try:
@@ -146,7 +151,7 @@ def _boundary_description_text(run_dir: Path, bp: Dict[str, Any]) -> str:
         side = find_trajectory_projection_pair_side_dir(run_dir, cluster_label, peer, str(trial_id))
         if side is None:
             # Legacy highlight_trials/boundary_c*
-            cdir = run_dir / f"cluster{cluster_label}"
+            cdir = run_source_dir(run_dir) / f"cluster{cluster_label}"
             bdir = resolve_highlight_subdir(
                 cdir, f"boundary_c{peer}", must_exist=True
             )
@@ -435,7 +440,7 @@ def run_cross_cluster_eval(
     Returns the output path on success, None on failure.
     """
     run_dir = Path(run_dir)
-    out_path = run_dir / _OUTPUT_FILE
+    out_path = run_artifact_path(run_dir, "cross_eval", write=True)
 
     # Deterministic half of the hybrid verdict — cheap, and useful even on the
     # stub path where no LLM runs.

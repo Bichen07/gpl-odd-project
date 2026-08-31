@@ -319,12 +319,12 @@ def highlight_conflict_corridor_roads(
     df: pd.DataFrame,
     map_tracks_csv: str,
     *,
-    partner_name: Optional[str] = None,
+    vehicle_name: Optional[str] = None,
     context_name: Optional[str] = None,
     max_roads: int = 5,
     at_time: Optional[float] = None,
 ) -> List[str]:
-    """Road IDs for conflict BEV labels: ego + partner (+ context), ≤ ``max_roads``.
+    """Road IDs for conflict BEV labels: ego + vehicle (+ context), ≤ ``max_roads``.
 
     Prefer real ``roadId`` / ``road_id`` from those agents when present (>0).
     Otherwise pick the single nearest odrplot road label per agent position.
@@ -340,7 +340,7 @@ def highlight_conflict_corridor_roads(
 
     names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
     ego_name = "Ego" if "Ego" in names else (sorted(names)[0] if names else None)
-    focus = [n for n in (ego_name, partner_name, context_name) if n]
+    focus = [n for n in (ego_name, vehicle_name, context_name) if n]
 
     def _ids_for_name(name: str) -> List[str]:
         sub = df[df["name"].astype(str).str.strip() == str(name).strip()]
@@ -625,7 +625,7 @@ def infer_collision_timestep(
     collided: bool = True,
 ) -> Optional[float]:
     """Return collision key time from GT events or polygon clearance."""
-    from collision_partner import resolve_collision_partner
+    from collision_vehicle import resolve_collision_vehicle
 
     agents = meta_agents or []
     if not agents:
@@ -634,13 +634,13 @@ def infer_collision_timestep(
             {"track_id": a["track_id"], "name": a["name"]}
             for a in registry
         ]
-    partner = resolve_collision_partner(
+    vehicle = resolve_collision_vehicle(
         df,
         agents,
         trial_events=trial_events,
         collided=collided,
     )
-    return partner.key_time if partner else None
+    return vehicle.key_time if vehicle else None
 
 
 def df_to_trajectory_dict(df: pd.DataFrame) -> Tuple[Dict[str, List[dict]], List[float]]:
@@ -706,7 +706,7 @@ class Tier2BevRenderer:
         self.snapshot_border_frac = snapshot_border_frac
         self.typography = typography
         # Legacy radius kept for callers; medoid snapshots now use adaptive
-        # ego–partner + 2 m framing instead of a fixed dual-panel zoom.
+        # ego–vehicle + 2 m framing instead of a fixed dual-panel zoom.
         self.ego_zoom_radius = ego_zoom_radius
         self.fixed_view_yaw_deg: Optional[float] = None
         if not Path(map_tracks_csv).is_file():
@@ -803,7 +803,7 @@ class Tier2BevRenderer:
             key_indices = [(i, lab) for i, lab, _ in key_with_frames]
             print(
                 f"[Tier2BevRenderer] action-derived selection: {len(key_indices)} frames "
-                f"(partner={selection.partner_name or '?'}, peak_t={selection.peak_t})"
+                f"(vehicle={selection.vehicle_name or '?'}, peak_t={selection.peak_t})"
             )
 
             if n_snapshots is not None and len(key_with_frames) > n_snapshots:
@@ -813,8 +813,8 @@ class Tier2BevRenderer:
             highlight = highlight_conflict_corridor_roads(
                 df,
                 self.map_tracks_csv,
-                partner_name=selection.partner_name if selection else None,
-                context_name=selection.context_partner_name if selection else None,
+                vehicle_name=selection.vehicle_name if selection else None,
+                context_name=selection.context_vehicle_name if selection else None,
                 max_roads=5,
                 at_time=selection.peak_t if selection else None,
             )
@@ -840,13 +840,13 @@ class Tier2BevRenderer:
             ego_xy_at = _ego_position_lookup(df)
             if self.fixed_view_yaw_deg is None:
                 self.fixed_view_yaw_deg = _ego_initial_yaw_deg(df)
-            partner_name = selection.partner_name if selection else None
-            partner_xy_at = (
-                _agent_position_lookup(df, name=partner_name)
-                if partner_name
+            vehicle_name = selection.vehicle_name if selection else None
+            vehicle_xy_at = (
+                _agent_position_lookup(df, name=vehicle_name)
+                if vehicle_name
                 else (lambda _t: None)
             )
-            ctx_name = selection.context_partner_name if selection else None
+            ctx_name = selection.context_vehicle_name if selection else None
             ctx_xy_at = (
                 _agent_position_lookup(df, name=ctx_name)
                 if ctx_name
@@ -877,7 +877,7 @@ class Tier2BevRenderer:
 
                 out_name = f"{prefix}_t_{t:05.2f}_{slug}.jpg"
                 out_path = os.path.join(output_dir, out_name)
-                partner_xy = partner_xy_at(t) if partner_name else None
+                vehicle_xy = vehicle_xy_at(t) if vehicle_name else None
                 ctx_xy = ctx_xy_at(t) if ctx_name else None
                 extra = [ctx_xy] if ctx_xy is not None else None
                 self._render_snapshot(
@@ -889,7 +889,7 @@ class Tier2BevRenderer:
                     t=t,
                     label=label_for_title,
                     ego_xy=ego_xy_at(t),
-                    partner_xy=partner_xy,
+                    vehicle_xy=vehicle_xy,
                     work=work,
                     use_whole_scene=use_whole,
                     draw_agent_road_labels=draw_road,
@@ -943,23 +943,23 @@ class Tier2BevRenderer:
         if center is None and view_bounds is not None:
             xmin, xmax, ymin, ymax = view_bounds
             center = ((xmin + xmax) / 2.0, (ymin + ymax) / 2.0)
-        self._plotter.render_scene(
-            self.map_tracks_csv,
-            out_path,
-            highlight_road_ids_list=highlight,
+                self._plotter.render_scene(
+                    self.map_tracks_csv,
+                    out_path,
+                    highlight_road_ids_list=highlight,
             view_bounds=view_bounds,
             draw_labels=draw_labels,
-            typography=self.typography,
-            tracks_csv_path=str(traj_csv),
-            metadata_yaml_path=str(meta_yaml),
-            timestamp=float(t),
-            ego_id=0,
-            heading_in_degrees=True,
-            draw_trajectory_trails=True,
+                    typography=self.typography,
+                    tracks_csv_path=str(traj_csv),
+                    metadata_yaml_path=str(meta_yaml),
+                    timestamp=float(t),
+                    ego_id=0,
+                    heading_in_degrees=True,
+                    draw_trajectory_trails=True,
             time_label=time_label,
             scope_bounds=view_bounds,
-            output_px=self.snapshot_output_px,
-            white_border_frac=self.snapshot_border_frac,
+                    output_px=self.snapshot_output_px,
+                    white_border_frac=self.snapshot_border_frac,
             label_anchors=label_anchors,
             metric_chip=metric_chip,
             label_avoid_xy=label_avoid_xy,
@@ -983,14 +983,14 @@ class Tier2BevRenderer:
         label: str,
         ego_xy: Optional[Tuple[float, float]],
         work: Path,
-        partner_xy: Optional[Tuple[float, float]] = None,
+        vehicle_xy: Optional[Tuple[float, float]] = None,
         use_whole_scene: bool = True,
         draw_agent_road_labels: bool = False,
         metric_chip: Optional[str] = None,
         extra_pair_xy: Optional[List[Tuple[float, float]]] = None,
         frame: Optional[Any] = None,
     ) -> None:
-        """Render a single ego-centered adaptive BEV (ego–partner + 2 m)."""
+        """Render a single ego-centered adaptive BEV (ego–vehicle + 2 m)."""
         from conflict_frame_selector import (
             adaptive_half_extent,
             ego_centered_square_bounds,
@@ -1000,8 +1000,8 @@ class Tier2BevRenderer:
         avoid: Optional[List[Tuple[float, float]]] = None
         if ego_xy is not None:
             avoid = [ego_xy]
-            if partner_xy is not None:
-                avoid.append(partner_xy)
+            if vehicle_xy is not None:
+                avoid.append(vehicle_xy)
             if extra_pair_xy:
                 avoid.extend(extra_pair_xy)
         if draw_agent_road_labels and ego_xy is not None:
@@ -1024,10 +1024,10 @@ class Tier2BevRenderer:
             return
 
         d_m = None
-        if partner_xy is not None:
+        if vehicle_xy is not None:
             d_m = math.hypot(
-                float(partner_xy[0]) - float(ego_xy[0]),
-                float(partner_xy[1]) - float(ego_xy[1]),
+                float(vehicle_xy[0]) - float(ego_xy[0]),
+                float(vehicle_xy[1]) - float(ego_xy[1]),
             )
         elif frame is not None and getattr(frame, "d", None) is not None:
             d_m = float(frame.d)

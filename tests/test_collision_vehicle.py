@@ -1,4 +1,4 @@
-"""Collision partner resolution (GT events + polygon clearance)."""
+"""Collision vehicle resolution (GT events + polygon clearance)."""
 from __future__ import annotations
 
 import sys
@@ -11,14 +11,14 @@ REPO = Path(__file__).resolve().parents[1]
 SRC = REPO / "app" / "analyzer" / "src"
 sys.path.insert(0, str(SRC))
 
-from collision_partner import (  # noqa: E402
+from collision_vehicle import (  # noqa: E402
     augment_interactions,
     collision_interaction_to_medoid_doc,
     enrich_collision_interaction,
     inject_collision_agent_actions,
     parse_collision_from_events,
     polygon_clearance,
-    resolve_collision_partner,
+    resolve_collision_vehicle,
 )
 from csv_roadid_loader import get_csv_road_data  # noqa: E402
 
@@ -44,18 +44,18 @@ def test_parse_collision_gt_from_events():
         }
     )
     events = [{"name": "collisionWithOpposite", "esminiSeconds": 1.0}]
-    partner = parse_collision_from_events(events, meta, df)
-    assert partner is not None
-    assert partner.partner_name == "Opposite"
-    assert partner.partner_track_id == 2
-    assert partner.source == "gt_events"
+    vehicle = parse_collision_from_events(events, meta, df)
+    assert vehicle is not None
+    assert vehicle.vehicle_name == "Opposite"
+    assert vehicle.vehicle_track_id == 2
+    assert vehicle.source == "gt_events"
 
 
 @pytest.mark.skipif(
     not (REPO / "simulation/ros/.cache/scenario_search/records/esmini_2_1188.csv").is_file(),
     reason="batch2 trial 1188 CSV not on disk",
 )
-def test_batch2_trial_1188_near_miss_partner_name():
+def test_batch2_trial_1188_near_miss_vehicle_name():
     from labeller import _normalize_columns, detect_interactions
 
     df = get_csv_road_data(2, 1188)
@@ -99,10 +99,10 @@ def test_collision_enrichment_has_kinematics():
         "source": "polygon",
     }, df, meta)
     assert iv["ego_at_collision"]["speed_mps"] == pytest.approx(4.2, abs=0.1)
-    assert iv["partner_at_collision"]["speed_mps"] == 0.0
+    assert iv["vehicle_at_collision"]["speed_mps"] == 0.0
     doc = collision_interaction_to_medoid_doc(iv)
     assert doc is not None
-    assert doc["partner_name"] == "Parking"
+    assert doc["vehicle_name"] == "Parking"
     assert doc["ego_speed_mps"] == pytest.approx(4.2, abs=0.1)
 
 
@@ -158,14 +158,14 @@ def test_inject_collision_agent_actions():
     not (REPO / "simulation/ros/.cache/scenario_search/records/esmini_2_1237.csv").is_file(),
     reason="batch2 collision trial 1237 CSV not on disk",
 )
-def test_batch2_collision_trial_polygon_partner():
+def test_batch2_collision_trial_polygon_vehicle():
     df = get_csv_road_data(2, 1237)
     assert df is not None
     names = sorted({str(x).strip() for x in df["name"].unique()})
     if "Ego" in names:
         names = ["Ego"] + sorted(n for n in names if n != "Ego")
     meta = [{"track_id": i, "name": n} for i, n in enumerate(names)]
-    partner = resolve_collision_partner(df, meta, collided=True)
-    assert partner is not None
-    assert partner.key_time > 0
-    assert partner.min_clearance_m < 2.0
+    vehicle = resolve_collision_vehicle(df, meta, collided=True)
+    assert vehicle is not None
+    assert vehicle.key_time > 0
+    assert vehicle.min_clearance_m < 2.0

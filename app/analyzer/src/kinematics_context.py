@@ -1,6 +1,6 @@
 """Trajectory-backed kinematics for description tables + heading-sweep text.
 
-Used to enrich human ``description.txt`` action rows (v, a, heading, partner
+Used to enrich human ``description.txt`` action rows (v, a, heading, named vehicle
 distance/azimuth) and to emit same-lane heading/curve events into
 ``context.md`` when OpenDRIVE ``lane_id`` does not change.
 """
@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 import pandas as pd
+from agent_labels import normalize_vehicle_schema
 
 # Heading sweep (same-lane steer / path curve) thresholds.
 # Keep in sync with taxonomy.Thresholds.SAME_LANE_TURN_* (labeller source of truth).
@@ -53,8 +54,9 @@ def _normalize_traj(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def primary_partner_track_id(action_data: Optional[Dict[str, Any]]) -> Optional[int]:
-    """Prefer conflict partner, else ONCOMING NPC, else first non-ego agent."""
+def primary_vehicle_track_id(action_data: Optional[Dict[str, Any]]) -> Optional[int]:
+    """Prefer the conflict vehicle, else ONCOMING NPC, else first non-ego agent."""
+    action_data = normalize_vehicle_schema(action_data)
     if not action_data:
         return None
     for iv in action_data.get("interactions") or []:
@@ -76,9 +78,10 @@ def primary_partner_track_id(action_data: Optional[Dict[str, Any]]) -> Optional[
     return None
 
 
-def partner_name(action_data: Optional[Dict[str, Any]], tid: Optional[int]) -> str:
+def vehicle_name(action_data: Optional[Dict[str, Any]], tid: Optional[int]) -> str:
+    action_data = normalize_vehicle_schema(action_data)
     if tid is None or not action_data:
-        return "partner"
+        return "other vehicle"
     for ag in action_data.get("agents") or []:
         if int(ag.get("track_id", -1)) == int(tid):
             return str(ag.get("name") or f"agent{tid}")
@@ -109,13 +112,13 @@ def _accel_at(df: pd.DataFrame, track_id: int, t: float) -> Optional[float]:
     return float((v[i1] - v[i0]) / dt)
 
 
-def _rel_partner(
-    ego: pd.Series, partner: Optional[pd.Series]
+def _rel_vehicle(
+    ego: pd.Series, vehicle: Optional[pd.Series]
 ) -> Tuple[Optional[float], Optional[float]]:
-    if partner is None:
+    if vehicle is None:
         return None, None
-    dx = float(partner["x"]) - float(ego["x"])
-    dy = float(partner["y"]) - float(ego["y"])
+    dx = float(vehicle["x"]) - float(ego["x"])
+    dy = float(vehicle["y"]) - float(ego["y"])
     d = math.hypot(dx, dy)
     bearing = math.atan2(dy, dx)
     eh = _heading_to_rad(float(ego.get("heading", 0.0)))
@@ -231,7 +234,7 @@ def enrich_action_row(
     act: Dict[str, Any],
     traj_df: pd.DataFrame,
     track_id: int,
-    partner_tid: Optional[int],
+    vehicle_tid: Optional[int],
     map_tracks_csv: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Sample kinematics at action start (and end for intervals)."""
@@ -270,15 +273,15 @@ def enrich_action_row(
     if out.get("vs1") is not None:
         out["vlat1"] = round(float(v1) * math.sin(math.radians(float(out["vs1"]))), 2)
 
-    if partner_tid is not None:
-        p0 = _agent_at(df, partner_tid, st)
-        d0, az0 = _rel_partner(ego0, p0)
+    if vehicle_tid is not None:
+        p0 = _agent_at(df, vehicle_tid, st)
+        d0, az0 = _rel_vehicle(ego0, p0)
         if d0 is not None:
             out["d0"] = round(d0, 1)
             out["az0"] = round(float(az0), 1)
         if ego1 is not None and abs(et - st) > 1e-3:
-            p1 = _agent_at(df, partner_tid, et)
-            d1, az1 = _rel_partner(ego1, p1)
+            p1 = _agent_at(df, vehicle_tid, et)
+            d1, az1 = _rel_vehicle(ego1, p1)
             if d1 is not None:
                 out["d1"] = round(d1, 1)
                 out["az1"] = round(float(az1), 1)
@@ -289,7 +292,7 @@ def sample_kinematics_at_time(
     traj_df: pd.DataFrame,
     track_id: int,
     t: float,
-    partner_tid: Optional[int] = None,
+    vehicle_tid: Optional[int] = None,
     map_tracks_csv: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Instantaneous kinematics snapshot at time *t* for one agent."""
@@ -313,9 +316,9 @@ def sample_kinematics_at_time(
         out["v_lat"] = round(
             float(out["v"]) * math.sin(math.radians(float(out["vs_road"]))), 2
         )
-    if partner_tid is not None:
-        p = _agent_at(df, partner_tid, t)
-        d, az = _rel_partner(row, p)
+    if vehicle_tid is not None:
+        p = _agent_at(df, vehicle_tid, t)
+        d, az = _rel_vehicle(row, p)
         if d is not None:
             out["d"] = round(float(d), 1)
             out["az"] = round(float(az), 1)
@@ -529,11 +532,11 @@ def format_heading_sweep_sentences(sweeps: Sequence[HeadingSweep]) -> str:
 def format_enriched_action_table(
     agent: Dict[str, Any],
     traj_df: Optional[pd.DataFrame],
-    partner_tid: Optional[int],
-    partner_label: str = "Opposite",
+    vehicle_tid: Optional[int],
+    vehicle_label: str = "Oncoming",
     map_tracks_csv: Optional[str] = None,
 ) -> List[str]:
-    """Markdown table with v/a/heading, heading-vs-road, and partner geometry."""
+    """Markdown table with v/a/heading, heading-vs-road, and vehicle geometry."""
     name = agent.get("name", f"agent {agent['track_id']}")
     role = agent.get("role", "npc")
     tid = int(agent.get("track_id", -1))
@@ -541,13 +544,13 @@ def format_enriched_action_table(
     if role == "npc" and agent.get("relation_to_ego"):
         header += f" — {agent['relation_to_ego']}"
 
-    use_partner = traj_df is not None and partner_tid is not None and role == "ego"
+    use_vehicle = traj_df is not None and vehicle_tid is not None and role == "ego"
     # vs road: nose − local road tangent; v_lat: signed lateral component (m/s).
-    if use_partner:
+    if use_vehicle:
         cols = (
             "| time | action | road | lane | v (m/s) | a (m/s²) | heading (°) | "
             "vs road (°) | v_lat (m/s) | "
-            f"d→{partner_label} (m) | az→{partner_label} (°) |"
+            f"d→{vehicle_label} (m) | az→{vehicle_label} (°) |"
         )
         sep = (
             "|------|--------|------|------|---------|----------|-------------|"
@@ -575,7 +578,7 @@ def format_enriched_action_table(
     actions = agent.get("actions") or []
     if not actions:
         empty = "| — | (no significant actions) | — | — | — | — | — | — | — |"
-        if use_partner:
+        if use_vehicle:
             empty += " — | — |"
         lines.append(empty)
         lines.append("")
@@ -590,7 +593,7 @@ def format_enriched_action_table(
                 act,
                 traj_df,
                 tid,
-                partner_tid if use_partner else None,
+                vehicle_tid if use_vehicle else None,
                 map_tracks_csv=map_tracks_csv,
             )
 
@@ -618,7 +621,7 @@ def format_enriched_action_table(
             f"| {tspan} | {act.get('action')} | {act.get('road_id')} | {act.get('lane_id')} "
             f"| {v_cell} | {a_cell} | {h_cell} | {vs_cell} | {vlat_cell} |"
         )
-        if use_partner:
+        if use_vehicle:
             if "d1" in kin and abs(float(st) - float(et)) > 1e-6:
                 d_cell = f"{_f('d0', '{:.1f}')}→{_f('d1', '{:.1f}')}"
                 az_cell = f"{_f('az0', '{:.1f}')}→{_f('az1', '{:.1f}')}"

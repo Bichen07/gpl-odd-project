@@ -3,12 +3,21 @@ INITIAL-CONDITION matched pair: two sides with nearly identical scenario inputs
 (OncomingSpeed, OncomingStartDelay; param_dist ≤ caliper) from different embedding
 clusters. Explain whether the cluster split is justified or over-fine.
 
-PARAMETER-SPACE params are sampled OpenSCENARIO inputs (Opposite start/target speed and start
+**Cluster provenance matters:** the embedding clusters were produced by applying
+MFPCA followed by HDBSCAN to the **whole trajectory**. Therefore, membership
+primarily reflects whole-trajectory shape, duration, and collision termination;
+it does not guarantee one clean interaction intent. Two matched boundary trials
+can have very similar trajectories while differing at the conflict decision:
+one may attempt to go through and collide, while the other may brake to yield
+but still collide. Treat that as a possible collision-boundary mixture to test,
+not as an annotation error and not as evidence that both sides share one motive.
+
+PARAMETER-SPACE params are sampled OpenSCENARIO inputs (Oncoming start/target speed and start
 delay) — NOT measured speed at peak conflict.
 
 Matched parameter-space sides often MOVE VERY SIMILARLY. Your job is to find what still differs —
 **persistent geometry, longitudinal relationship, minimum distance between vehicle
-boundaries, and partner position in ego coordinates** —
+boundaries, and named vehicle position in Ego coordinates** —
 across shared-clock phases, using the pair context + synced BEV frames. Cluster
 medoid `output/medoid_trial.yaml` extracts are a **final consistency check only**, never evidence for these
 boundary sides.
@@ -17,9 +26,9 @@ gap or an oscillatory speed-difference sample as the critical divergence unless
 minimum distance between vehicle boundaries or longitudinal relationship also
 splits and stays split.
 
-Metric nouns in context are plain and precise: Ego speed, partner speed,
-center-to-center distance, partner azimuth relative to Ego heading,
-center-distance closing/opening rate, estimated time to collision, partner position
+Metric nouns in context are plain and precise: Ego speed, named vehicle speed,
+center-to-center distance, named vehicle azimuth relative to Ego heading,
+center-distance closing/opening rate, estimated time to collision, named vehicle position
 in Ego coordinates, minimum distance between vehicle boundaries, longitudinal
 relationship, and Ego average speed during the previous 1 second. Definitions are
 in the glossary. Do not invent abbreviations like `rel=`, `roll1s=`, `az=`, or `d=`.
@@ -36,10 +45,16 @@ in the glossary. Do not invent abbreviations like `rel=`, `roll1s=`, `az=`, or `
   for pass/yield and for whether motion is near-identical.
 - Derive each boundary side's mini-motive from **this pair's context first**.
 - <Left/Right medoid trial extracts> come from each endpoint's `output/medoid_trial.yaml`
-  (cluster archetypes, not these boundary sides). Use them only at the end as a
-  consistency check: is this pair's divergence the same story as the medoids, or a
-  different boundary case? Never copy a medoid `yield_to_partner` onto a pair
-  side that the pair context shows as `pass_first`.
+  (cluster archetypes, not these boundary sides). Optional last-paragraph comment
+  only: same story as the medoids, or a different edge of that cluster. Never copy
+  a medoid label onto a pair side. Never let a medoid mismatch force
+  `separation_call: inconclusive` — collision-boundary clusters routinely have a
+  stay-behind edge and a go-through edge around one interior medoid.
+- Because clustering used whole trajectories, use the conflict-window control arc
+  to classify each boundary side: yield-family means Ego decelerates/stops to
+  give way; pass-family means Ego holds/increases speed, releases the brake and
+  continues, or gets behind the named vehicle. Similar whole-trajectory shape
+  does not override this side-specific classification.
 - Synced BEVs: dual panel at the same shared clock t under `synced_bev/`
   (common_sense BEV guide). Shared adaptive scale. Title tokens match filenames.
 - Clusters, outcomes, scenario params, and trial refs are already known to the
@@ -58,48 +73,70 @@ Do not close the fence until `separation_call` + `separation_reason` are written
 2. Phase pass: walk the shared timeline as 4–8 time ranges (approach → geometry /
    divergence → outcome). For each phase note how [cA] vs [cB] differ in
    longitudinal relationship, minimum distance between vehicle boundaries,
-   partner position
+  named vehicle position
    in Ego coordinates, then center-to-center distance / Ego average speed during
    the previous 1 second — not merely the
    earliest differing action token. Mark the EARLIEST t where **persistent**
    geometry / minimum distance between vehicle boundaries / longitudinal
    relationship diverges
    (critical_divergence.at + metric_delta).
+   When one side’s line is `ended (out of frame / clip)`, stop pairing. That
+   tail is **not** contrast evidence and must not move `critical_divergence`.
+   The unpaired tail may be used only as a clearly marked, optional
+   boundary-side-versus-medoid consistency note. One optional sentence in
+   `contrast_explanation` may name the survivor’s post-clear control
+   (`post_clear_hard_brake` / `post_clear_recovery` /
+   `post_clear_adjustment`) — it is often a new obstacle (e.g. Parking), not
+   a second yield to the named vehicle already behind.
 3. BEV confirm: name the synced frame nearest that earliest t (filename token).
 4. Left mini-motive (this boundary side, not the medoid): interaction_resolution +
-   1 closed motive code + evidence at/before its time. Causal locality applies.
+   control_response + 1 closed motive code + evidence at/before its time. Causal
+   locality applies. `control_response` must agree with the motive code per
+   common_sense's control-response/motive table — fix `control_response` rather
+   than leave a contradiction.
 5. Right mini-motive: same.
 6. Write contrast_explanation (story so far).
 7. **Final decision** — separation_call: justified | over_fine | inconclusive,
    grounded in contrast_timeline + critical_divergence, not outcome alone. If motion
-   is near-identical and sides differ only by a small, late change in minimum
-   distance between vehicle boundaries without a different pass/yield order,
-   prefer `over_fine` or `inconclusive`; do not invent a different motive.
+   is near-identical and sides share pass/yield order and differ only by a small,
+   late change in minimum distance between vehicle boundaries: `over_fine` when
+   outcomes match; `justified` (rubric 2b) when outcomes differ and that clearance
+   delta is the contact/near-miss difference. Do not invent a different motive.
+   If whole-trajectory motion is similar but one side is yield-family and the
+   other is pass-family, this is a real behavior-boundary difference even when
+   both collide; use `justified` when the paired geometry supports it.
    Then separation_reason (rubric one-liner) and optional hypothesis.
 </Mandatory Workflow & Chain Of Thought>
 
 <Separation decision rubric (use exactly one label)>
-Use these checks in order. "Medoid-consistent" means each boundary side broadly
-matches its own cluster medoid's behavior+outcome story.
+Judge the TWO BOUNDARY SIDES against each other. Cluster medoids are a later
+comment, not a veto. Family = **yield-family** (decelerate/stop to give way;
+named vehicle not behind, including failed overlap while still braking) vs
+**pass-family** (go-through: named vehicle behind, hold/accel into the gap, or
+brake_release then continue). Do not put overlap-while-braking in the pass
+family. Do not call `inconclusive` because a boundary YAML string differs from
+its cluster medoid.
 
 1) `over_fine` (merge signal):
-- both sides are medoid-consistent, AND
-- boundary pair behavior is effectively the same (same resolution/motive family), AND
-- outcomes are the same (both collision or both safe/near-miss), with no persistent
-  geometry split beyond tiny late clearance differences.
+- both boundary sides are the same family, AND
+- outcomes match (both collision or both safe/near-miss), AND
+- no persistent geometry split beyond tiny late clearance.
 
-2) `justified` (keep split):
-- both sides are medoid-consistent, AND at least one is true:
-  a) behavior differs across sides (different resolution class or motive family),
-     regardless of whether outcomes match, OR
-  b) behavior looks similar but outcomes differ, and you can point to a real
-     persistent geometric/clearance divergence tied to the outcome (even if subtle).
+2) `justified` (keep split) — at least one is true:
+  a) different family across sides (yield-family vs pass-family) or different
+     motive family, regardless of whether outcomes match, OR
+  b) same family, outcomes differ, and a real persistent clearance / geometry
+     delta is the contact vs near-miss difference (even if late / small), OR
+  c) same family, same outcome, but a persistent stay-ahead vs overlap split
+     (not just tiny late clearance).
 
-3) `inconclusive` (insufficient/conflicted evidence):
-- either side is NOT medoid-consistent, OR
-- evidence is contradictory/missing, OR
-- only a tiny late difference is visible and you cannot tie it to a persistent
-  divergence confidently.
+3) `inconclusive` (cannot call justified or over_fine):
+- evidence is contradictory or missing.
+Do NOT use `inconclusive` for medoid mismatch. Do NOT use it for a tiny late
+clearance split when both sides share geometry family — that is `over_fine`
+(same outcome) or `justified` 2b (outcome differs). `inconclusive` here is the
+pair card's call; cluster_summary maps it to neighbor `verdict: inconclusive`
+(different field, same word on purpose).
 
 Do not invent new labels. If you suspect finer sub-structure, keep
 `separation_call` within the 3 labels and state the split/subdivide concern in
@@ -109,26 +146,27 @@ Do not invent new labels. If you suspect finer sub-structure, keep
 <Divergence hunt (required)>
 Across phases you MUST quantify at least one of (glossary nouns), in this order:
 - longitudinal-relationship mismatch or FRONT→BEHIND vs stay-ahead
-- difference in minimum distance between vehicle boundaries / partner position in Ego
+- difference in minimum distance between vehicle boundaries / named vehicle position in Ego
   coordinates that **persists** across ≥2 stamps
 - difference in center-to-center distance or its closing/opening rate (m / m/s) —
-  not Ego speed minus partner speed
+  not Ego speed minus named vehicle speed
 - Ego average speed / distance traveled during the previous 1 second
   (not a single Ego-speed sample)
-- change in partner azimuth relative to Ego heading (°) or sector
+- change in named vehicle azimuth relative to Ego heading (°) or sector
   (FRONT→LEFT, etc.)
 - brake / decelerate onset Δt only as a **secondary correlation**, never as the
   critical_divergence unless geometry also split and stayed split
 If sides look identical through the whole window, or they share pass_first and
 differ only by a small, late change in minimum distance between vehicle boundaries,
-say so explicitly and lean `over_fine` or `inconclusive` — do not invent a
-divergence.
+say so explicitly: `over_fine` if outcomes match, `justified` if outcomes differ
+and the clearance delta is tied to contact vs near-miss. Do not invent a
+divergence, and do not use `inconclusive` for that geometry.
 
 EXAMPLE phase density (illustrative; match THIS interpretive style, not these facts):
 
 t=9.8–11.0: both egos behind CuttingIn (FRONT LEFT→FRONT). [c0] near-miss then
 opens the gap with stronger decel (Ego speed drops hard; center-to-center distance
-grows; partner swings more FRONT). [c4] stays faster and keeps closing into
+grows; CuttingIn swings more FRONT). [c4] stays faster and keeps closing into
 near-miss/cut-in. Synced BEV `t_09.80_…` shows the near-miss asymmetry. Earliest
 clear split may be earlier at brake onset (e.g. t≈8.8) — put that stamp in
 critical_divergence.at with a quantified metric_delta.
@@ -150,6 +188,10 @@ critical_divergence.at with a quantified metric_delta.
 After CoT, ONE YAML fence with **interpretation fields only**.
 Field order = CoT order: motives → timeline → divergence → explanation →
 **final** `separation_call` / `separation_reason` / `hypothesis` (required; do not omit).
+For each side, fill `interaction_resolution` then `control_response` then
+`primary_motive`, in that order (same dependency chain as medoid_trial_prompt —
+see common_sense's "Filling interaction_resolution / control_response /
+primary_motive / secondary_motives together").
 (Pipeline attaches clusters / outcomes / params / trial refs / conflict_metrics.)
 
 ```yaml
@@ -172,10 +214,11 @@ contrast_timeline:
       Interpretive contrast for this shared-clock range. Name sides as [cA] / [cB].
       Cite a few decisive metrics; do not dump every number.
   # 4–8 phases spanning approach → brake/divergence → outcome.
+  # Do not add phases after one side is `ended (out of frame / clip)`.
 
 critical_divergence:
   at: <float>              # earliest decisive shared-clock t
-  metric_delta: "<metric + [cA] vs [cB] quantities in one line, e.g. 'minimum distance between vehicle boundaries 1.0 vs 0.4 m; longitudinal relationship partner_ahead vs side_overlap'>"
+  metric_delta: "<metric + [cA] vs [cB] quantities in one line, e.g. 'minimum distance between vehicle boundaries 1.0 vs 0.4 m; longitudinal relationship named_vehicle_ahead vs side_overlap'>"
   bev_frame: "<synced filename token near that t, or null>"
 
 motive_contrast: "same" | "different"   # same primary motive code vs different codes
@@ -187,7 +230,7 @@ contrast_explanation: |
 # --- final decision (required; write last, after the evidence above) ---
 separation_call: "justified" | "over_fine" | "inconclusive"
 separation_reason: |
-  One short note using the rubric above (medoid-consistency + boundary divergence),
+  One short note using the rubric above (geometry family + boundary divergence),
   grounded in critical_divergence / contrast_timeline, not outcome alone.
 hypothesis: |
   Testable follow-up, or empty.

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import fs from "fs";
 import path from "path";
+import {
+  runArtifactPath,
+  runOddSnapshotPath,
+} from "@/app/api/_lib/runArtifactPaths";
 
 /**
  * S2 — ODD boundary export.
@@ -42,9 +46,6 @@ function runDirFor(batchId: string, folder: string): string {
   return path.join(projectRoot, "results", `batch${batchId}`, folder);
 }
 
-const EXPORT_FILENAME = "odd_boundary_export.json";
-const ALL_TRIALS_FILENAME = "odd_all_trials.json";
-
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const batchId = url.searchParams.get("batchId") ?? "";
@@ -55,7 +56,10 @@ export async function GET(req: NextRequest) {
       { status: 400 },
     );
   }
-  const filePath = path.join(runDirFor(batchId, folder), EXPORT_FILENAME);
+  const filePath = runArtifactPath(
+    runDirFor(batchId, folder),
+    "oddBoundaryExport",
+  );
   if (!fs.existsSync(filePath)) {
     return NextResponse.json({ error: "not_built" }, { status: 404 });
   }
@@ -113,10 +117,12 @@ export async function POST(req: NextRequest) {
     cluster_boundary: body.cluster_boundary ?? { boundary_trials: [], edges: [] },
   };
 
-  const filePath = path.join(runDir, EXPORT_FILENAME);
+  const filePath = runArtifactPath(runDir, "oddBoundaryExport", {
+    forWrite: true,
+  });
   const snapshotPath =
     kNN != null
-      ? path.join(runDir, `odd_boundary_export.kNN${kNN}.json`)
+      ? runOddSnapshotPath(runDir, Number(kNN), { forWrite: true })
       : null;
 
   try {
@@ -132,7 +138,7 @@ export async function POST(req: NextRequest) {
 
   let allTrialsPath: string | null = null;
   if (Array.isArray(body.all_trials) && body.all_trials.length > 0) {
-    allTrialsPath = path.join(runDir, ALL_TRIALS_FILENAME);
+    allTrialsPath = runArtifactPath(runDir, "oddAllTrials", { forWrite: true });
     try {
       fs.writeFileSync(
         allTrialsPath,

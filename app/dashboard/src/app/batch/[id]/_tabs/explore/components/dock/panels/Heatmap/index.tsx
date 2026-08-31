@@ -745,7 +745,7 @@ export default function TrajectoryHeatmap() {
 
     dispatch(batchSlice.actions.setAttributes(attributes));
     // Fixed default for every batch: ego kinematics + parking distance only.
-    // Users can add other partners (Opposite / CuttingIn / …) via Sort & Filter.
+    // Users can add other vehicles (Opposite / CuttingIn / …) via Sort & Filter.
     const preferred = [
       "EgoSpeed",
       "EgoAcceleration",

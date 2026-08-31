@@ -106,6 +106,8 @@ def main() -> None:
     oc.add_argument("--temperature", type=float, default=0.1)
     oc.add_argument("--history-json", default=None,
                      help="Path to a JSON list of {role, content} turns (role: user|assistant)")
+    oc.add_argument("--conversation-id", default="default",
+                    help="Conversation id used to partition the persisted chat log")
     oc.add_argument("--dry-run", action="store_true")
     oc.add_argument("--no-log", action="store_true", help="Do not append to odd_chat_log.jsonl")
 
@@ -164,11 +166,14 @@ def main() -> None:
         out = _json.dumps(join_run_dir(Path(args.run_dir)), indent=2)
     elif args.cmd == "odd-briefing":
         from .odd_briefing import build_briefing
+        from .paths import run_artifact_path
 
         doc = build_briefing(Path(args.run_dir))
         out = _json.dumps(
             {
-                "briefing_path": str(Path(args.run_dir) / "odd_chat_briefing.json"),
+                "briefing_path": str(
+                    run_artifact_path(Path(args.run_dir), "odd_briefing")
+                ),
                 "n_clusters": len(doc.get("clusters") or []),
                 "n_pairs": len(doc.get("pairs") or []),
                 "n_rules": len(doc.get("rules") or []),
@@ -189,6 +194,7 @@ def main() -> None:
             api_key=args.api_key,
             temperature=args.temperature,
             history=history,
+            conversation_id=args.conversation_id,
             dry_run=args.dry_run,
             log=not args.no_log,
         )

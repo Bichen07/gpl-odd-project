@@ -8,6 +8,8 @@ import {
   Alert,
   Box,
   Chip,
+  Collapse,
+  IconButton,
   Paper,
   Slider,
   Stack,
@@ -17,7 +19,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { ExpandMore } from "@mui/icons-material";
+import { Close, ExpandMore, HelpOutline } from "@mui/icons-material";
 import type { IcPairEntry, SplitClusterCard } from "../types";
 import { CONTRAST_FIELD_BODY_SX, CONTRAST_FIELD_LABEL_SX, fmtNum } from "../utils";
 
@@ -34,6 +36,7 @@ export default function IcPairPanel({
 }) {
   const [idx, setIdx] = useState(0);
   const [frame, setFrame] = useState(0);
+  const [showContrastHelp, setShowContrastHelp] = useState(false);
   const pair = pairs[Math.min(idx, Math.max(0, pairs.length - 1))] ?? null;
   const facts = (pair?.facts ?? null) as Record<string, any> | null;
   const frames = pair?.syncedBev ?? [];
@@ -240,14 +243,65 @@ export default function IcPairPanel({
       )}
 
       <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="subtitle2" gutterBottom sx={{ fontSize: 20, fontWeight: 700 }}>
-          Contrast card (output/contrast.yaml)
-        </Typography>
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontSize: 20, fontWeight: 700 }}>
+            Contrast card (output/contrast.yaml)
+          </Typography>
+          <IconButton
+            size="small"
+            aria-label={
+              showContrastHelp
+                ? "Hide contrast field meanings"
+                : "Show contrast field meanings"
+            }
+            onClick={() => setShowContrastHelp((open) => !open)}
+          >
+            {showContrastHelp ? (
+              <Close fontSize="inherit" />
+            ) : (
+              <HelpOutline fontSize="inherit" />
+            )}
+          </IconButton>
+        </Stack>
+        <Collapse in={showContrastHelp}>
+          <Alert severity="info" sx={{ mb: 2, py: 0.5 }}>
+            <Typography variant="caption" display="block" fontWeight={700}>
+              motive_contrast
+            </Typography>
+            <Typography variant="caption" component="div">
+              <Chip size="small" label="same" /> means both boundary trials have
+              the same primary motive code.
+            </Typography>
+            <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+              <Chip size="small" label="different" /> means the boundary trials
+              have different primary motive codes or behavior families. This is
+              descriptive, not a risk level.
+            </Typography>
+            <Typography variant="caption" display="block" fontWeight={700} sx={{ mt: 1 }}>
+              separation_call
+            </Typography>
+            <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+              <Chip size="small" color="primary" label="justified" /> means the
+              cluster split is supported by persistent behavior, geometry, or an
+              outcome-linked clearance difference; keep the clusters separate.
+              Blue is a clustering decision, not a safe outcome.
+            </Typography>
+            <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+              <Chip size="small" color="warning" label="over_fine" /> means the
+              two sides are effectively the same behavior family and may be merge
+              candidates.
+            </Typography>
+            <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+              <Chip size="small" label="inconclusive" /> means the evidence
+              cannot decide whether to keep or merge the clusters.
+            </Typography>
+          </Alert>
+        </Collapse>
         <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }}>
           {contrastParsed?.motive_contrast && (
             <Chip
               size="small"
-              color={String(contrastParsed.motive_contrast) === "different" ? "warning" : "default"}
+              variant="outlined"
               label={`motive_contrast: ${String(contrastParsed.motive_contrast)}`}
             />
           )}
@@ -256,7 +310,7 @@ export default function IcPairPanel({
               size="small"
               color={
                 String(contrastParsed.separation_call) === "justified"
-                  ? "success"
+                  ? "primary"
                   : String(contrastParsed.separation_call) === "over_fine"
                     ? "warning"
                     : "default"

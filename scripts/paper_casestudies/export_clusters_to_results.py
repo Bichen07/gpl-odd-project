@@ -7,7 +7,7 @@ Writes the artifacts your existing analyzer / LLM expect:
     clustering/selectedClusteringResult.json
     manifest.json
     cluster<N>/cluster.json   (skeleton; BEV filled later via --from-run)
-    PAPER_SOURCE.json
+    analysis/metadata/PAPER_SOURCE.json
 
 Paper defaults (IEEE ITS 2026 figures):
   Case 1 batch7 ITRI k=4, ITRILatest k=3
@@ -203,10 +203,11 @@ def _export_one(
     run_name = f"{k}_cluster_s={sil:.4f}"
     run_dir = RESULTS / batch_label / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
-    (run_dir / "clustering").mkdir(exist_ok=True)
+    source_dir = run_dir
+    (source_dir / "clustering").mkdir(exist_ok=True)
 
     # selectedClusteringResult.json — same shape as existing pipeline
-    (run_dir / "clustering" / "selectedClusteringResult.json").write_text(
+    (source_dir / "clustering" / "selectedClusteringResult.json").write_text(
         json.dumps(selected, indent=2), encoding="utf-8"
     )
 
@@ -261,7 +262,7 @@ def _export_one(
         cj["cluster"]["collision_rate"] = round(
             cj["cluster"]["collision_count"] / n, 4
         )
-        cdir = run_dir / f"cluster{lab}"
+        cdir = source_dir / f"cluster{lab}"
         cdir.mkdir(exist_ok=True)
         (cdir / "cluster.json").write_text(
             json.dumps(cj, indent=2), encoding="utf-8"
@@ -286,10 +287,12 @@ def _export_one(
             "BEV/action.yaml not generated yet — use dataset_builder --from-run."
         ),
     }
-    (run_dir / "manifest.json").write_text(
+    (source_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
-    (run_dir / "PAPER_SOURCE.json").write_text(
+    paper_source_dir = run_dir / "analysis" / "metadata"
+    paper_source_dir.mkdir(parents=True, exist_ok=True)
+    (paper_source_dir / "PAPER_SOURCE.json").write_text(
         json.dumps(
             {
                 "paper": paper,

@@ -17,13 +17,14 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 import pandas as pd
 import yaml
+from agent_labels import display_agent_name, normalize_vehicle_schema
 
 # Defaults (also exposed as dataset_builder CLI flags for near-conflict filter).
 DEFAULT_CONFLICT_WINDOW_S = 8.0  # legacy ±W / after-window default
 DEFAULT_CONFLICT_WINDOW_BEFORE_S = 15.0  # include pre-conflict setup maneuvers
 DEFAULT_CONFLICT_WINDOW_AFTER_S = 8.0
 DEFAULT_CONFLICT_DISTANCE_M = 50.0
-DEFAULT_PARTNER_SPEED_EPS = 0.3
+DEFAULT_VEHICLE_SPEED_EPS = 0.3
 DEFAULT_HEADING_TURN_DEG = 25.0
 DEFAULT_MIN_GAP_S = 0.1
 DEFAULT_PAIR_MARGIN_M = 12.0
@@ -32,7 +33,7 @@ DEFAULT_ACTION_MIN_GAP_S = 0.1
 PASS_LONG_OVERLAP_M = 2.5
 PASS_HYSTERESIS_S = 0.3
 ROLLING_WINDOW_S = 1.0
-# Adaptive BEV: half-extent = ego–partner distance + margin, clamped.
+# Adaptive BEV: half-extent = ego–vehicle distance + margin, clamped.
 ADAPTIVE_BEV_MARGIN_M = 2.0
 ADAPTIVE_BEV_MIN_HALF_M = 8.0
 ADAPTIVE_BEV_MAX_HALF_M = 40.0
@@ -71,17 +72,18 @@ _ALWAYS_KEEP_EGO_ACTIONS = frozenset({
 })
 
 AZIMUTH_GLOSSARY = (
-    "partner azimuth relative to ego heading: bearing of the conflict partner, "
+    "Named conflict-vehicle azimuth relative to ego heading: bearing of the named "
+    "CuttingIn, Oncoming, or Parking vehicle, "
     "degrees in [-180, 180]; 0=ahead, +=left, −=right, ±180=behind. "
     "estimated time to collision: seconds until the center-to-center distance "
     "would reach zero if its current closing rate stayed constant. "
     "center-to-center distance: distance between the two vehicle centers (m). "
     "center-distance closing/opening rate: rate of change of that distance "
-    "(m/s); closing means approaching. partner position in ego coordinates: "
+    "(m/s); closing means approaching. named vehicle position in ego coordinates: "
     "longitudinal distance ahead/behind and lateral distance left/right. "
     "minimum distance between vehicle boundaries: shortest Euclidean distance "
     "between the two oriented vehicle rectangles (m). longitudinal relationship: "
-    "partner ahead, vehicle lengths overlapping longitudinally, or partner behind. "
+    "named vehicle ahead, vehicle lengths overlapping longitudinally, or named vehicle behind. "
     "ego average speed during previous 1 second: prefer this over one sample."
 )
 
@@ -134,20 +136,20 @@ class SelectedFrame:
     t: float
     label: str
     role: str  # peak | burst | action | interaction
-    partner_name: str = ""
-    partner_track_id: Optional[int] = None
-    context_partner_name: str = ""
-    context_partner_track_id: Optional[int] = None
+    vehicle_name: str = ""
+    vehicle_track_id: Optional[int] = None
+    context_vehicle_name: str = ""
+    context_vehicle_track_id: Optional[int] = None
     d: Optional[float] = None
     ttc: Optional[float] = None
     v_ego: Optional[float] = None
-    v_partner: Optional[float] = None
+    v_vehicle: Optional[float] = None
     az: Optional[float] = None
     closing: Optional[float] = None
     ego_road: Optional[int] = None
     ego_lane: Optional[int] = None
-    partner_road: Optional[int] = None
-    partner_lane: Optional[int] = None
+    vehicle_road: Optional[int] = None
+    vehicle_lane: Optional[int] = None
     rel_long_m: Optional[float] = None
     rel_lat_m: Optional[float] = None
     clearance_m: Optional[float] = None
@@ -175,10 +177,11 @@ class SelectedFrame:
         if len(event) > 40:
             event = event[:40]
         parts.append(event or self.role)
-        if self.partner_name and self.partner_name.lower() not in event.lower():
+        display_name = display_agent_name(self.vehicle_name)
+        if self.vehicle_name and display_name.lower() not in event.lower():
             if self.role in ("peak", "burst") or "COLLISION" in event.upper() or "NEAR_MISS" in event.upper():
-                if self.partner_name not in "_".join(parts):
-                    parts.append(self.partner_name)
+                if display_name not in "_".join(parts):
+                    parts.append(display_name)
         slug = "_".join(parts)
         return "".join(c if c.isalnum() or c in "-_" else "_" for c in slug).strip("_")[:72]
 
@@ -208,10 +211,10 @@ class SelectedFrame:
 class SelectionResult:
     frames: List[SelectedFrame] = field(default_factory=list)
     conflict_times: List[float] = field(default_factory=list)
-    partner_track_id: Optional[int] = None
-    partner_name: str = ""
-    context_partner_track_id: Optional[int] = None
-    context_partner_name: str = ""
+    vehicle_track_id: Optional[int] = None
+    vehicle_name: str = ""
+    context_vehicle_track_id: Optional[int] = None
+    context_vehicle_name: str = ""
     relevance_t: Optional[float] = None
     peak_t: Optional[float] = None
     pass_time: Optional[float] = None
@@ -225,16 +228,16 @@ class SelectionResult:
                 "t": round(fr.t, 3),
                 "label": fr.label,
                 "role": fr.role,
-                "partner": fr.partner_name,
-                "context_partner": fr.context_partner_name or None,
+                "vehicle": fr.vehicle_name,
+                "context_vehicle": fr.context_vehicle_name or None,
                 "d": fr.d,
                 "ttc": fr.ttc,
                 "v_ego": fr.v_ego,
-                "v_partner": fr.v_partner,
+                "v_vehicle": fr.v_vehicle,
                 "az": fr.az,
                 "closing": fr.closing,
                 "ego_road_lane": _road_lane(fr.ego_road, fr.ego_lane),
-                "partner_road_lane": _road_lane(fr.partner_road, fr.partner_lane),
+                "vehicle_road_lane": _road_lane(fr.vehicle_road, fr.vehicle_lane),
                 "rel_long_m": fr.rel_long_m,
                 "rel_lat_m": fr.rel_lat_m,
                 "clearance_m": fr.clearance_m,
@@ -248,10 +251,10 @@ class SelectionResult:
             })
         return {
             "prefix": file_prefix,
-            "partner_name": self.partner_name,
-            "partner_track_id": self.partner_track_id,
-            "context_partner_name": self.context_partner_name,
-            "context_partner_track_id": self.context_partner_track_id,
+            "vehicle_name": self.vehicle_name,
+            "vehicle_track_id": self.vehicle_track_id,
+            "context_vehicle_name": self.context_vehicle_name,
+            "context_vehicle_track_id": self.context_vehicle_track_id,
             "peak_t": self.peak_t,
             "relevance_t": self.relevance_t,
             "pass_time": self.pass_time,
@@ -286,35 +289,36 @@ def selection_from_llm_snapshots(doc: Dict[str, Any]) -> SelectionResult:
 
     Used to rewrite ``context_medoid.md`` without re-running BEV selection.
     """
+    doc = normalize_vehicle_schema(doc)
     frames: List[SelectedFrame] = []
-    default_partner = str(doc.get("partner_name") or "")
-    default_tid = doc.get("partner_track_id")
+    default_vehicle = str(doc.get("vehicle_name") or "")
+    default_vehicle_tid = doc.get("vehicle_track_id")
     for snap in doc.get("snapshots") or []:
         ego_road, ego_lane = _parse_road_lane_token(snap.get("ego_road_lane"))
-        p_road, p_lane = _parse_road_lane_token(snap.get("partner_road_lane"))
+        p_road, p_lane = _parse_road_lane_token(snap.get("vehicle_road_lane"))
         frames.append(
             SelectedFrame(
                 t=float(snap.get("t", 0.0)),
                 label=str(snap.get("label") or ""),
                 role=str(snap.get("role") or "action"),
-                partner_name=str(snap.get("partner") or default_partner),
-                partner_track_id=snap.get("partner_track_id", default_tid),
-                context_partner_name=str(
-                    snap.get("context_partner") or doc.get("context_partner_name") or ""
+                vehicle_name=str(snap.get("vehicle") or default_vehicle),
+                vehicle_track_id=snap.get("vehicle_track_id", default_vehicle_tid),
+                context_vehicle_name=str(
+                    snap.get("context_vehicle") or doc.get("context_vehicle_name") or ""
                 ),
-                context_partner_track_id=snap.get(
-                    "context_partner_track_id", doc.get("context_partner_track_id")
+                context_vehicle_track_id=snap.get(
+                    "context_vehicle_track_id", doc.get("context_vehicle_track_id")
                 ),
                 d=snap.get("d"),
                 ttc=snap.get("ttc"),
                 v_ego=snap.get("v_ego"),
-                v_partner=snap.get("v_partner"),
+                v_vehicle=snap.get("v_vehicle"),
                 az=snap.get("az"),
                 closing=snap.get("closing"),
                 ego_road=ego_road,
                 ego_lane=ego_lane,
-                partner_road=p_road,
-                partner_lane=p_lane,
+                vehicle_road=p_road,
+                vehicle_lane=p_lane,
                 rel_long_m=snap.get("rel_long_m"),
                 rel_lat_m=snap.get("rel_lat_m"),
                 clearance_m=snap.get("clearance_m"),
@@ -329,10 +333,10 @@ def selection_from_llm_snapshots(doc: Dict[str, Any]) -> SelectionResult:
         )
     return SelectionResult(
         frames=frames,
-        partner_track_id=default_tid,
-        partner_name=default_partner,
-        context_partner_track_id=doc.get("context_partner_track_id"),
-        context_partner_name=str(doc.get("context_partner_name") or ""),
+        vehicle_track_id=default_vehicle_tid,
+        vehicle_name=default_vehicle,
+        context_vehicle_track_id=doc.get("context_vehicle_track_id"),
+        context_vehicle_name=str(doc.get("context_vehicle_name") or ""),
         relevance_t=doc.get("relevance_t"),
         peak_t=doc.get("peak_t"),
         pass_time=doc.get("pass_time"),
@@ -401,13 +405,13 @@ def ego_frame_xy(
     px: float,
     py: float,
 ) -> Tuple[float, float]:
-    """Partner position in ego frame: (forward, left) metres.
+    """Vehicle position in ego frame: (forward, left) metres.
 
     Inputs are vehicle **centers** from the trajectory CSV (``x``, ``y``) plus
     Ego **heading** ``h`` (yaw). This is a center-to-center projection, not
     bumper / nose tip geometry and not oriented-rectangle contact.
 
-    World offset from Ego center to partner center:
+    World offset from Ego center to vehicle center:
         dx, dy = px - ego_x, py - ego_y
     Rotate into Ego body axes (heading ``ego_h_rad``):
         fwd  =  dx·cos(h) + dy·sin(h)   # +ahead / −behind along Ego nose
@@ -427,13 +431,13 @@ def pass_state_from_rel_long(
 ) -> Optional[str]:
     """Bin longitudinal center offset into pass order.
 
-    ``rel_long_m`` is ``fwd`` from :func:`ego_frame_xy` (partner center relative
+    ``rel_long_m`` is ``fwd`` from :func:`ego_frame_xy` (vehicle center relative
     to Ego center along Ego heading). ``overlap_m`` defaults to
     ``PASS_LONG_OVERLAP_M`` (2.5 m ≈ half vehicle length):
 
-    - ``partner_ahead``  if fwd > +overlap_m
+    - ``vehicle_ahead``  if fwd > +overlap_m
     - ``side_overlap``   if |fwd| ≤ overlap_m  (centers roughly abreast)
-    - ``partner_behind`` if fwd < −overlap_m
+    - ``vehicle_behind`` if fwd < −overlap_m
 
     Lateral offset is ignored here; use boundary distance for geometric gap.
     """
@@ -442,9 +446,9 @@ def pass_state_from_rel_long(
     x = float(rel_long_m)
     band = float(overlap_m)
     if x > band:
-        return "partner_ahead"
+        return "vehicle_ahead"
     if x < -band:
-        return "partner_behind"
+        return "vehicle_behind"
     return "side_overlap"
 
 
@@ -477,7 +481,7 @@ def rolling_ego_motion(
 
 def minimum_vehicle_boundary_distance_m(
     source_df: Optional[pd.DataFrame],
-    partner_name: str,
+    vehicle_name: str,
     ego_x: float,
     ego_y: float,
     ego_h: float,
@@ -486,16 +490,16 @@ def minimum_vehicle_boundary_distance_m(
     npc_h: float,
 ) -> Optional[float]:
     """Shortest distance between oriented vehicle-rectangle boundaries."""
-    if source_df is None or source_df.empty or not partner_name:
+    if source_df is None or source_df.empty or not vehicle_name:
         return None
     try:
-        from collision_partner import _dims_for_name, _ego_name, polygon_clearance
+        from collision_vehicle import _dims_for_name, _ego_name, polygon_clearance
     except Exception:
         return None
     try:
         ego_name = _ego_name(source_df)
         ew, eln = _dims_for_name(source_df, ego_name)
-        nw, nln = _dims_for_name(source_df, partner_name)
+        nw, nln = _dims_for_name(source_df, vehicle_name)
         gap = polygon_clearance(
             float(ego_x), float(ego_y), float(ego_h), float(ew), float(eln),
             float(npc_x), float(npc_y), float(npc_h), float(nw), float(nln),
@@ -511,7 +515,7 @@ def first_pass_time(
     hold_s: float = PASS_HYSTERESIS_S,
     overlap_m: float = PASS_LONG_OVERLAP_M,
 ) -> Optional[float]:
-    """First time the partner stays behind for ``hold_s`` seconds."""
+    """First time the vehicle stays behind for ``hold_s`` seconds."""
     if series is None or series.empty:
         return None
     behind_start: Optional[float] = None
@@ -550,9 +554,9 @@ def interaction_resolution_from_series(
         float(row["nx"]), float(row["ny"]),
     )
     state = pass_state_from_rel_long(fwd)
-    if pass_t is not None or state == "partner_behind":
+    if pass_t is not None or state == "vehicle_behind":
         return "pass_first"
-    if state == "partner_ahead":
+    if state == "vehicle_ahead":
         return "yield"
     # At peak still overlapping: look at the last sample.
     last = series.iloc[-1]
@@ -562,9 +566,9 @@ def interaction_resolution_from_series(
         float(last["nx"]), float(last["ny"]),
     )
     last_state = pass_state_from_rel_long(fwd_l)
-    if last_state == "partner_behind":
+    if last_state == "vehicle_behind":
         return "pass_first"
-    if last_state == "partner_ahead":
+    if last_state == "vehicle_ahead":
         return "yield"
     return "unresolved"
 
@@ -639,7 +643,7 @@ def _load_action(action_yaml_path: Optional[str | Path]) -> Optional[Dict[str, A
 def _conflict_anchors(
     action_data: Optional[Dict[str, Any]],
 ) -> List[Tuple[float, str, Optional[int], str]]:
-    """Return (t*, type, partner_tid, partner_name) from action.yaml only."""
+    """Return (t*, type, vehicle_tid, vehicle_name) from action.yaml only."""
     if not action_data:
         return []
     id_to_name = _agent_name_map(action_data)
@@ -658,7 +662,7 @@ def _conflict_anchors(
         ct = iv.get("cut_in_time")
         # Lane-entry stamp is useful only when it precedes (or equals) the
         # min-distance peak. Post-peak cut_in_time is usually a lane-ID flicker
-        # after the partner has already passed — do not promote it to a peak.
+        # after the vehicle has already passed — do not promote it to a peak.
         if (
             ct is not None
             and typ == "DANGEROUS_CUT_IN"
@@ -690,9 +694,9 @@ def _conflict_anchors(
     return merged
 
 
-def _pair_series(df: pd.DataFrame, partner_tid: int) -> Optional[pd.DataFrame]:
+def _pair_series(df: pd.DataFrame, vehicle_tid: int) -> Optional[pd.DataFrame]:
     ego = df[df["trackId"] == 0].sort_values("time")
-    npc = df[df["trackId"] == partner_tid].sort_values("time")
+    npc = df[df["trackId"] == vehicle_tid].sort_values("time")
     if ego.empty or npc.empty:
         return None
     ego_cols = ["time", "x", "y", "velocity", "heading", "road_id", "lane_id"]
@@ -734,7 +738,7 @@ def _pair_series(df: pd.DataFrame, partner_tid: int) -> Optional[pd.DataFrame]:
     return merged
 
 
-def _fallback_partner(
+def _fallback_vehicle(
     df: pd.DataFrame,
     action_data: Optional[Dict[str, Any]],
 ) -> Tuple[Optional[int], str, Optional[float]]:
@@ -744,7 +748,7 @@ def _fallback_partner(
         series = _pair_series(df, tid)
         if series is None or series.empty:
             continue
-        if float(series["nv"].abs().max()) < DEFAULT_PARTNER_SPEED_EPS:
+        if float(series["nv"].abs().max()) < DEFAULT_VEHICLE_SPEED_EPS:
             continue
         i = int(series["dist"].to_numpy().argmin())
         d = float(series["dist"].iloc[i])
@@ -756,7 +760,7 @@ def _fallback_partner(
     return best[1], id_to_name.get(best[1], f"agent{best[1]}"), best[2]
 
 
-def _context_partner_for_stationary(
+def _context_vehicle_for_stationary(
     df: pd.DataFrame,
     action_data: Optional[Dict[str, Any]],
     primary_tid: Optional[int],
@@ -769,7 +773,7 @@ def _context_partner_for_stationary(
     if primary is None or primary.empty:
         return None, ""
     i = int(np.argmin(np.abs(primary["time"].to_numpy(float) - peak_t)))
-    if abs(float(primary["nv"].iloc[i])) > DEFAULT_PARTNER_SPEED_EPS:
+    if abs(float(primary["nv"].iloc[i])) > DEFAULT_VEHICLE_SPEED_EPS:
         return None, ""
 
     best: Optional[Tuple[float, int]] = None
@@ -778,7 +782,7 @@ def _context_partner_for_stationary(
         if series is None or series.empty:
             continue
         j = int(np.argmin(np.abs(series["time"].to_numpy(float) - peak_t)))
-        if abs(float(series["nv"].iloc[j])) < DEFAULT_PARTNER_SPEED_EPS:
+        if abs(float(series["nv"].iloc[j])) < DEFAULT_VEHICLE_SPEED_EPS:
             continue
         d = float(series["dist"].iloc[j])
         if best is None or d < best[0]:
@@ -791,24 +795,24 @@ def _context_partner_for_stationary(
 def _metrics_at(
     series: Optional[pd.DataFrame],
     t: float,
-    partner_name: str,
-    partner_tid: Optional[int],
+    vehicle_name: str,
+    vehicle_tid: Optional[int],
     *,
     source_df: Optional[pd.DataFrame] = None,
 ) -> Dict[str, Any]:
     out: Dict[str, Any] = {
-        "partner_name": partner_name,
-        "partner_track_id": partner_tid,
+        "vehicle_name": vehicle_name,
+        "vehicle_track_id": vehicle_tid,
         "d": None,
         "ttc": None,
         "v_ego": None,
-        "v_partner": None,
+        "v_vehicle": None,
         "az": None,
         "closing": None,
         "ego_road": None,
         "ego_lane": None,
-        "partner_road": None,
-        "partner_lane": None,
+        "vehicle_road": None,
+        "vehicle_lane": None,
         "rel_long_m": None,
         "rel_lat_m": None,
         "clearance_m": None,
@@ -824,12 +828,12 @@ def _metrics_at(
     ttc = float(row["ttc"])
     out["ttc"] = None if not np.isfinite(ttc) or ttc > 60 else round(ttc, 2)
     out["v_ego"] = round(float(row["ev"]), 2)
-    out["v_partner"] = round(float(row["nv"]), 2)
+    out["v_vehicle"] = round(float(row["nv"]), 2)
     out["closing"] = round(float(row["closing"]), 2)
     out["ego_road"] = int(row["er"]) if not pd.isna(row["er"]) else None
     out["ego_lane"] = int(row["el"]) if not pd.isna(row["el"]) else None
-    out["partner_road"] = int(row["nr"]) if not pd.isna(row["nr"]) else None
-    out["partner_lane"] = int(row["nl"]) if not pd.isna(row["nl"]) else None
+    out["vehicle_road"] = int(row["nr"]) if not pd.isna(row["nr"]) else None
+    out["vehicle_lane"] = int(row["nl"]) if not pd.isna(row["nl"]) else None
     eh = _heading_to_rad(float(row["eh"]))
     out["az"] = round(
         _azimuth_deg(float(row["ex"]), float(row["ey"]), eh, float(row["nx"]), float(row["ny"])),
@@ -847,7 +851,7 @@ def _metrics_at(
     npc_h = float(row["nh"]) if "nh" in series.columns and not pd.isna(row["nh"]) else 0.0
     gap = minimum_vehicle_boundary_distance_m(
         source_df,
-        partner_name,
+        vehicle_name,
         float(row["ex"]),
         float(row["ey"]),
         float(row["eh"]),
@@ -915,8 +919,8 @@ def extract_action_timestamps(
                 continue
             st, et = float(st), float(et)
             if name == "COLLISION":
-                partner = attrs.get("with_name")
-                suffix = f" with {partner}" if partner else ""
+                vehicle = attrs.get("with_name")
+                suffix = f" with {vehicle}" if vehicle else ""
                 raw.append((st, f"{token} {name}{suffix}"))
                 continue
             if et - st > 1e-6:
@@ -927,8 +931,8 @@ def extract_action_timestamps(
 
     for inter in action_data.get("interactions") or []:
         name = str(inter.get("type", "interaction"))
-        partner = inter.get("with_name") or id_to_token.get(inter.get("with_track_id"))
-        suffix = f" with {partner}" if partner else ""
+        vehicle = inter.get("with_name") or id_to_token.get(inter.get("with_track_id"))
+        suffix = f" with {vehicle}" if vehicle else ""
         kt = inter.get("key_time")
         if kt is not None:
             raw.append((float(kt), f"{name}{suffix}"))
@@ -1019,11 +1023,11 @@ def _noise_filtered_action_times(
                     continue
             if name == "COLLISION":
                 # Ego (and interactions) already emit the conflict peak — skip the
-                # mirrored NPC-side COLLISION (partner=Ego) which garbles the slug.
+                # mirrored NPC-side COLLISION (vehicle=Ego) which garbles the slug.
                 if tid != 0:
                     continue
-                partner = (act.get("attributes") or {}).get("with_name", "")
-                out.append((st_f, f"COLLISION_{partner}" if partner else "COLLISION"))
+                vehicle = (act.get("attributes") or {}).get("with_name", "")
+                out.append((st_f, f"COLLISION_{vehicle}" if vehicle else "COLLISION"))
                 continue
             if abs(et_f - st_f) > 1e-6:
                 out.append((st_f, f"{token}_start_{name}"))
@@ -1054,8 +1058,10 @@ def select_action_frames(
     8 s). Pass ``conflict_window_s`` for legacy symmetric ±W.
     """
     df = _normalize_traj_df(traj_df)
+    action_data = normalize_vehicle_schema(action_data) if action_data is not None else None
     if action_data is None:
         action_data = _load_action(action_yaml_path)
+    action_data = normalize_vehicle_schema(action_data)
 
     if time_steps is None:
         time_steps = sorted(float(t) for t in df["time"].unique())
@@ -1070,19 +1076,19 @@ def select_action_frames(
     )
 
     anchors = _conflict_anchors(action_data)
-    partner_tid: Optional[int] = None
-    partner_name = ""
+    vehicle_tid: Optional[int] = None
+    vehicle_name = ""
     conflict_times: List[float] = []
 
     if anchors:
         primary = next((a for a in anchors if a[1] in ("COLLISION", "NEAR_MISS")), anchors[0])
-        partner_tid = primary[2]
-        partner_name = primary[3]
+        vehicle_tid = primary[2]
+        vehicle_name = primary[3]
         conflict_times = [a[0] for a in anchors]
     else:
-        partner_tid, partner_name, _t_fb = _fallback_partner(df, action_data)
+        vehicle_tid, vehicle_name, _t_fb = _fallback_vehicle(df, action_data)
 
-    series = _pair_series(df, partner_tid) if partner_tid is not None else None
+    series = _pair_series(df, vehicle_tid) if vehicle_tid is not None else None
     peak_t = conflict_times[0] if conflict_times else None
 
     # (t, label, role, burst_offset)
@@ -1154,33 +1160,33 @@ def select_action_frames(
             continue
         merged.append((t, lab, role, bo))
 
-    ctx_tid, ctx_name = _context_partner_for_stationary(
-        df, action_data, partner_tid, peak_t
+    ctx_tid, ctx_name = _context_vehicle_for_stationary(
+        df, action_data, vehicle_tid, peak_t
     )
 
     frames: List[SelectedFrame] = []
     for t, lab, role, bo in merged:
         m = _metrics_at(
-            series, t, partner_name, partner_tid, source_df=df,
+            series, t, vehicle_name, vehicle_tid, source_df=df,
         )
         frames.append(SelectedFrame(
             t=round(t, 3),
             label=lab,
             role=role,
-            partner_name=partner_name,
-            partner_track_id=partner_tid,
-            context_partner_name=ctx_name,
-            context_partner_track_id=ctx_tid,
+            vehicle_name=vehicle_name,
+            vehicle_track_id=vehicle_tid,
+            context_vehicle_name=ctx_name,
+            context_vehicle_track_id=ctx_tid,
             d=m["d"],
             ttc=m["ttc"],
             v_ego=m["v_ego"],
-            v_partner=m["v_partner"],
+            v_vehicle=m["v_vehicle"],
             az=m["az"],
             closing=m["closing"],
             ego_road=m["ego_road"],
             ego_lane=m["ego_lane"],
-            partner_road=m["partner_road"],
-            partner_lane=m["partner_lane"],
+            vehicle_road=m["vehicle_road"],
+            vehicle_lane=m["vehicle_lane"],
             rel_long_m=m["rel_long_m"],
             rel_lat_m=m["rel_lat_m"],
             clearance_m=m["clearance_m"],
@@ -1198,10 +1204,10 @@ def select_action_frames(
     return SelectionResult(
         frames=frames,
         conflict_times=conflict_times,
-        partner_track_id=partner_tid,
-        partner_name=partner_name,
-        context_partner_track_id=ctx_tid,
-        context_partner_name=ctx_name,
+        vehicle_track_id=vehicle_tid,
+        vehicle_name=vehicle_name,
+        context_vehicle_track_id=ctx_tid,
+        context_vehicle_name=ctx_name,
         relevance_t=None,
         peak_t=peak_t,
         pass_time=pass_t,
@@ -1249,15 +1255,15 @@ def _distance_band(d: float) -> str:
     return "very close"
 
 
-def format_az_token(az: Optional[float]) -> Optional[str]:
-    """Partner bearing relative to ego's heading."""
+def format_az_token(
+    az: Optional[float], conflict_name: Optional[str] = None
+) -> Optional[str]:
+    """Named conflict-vehicle bearing relative to Ego's heading."""
     if az is None:
         return None
     sector = _bearing_sector(float(az))
-    return (
-        "partner azimuth relative to ego heading="
-        f"{sector} ({float(az):.0f}°)"
-    )
+    name = display_agent_name(conflict_name)
+    return f"{name} azimuth relative to Ego heading={sector} ({float(az):.0f}°)"
 
 
 def format_closing_token(closing: Optional[float]) -> Optional[str]:
@@ -1277,16 +1283,18 @@ def format_closing_token(closing: Optional[float]) -> Optional[str]:
 def format_rel_position_token(
     rel_long_m: Optional[float],
     rel_lat_m: Optional[float],
+    conflict_name: Optional[str] = None,
 ) -> Optional[str]:
-    """Directional partner position in ego-aligned coordinates."""
+    """Directional named conflict-vehicle position in Ego-aligned coordinates."""
     if rel_long_m is None or rel_lat_m is None:
         return None
     longitudinal = float(rel_long_m)
     lateral = float(rel_lat_m)
     long_direction = "ahead of ego" if longitudinal >= 0.0 else "behind ego"
     lat_direction = "left of ego" if lateral >= 0.0 else "right of ego"
+    name = display_agent_name(conflict_name)
     return (
-        "partner position in ego coordinates=("
+        f"{name} position in Ego coordinates=("
         f"{abs(longitudinal):.1f} m {long_direction}, "
         f"{abs(lateral):.1f} m {lat_direction})"
     )
@@ -1294,6 +1302,7 @@ def format_rel_position_token(
 
 def format_longitudinal_relationship_token(
     pass_state: Optional[str],
+    conflict_name: Optional[str] = None,
 ) -> Optional[str]:
     """Pretty-print ``pass_state`` for context.md (no geometry math here).
 
@@ -1303,10 +1312,11 @@ def format_longitudinal_relationship_token(
     """
     if not pass_state:
         return None
+    name = display_agent_name(conflict_name)
     human = {
-        "partner_ahead": "partner ahead of ego",
+        "vehicle_ahead": f"{name} ahead of Ego",
         "side_overlap": "vehicle lengths overlap longitudinally",
-        "partner_behind": "partner behind ego (ego has passed)",
+        "vehicle_behind": f"{name} behind Ego (Ego has passed)",
     }.get(str(pass_state), str(pass_state))
     return f"longitudinal relationship={human}"
 
@@ -1338,7 +1348,7 @@ def format_side_metric_bits(
     d: Optional[float] = None,
     ttc: Optional[float] = None,
     v_ego: Optional[float] = None,
-    v_partner: Optional[float] = None,
+    v_vehicle: Optional[float] = None,
     az: Optional[float] = None,
     closing: Optional[float] = None,
     rel_long_m: Optional[float] = None,
@@ -1346,27 +1356,29 @@ def format_side_metric_bits(
     clearance_m: Optional[float] = None,
     pass_state: Optional[str] = None,
     rolling_speed_1s_mps: Optional[float] = None,
+    conflict_name: Optional[str] = None,
 ) -> List[str]:
     """Full-noun metric tokens for pair/medoid context lines."""
     bits: List[str] = []
     if v_ego is not None:
         bits.append(f"ego speed={float(v_ego):.1f} m/s")
-    if v_partner is not None:
-        bits.append(f"partner speed={float(v_partner):.1f} m/s")
+    name = display_agent_name(conflict_name)
+    if v_vehicle is not None:
+        bits.append(f"{name} speed={float(v_vehicle):.1f} m/s")
     if d is not None:
         bits.append(f"center-to-center distance={float(d):.1f} m")
     if ttc is not None:
         bits.append(f"estimated time to collision={float(ttc):.1f} s")
-    az_tok = format_az_token(az)
+    az_tok = format_az_token(az, name)
     if az_tok:
         bits.append(az_tok)
     closing_tok = format_closing_token(closing)
     if closing_tok:
         bits.append(closing_tok)
-    rel_tok = format_rel_position_token(rel_long_m, rel_lat_m)
+    rel_tok = format_rel_position_token(rel_long_m, rel_lat_m, name)
     if rel_tok:
         bits.append(rel_tok)
-    pass_tok = format_longitudinal_relationship_token(pass_state)
+    pass_tok = format_longitudinal_relationship_token(pass_state, name)
     if pass_tok:
         bits.append(pass_tok)
     clear_tok = format_minimum_vehicle_boundary_distance_token(clearance_m)
@@ -1469,17 +1481,32 @@ def _event_gloss_one(
             span = _matching_action_span(who, act, float(t), action_data)
             if span is not None:
                 note = _span_pair_note(kind, span[0], span[1], clock_offset_s)
-        return f"{who} {verb} {noun}{note}"
+        return f"{display_agent_name(who)} {verb} {noun}{note}"
     if lab.startswith("APPROACH_"):
-        return f"approach phase with {lab[len('APPROACH_'):]}"
+        return (
+            f"approach phase with "
+            f"{display_agent_name(lab[len('APPROACH_'):])}"
+        )
     if lab.startswith("POST_"):
-        return f"post-conflict phase with {lab[len('POST_'):]}"
+        return (
+            f"post-conflict phase with "
+            f"{display_agent_name(lab[len('POST_'):])}"
+        )
     if lab.startswith("NEAR_MISS_"):
-        return f"near-miss with {lab[len('NEAR_MISS_'):]}"
+        return (
+            f"near-miss with "
+            f"{display_agent_name(lab[len('NEAR_MISS_'):])}"
+        )
     if lab.startswith("COLLISION_"):
-        return f"collision with {lab[len('COLLISION_'):]}"
+        return (
+            f"collision with "
+            f"{display_agent_name(lab[len('COLLISION_'):])}"
+        )
     if lab.startswith("CLOSEST_APPROACH_"):
-        return f"closest approach with {lab[len('CLOSEST_APPROACH_'):]}"
+        return (
+            f"closest approach with "
+            f"{display_agent_name(lab[len('CLOSEST_APPROACH_'):])}"
+        )
     return lab.replace("_", " ")
 
 
@@ -1507,10 +1534,10 @@ def _event_gloss(
     return "; ".join(glosses) if glosses else lab.replace("_", " ")
 
 
-def _partner_relation_phrase(
-    partner: str, sector: str, band: str, d: float, az: float
+def _named_vehicle_relation_phrase(
+    vehicle_name: str, sector: str, band: str, d: float, az: float
 ) -> str:
-    name = partner or "the conflict partner"
+    name = display_agent_name(vehicle_name)
     sector_phrase = {
         "FRONT": f"{name} is {band} ahead of Ego",
         "FRONT LEFT": f"{name} is {band} front-left of Ego",
@@ -1523,7 +1550,7 @@ def _partner_relation_phrase(
     }.get(sector, f"{name} is {band} relative to Ego ({sector})")
     return (
         f"{sector_phrase} (center-to-center distance={d:.1f} m), "
-        "partner azimuth relative to ego heading="
+        f"{name} azimuth relative to Ego heading="
         f"{sector} ({az:.1f}°)"
     )
 
@@ -1563,7 +1590,7 @@ def format_conflict_timeline_sentences(
         f"verdict.{clock_note}",
         "",
     ]
-    partner_fallback = selection.partner_name or "Opposite"
+    vehicle_fallback = display_agent_name(selection.vehicle_name)
     off = float(clock_offset_s or 0.0)
     for i, fr in enumerate(selection.frames):
         gloss = (
@@ -1586,16 +1613,19 @@ def format_conflict_timeline_sentences(
         if fr.d is not None and fr.az is not None:
             sector = _bearing_sector(fr.az)
             band = _distance_band(float(fr.d))
-            pname = fr.partner_name or partner_fallback
+            pname = display_agent_name(fr.vehicle_name, vehicle_fallback)
             parts.append(
-                _partner_relation_phrase(
+                _named_vehicle_relation_phrase(
                     pname, sector, band, float(fr.d), float(fr.az)
                 )
             )
-        rel_tok = format_rel_position_token(fr.rel_long_m, fr.rel_lat_m)
+        pname = display_agent_name(fr.vehicle_name, vehicle_fallback)
+        rel_tok = format_rel_position_token(
+            fr.rel_long_m, fr.rel_lat_m, pname
+        )
         if rel_tok:
             parts.append(rel_tok)
-        pass_tok = format_longitudinal_relationship_token(fr.pass_state)
+        pass_tok = format_longitudinal_relationship_token(fr.pass_state, pname)
         if pass_tok:
             parts.append(pass_tok)
         clear_tok = format_minimum_vehicle_boundary_distance_token(fr.clearance_m)
@@ -1615,7 +1645,7 @@ def format_conflict_timeline_sentences(
                     traj_df,
                     track_id=0,
                     t=float(fr.t),
-                    partner_tid=fr.partner_track_id,
+                    vehicle_tid=fr.vehicle_track_id,
                     map_tracks_csv=map_tracks_csv,
                 )
                 if k and k.get("v_lat") is not None and k.get("vs_road") is not None:
@@ -1638,16 +1668,16 @@ def format_conflict_timeline_sentences(
             parts.append(f"estimated time to collision≈{float(fr.ttc):.2f} s")
         if fr.v_ego is not None:
             parts.append(f"ego speed={float(fr.v_ego):.2f} m/s")
-        # Partner speed / closing rate only matter once the gap is tight —
+        # Vehicle speed / closing rate only matter once the gap is tight —
         # this is exactly the evidence needed to tell "who is catching up to
         # whom" at approach/collision, so surface it for near + very-close
         # bands (and always at COLLISION) instead of dropping it everywhere.
         is_close = fr.d is not None and float(fr.d) < 15.0
         is_collision = "COLLISION" in str(fr.label or "").upper()
-        if (is_close or is_collision) and fr.v_partner is not None:
-            pname = fr.partner_name or partner_fallback
+        if (is_close or is_collision) and fr.v_vehicle is not None:
+            pname = display_agent_name(fr.vehicle_name, vehicle_fallback)
             parts.append(
-                f"partner speed ({pname})={float(fr.v_partner):.2f} m/s"
+                f"{pname} speed={float(fr.v_vehicle):.2f} m/s"
             )
             if fr.closing is not None:
                 closing_tok = format_closing_token(float(fr.closing))
@@ -1819,10 +1849,10 @@ def format_snapshot_evidence_block(
                 d="—" if fr.d is None else f"{fr.d:.2f}",
                 ttc="—" if fr.ttc is None else f"{fr.ttc:.2f}",
                 ve="—" if fr.v_ego is None else f"{fr.v_ego:.2f}",
-                vp="—" if fr.v_partner is None else f"{fr.v_partner:.2f}",
+                vp="—" if fr.v_vehicle is None else f"{fr.v_vehicle:.2f}",
                 az="—" if fr.az is None else f"{fr.az:.1f}",
                 er=_road_lane(fr.ego_road, fr.ego_lane),
-                pr=_road_lane(fr.partner_road, fr.partner_lane),
+                pr=_road_lane(fr.vehicle_road, fr.vehicle_lane),
             )
         )
     lines.append("")
@@ -1851,15 +1881,15 @@ def format_snapshot_evidence_block(
 
 def pair_zoom_bounds(
     ego_xy: Tuple[float, float],
-    partner_xy: Optional[Tuple[float, float]],
+    vehicle_xy: Optional[Tuple[float, float]],
     margin_m: float = DEFAULT_PAIR_MARGIN_M,
     min_half: float = 15.0,
     extra_xy: Optional[Sequence[Tuple[float, float]]] = None,
 ) -> Tuple[float, float, float, float]:
-    """Axis-aligned bounds covering ego + partner (+ optional context agents)."""
+    """Axis-aligned bounds covering ego + vehicle (+ optional context agents)."""
     pts: List[Tuple[float, float]] = [ego_xy]
-    if partner_xy is not None:
-        pts.append(partner_xy)
+    if vehicle_xy is not None:
+        pts.append(vehicle_xy)
     if extra_xy:
         pts.extend(list(extra_xy))
     xs = [p[0] for p in pts]
@@ -1896,9 +1926,9 @@ def pair_geometry_summary(
             for fr in frames
             if fr.get(f"{side}_alive", True) and _get(fr, side, "pass_state")
         ]
-        if any(s == "partner_behind" for s in states):
+        if any(s == "vehicle_behind" for s in states):
             return "pass_first"
-        if states and states[-1] == "partner_ahead":
+        if states and states[-1] == "vehicle_ahead":
             return "yield"
         return "unresolved"
 

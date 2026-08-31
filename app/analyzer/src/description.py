@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import yaml
+from agent_labels import display_agent_name, normalize_vehicle_schema
 
 try:
     import pandas as pd
@@ -84,7 +85,10 @@ def _narrate_agent(agent: Dict) -> List[str]:
 
     for act in agent["actions"]:
         attrs = act.get("attributes", {})
-        if act["action"] == "COLLISION" and attrs.get("role") == "partner":
+        if act["action"] == "COLLISION" and attrs.get("role") in {
+            "vehicle",
+            "other_vehicle",
+        }:
             phrase = "is struck by"
         else:
             phrase = _EGO_PHRASES.get(act["action"], act["action"].lower().replace("_", " "))
@@ -119,17 +123,17 @@ def _narrate_agent(agent: Dict) -> List[str]:
 
 def _format_collision_action_line(when: str, phrase: str, act: dict, role: str) -> str:
     attrs = act.get("attributes", {})
-    partner = attrs.get("with_name", "unknown agent")
+    vehicle = display_agent_name(attrs.get("with_name"), "unknown vehicle")
     ptid = attrs.get("with_track_id")
-    who = f"{partner} (track {ptid})" if ptid is not None else str(partner)
-    if attrs.get("role") == "partner" or role != "ego":
+    who = f"{vehicle} (track {ptid})" if ptid is not None else vehicle
+    if attrs.get("role") in {"vehicle", "other_vehicle"} or role != "ego":
         target = f" {who}"
     else:
         target = f" with {who}"
 
     loc = f"on road {act['road_id']}, lane {act['lane_id']}"
     ex, ey = attrs.get("ego_x"), attrs.get("ego_y")
-    px, py = attrs.get("partner_x"), attrs.get("partner_y")
+    px, py = attrs.get("vehicle_x"), attrs.get("vehicle_y")
     if role == "ego" and ex is not None and ey is not None:
         loc += f" at (x={ex}, y={ey})"
     elif px is not None and py is not None:
@@ -138,8 +142,8 @@ def _format_collision_action_line(when: str, phrase: str, act: dict, role: str) 
     speeds = []
     if attrs.get("ego_speed_mps") is not None:
         speeds.append(f"ego {attrs['ego_speed_mps']} m/s")
-    if attrs.get("partner_speed_mps") is not None:
-        speeds.append(f"partner {attrs['partner_speed_mps']} m/s")
+    if attrs.get("vehicle_speed_mps") is not None:
+        speeds.append(f"{vehicle} speed {attrs['vehicle_speed_mps']} m/s")
     speed_txt = f" — {', '.join(speeds)}" if speeds else ""
     clearance = ""
     if attrs.get("min_clearance_m") is not None:
@@ -150,7 +154,7 @@ def _format_collision_action_line(when: str, phrase: str, act: dict, role: str) 
     return f"  {when}: {phrase}{target} {loc}{speed_txt}{clearance}"
 
 
-def _partner_label(iv: Dict) -> str:
+def _vehicle_label(iv: Dict) -> str:
     if iv.get("with_name"):
         return str(iv["with_name"])
     tid = iv.get("with_track_id")
@@ -180,8 +184,8 @@ def _format_collision_structured(iv: Dict) -> List[str]:
     lines = ["Collision event:"]
     lines.append(f"  when: t={float(iv.get('key_time', 0)):.1f}s")
     ego = iv.get("ego_at_collision") or {}
-    partner = iv.get("partner_at_collision") or {}
-    pname = _partner_label(iv)
+    vehicle = iv.get("vehicle_at_collision") or {}
+    pname = display_agent_name(_vehicle_label(iv), "unknown vehicle")
     if ego:
         lines.append(
             f"  where (ego): road {ego.get('road_id')}, lane {ego.get('lane_id')} "
@@ -190,12 +194,12 @@ def _format_collision_structured(iv: Dict) -> List[str]:
         lines.append(
             f"  ego: {ego.get('name', 'Ego')} — speed {ego.get('speed_mps')} m/s"
         )
-    if partner:
+    if vehicle:
         lines.append(
-            f"  partner: {pname} (track {iv.get('with_track_id')}) — "
-            f"speed {partner.get('speed_mps')} m/s, "
-            f"road {partner.get('road_id')}, lane {partner.get('lane_id')} "
-            f"(x={partner.get('x')}, y={partner.get('y')})"
+            f"  {pname} (track {iv.get('with_track_id')}) — "
+            f"speed {vehicle.get('speed_mps')} m/s, "
+            f"road {vehicle.get('road_id')}, lane {vehicle.get('lane_id')} "
+            f"(x={vehicle.get('x')}, y={vehicle.get('y')})"
         )
     if iv.get("min_clearance_m") is not None:
         lines.append(
@@ -203,15 +207,15 @@ def _format_collision_structured(iv: Dict) -> List[str]:
             f"{iv['min_clearance_m']} m"
         )
     if iv.get("source"):
-        lines.append(f"  partner source: {iv['source']}")
+        lines.append(f"  collision geometry source: {iv['source']}")
     return lines
 
 
 def _agent_action_table(
     agent: Dict,
     traj_df: Any = None,
-    partner_tid: Optional[int] = None,
-    partner_label: str = "Opposite",
+    vehicle_tid: Optional[int] = None,
+    vehicle_label: str = "other vehicle",
     map_tracks_csv: Optional[str] = None,
 ) -> List[str]:
     """Detailed kinematics table for human ``description.txt``."""
@@ -220,8 +224,8 @@ def _agent_action_table(
     return format_enriched_action_table(
         agent,
         traj_df,
-        partner_tid if agent.get("role") == "ego" else None,
-        partner_label,
+        vehicle_tid if agent.get("role") == "ego" else None,
+        vehicle_label,
         map_tracks_csv=map_tracks_csv,
     )
 
@@ -230,8 +234,8 @@ def _ego_actions_with_checkpoints_table(
     action_data: Dict,
     ego_agent: Dict,
     traj_df: Any,
-    partner_tid: Optional[int],
-    partner_label: str,
+    vehicle_tid: Optional[int],
+    vehicle_label: str,
     map_tracks_csv: Optional[str] = None,
 ) -> List[str]:
     """Single Ego table: action rows + before/after near-miss rows, time-sorted."""
@@ -239,8 +243,8 @@ def _ego_actions_with_checkpoints_table(
         return _agent_action_table(
             ego_agent,
             traj_df=traj_df,
-            partner_tid=partner_tid,
-            partner_label=partner_label,
+            vehicle_tid=vehicle_tid,
+            vehicle_label=vehicle_label,
             map_tracks_csv=map_tracks_csv,
         )
 
@@ -259,7 +263,7 @@ def _ego_actions_with_checkpoints_table(
             act,
             traj_df,
             int(ego_agent.get("track_id", 0)),
-            partner_tid,
+            vehicle_tid,
             map_tracks_csv=map_tracks_csv,
         )
         tspan = f"{st:.1f}s" if abs(st - et) < 1e-6 else f"{st:.1f}–{et:.1f}s"
@@ -320,7 +324,7 @@ def _ego_actions_with_checkpoints_table(
                 traj_df,
                 track_id=int(ego_agent.get("track_id", 0)),
                 t=t,
-                partner_tid=partner_tid,
+                vehicle_tid=vehicle_tid,
                 map_tracks_csv=map_tracks_csv,
             )
             if not k:
@@ -342,7 +346,7 @@ def _ego_actions_with_checkpoints_table(
         "_v_lat_ ≈ v * sin(vs_road): signed lateral speed (+ leftward, − rightward).",
         "",
         "| time | action | road | lane | v (m/s) | a (m/s²) | heading (°) | vs road (°) | "
-        f"v_lat (m/s) | d→{partner_label} (m) | az→{partner_label} (°) |",
+        f"v_lat (m/s) | d→{vehicle_label} (m) | az→{vehicle_label} (°) |",
         "|------|--------|------|------|---------|----------|-------------|---------------|"
         "-------------|-------------------|--------------------|",
     ]
@@ -357,8 +361,9 @@ def build_description(
     traj_df: Any = None,
     map_tracks_csv: Optional[str] = None,
 ) -> str:
-    from kinematics_context import partner_name, primary_partner_track_id
+    from kinematics_context import primary_vehicle_track_id, vehicle_name
 
+    action_data = normalize_vehicle_schema(action_data)
     parts: List[str] = []
     loc = action_data.get("location", "unknown")
     dur = action_data.get("duration", "?")
@@ -370,16 +375,16 @@ def build_description(
         )
     parts.append("")
 
-    partner_tid = primary_partner_track_id(action_data) if traj_df is not None else None
-    pname = partner_name(action_data, partner_tid)
+    vehicle_tid = primary_vehicle_track_id(action_data) if traj_df is not None else None
+    pname = display_agent_name(vehicle_name(action_data, vehicle_tid))
 
     # Detailed structured tables with kinematics when trajectory is available.
     parts.append("## Agent actions")
     parts.append("")
-    if traj_df is not None and partner_tid is not None:
+    if traj_df is not None and vehicle_tid is not None:
         parts.append(
             f"Ego rows include velocity, accel, heading, and geometry vs "
-            f"**{pname}** (track {partner_tid}) at action start→end."
+            f"**{pname}** (track {vehicle_tid}) at action start→end."
         )
         parts.append("")
     agents = sorted(action_data.get("agents", []), key=lambda a: a["track_id"])
@@ -390,8 +395,8 @@ def build_description(
                     action_data=action_data,
                     ego_agent=agent,
                     traj_df=traj_df,
-                    partner_tid=partner_tid,
-                    partner_label=pname,
+                    vehicle_tid=vehicle_tid,
+                    vehicle_label=pname,
                     map_tracks_csv=map_tracks_csv,
                 )
             )
@@ -400,8 +405,8 @@ def build_description(
                 _agent_action_table(
                     agent,
                     traj_df=traj_df,
-                    partner_tid=partner_tid,
-                    partner_label=pname,
+                    vehicle_tid=vehicle_tid,
+                    vehicle_label=pname,
                     map_tracks_csv=map_tracks_csv,
                 )
             )
@@ -431,9 +436,9 @@ def build_description(
             for iv in critical:
                 phrase = _INTERACTION_PHRASES.get(iv.get("type"), str(iv.get("type")).lower())
                 kt = iv.get("key_time")
-                partner = _partner_label(iv)
+                vehicle = display_agent_name(_vehicle_label(iv), "unknown vehicle")
                 parts.append(
-                    f"  t={kt:.1f}s: {phrase} with {partner}{_format_interaction_detail(iv)}"
+                    f"  t={kt:.1f}s: {phrase} with {vehicle}{_format_interaction_detail(iv)}"
                 )
             parts.append("")
 
@@ -441,9 +446,9 @@ def build_description(
         for iv in interactions:
             phrase = _INTERACTION_PHRASES.get(iv.get("type"), str(iv.get("type")).lower())
             kt = iv.get("key_time")
-            partner = _partner_label(iv)
+            vehicle = display_agent_name(_vehicle_label(iv), "unknown vehicle")
             parts.append(
-                f"  t={kt:.1f}s: {phrase} with {partner}{_format_interaction_detail(iv)}"
+                f"  t={kt:.1f}s: {phrase} with {vehicle}{_format_interaction_detail(iv)}"
             )
         parts.append("")
 

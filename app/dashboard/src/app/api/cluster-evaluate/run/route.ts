@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from "child_process";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
+import { runArtifactPath } from "../../_lib/runArtifactPaths";
 
 /**
  * POST /api/cluster-evaluate/run
@@ -180,7 +181,7 @@ export async function POST(req: NextRequest) {
         let quality: Record<string, unknown> = {};
         try {
           quality = JSON.parse(
-            fs.readFileSync(path.join(runDir, "clustering_quality.json"), "utf-8"),
+            fs.readFileSync(runArtifactPath(runDir, "quality"), "utf-8"),
           );
         } catch {
           /* ignore */

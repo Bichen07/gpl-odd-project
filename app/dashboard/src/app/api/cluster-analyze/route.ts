@@ -8,6 +8,10 @@ import {
 } from "@/app/_shared/utils/snapshotSelection";
 import { resolveClusterArtifact, resolveHighlightSubdir } from "@/app/api/_lib/clusterPaths";
 import { metaFromYamlPath } from "@/app/api/_lib/readYaml";
+import {
+  runArtifactPath,
+  runSourceDir,
+} from "@/app/api/_lib/runArtifactPaths";
 
 /**
  * Config + image server for the "Select and analyze" page.
@@ -270,10 +274,11 @@ export async function GET(req: NextRequest) {
     defaultSnapshots: string[];
     contextMedoid?: string;
   }> = [];
-  for (const entry of fs.readdirSync(runDir, { withFileTypes: true })) {
+  const sourceDir = runSourceDir(runDir);
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
     const m = entry.isDirectory() ? entry.name.match(/^cluster(\d+)$/) : null;
     if (!m) continue;
-    const clusterDir = path.join(runDir, entry.name);
+    const clusterDir = path.join(sourceDir, entry.name);
     let stats: unknown = null;
     let medoid: unknown = null;
     let intraVariance: unknown = null;
@@ -335,10 +340,10 @@ export async function GET(req: NextRequest) {
     rawYaml: string;
   }> = [];
   const splitClusters: Array<Record<string, unknown>> = [];
-  for (const entry of fs.readdirSync(runDir, { withFileTypes: true })) {
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
     const m = entry.isDirectory() ? entry.name.match(/^cluster(\d+)$/) : null;
     if (!m) continue;
-    const clusterDir = path.join(runDir, entry.name);
+    const clusterDir = path.join(sourceDir, entry.name);
     const cid = parseInt(m[1], 10);
 
     const medoidYamlPath = resolveClusterArtifact(clusterDir, "medoid_trial.yaml");
@@ -395,7 +400,7 @@ export async function GET(req: NextRequest) {
     (a, b) => Number(a.cluster) - Number(b.cluster),
   );
 
-  const icPairsDir = path.join(runDir, "parameter_space_pairs");
+  const icPairsDir = path.join(runSourceDir(runDir), "parameter_space_pairs");
   const icPairs: Array<{
     name: string;
     yaml: string;
@@ -521,9 +526,9 @@ export async function GET(req: NextRequest) {
     splitAnalysis: {
       clusters: splitClusters,
       icPairs,
-      crossEval: readJsonSafe(path.join(runDir, "cross_cluster_eval.json")),
-      selectionEval: readJsonSafe(path.join(runDir, "cluster_selection_eval.json")),
-      quality: readJsonSafe(path.join(runDir, "clustering_quality.json")),
+      crossEval: readJsonSafe(runArtifactPath(runDir, "crossEval")),
+      selectionEval: readJsonSafe(runArtifactPath(runDir, "selectionEval")),
+      quality: readJsonSafe(runArtifactPath(runDir, "quality")),
     },
   });
 }

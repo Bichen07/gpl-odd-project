@@ -32,7 +32,12 @@ from .llm_factory import (
     has_llm_credentials,
     normalize_model_name,
 )
-from .paths import PROMPT_TEMPLATES_DIR, REPO_ROOT
+from .paths import (
+    PROMPT_TEMPLATES_DIR,
+    REPO_ROOT,
+    run_artifact_path,
+    run_source_path,
+)
 
 
 def _cp():
@@ -399,7 +404,7 @@ def _load_payload_context(batch_id: int) -> Tuple[
 
 
 def _assignments_from_run(run_dir: Path) -> Optional[Dict[str, Any]]:
-    p = run_dir / "clustering" / "selectedClusteringResult.json"
+    p = run_source_path(run_dir, "clustering", "selectedClusteringResult.json")
     if not p.is_file():
         return None
     try:
@@ -702,7 +707,7 @@ def run_split_analysis(
         from .cluster_selection_eval import medoid_card_block
 
         manifest = {}
-        mp = results_dir / "manifest.json"
+        mp = run_source_path(results_dir, "manifest.json")
         if mp.is_file():
             manifest = json.loads(mp.read_text(encoding="utf-8"))
         pairs = (
@@ -735,7 +740,7 @@ def run_split_analysis(
             pair_pack_dir = lambda rd, a, b: Path(rd) / "parameter_space_pairs" / pair_folder_name(a, b)
             write_pair_process_context_md = None  # type: ignore
 
-        pair_root = results_dir / "parameter_space_pairs"
+        pair_root = run_source_path(results_dir, "parameter_space_pairs")
         if not pair_root.is_dir() and (results_dir / "ic_pairs").is_dir():
             pair_root = results_dir / "ic_pairs"
         pair_root.mkdir(exist_ok=True)
@@ -1166,7 +1171,7 @@ def run_split_analysis(
         except Exception as exc:
             print(f"  ⚠️  cross-eval failed: {exc}")
 
-    summary_path = results_dir / "split_analysis_summary.json"
+    summary_path = run_artifact_path(results_dir, "split_summary", write=True)
     summary_path.write_text(json.dumps(outputs, indent=2), encoding="utf-8")
     print(f"\n[split-analysis] done → {summary_path}")
     return outputs

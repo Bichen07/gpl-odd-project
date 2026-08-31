@@ -26,29 +26,24 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from .llm_factory import create_interpretation_llm, has_llm_credentials, api_key_env_hint
+from .paths import run_artifact_path
 
 BRIEFING_FILENAME = "odd_chat_briefing.json"
 CHAT_LOG_FILENAME = "odd_chat_log.jsonl"
 
-SYSTEM_PROMPT = """You are an ODD (Operational Design Domain) analysis consultant helping an \
-AV test engineer discuss the results of ONE clustering run of scenario trials.
+def _load_system_prompt() -> str:
+    prompt_path = (
+        Path(__file__).resolve().parents[2]
+        / "prompt_templates"
+        / "odd_chat_system_prompt.txt"
+    )
+    try:
+        return prompt_path.read_text(encoding="utf-8").strip()
+    except OSError as exc:
+        raise RuntimeError(f"Could not load Q&A system prompt: {prompt_path}") from exc
 
-Rules you must follow:
-1. Use ONLY the "BRIEFING" JSON given below (and prior turns in this chat) as your source of \
-numbers, cluster ids, motives, rules, and pair outcomes. Never invent a threshold, percentage, \
-or trial id that is not in the briefing.
-2. If something is not in the briefing (see its "missing" list), say you don't know and name \
-which pipeline step would produce it (e.g. "run S3 to get parameter rules").
-3. Distinguish deterministic facts (collision_rate, support, precision, param ranges) from LLM \
-interpretation (motive, caption, separation_call) — the briefing already separates these; keep \
-that separation in your answer (e.g. say "the LLM-authored cluster summary describes this as ..." \
-rather than stating it as ground truth).
-4. This run's parameter "rules" are a shallow decision tree (depth<=3) — auditable hypotheses \
-about the SAMPLED trials, not a certified SAE J3016 ODD boundary. Never call them "the ODD".
-5. Cite what you used: end your answer with a line "Sources: ..." naming cluster ids / pair \
-folders / rule ids / "boundary export" you actually referenced.
-6. Be concise and concrete. Prefer numbers over adjectives.
-"""
+
+SYSTEM_PROMPT = _load_system_prompt()
 
 INTENT_KEYWORDS: List[Tuple[str, List[str]]] = [
     ("weakness", [r"\bweak", r"\bfail(ure|ing)?\s+mode", r"\bworst\b", r"\bproblem"]),
@@ -65,7 +60,7 @@ def _now_iso() -> str:
 
 
 def load_briefing(run_dir: Path) -> Dict[str, Any]:
-    p = Path(run_dir) / BRIEFING_FILENAME
+    p = run_artifact_path(Path(run_dir), "odd_briefing")
     if not p.is_file():
         raise FileNotFoundError(
             f"Missing {p} — run S5 briefing build first (odd_briefing.build_briefing)."
@@ -158,7 +153,9 @@ def build_messages(
     max_history_turns: int = 8,
 ) -> Tuple[List[Dict[str, str]], List[str]]:
     routed = route(question, briefing)
-    trimmed_history = history[-max_history_turns:] if history else []
+    # History is stored as alternating user/assistant messages, so K dialog
+    # turns correspond to up to 2*K message entries.
+    trimmed_history = history[-(max_history_turns * 2):] if history else []
 
     messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.append(
@@ -181,6 +178,7 @@ def answer(
     api_key: Optional[str] = None,
     temperature: float = 0.1,
     history: Optional[List[Dict[str, str]]] = None,
+    conversation_id: str = "default",
     dry_run: bool = False,
     log: bool = True,
 ) -> Dict[str, Any]:
@@ -206,13 +204,20 @@ def answer(
         result = {"answer": text, "citations": citations, "model": model, "dry_run": False}
 
     if log:
-        _append_log(run_dir, question, result, briefing)
+        _append_log(run_dir, question, result, briefing, conversation_id)
     return result
 
 
-def _append_log(run_dir: Path, question: str, result: Dict[str, Any], briefing: Dict[str, Any]) -> None:
+def _append_log(
+    run_dir: Path,
+    question: str,
+    result: Dict[str, Any],
+    briefing: Dict[str, Any],
+    conversation_id: str,
+) -> None:
     entry = {
         "timestamp": _now_iso(),
+        "conversation_id": conversation_id or "default",
         "question": question,
         "answer": result.get("answer"),
         "citations": result.get("citations"),
@@ -220,6 +225,6 @@ def _append_log(run_dir: Path, question: str, result: Dict[str, Any], briefing: 
         "dry_run": result.get("dry_run"),
         "briefing_generated_at": briefing.get("generated_at"),
     }
-    p = Path(run_dir) / CHAT_LOG_FILENAME
+    p = run_artifact_path(Path(run_dir), "odd_chat_log", write=True)
     with p.open("a", encoding="utf-8") as f:
         f.write(json.dumps(entry) + "\n")

@@ -3,6 +3,10 @@ import fs from "fs";
 import path from "path";
 import { resolveClusterArtifact } from "@/app/api/_lib/clusterPaths";
 import { readYamlDoc } from "@/app/api/_lib/readYaml";
+import {
+  runArtifactPath,
+  runSourceDir,
+} from "@/app/api/_lib/runArtifactPaths";
 
 /**
  * Report API — assembles all existing analysis artifacts for one $RUN
@@ -152,21 +156,22 @@ export async function GET(req: NextRequest) {
   // ── Quality / selection JSON ──────────────────────────────────────────
 
   const qualityJson = readJsonSafe(
-    path.join(runDir, "clustering_quality.json"),
+    runArtifactPath(runDir, "quality"),
   ) as Record<string, any> | null;
   const selectionJson = readJsonSafe(
-    path.join(runDir, "cluster_selection_eval.json"),
+    runArtifactPath(runDir, "selectionEval"),
   ) as Record<string, any> | null;
 
   // ── Clusters ──────────────────────────────────────────────────────────
 
   const clusters: ReportCluster[] = [];
 
-  for (const entry of fs.readdirSync(runDir, { withFileTypes: true })) {
+  const sourceDir = runSourceDir(runDir);
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
     const m = entry.isDirectory() ? entry.name.match(/^cluster(\d+)$/) : null;
     if (!m) continue;
     const cid = parseInt(m[1], 10);
-    const clusterDir = path.join(runDir, entry.name);
+    const clusterDir = path.join(sourceDir, entry.name);
 
     // cluster.json (raw stats)
     const cjPath = resolveClusterArtifact(clusterDir, "cluster.json");
@@ -213,7 +218,7 @@ export async function GET(req: NextRequest) {
   // ── Parameter-space pairs ─────────────────────────────────────────────
 
   const pairs: ReportPair[] = [];
-  const pairsDir = path.join(runDir, "parameter_space_pairs");
+  const pairsDir = path.join(sourceDir, "parameter_space_pairs");
 
   if (fs.existsSync(pairsDir)) {
     for (const f of fs.readdirSync(pairsDir).sort()) {
@@ -258,7 +263,7 @@ export async function GET(req: NextRequest) {
   // ── S2 boundary export (optional) ─────────────────────────────────────
 
   const boundaryExportJson = readJsonSafe(
-    path.join(runDir, "odd_boundary_export.json"),
+    runArtifactPath(runDir, "oddBoundaryExport"),
   ) as Record<string, any> | null;
 
   const boundaryExport = boundaryExportJson
@@ -280,7 +285,7 @@ export async function GET(req: NextRequest) {
   // ── S3 parameter rules (optional, written by the `odd-rules` CLI) ─────
 
   const rulesJson = readJsonSafe(
-    path.join(runDir, "odd_parameter_rules.json"),
+    runArtifactPath(runDir, "oddRules"),
   ) as Record<string, any> | null;
 
   const parameterRules = rulesJson
@@ -305,7 +310,7 @@ export async function GET(req: NextRequest) {
   // ── S4 boundary <-> pairs join (optional, written by `odd-join` CLI) ──
 
   const joinJson = readJsonSafe(
-    path.join(runDir, "odd_boundary_pairs_join.json"),
+    runArtifactPath(runDir, "oddJoin"),
   ) as Record<string, any> | null;
 
   const boundaryPairsJoin = joinJson

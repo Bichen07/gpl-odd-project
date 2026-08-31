@@ -3,6 +3,7 @@ import { spawn } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { runArtifactPath } from "@/app/api/_lib/runArtifactPaths";
 
 /**
  * S5 (part 2) — ODD Q&A over one run's `odd_chat_briefing.json`.
@@ -32,15 +33,24 @@ import path from "path";
 export const dynamic = "force-dynamic";
 
 const MAX_RUN_MS = 90 * 1000; // one grounded Q&A turn, not a whole analysis run
+const DEFAULT_CONVERSATION_ID = "default";
 
 type ChatLogEntry = {
   timestamp: string;
+  conversation_id?: string;
   question: string;
   answer: string;
   citations: string[];
   model: string;
   dry_run: boolean;
   briefing_generated_at?: string | null;
+};
+
+type ConversationSummary = {
+  id: string;
+  title: string;
+  updatedAt: string;
+  turnCount: number;
 };
 
 function findProjectRoot(start: string): string {
@@ -61,7 +71,7 @@ function resolveRunDir(batchId: string, folder: string): string | null {
 }
 
 function readChatLog(runDir: string): ChatLogEntry[] {
-  const p = path.join(runDir, "odd_chat_log.jsonl");
+  const p = runArtifactPath(runDir, "oddChatLog");
   if (!fs.existsSync(p)) return [];
   const lines = fs.readFileSync(p, "utf-8").split("\n").filter((l) => l.trim());
   const out: ChatLogEntry[] = [];
@@ -73,6 +83,35 @@ function readChatLog(runDir: string): ChatLogEntry[] {
     }
   }
   return out;
+}
+
+function entryConversationId(entry: ChatLogEntry): string {
+  return entry.conversation_id?.trim() || DEFAULT_CONVERSATION_ID;
+}
+
+function conversationTitle(question: string): string {
+  const normalized = question.replace(/\s+/g, " ").trim();
+  return normalized.length > 56 ? `${normalized.slice(0, 56)}…` : normalized || "New conversation";
+}
+
+function summarizeConversations(entries: ChatLogEntry[]): ConversationSummary[] {
+  const summaries = new Map<string, ConversationSummary>();
+  for (const entry of entries) {
+    const id = entryConversationId(entry);
+    const existing = summaries.get(id);
+    if (existing) {
+      existing.updatedAt = entry.timestamp;
+      existing.turnCount += 1;
+    } else {
+      summaries.set(id, {
+        id,
+        title: conversationTitle(entry.question),
+        updatedAt: entry.timestamp,
+        turnCount: 1,
+      });
+    }
+  }
+  return [...summaries.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 // GET — hydrate prior conversation (persisted in the run folder, not the browser).
@@ -88,7 +127,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: `Run directory not found: ${folder}` }, { status: 404 });
   }
 
-  const briefingPath = path.join(runDir, "odd_chat_briefing.json");
+  const briefingPath = runArtifactPath(runDir, "oddBriefing");
   const briefingAvailable = fs.existsSync(briefingPath);
   let missing: string[] = [];
   if (briefingAvailable) {
@@ -100,8 +139,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const history = readChatLog(runDir);
-  return NextResponse.json({ briefingAvailable, missing, history });
+  const allHistory = readChatLog(runDir);
+  const conversations = summarizeConversations(allHistory);
+  const requestedConversationId = url.searchParams.get("conversationId")?.trim();
+  const selectedConversationId =
+    requestedConversationId || conversations[0]?.id || DEFAULT_CONVERSATION_ID;
+  const history = allHistory.filter(
+    (entry) => entryConversationId(entry) === selectedConversationId,
+  );
+  return NextResponse.json({
+    briefingAvailable,
+    missing,
+    conversations,
+    conversationId: selectedConversationId,
+    history,
+  });
 }
 
 // POST — ask one grounded question; the CLI appends it to the persisted log itself.
@@ -116,6 +168,11 @@ export async function POST(req: NextRequest) {
   const batchId = String(body.batchId ?? "");
   const folder = String(body.folder ?? "");
   const question = typeof body.question === "string" ? body.question.trim() : "";
+  const requestedConversationId =
+    typeof body.conversationId === "string" ? body.conversationId.trim() : DEFAULT_CONVERSATION_ID;
+  const conversationId = /^[A-Za-z0-9_-]{1,100}$/.test(requestedConversationId)
+    ? requestedConversationId
+    : DEFAULT_CONVERSATION_ID;
   const model = typeof body.model === "string" && body.model ? body.model : "gemini-2.5-flash";
   const apiKey = typeof body.apiKey === "string" ? body.apiKey : "";
   const historyTurns = typeof body.historyTurns === "number" ? body.historyTurns : 8;
@@ -132,7 +189,7 @@ export async function POST(req: NextRequest) {
   if (!runDir) {
     return NextResponse.json({ error: `Run directory not found: ${folder}` }, { status: 404 });
   }
-  if (!fs.existsSync(path.join(runDir, "odd_chat_briefing.json"))) {
+  if (!fs.existsSync(runArtifactPath(runDir, "oddBriefing"))) {
     return NextResponse.json(
       {
         error:
@@ -151,7 +208,9 @@ export async function POST(req: NextRequest) {
   // log so the LLM has short-term memory, matching odd_chat.py's own
   // `history` contract — the briefing itself is re-attached fresh by the
   // CLI every turn so old hallucinations can't silently "stick".
-  const priorTurns = readChatLog(runDir);
+  const priorTurns = readChatLog(runDir).filter(
+    (entry) => entryConversationId(entry) === conversationId,
+  );
   const asMessages: Array<{ role: string; content: string }> = [];
   for (const t of priorTurns.slice(-historyTurns)) {
     asMessages.push({ role: "user", content: t.question });
@@ -168,6 +227,8 @@ export async function POST(req: NextRequest) {
     runDir,
     "--question",
     question,
+    "--conversation-id",
+    conversationId,
     "--model",
     model,
     "--history-json",

@@ -7,6 +7,7 @@ import {
   resolveHighlightSubdir,
 } from "../_lib/clusterPaths";
 import { metaFromYamlPath } from "../_lib/readYaml";
+import { runSourceDir, runSourcePath } from "../_lib/runArtifactPaths";
 
 /**
  * GET /api/cluster-analysis-status?batchId=2
@@ -102,8 +103,9 @@ type FolderStatus = {
 };
 
 function scanClusterDirs(runDir: string): string[] {
+  const sourceDir = runSourceDir(runDir);
   return fs
-    .readdirSync(runDir, { withFileTypes: true })
+    .readdirSync(sourceDir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && /^cluster\d+$/.test(e.name))
     .map((e) => e.name)
     .sort((a, b) => Number(a.replace("cluster", "")) - Number(b.replace("cluster", "")));
@@ -116,9 +118,10 @@ function checkPreprocessComplete(
   paramBoundaryPairs: ParamBoundaryPair[],
 ): boolean {
   if (clusterNames.length === 0) return false;
+  const sourceDir = runSourceDir(runDir);
 
   for (const name of clusterNames) {
-    const clusterDir = path.join(runDir, name);
+    const clusterDir = path.join(sourceDir, name);
     const cjPath = resolveClusterArtifact(clusterDir, "cluster.json");
     const cj = cjPath ? readJsonSafe(cjPath) : null;
     const medoid = cj?.medoid as Record<string, unknown> | undefined;
@@ -140,7 +143,7 @@ function checkPreprocessComplete(
       if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
       const lo = Math.min(a, b);
       const hi = Math.max(a, b);
-      const pack = path.join(runDir, "trajectory_projection_pairs", `c${lo}-c${hi}`);
+      const pack = path.join(sourceDir, "trajectory_projection_pairs", `c${lo}-c${hi}`);
       if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
       const sides = fs
         .readdirSync(pack, { withFileTypes: true })
@@ -155,7 +158,7 @@ function checkPreprocessComplete(
     const b = Number(bp.cluster_b);
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
-    const pack = path.join(runDir, "trajectory_projection_pairs", `c${lo}-c${hi}`);
+    const pack = path.join(sourceDir, "trajectory_projection_pairs", `c${lo}-c${hi}`);
     if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
     const sides = fs
       .readdirSync(pack, { withFileTypes: true })
@@ -172,7 +175,7 @@ function checkPreprocessComplete(
     const b = Number(bp.cluster_b);
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
-    const pack = path.join(runDir, "parameter_space_pairs", `c${lo}-c${hi}`);
+    const pack = path.join(sourceDir, "parameter_space_pairs", `c${lo}-c${hi}`);
     if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
     if (!fs.existsSync(path.join(pack, "process", "context.md"))) return false;
     const synced = path.join(pack, "synced_bev");
@@ -205,7 +208,7 @@ export async function GET(req: NextRequest) {
     if (!/^\d+_cluster/.test(entry.name)) continue;
 
     const runDir = path.join(batchDir, entry.name);
-    const manifest = readJsonSafe(path.join(runDir, "manifest.json"));
+    const manifest = readJsonSafe(runSourcePath(runDir, ["manifest.json"]));
 
     const medoids: Record<string, string> = {};
     const clusters = (manifest?.clusters ?? []) as Array<Record<string, unknown>>;
@@ -262,7 +265,7 @@ export async function GET(req: NextRequest) {
     let hasAnalysis = false;
 
     const savedClustering = readJsonSafe(
-      path.join(runDir, "clustering", "selectedClusteringResult.json"),
+      runSourcePath(runDir, ["clustering", "selectedClusteringResult.json"]),
     );
     const savedTask =
       (savedClustering?.task as Record<string, unknown> | undefined) ?? null;
@@ -371,7 +374,7 @@ export async function GET(req: NextRequest) {
         hasAnalysis = true;
       }
     }
-    const icPairsDir = path.join(runDir, "parameter_space_pairs");
+    const icPairsDir = path.join(runSourceDir(runDir), "parameter_space_pairs");
     let hasIcPairs = false;
     if (fs.existsSync(icPairsDir)) {
       for (const f of fs.readdirSync(icPairsDir).sort()) {

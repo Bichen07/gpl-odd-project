@@ -3,7 +3,9 @@
 import {
   Alert,
   Chip,
+  Collapse,
   Divider,
+  IconButton,
   Paper,
   Stack,
   Table,
@@ -11,8 +13,11 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
+import { Close, HelpOutline } from "@mui/icons-material";
+import { useState } from "react";
 import { fmtNum } from "../utils";
 
 const SELECTION_COMPONENT_HELP: Record<string, string> = {
@@ -41,12 +46,61 @@ export default function SelectionQualityPanel({
   const components = (sel?.components ?? {}) as Record<string, number | null>;
   const findings = (sel?.findings ?? []) as string[];
   const crossIsStub = cross?.stub === true;
+  const [showHelp, setShowHelp] = useState(false);
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        Is this cluster selection good?
-      </Typography>
+      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 1 }}>
+        <Typography variant="h6">
+          Is this cluster selection good?
+        </Typography>
+        <Tooltip title="Explain the quality scores">
+          <IconButton
+            size="small"
+            aria-label="Explain the quality scores"
+            onClick={() => setShowHelp((value) => !value)}
+          >
+            <HelpOutline fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+      <Collapse in={showHelp}>
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          action={
+            <IconButton
+              size="small"
+              aria-label="Close quality score explanation"
+              onClick={() => setShowHelp(false)}
+            >
+              <Close fontSize="small" />
+            </IconButton>
+          }
+        >
+          <Typography variant="body2">
+            <strong>Deterministic</strong> is
+            <code> cross_cluster/input/cluster_selection_eval.json.selection_score</code>:
+            a rule-based weighted score using outcome purity (0.30), motive distinctness
+            (0.30), Parameter-space pair decisiveness (0.25), and no-merge candidates (0.15).
+            It needs no new LLM call.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            <strong>LLM separation</strong> and <strong>LLM boundary clarity</strong> are the
+            1–10 ratings from
+            <code> cross_cluster/output/cross_cluster_eval.json</code>. They describe the
+            whole partition and are not calculated from silhouette.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            <strong>Composite</strong> is
+            <code> analysis/quality/clustering_quality.json.final_score</code>. When valid LLM
+            ratings exist, the scorer uses
+            <code> 0.6 × Rule Score + 0.4 × LLM Score</code>, where LLM Score is the
+            separation/clarity average scaled from 1–10 to 0–100. Without an LLM result, the
+            composite stays rule-only.
+          </Typography>
+        </Alert>
+      </Collapse>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Two independent halves. The deterministic checks are measured from the artifacts on disk
         and need no LLM; the cross-cluster verdict is the LLM reading the medoid and Parameter-space pair cards.

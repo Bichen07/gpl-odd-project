@@ -14,6 +14,9 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+from agent_labels import display_agent_name, normalize_vehicle_schema
+from cluster_paths import run_source_dir
+
 # Z-scored L2 caliper in 2D parameter space (OncomingSpeed, OncomingStartDelay).
 PARAMETER_SPACE_DIST_TAU = 0.1
 
@@ -48,7 +51,7 @@ def _fmt_div_reason(div: Dict[str, Any]) -> str:
     lr = div.get("right_rel_lat_m")
     if ll is not None and lr is not None:
         bits.append(
-            "partner lateral position in ego coordinates "
+            "named vehicle lateral position in Ego coordinates "
             f"{float(ll):+.1f} vs {float(lr):+.1f} m"
         )
     ps_l = div.get("left_pass_state")
@@ -83,8 +86,8 @@ def _gloss_event_label(
 def _resolution_phrase(value: Any) -> str:
     """Readable interaction outcome for a stored resolution code."""
     return {
-        "pass_first": "Ego passed the partner first",
-        "yield": "Ego yielded and remained behind the partner",
+        "pass_first": "Ego passed the named vehicle first",
+        "yield": "Ego yielded and remained behind the named vehicle",
         "unresolved": "pass/yield order remained unresolved",
     }.get(str(value), str(value))
 
@@ -121,10 +124,10 @@ def write_pair_process_context_md(
         f"Shared-clock comparison of [{left_lab}] vs [{right_lab}].",
         "t = seconds from each side's own OpenSCENARIO StartValidCondition "
         "(scenario-start condition) clip "
-        "(same shared t on both sides). Each timeline line spells out: ego and "
-        "partner ground speeds; center-to-center distance; estimated time to "
-        "collision; partner azimuth relative to ego heading; center-distance "
-        "closing/opening rate; partner position in ego coordinates; longitudinal "
+        "(same shared t on both sides). Each timeline line spells out: Ego and "
+        "named conflict-vehicle speeds; center-to-center distance; estimated time to "
+        "collision; named vehicle azimuth relative to Ego heading; center-distance "
+        "closing/opening rate; named vehicle position in Ego coordinates; longitudinal "
         "relationship; minimum distance between vehicle boundaries; and Ego's "
         "average speed during the previous 1 second. "
         "Synced panels share one scale: the larger center-to-center distance "
@@ -165,13 +168,24 @@ def write_pair_process_context_md(
         return out
 
     try:
-        doc: Dict[str, Any] = json.loads(idx_path.read_text(encoding="utf-8"))
+        doc: Dict[str, Any] = normalize_vehicle_schema(
+            json.loads(idx_path.read_text(encoding="utf-8"))
+        )
     except Exception:
         header.append("(synced_bev_index.json unreadable)")
         out.write_text("\n".join(header) + "\n", encoding="utf-8")
         return out
 
     frames = doc.get("frames") or []
+    left_vehicle_name = display_agent_name(doc.get("left_conflict_vehicle"))
+    right_vehicle_name = display_agent_name(doc.get("right_conflict_vehicle"))
+    header.extend(
+        [
+            f"- **left named conflict vehicle**: {left_vehicle_name}",
+            f"- **right named conflict vehicle**: {right_vehicle_name}",
+            "",
+        ]
+    )
     geom = doc.get("geometry_summary") or {}
     if geom:
         header.extend(
@@ -224,7 +238,7 @@ def write_pair_process_context_md(
         d: Optional[float],
         ttc: Optional[float],
         v_ego: Optional[float],
-        v_partner: Optional[float],
+        v_vehicle: Optional[float],
         az: Optional[float],
         closing: Optional[float],
         rel_long: Optional[float] = None,
@@ -233,6 +247,7 @@ def write_pair_process_context_md(
         pass_state: Optional[str] = None,
         roll_speed: Optional[float] = None,
         t: Optional[float] = None,
+        conflict_name: Optional[str] = None,
     ) -> str:
         if not alive:
             return "ended (out of frame / clip)"
@@ -247,7 +262,7 @@ def write_pair_process_context_md(
                 d=d,
                 ttc=ttc,
                 v_ego=v_ego,
-                v_partner=v_partner,
+                v_vehicle=v_vehicle,
                 az=az,
                 closing=closing,
                 rel_long_m=rel_long,
@@ -255,13 +270,16 @@ def write_pair_process_context_md(
                 clearance_m=clearance,
                 pass_state=pass_state,
                 rolling_speed_1s_mps=roll_speed,
+                conflict_name=conflict_name,
             )
         else:
             bits = []
             if v_ego is not None:
                 bits.append(f"ego speed={float(v_ego):.1f} m/s")
-            if v_partner is not None:
-                bits.append(f"partner speed={float(v_partner):.1f} m/s")
+            if v_vehicle is not None:
+                bits.append(
+                    f"{display_agent_name(conflict_name)} speed={float(v_vehicle):.1f} m/s"
+                )
             if d is not None:
                 bits.append(f"center-to-center distance={float(d):.1f} m")
             if ttc is not None:
@@ -296,7 +314,7 @@ def write_pair_process_context_md(
             _pick(fr, "left_d", "left_d_m"),
             _pick(fr, "left_ttc", "left_ttc_s"),
             fr.get("left_v_ego"),
-            fr.get("left_v_partner"),
+            fr.get("left_v_vehicle"),
             _pick(fr, "left_az", "left_az_deg"),
             _pick(fr, "left_closing", "left_closing_mps"),
             fr.get("left_rel_long_m"),
@@ -305,6 +323,7 @@ def write_pair_process_context_md(
             fr.get("left_pass_state"),
             fr.get("left_rolling_speed_1s_mps"),
             t=float(t_s),
+            conflict_name=left_vehicle_name,
         )
         right_txt = _fmt(
             fr.get("right_alive"),
@@ -312,7 +331,7 @@ def write_pair_process_context_md(
             _pick(fr, "right_d", "right_d_m"),
             _pick(fr, "right_ttc", "right_ttc_s"),
             fr.get("right_v_ego"),
-            fr.get("right_v_partner"),
+            fr.get("right_v_vehicle"),
             _pick(fr, "right_az", "right_az_deg"),
             _pick(fr, "right_closing", "right_closing_mps"),
             fr.get("right_rel_long_m"),
@@ -321,6 +340,7 @@ def write_pair_process_context_md(
             fr.get("right_pass_state"),
             fr.get("right_rolling_speed_1s_mps"),
             t=float(t_s),
+            conflict_name=right_vehicle_name,
         )
         lines.append(
             f"- t={float(t_s):.2f}s: [{left_lab}] {left_txt} | "
@@ -388,7 +408,7 @@ def annotate_parameter_space_pairs(
 def parameter_space_pairs_root(run_dir: Path) -> Path:
     """Prefer ``parameter_space_pairs/``; fall back to legacy ``ic_pairs/``."""
     run_dir = Path(run_dir)
-    new = run_dir / "parameter_space_pairs"
+    new = run_source_dir(run_dir, for_write=True) / "parameter_space_pairs"
     if new.is_dir():
         return new
     legacy = run_dir / "ic_pairs"
@@ -438,7 +458,7 @@ def remove_legacy_param_boundary_dirs(run_dir: Path) -> List[str]:
     """Delete ``cluster*/highlight_trials/param_boundary_c*`` (and flat legacy)."""
     removed: List[str] = []
     run_dir = Path(run_dir)
-    for cluster_dir in sorted(run_dir.glob("cluster*")):
+    for cluster_dir in sorted(run_source_dir(run_dir).glob("cluster*")):
         if not cluster_dir.is_dir():
             continue
         for base in (cluster_dir / "highlight_trials", cluster_dir):
@@ -513,7 +533,7 @@ def write_parameter_space_trial_context_md(
 
         sel_view = _Sel()
         sel_view.frames = frames
-        sel_view.partner_name = getattr(selection, "partner_name", None)
+        sel_view.vehicle_name = getattr(selection, "vehicle_name", None)
         sel_view.interaction_resolution = getattr(
             selection, "interaction_resolution", None
         )
@@ -842,15 +862,15 @@ def render_synced_parameter_space_pair_bevs(
         highlight = highlight_conflict_corridor_roads(
             df,
             renderer.map_tracks_csv,
-            partner_name=sel.partner_name,
-            context_name=sel.context_partner_name,
+            vehicle_name=sel.vehicle_name,
+            context_name=sel.context_vehicle_name,
             max_roads=5,
             at_time=peak,
         )
-        partner_tid = sel.partner_track_id
+        vehicle_tid = sel.vehicle_track_id
         series = (
-            _pair_series(df_n, int(partner_tid))
-            if partner_tid is not None
+            _pair_series(df_n, int(vehicle_tid))
+            if vehicle_tid is not None
             else None
         )
         t_max = float(max(ts)) if ts else 0.0
@@ -867,13 +887,13 @@ def render_synced_parameter_space_pair_bevs(
             "highlight": highlight or [],
             "vbounds": view_bounds_from_df(df),
             "ego_at": _ego_position_lookup(df),
-            "partner_at": (
-                _agent_position_lookup(df, name=sel.partner_name)
-                if sel.partner_name
+            "vehicle_at": (
+                _agent_position_lookup(df, name=sel.vehicle_name)
+                if sel.vehicle_name
                 else (lambda _t: None)
             ),
-            "partner_name": sel.partner_name,
-            "partner_tid": partner_tid,
+            "vehicle_name": sel.vehicle_name,
+            "vehicle_tid": vehicle_tid,
             "series": series,
             "yaw_deg": _ego_initial_yaw_deg(df),
             "resolution": getattr(sel, "interaction_resolution", None),
@@ -954,11 +974,11 @@ def render_synced_parameter_space_pair_bevs(
             if not left_alive and not right_alive:
                 continue
 
-            partner_l = (
-                left["partner_at"](t_l) if left_alive and t_l is not None else None
+            vehicle_l = (
+                left["vehicle_at"](t_l) if left_alive and t_l is not None else None
             )
-            partner_r = (
-                right["partner_at"](t_r) if right_alive and t_r is not None else None
+            vehicle_r = (
+                right["vehicle_at"](t_r) if right_alive and t_r is not None else None
             )
 
             fr_l = kf.get("left_fr") if left_alive else None
@@ -995,12 +1015,12 @@ def render_synced_parameter_space_pair_bevs(
 
             if left_alive and ego_l is not None and t_l is not None:
                 m_l = _metrics_at(
-                    left["series"], t_l, left["partner_name"], left["partner_tid"],
+                    left["series"], t_l, left["vehicle_name"], left["vehicle_tid"],
                     source_df=left["df"],
                 )
             if right_alive and ego_r is not None and t_r is not None:
                 m_r = _metrics_at(
-                    right["series"], t_r, right["partner_name"], right["partner_tid"],
+                    right["series"], t_r, right["vehicle_name"], right["vehicle_tid"],
                     source_df=right["df"],
                 )
             half = shared_pair_half_extent(m_l.get("d"), m_r.get("d"))
@@ -1008,7 +1028,7 @@ def render_synced_parameter_space_pair_bevs(
             if left_alive and ego_l is not None and t_l is not None:
                 bounds_l = ego_centered_square_bounds(ego_l, half)
                 chip_l = _metric_chip_text(m_l.get("d"), m_l.get("ttc"))
-                avoid_l = [ego_l] + ([partner_l] if partner_l else [])
+                avoid_l = [ego_l] + ([vehicle_l] if vehicle_l else [])
                 renderer._render_one_panel(
                     left_tmp,
                     traj_csv=left["traj"],
@@ -1030,7 +1050,7 @@ def render_synced_parameter_space_pair_bevs(
             if right_alive and ego_r is not None and t_r is not None:
                 bounds_r = ego_centered_square_bounds(ego_r, half)
                 chip_r = _metric_chip_text(m_r.get("d"), m_r.get("ttc"))
-                avoid_r = [ego_r] + ([partner_r] if partner_r else [])
+                avoid_r = [ego_r] + ([vehicle_r] if vehicle_r else [])
                 renderer._render_one_panel(
                     right_tmp,
                     traj_csv=right["traj"],
@@ -1073,10 +1093,12 @@ def render_synced_parameter_space_pair_bevs(
                         if right.get("yaw_deg") is not None
                         else None
                     ),
+                    "left_conflict_vehicle": left.get("vehicle_name"),
+                    "right_conflict_vehicle": right.get("vehicle_name"),
                     "left_d": m_l.get("d"),
                     "left_ttc": m_l.get("ttc"),
                     "left_v_ego": m_l.get("v_ego"),
-                    "left_v_partner": m_l.get("v_partner"),
+                    "left_v_vehicle": m_l.get("v_vehicle"),
                     "left_az": m_l.get("az"),
                     "left_closing": m_l.get("closing"),
                     "left_rel_long_m": m_l.get("rel_long_m"),
@@ -1088,7 +1110,7 @@ def render_synced_parameter_space_pair_bevs(
                     "right_d": m_r.get("d"),
                     "right_ttc": m_r.get("ttc"),
                     "right_v_ego": m_r.get("v_ego"),
-                    "right_v_partner": m_r.get("v_partner"),
+                    "right_v_vehicle": m_r.get("v_vehicle"),
                     "right_az": m_r.get("az"),
                     "right_closing": m_r.get("closing"),
                     "right_rel_long_m": m_r.get("rel_long_m"),
@@ -1141,6 +1163,12 @@ def render_synced_parameter_space_pair_bevs(
                     "window_hi_s": round(max(peak_l, peak_r) + win_after, 3),
                     "left_clip_start_s": left["clip"],
                     "right_clip_start_s": right["clip"],
+                    "left_conflict_vehicle": display_agent_name(
+                        left.get("vehicle_name")
+                    ),
+                    "right_conflict_vehicle": display_agent_name(
+                        right.get("vehicle_name")
+                    ),
                     "left_t_max_s": left["t_max"],
                     "right_t_max_s": right["t_max"],
                     "left_view_yaw_deg": left.get("yaw_deg"),

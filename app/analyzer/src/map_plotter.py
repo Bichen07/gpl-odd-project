@@ -150,7 +150,7 @@ def _thin_lane_id_labels(
     ``min_spacing_m`` of an already-kept label with the same lane id (even on
     a different road section) — so continuous corridors stay readable.
 
-    When ``prefer_near`` is set (ego/partner anchors), labels closer to those
+    When ``prefer_near`` is set (ego/vehicle anchors), labels closer to those
     points are considered first so conflict BEVs keep corridor lane IDs.
     """
     if not lane_id_text_plot_info:
@@ -684,7 +684,7 @@ class MapPlotter:
         """Single render path for empty-map overviews and agent snapshots.
 
         ``label_anchors`` + ``label_radius_m`` restrict road/lane ID text to
-        labels near ego/partner (conflict BEV overlays). ``metric_chip`` draws
+        labels near ego/vehicle (conflict BEV overlays). ``metric_chip`` draws
         a short ``d=… TTC=…`` badge in the bottom-right corner.
         ``label_avoid_xy`` nudges labels away from agent centers.
         ``view_rotation_deg`` is the world heading (0=+X) that should point
@@ -712,7 +712,7 @@ class MapPlotter:
         ) = self._parse_and_process_map_data(map_csv_path)
         highlight_road_ids = _coerce_highlight_road_ids(highlight_road_ids_list)
         # Conflict snapshots: always pick roads nearest to THIS frame's
-        # ego/partner anchors. A trial-wide highlight from end-of-trial poses
+        # ego/vehicle anchors. A trial-wide highlight from end-of-trial poses
         # (far junction connectors) would leave mid-trial frames with no
         # near-agent road/lane ID labels.
         if label_anchors and max_road_labels != 0:

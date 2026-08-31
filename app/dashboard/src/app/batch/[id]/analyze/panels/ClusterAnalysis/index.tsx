@@ -7,8 +7,10 @@ import {
   Checkbox,
   Chip,
   CircularProgress,
+  Collapse,
   Divider,
   FormControlLabel,
+  IconButton,
   Paper,
   Stack,
   Table,
@@ -17,8 +19,10 @@ import {
   TableHead,
   TableRow,
   Typography,
+  Tooltip,
 } from "@mui/material";
-import type { Dispatch, SetStateAction } from "react";
+import { Close, HelpOutline } from "@mui/icons-material";
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import type { AnalyzeProduct, ProductRunState } from "../../constants";
 import { PROMPT_KEYS } from "../../constants";
 import type {
@@ -31,6 +35,61 @@ import BoundaryComparePanel from "../../components/BoundaryComparePanel";
 import PromptsCard from "../../components/PromptsCard";
 import SelectionQualityPanel from "../../components/SelectionQualityPanel";
 import SplitCardsPanel from "../../components/SplitCardsPanel";
+
+function TitleWithHelp({
+  title,
+  help,
+  variant,
+}: {
+  title: string;
+  help: ReactNode;
+  variant: "h4" | "h6";
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={0.5}
+        sx={{ mb: variant === "h4" ? 0.5 : 1 }}
+      >
+        <Typography
+          variant={variant}
+          sx={variant === "h4" ? { fontWeight: 700 } : undefined}
+        >
+          {title}
+        </Typography>
+        <Tooltip title={`Explain ${title}`}>
+          <IconButton
+            size="small"
+            aria-label={`Explain ${title}`}
+            onClick={() => setOpen((value) => !value)}
+          >
+            <HelpOutline fontSize="small" />
+          </IconButton>
+        </Tooltip>
+      </Stack>
+      <Collapse in={open}>
+        <Alert
+          severity="info"
+          sx={{ mb: 2 }}
+          action={
+            <IconButton
+              size="small"
+              aria-label={`Close ${title} explanation`}
+              onClick={() => setOpen(false)}
+            >
+              <Close fontSize="small" />
+            </IconButton>
+          }
+        >
+          {help}
+        </Alert>
+      </Collapse>
+    </>
+  );
+}
 
 export type ClusterAnalysisProps = {
   config: Config;
@@ -109,9 +168,24 @@ export default function ClusterAnalysis({
 <Stack spacing={4}>
   {/* ---------- Section A: per-cluster summaries ---------- */}
   <Box>
-    <Typography variant="h4" sx={{ mb: 0.5, fontWeight: 700 }}>
-      Cluster analysis
-    </Typography>
+    <TitleWithHelp
+      title="Cluster analysis"
+      variant="h4"
+      help={
+        <>
+          <Typography variant="body2">
+            This section creates a local summary for selected clusters. The summary LLM reads
+            each cluster&apos;s medoid card, cluster context, and every touching
+            Parameter-space pair contrast.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            Select only clusters that are ready, then run <code>summary</code>. The output is
+            saved as <code>clusterN/output/cluster_summary.yaml</code>; this is a per-cluster
+            explanation, not a judgment of the whole partition.
+          </Typography>
+        </>
+      }
+    />
     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
       Per-cluster behavior summary (<code>cluster_summary.yaml</code>) from each
       cluster&apos;s medoid + touching Parameter-space pair contrasts. Pick which
@@ -295,15 +369,30 @@ export default function ClusterAnalysis({
 
   {/* ---------- Section B: whole-partition cross-cluster ---------- */}
   <Box>
-    <Typography variant="h4" sx={{ mb: 0.5, fontWeight: 700 }}>
-      Cross-cluster analysis
-    </Typography>
+    <TitleWithHelp
+      title="Cross-cluster analysis"
+      variant="h4"
+      help={
+        <>
+          <Typography variant="body2">
+            This evaluates the current clustering partition as a whole. It does not compare
+            different run folders or re-cluster the data.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 1 }}>
+            First, Python writes the deterministic selection report to
+            <code> cross_cluster/input/cluster_selection_eval.json</code>. The optional
+            whole-partition LLM then reads narrative cards and writes
+            <code> cross_cluster/output/cross_cluster_eval.json</code>. Finally, the rule-based
+            scorer writes <code>analysis/quality/clustering_quality.json</code>.
+          </Typography>
+        </>
+      }
+    />
     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
       Whole-partition verdict (<code>cross_cluster_eval.json</code>): are clusters
       behaviorally distinct? Uses all medoid + Parameter-space pair cards and
       deterministic selection checks.
     </Typography>
-
     <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
       <Stack direction="row" alignItems="center" spacing={2} flexWrap="wrap">
         <Button
@@ -340,9 +429,23 @@ export default function ClusterAnalysis({
 
     {evalConfigs.length > 0 && (
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          All Clustering Configurations (ranked)
-        </Typography>
+        <TitleWithHelp
+          title="All Clustering Configurations (ranked)"
+          variant="h6"
+          help={
+            <Typography variant="body2">
+              Each row is a different candidate run folder, not a cluster inside the current
+              run. <strong>k</strong> is the number of clusters. <strong>Silhouette</strong>
+              measures trajectory/FPC geometry. <strong>Rule Score</strong> comes from
+              <code>analysis/quality/clustering_quality.json</code> and combines silhouette,
+              collision-rate spread, TTC spread, parameter non-overlap, and intra-cluster
+              consistency. <strong>LLM Score</strong> is the separation and boundary-clarity
+              average scaled to 0–100. <strong>Final Score</strong> is
+              <code>0.6 × Rule Score + 0.4 × LLM Score</code> when valid LLM scores exist;
+              otherwise it remains rule-only.
+            </Typography>
+          }
+        />
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -397,9 +500,20 @@ export default function ClusterAnalysis({
 
     {config.clusters.length > 0 && (
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Per-Cluster Intra Variance
-        </Typography>
+        <TitleWithHelp
+          title="Per-Cluster Intra Variance"
+          variant="h6"
+          help={
+            <Typography variant="body2">
+              These are rule-side trajectory-spread statistics from
+              <code>clusterN/raw/cluster.json</code> and its <code>intra_variance</code> block.
+              Mean, standard deviation, and maximum distance are distances from the cluster
+              medoid in embedding space; <code>n_members</code> is the cluster size. A large
+              spread can indicate a heterogeneous cluster, but it is not by itself a behavioral
+              purity score.
+            </Typography>
+          }
+        />
         <Stack spacing={1}>
           {config.clusters.map((cl) => {
             const iv = cl.intraVariance as Record<string, unknown> | null;
@@ -473,9 +587,19 @@ export default function ClusterAnalysis({
 
     {currentCrossEval && (
       <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Inter-Cluster Analysis (LLM)
-        </Typography>
+        <TitleWithHelp
+          title="Inter-Cluster Analysis (LLM)"
+          variant="h6"
+          help={
+            <Typography variant="body2">
+              These fields come from <code>cross_cluster/output/cross_cluster_eval.json</code>.
+              Behavioral separation and boundary clarity are LLM ratings from 1–10;
+              <code>inter_notes</code> is the global explanation, while merge and split
+              candidates are recommendations. They are not automatically applied and do not
+              replace the deterministic selection checks.
+            </Typography>
+          }
+        />
         <Stack direction="row" spacing={2} sx={{ mb: 1 }} flexWrap="wrap">
           <Chip
             label={`Behavioral separation: ${currentCrossEval.behavioral_separation_score ?? "?"}/10`}

@@ -1,4 +1,4 @@
-"""Resolve ego collision partner and conflict key times.
+"""Resolve Ego collision vehicles and conflict key times.
 
 Priority:
   1. Payload trial ``events`` with ``collisionWith{AgentName}`` (simulation GT).
@@ -14,6 +14,7 @@ import pandas as pd
 from shapely.geometry import Polygon
 from shapely.ops import nearest_points
 
+from agent_labels import normalize_vehicle_schema
 from map_plotter import _rotated_box_vertices
 from taxonomy import InteractionAction, Thresholds
 
@@ -27,9 +28,11 @@ _AGENT_DEFAULTS: Dict[str, Tuple[float, float]] = {
 
 
 @dataclass(frozen=True)
-class CollisionPartner:
-    partner_name: str
-    partner_track_id: Optional[int]
+class CollisionVehicle:
+    """Rule-based collision geometry for Ego and a named vehicle."""
+
+    vehicle_name: str
+    vehicle_track_id: Optional[int]
     key_time: float
     min_clearance_m: float
     source: str  # "gt_events" | "polygon"
@@ -117,7 +120,7 @@ def parse_collision_from_events(
     df: pd.DataFrame,
     *,
     contact_clearance_m: float = Thresholds.CONTACT_CLEARANCE_M,
-) -> Optional[CollisionPartner]:
+) -> Optional[CollisionVehicle]:
     """Read simulation GT from ``Trial.events`` (``collisionWith{Name}``)."""
     if not events:
         return None
@@ -128,10 +131,10 @@ def parse_collision_from_events(
         ev_name = str(ev.get("name") or "")
         if not ev_name.startswith(_COLLISION_EVENT_PREFIX):
             continue
-        partner_name = ev_name[len(_COLLISION_EVENT_PREFIX) :]
-        if not partner_name:
+        vehicle_name = ev_name[len(_COLLISION_EVENT_PREFIX) :]
+        if not vehicle_name:
             continue
-        track_id = name_to_track.get(partner_name)
+        track_id = name_to_track.get(vehicle_name)
 
         key_time: Optional[float] = None
         for key in ("esminiSeconds", "time"):
@@ -145,8 +148,8 @@ def parse_collision_from_events(
                     key_time = t
                     break
 
-        clearance, t_clear = _min_clearance_with_partner(
-            df, ego_name, partner_name, key_time_hint=key_time
+        clearance, t_clear = _min_clearance_with_vehicle(
+            df, ego_name, vehicle_name, key_time_hint=key_time
         )
         if key_time is None:
             key_time = t_clear
@@ -154,9 +157,9 @@ def parse_collision_from_events(
         if key_time is None:
             continue
 
-        return CollisionPartner(
-            partner_name=partner_name,
-            partner_track_id=track_id,
+        return CollisionVehicle(
+            vehicle_name=vehicle_name,
+            vehicle_track_id=track_id,
             key_time=round(float(key_time), 2),
             min_clearance_m=round(float(clearance), 3),
             source="gt_events",
@@ -164,21 +167,21 @@ def parse_collision_from_events(
     return None
 
 
-def _min_clearance_with_partner(
+def _min_clearance_with_vehicle(
     df: pd.DataFrame,
     ego_name: str,
-    partner_name: str,
+    vehicle_name: str,
     *,
     key_time_hint: Optional[float] = None,
 ) -> Tuple[float, Optional[float]]:
     """Return (min_clearance, time_at_min) between ego and one NPC."""
     ego = df[df["name"].astype(str).str.strip() == ego_name].sort_values("time")
-    npc = df[df["name"].astype(str).str.strip() == partner_name].sort_values("time")
+    npc = df[df["name"].astype(str).str.strip() == vehicle_name].sort_values("time")
     if ego.empty or npc.empty:
         return float("inf"), key_time_hint
 
     ew, eln = _dims_for_name(df, ego_name)
-    nw, nln = _dims_for_name(df, partner_name)
+    nw, nln = _dims_for_name(df, vehicle_name)
 
     merged = pd.merge_asof(
         ego.sort_values("time"),
@@ -220,14 +223,14 @@ def _min_clearance_with_partner(
     return best_d, best_t
 
 
-def infer_collision_partner_polygon(
+def infer_collision_vehicle_polygon(
     df: pd.DataFrame,
     meta_agents: Sequence[dict],
     *,
     collided: bool = False,
     contact_clearance_m: float = Thresholds.CONTACT_CLEARANCE_M,
-) -> Optional[CollisionPartner]:
-    """Infer collision partner from polygon clearance across all NPCs."""
+) -> Optional[CollisionVehicle]:
+    """Infer collision vehicle from polygon clearance across all NPCs."""
     if not collided:
         return None
 
@@ -269,33 +272,33 @@ def infer_collision_partner_polygon(
     if best is None:
         return None
 
-    clearance, t_hit, partner_name = best
+    clearance, t_hit, vehicle_name = best
     if clearance > contact_clearance_m * 3.0:
         return None
 
-    return CollisionPartner(
-        partner_name=partner_name,
-        partner_track_id=name_to_track.get(partner_name),
+    return CollisionVehicle(
+        vehicle_name=vehicle_name,
+        vehicle_track_id=name_to_track.get(vehicle_name),
         key_time=round(t_hit, 2),
         min_clearance_m=round(clearance, 3),
         source="polygon",
     )
 
 
-def resolve_collision_partner(
+def resolve_collision_vehicle(
     df: pd.DataFrame,
     meta_agents: Sequence[dict],
     *,
     trial_events: Optional[Sequence[dict]] = None,
     collided: bool = False,
     contact_clearance_m: float = Thresholds.CONTACT_CLEARANCE_M,
-) -> Optional[CollisionPartner]:
+) -> Optional[CollisionVehicle]:
     gt = parse_collision_from_events(
         trial_events, meta_agents, df, contact_clearance_m=contact_clearance_m
     )
     if gt is not None:
         return gt
-    return infer_collision_partner_polygon(
+    return infer_collision_vehicle_polygon(
         df,
         meta_agents,
         collided=collided,
@@ -327,67 +330,69 @@ def enrich_collision_interaction(
     df: pd.DataFrame,
     meta_agents: Sequence[dict],
 ) -> dict:
-    """Attach ego/partner kinematics and map location at collision time."""
+    """Attach Ego and collision-vehicle kinematics at collision time."""
+    interaction = normalize_vehicle_schema(interaction)
     if interaction.get("type") != InteractionAction.COLLISION.value:
         return interaction
     t = float(interaction.get("key_time") or 0)
     ego_name = _ego_name(df)
-    partner_name = str(interaction.get("with_name") or "unknown")
+    vehicle_name = str(interaction.get("with_name") or "unknown")
     out = dict(interaction)
     ego = _agent_row_at_time(df, ego_name, t)
-    partner = _agent_row_at_time(df, partner_name, t)
+    vehicle = _agent_row_at_time(df, vehicle_name, t)
     if ego:
         out["ego_at_collision"] = ego
-    if partner:
-        out["partner_at_collision"] = partner
+    if vehicle:
+        out["vehicle_at_collision"] = vehicle
     return out
 
 
 def collision_interaction_to_medoid_doc(interaction: Optional[dict]) -> Optional[dict]:
     """Compact collision block for ``cluster.json`` medoid section."""
+    interaction = normalize_vehicle_schema(interaction)
     if not interaction or interaction.get("type") != InteractionAction.COLLISION.value:
         return None
     ego = interaction.get("ego_at_collision") or {}
-    partner = interaction.get("partner_at_collision") or {}
+    vehicle = interaction.get("vehicle_at_collision") or {}
     return {
         "time_s": interaction.get("key_time"),
-        "partner_name": interaction.get("with_name"),
-        "partner_track_id": interaction.get("with_track_id"),
+        "vehicle_name": interaction.get("with_name"),
+        "vehicle_track_id": interaction.get("with_track_id"),
         "min_clearance_m": interaction.get("min_clearance_m"),
         "source": interaction.get("source"),
         "ego_speed_mps": ego.get("speed_mps"),
-        "partner_speed_mps": partner.get("speed_mps"),
+        "vehicle_speed_mps": vehicle.get("speed_mps"),
         "ego_road_id": ego.get("road_id"),
         "ego_lane_id": ego.get("lane_id"),
-        "partner_road_id": partner.get("road_id"),
-        "partner_lane_id": partner.get("lane_id"),
+        "vehicle_road_id": vehicle.get("road_id"),
+        "vehicle_lane_id": vehicle.get("lane_id"),
         "ego_xy": [ego.get("x"), ego.get("y")] if ego else None,
-        "partner_xy": [partner.get("x"), partner.get("y")] if partner else None,
+        "vehicle_xy": [vehicle.get("x"), vehicle.get("y")] if vehicle else None,
     }
 
 
-def _collision_action_attributes(iv: dict, *, as_partner: bool) -> dict:
+def _collision_action_attributes(iv: dict, *, as_vehicle: bool) -> dict:
     """Build action.yaml attributes for a per-agent COLLISION event."""
     ego = iv.get("ego_at_collision") or {}
-    partner = iv.get("partner_at_collision") or {}
+    vehicle = iv.get("vehicle_at_collision") or {}
     base = {
         "min_clearance_m": iv.get("min_clearance_m"),
         "source": iv.get("source"),
         "ego_speed_mps": ego.get("speed_mps"),
-        "partner_speed_mps": partner.get("speed_mps"),
+        "vehicle_speed_mps": vehicle.get("speed_mps"),
         "ego_road_id": ego.get("road_id"),
         "ego_lane_id": ego.get("lane_id"),
         "ego_x": ego.get("x"),
         "ego_y": ego.get("y"),
-        "partner_road_id": partner.get("road_id"),
-        "partner_lane_id": partner.get("lane_id"),
-        "partner_x": partner.get("x"),
-        "partner_y": partner.get("y"),
+        "vehicle_road_id": vehicle.get("road_id"),
+        "vehicle_lane_id": vehicle.get("lane_id"),
+        "vehicle_x": vehicle.get("x"),
+        "vehicle_y": vehicle.get("y"),
     }
-    if as_partner:
+    if as_vehicle:
         base["with_name"] = ego.get("name", "Ego")
         base["with_track_id"] = 0
-        base["role"] = "partner"
+        base["role"] = "other_vehicle"
     else:
         base["with_name"] = iv.get("with_name")
         base["with_track_id"] = iv.get("with_track_id")
@@ -411,8 +416,8 @@ def inject_collision_agent_actions(
     for iv in collisions:
         t = round(float(iv.get("key_time") or 0), 2)
         ego = iv.get("ego_at_collision") or {}
-        partner = iv.get("partner_at_collision") or {}
-        partner_tid = iv.get("with_track_id")
+        vehicle = iv.get("vehicle_at_collision") or {}
+        vehicle_tid = iv.get("with_track_id")
 
         ego_agent = by_track.get(0)
         if ego_agent is not None:
@@ -424,12 +429,12 @@ def inject_collision_agent_actions(
                     "duration": 0.0,
                     "road_id": int(ego.get("road_id", 0) or 0),
                     "lane_id": int(ego.get("lane_id", 0) or 0),
-                    "attributes": _collision_action_attributes(iv, as_partner=False),
+                    "attributes": _collision_action_attributes(iv, as_vehicle=False),
                 }
             )
 
-        if partner_tid is not None:
-            pa = by_track.get(int(partner_tid))
+        if vehicle_tid is not None:
+            pa = by_track.get(int(vehicle_tid))
             if pa is not None:
                 pa.setdefault("actions", []).append(
                     {
@@ -437,9 +442,9 @@ def inject_collision_agent_actions(
                         "start_time": t,
                         "end_time": t,
                         "duration": 0.0,
-                        "road_id": int(partner.get("road_id", 0) or 0),
-                        "lane_id": int(partner.get("lane_id", 0) or 0),
-                        "attributes": _collision_action_attributes(iv, as_partner=True),
+                        "road_id": int(vehicle.get("road_id", 0) or 0),
+                        "lane_id": int(vehicle.get("lane_id", 0) or 0),
+                        "attributes": _collision_action_attributes(iv, as_vehicle=True),
                     }
                 )
 
@@ -475,7 +480,7 @@ def infer_closest_approaches(
         if float(npc["speed"].abs().max()) <= Thresholds.STOPPED_SPEED:
             continue
 
-        clearance, t_hit = _min_clearance_with_partner(df, ego_name, npc_name)
+        clearance, t_hit = _min_clearance_with_vehicle(df, ego_name, npc_name)
         if clearance >= conflict_relevance_m or t_hit is None:
             continue
 
@@ -534,29 +539,29 @@ def augment_interactions(
         }
     }
 
-    partner = resolve_collision_partner(
+    collision_vehicle = resolve_collision_vehicle(
         df,
         meta_agents,
         trial_events=trial_events,
         collided=collided,
         contact_clearance_m=contact_clearance_m,
     )
-    if partner is not None:
+    if collision_vehicle is not None:
         collision_iv = enrich_collision_interaction(
             {
                 "type": InteractionAction.COLLISION.value,
-                "with_track_id": partner.partner_track_id,
-                "with_name": partner.partner_name,
-                "key_time": partner.key_time,
-                "min_clearance_m": partner.min_clearance_m,
-                "source": partner.source,
+                "with_track_id": collision_vehicle.vehicle_track_id,
+                "with_name": collision_vehicle.vehicle_name,
+                "key_time": collision_vehicle.key_time,
+                "min_clearance_m": collision_vehicle.min_clearance_m,
+                "source": collision_vehicle.source,
             },
             df,
             meta_agents,
         )
         out.insert(0, collision_iv)
-        if partner.partner_track_id is not None:
-            tier_a_tracks.add(int(partner.partner_track_id))
+        if collision_vehicle.vehicle_track_id is not None:
+            tier_a_tracks.add(int(collision_vehicle.vehicle_track_id))
 
     closest = infer_closest_approaches(
         df,

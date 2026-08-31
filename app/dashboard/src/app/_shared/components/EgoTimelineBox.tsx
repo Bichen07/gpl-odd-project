@@ -69,7 +69,7 @@ export default function EgoTimelineBox({
           color: isOverlay ? "inherit" : isChat ? "#000" : undefined,
         }}
       >
-        {title} — t = {timeSec.toFixed(2)} s
+        {title}
       </Typography>
       {(velocityMps != null || accelMps2 != null) && (
         <Typography
@@ -96,7 +96,7 @@ export default function EgoTimelineBox({
             opacity: isChat ? 0.85 : 1,
           }}
         >
-          {`event at time t = ${active.t.toFixed(2)} s`}
+          {`event occurs at t = ${active.t.toFixed(2)} s`}
         </Typography>
       )}
       {active && (

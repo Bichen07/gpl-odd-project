@@ -25,6 +25,8 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .paths import run_artifact_path, run_source_dir
+
 _OUTPUT_FILE = "cluster_selection_eval.json"
 
 # Composite weights over the components that could be computed (renormalized
@@ -48,7 +50,7 @@ _MERGE_PARAM_OVERLAP = 0.8
 def _load_clusters(run_dir: Path) -> List[Dict[str, Any]]:
     """Read every ``cluster<N>`` doc, newest layout first then flat fallback."""
     out: List[Dict[str, Any]] = []
-    for cdir in sorted(run_dir.glob("cluster*")):
+    for cdir in sorted(run_source_dir(run_dir).glob("cluster*")):
         if not cdir.is_dir() or not cdir.name[len("cluster"):].isdigit():
             continue
         path = cdir / "raw" / "cluster.json"
@@ -86,7 +88,7 @@ def _primary_motive(cluster_dir: Path) -> Optional[str]:
 
 def _load_parameter_space_pairs(run_dir: Path) -> List[Dict[str, Any]]:
     pairs: List[Dict[str, Any]] = []
-    for path in sorted((run_dir / "parameter_space_pairs").glob("*/pair.json")):
+    for path in sorted((run_source_dir(run_dir) / "parameter_space_pairs").glob("*/pair.json")):
         try:
             pairs.append(json.loads(path.read_text(encoding="utf-8")))
         except Exception:
@@ -318,7 +320,7 @@ def write_eval(run_dir: Path) -> Optional[Path]:
     if report is None:
         print(f"[selection-eval] no cluster dirs in {run_dir}")
         return None
-    out_path = run_dir / _OUTPUT_FILE
+    out_path = run_artifact_path(run_dir, "selection_eval", write=True)
     out_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     score = report.get("selection_score")
     print(
@@ -478,7 +480,7 @@ def neighbor_cards_for_cluster(run_dir: Path, cluster_label: Any) -> str:
     """
     run_dir = Path(run_dir)
     cid = str(cluster_label)
-    parameter_space_pairs_dir = run_dir / "parameter_space_pairs"
+    parameter_space_pairs_dir = run_source_dir(run_dir) / "parameter_space_pairs"
     if not parameter_space_pairs_dir.is_dir():
         return f"(no parameter_space_pairs/ directory in this run — cluster{cid} has no neighbor cards)"
 
@@ -542,7 +544,7 @@ def neighbor_cards_for_cluster(run_dir: Path, cluster_label: Any) -> str:
                 "pack facts only)"
             )
 
-        neighbor_card = medoid_card_block(run_dir / f"cluster{other}")
+        neighbor_card = medoid_card_block(run_source_dir(run_dir) / f"cluster{other}")
         block += "\n\n" + (
             neighbor_card or f"(cluster{other} has no medoid card yet)"
         )
@@ -574,7 +576,7 @@ def neighbor_rollup_digest(run_dir: Path) -> str:
     lines: List[str] = []
     any_found = False
     for cdir in sorted(
-        d for d in run_dir.glob("cluster*")
+        d for d in run_source_dir(run_dir).glob("cluster*")
         if d.is_dir() and d.name[len("cluster"):].isdigit()
     ):
         path = cdir / "output" / "cluster_summary.yaml"

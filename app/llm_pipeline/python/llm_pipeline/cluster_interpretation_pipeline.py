@@ -34,7 +34,13 @@ from .llm_factory import (
     llm_api_key_for_model,
     normalize_model_name,
 )
-from .paths import CLUSTERS_DIR, REPO_ROOT, RESULTS_DIR
+from .paths import (
+    CLUSTERS_DIR,
+    REPO_ROOT,
+    RESULTS_DIR,
+    run_source_dir,
+    run_source_path,
+)
 
 ensure_analyzer_src()
 from dataset_config import DATASETS, trial_id_to_csv_indices, xodr_path_for_dataset  # noqa: E402
@@ -114,6 +120,9 @@ def load_clustering_result_json(dataset: str, n_clusters: int) -> Optional[Dict[
     ]
     from .paths import RESULTS_DIR
 
+    candidates.append(
+        RESULTS_DIR / dataset / str(n_clusters) / "source" / "clustering" / "selectedClusteringResult.json"
+    )
     candidates.append(
         RESULTS_DIR / dataset / str(n_clusters) / "clustering" / "selectedClusteringResult.json"
     )
@@ -848,7 +857,7 @@ def build_llm_run_from_analyzer(
             )
 
     manifest = build_run_manifest(dataset, n_clusters, medoids, run_id)
-    (run_dir / "manifest.json").write_text(
+    run_source_path(run_dir, "manifest.json", write=True).write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
     )
     return run_dir
@@ -857,9 +866,11 @@ def build_llm_run_from_analyzer(
 def zip_interpretations(run_dir: Path) -> BytesIO:
     buf = BytesIO()
     with zipfile.ZipFile(buf, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for yml in sorted(run_dir.glob("clusters/cluster_*/cluster_interpretation.yaml")):
+        for yml in sorted(
+            run_source_dir(run_dir).glob("clusters/cluster_*/cluster_interpretation.yaml")
+        ):
             zf.write(yml, arcname=yml.relative_to(run_dir).as_posix())
-        manifest = run_dir / "manifest.json"
+        manifest = run_source_path(run_dir, "manifest.json")
         if manifest.is_file():
             zf.write(manifest, arcname="manifest.json")
     buf.seek(0)
@@ -987,7 +998,7 @@ def run_stage2b_for_dataset_k(
     outputs: Dict[str, str] = {}
     search_dirs = [run_dir, REPO_ROOT, Path.cwd()]
     cluster_dirs = sorted(
-        d for d in run_dir.glob("cluster*")
+        d for d in run_source_dir(run_dir).glob("cluster*")
         if d.is_dir() and d.name[len("cluster"):].isdigit()
     )
     if not cluster_dirs:

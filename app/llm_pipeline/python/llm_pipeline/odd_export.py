@@ -43,7 +43,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .paths import find_repo_root
+from .paths import find_repo_root, run_artifact_path, run_source_path
 
 ALL_TRIALS_FILENAME = "odd_all_trials.json"
 EXPORT_FILENAME = "odd_boundary_export.json"
@@ -76,7 +76,7 @@ def parse_run_dir(run_dir: Path) -> Tuple[int, int, str]:
 
 
 def load_selected_clustering_result(run_dir: Path) -> Dict[str, Any]:
-    p = run_dir / "clustering" / "selectedClusteringResult.json"
+    p = run_source_path(run_dir, "clustering", "selectedClusteringResult.json")
     if not p.is_file():
         raise FileNotFoundError(
             f"Missing {p} — this folder was not produced by dataset_builder "
@@ -391,11 +391,13 @@ def export_run_dir(
         "trials": result["all_trials"],
     }
 
-    export_path = run_dir / EXPORT_FILENAME
+    export_path = run_artifact_path(run_dir, "odd_boundary_export", write=True)
     export_path.write_text(json.dumps(export_doc, indent=2), encoding="utf-8")
-    all_trials_path = run_dir / ALL_TRIALS_FILENAME
+    all_trials_path = run_artifact_path(run_dir, "odd_all_trials", write=True)
     all_trials_path.write_text(json.dumps(all_trials_doc, indent=2), encoding="utf-8")
-    snapshot_path = run_dir / f"odd_boundary_export.kNN{kNN}.json"
+    snapshot_path = run_artifact_path(
+        run_dir, "odd_boundary_snapshot", write=True, snapshot_knn=kNN
+    )
     snapshot_path.write_text(json.dumps(export_doc, indent=2), encoding="utf-8")
 
     return {

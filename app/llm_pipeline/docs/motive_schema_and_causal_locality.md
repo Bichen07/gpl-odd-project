@@ -21,9 +21,9 @@ readable — the new keys are additive.
 
 ### The closed motive set
 
-`yield_to_partner` · `early_brake` · `late_reaction` · `gap_acceptance_creep` ·
+`yield_to_vehicle` · `early_brake` · `late_reaction` · `gap_acceptance_creep` ·
 `assertive_gap_acceptance` · `maintain_through` · `post_clear_recovery` ·
-`partner_driven_swerve` · `unclear`
+`vehicle_driven_swerve` · `unclear`
 
 Each code carries a gating condition in `common_sense.txt` (e.g. `late_reaction` =
 first strong decelerate only near `peak_t` or `ttc_min` < 1.5 s), and every code used
@@ -39,7 +39,7 @@ an unnamed behavior became visible instead of being buried in prose.
 > An ego action at time `t_a` may be explained only by evidence at `t ≤ t_a`, plus
 > global ground truth (`peak_t`, `d_min`, `ttc_min`, outcome). Post-peak accelerate /
 > same-lane turn ⇒ `post_clear_recovery` only; never the motive for a pre-peak brake.
-> Stamps where the partner is still far (d ≳ 100 m) are scene setup, not motives.
+> Stamps where the vehicle is still far (d ≳ 100 m) are scene setup, not motives.
 
 ---
 
@@ -185,7 +185,7 @@ This is why the enum and locality rule live in `system_prompt.txt` +
 numeric thresholds. We deliberately **did not** move our `v_lat` band from 0.3 to their
 0.42 m/s equivalent in this change.
 
-### 3.4 Staged reasoning: partner → ego action → behavior — DriveLM
+### 3.4 Staged reasoning: vehicle → ego action → behavior — DriveLM
 ECCV 2024 **Oral** · [arXiv:2312.14150](https://arxiv.org/abs/2312.14150)
 
 > **Abstract:** "While recent approaches adapt VLMs to driving via single-round visual
@@ -275,8 +275,8 @@ Our two builds, with `primary_motive` from the new schema:
 
 | k=3 (`s=0.8032`) | n | collision | primary_motive |
 |---|---|---|---|
-| cluster0 | 904 | 1.99 % | `yield_to_partner` |
-| cluster1 | 753 | 0 % | `yield_to_partner` |
+| cluster0 | 904 | 1.99 % | `yield_to_vehicle` |
+| cluster1 | 753 | 0 % | `yield_to_vehicle` |
 | cluster2 | 1343 | 100 % | `assertive_gap_acceptance` |
 
 | k=6 (`s=0.6113`, paper) | n | collision | primary_motive |
@@ -385,14 +385,14 @@ The audit numbers in §5.1–§5.4 below cover the first three-pack run (13 medo
 | Post-peak evidence attached to a non-recovery code | **2 / 13** (see 5.2) |
 | Completion tokens | max 7458, mean 5470 (cap 12288) |
 
-Observed motive distribution: `assertive_gap_acceptance` 6, `yield_to_partner` 4,
+Observed motive distribution: `assertive_gap_acceptance` 6, `yield_to_vehicle` 4,
 `gap_acceptance_creep` 2, `late_reaction` 1.
 
 ### 5.2 The checker earns its keep
 
 Two cards attach evidence slightly after `peak_t` to a non-recovery code:
 `4_cluster/cluster2` (`gap_acceptance_creep` at 14.08 s vs `peak_t`=13.98 s) and
-`3_cluster/cluster0` (`yield_to_partner` at 10.8 s vs `peak_t`=9.7 s). The first is 0.1 s
+`3_cluster/cluster0` (`yield_to_vehicle` at 10.8 s vs `peak_t`=9.7 s). The first is 0.1 s
 and benign; the second is a real 1.1 s post-peak attribution. Neither was detectable in
 the old free-text format. This is the intended outcome: violations become findable.
 
@@ -405,11 +405,11 @@ differently:
 
 | run | primary | secondary |
 | --- | ------- | --------- |
-| `3_cluster/cluster1` | `yield_to_partner` | `assertive_gap_acceptance`, `post_clear_recovery` |
+| `3_cluster/cluster1` | `yield_to_vehicle` | `assertive_gap_acceptance`, `post_clear_recovery` |
 | `6_cluster/cluster0` | `assertive_gap_acceptance` | `late_reaction`, `post_clear_recovery` |
 
 The disagreement is narrow and legible: is braking at 7.8 s (TTC ≈ 2.18 s, `ttc_min` 1.93 s)
-a `yield_to_partner` or a `late_reaction`, and which code is primary. Both are defensible
+a `yield_to_vehicle` or a `late_reaction`, and which code is primary. Both are defensible
 under the current gating conditions, which means the **gate wording is under-specified**,
 not that the model is wrong. Under the old prose format this variance existed too but was
 invisible. It is the strongest argument for Phase 2 (code-emitted features) and for
@@ -510,7 +510,7 @@ Reviewing the three `batch8/3_cluster_s=0.8032` medoid cards side by side showed
 
 | card | stamp | what actually happened | tagged |
 | --- | --- | --- | --- |
-| `cluster2` (collision) | t=9.7 s | Ego ENDS its yield_to_partner decelerate, holds 5.56 m/s, while CuttingIn is still very close (d=4.1 m, ttc=2.32 s) — 1 s before impact | `unclear` |
+| `cluster2` (collision) | t=9.7 s | Ego ENDS its yield_to_vehicle decelerate, holds 5.56 m/s, while CuttingIn is still very close (d=4.1 m, ttc=2.32 s) — 1 s before impact | `unclear` |
 | `cluster1` (near_miss) | t=12.3 s | after `post_clear_recovery` accelerate, Ego takes a light decelerate while CuttingIn is near-ahead but not re-closing (d=6.6 m) | `unclear` |
 | `cluster0` (near_miss) | t=10.8 s | context log literally states "Ego ends deceleration; Ego begins decelerating" at the same stamp | `unclear` |
 
@@ -522,19 +522,19 @@ post-peak follow adjustment) with no code to name it — exactly what Phase 0's
 
 **Two codes added to `common_sense.txt`:**
 
-- `unresolved_brake_release` — ego ends/eases an active evasive decelerate
-  **before** `peak_t`/outcome while the partner is still near/very-close (d ≲ 8 m)
+- `brake_release` — ego ends/eases an active evasive decelerate
+  **before** `peak_t`/outcome while the vehicle is still near/very-close (d ≲ 8 m)
   or `ttc` ≲ 3 s. This is the direct precursor to a collision in cases like
   `cluster2` above — naming it instead of `unclear` makes "why did the collision
   happen" answerable from the typed field, not just the prose.
 - `post_clear_adjustment` — light/moderate decelerate (or a second short
-  accelerate) strictly after `peak_t` while trailing a partner that is NOT
+  accelerate) strictly after `peak_t` while trailing a vehicle that is NOT
   re-closing. Distinguishes ordinary follow-distance correction from
   `post_clear_recovery` (which specifically means resuming speed/heading) and
   from a new conflict.
 
 A precedence list was added directly above `unclear` in the table: check
-`unresolved_brake_release`, then `post_clear_adjustment`, then
+`brake_release`, then `post_clear_adjustment`, then
 `post_clear_recovery`, and only fall through to `unclear` when the evidence
 itself is contradictory or missing (the `cluster0` t=10.8 s case). `unclear`'s
 gating condition was reworded to say this explicitly, so it can't be used just
@@ -557,3 +557,59 @@ instead of a second copy of the timeline.
 Not yet done: re-running `--products medoid` against `batch8/3_cluster_s=0.8032`
 to confirm the three `unclear` stamps above resolve to the new codes and the
 summaries shrink — deferred per explicit request, prompt-only change for now.
+
+---
+
+## 10. Phase 1.2 — taxonomy cross-check against the reference paper; one more
+closed code + a control-response/motive consistency table (2026-08-29)
+
+**Status:** implemented (prompt-level). **Scope:** `common_sense.txt` +
+`medoid_trial_prompt.txt` only.
+
+Cross-checked our closed vocabulary against the case-study labels in the lab's
+reference paper ("Behavior-Centric Visual Analytics for Scenario-Based Safety
+Evaluation of Autonomous Vehicles") and against published traffic-interaction
+taxonomies (van Haperen et al.'s active/passive/no-yield classes; Markkula et
+al.'s adherence/violation taxonomy referenced therein). Two findings:
+
+1. **Our closed set already matches the paper's vocabulary.** Every cluster
+   label used across its three case studies — `pass-first`, `smooth-pass`,
+   `pass-slowdown`, `proactive-yield`, `late-yield`, `yield`,
+   `yield-stop-collision`, `braking-rear-end`, and named collisions
+   (`opposite-collision` / `parked-collision` / `cut-in-collision`) — already
+   has a corresponding entry in common_sense's `interaction_resolution` /
+   `control_response` values or in the "Cluster label building blocks" table.
+   No new label vocabulary was needed.
+
+2. **Gap: no trial-level motive code produced the paper's `braking-rear-end`
+   pattern.** The label table already listed a `Brake` modifier
+   ("severe/abrupt, often post-pass rear-end"), but nothing in the closed
+   `primary_motive` set represented "Ego brakes hard, for an unrelated reason,
+   strictly after clearing the named vehicle it just passed" — the exact arc
+   behind the paper's Case Study 3 `braking-rear-end` (C4) cluster. Without a
+   named code, a medoid on this arc would fall through to `unclear` or get
+   mis-tagged as `post_clear_adjustment` (which is explicitly for *minor*
+   post-peak corrections, not severe/abrupt braking).
+
+**Code added to `common_sense.txt`:** `post_clear_hard_brake` — severe/abrupt
+decelerate (EMERGENCY_BRAKE or |Δv| ≳5 m/s) strictly after `peak_t`, named
+vehicle already behind/clear, braking for a new reason unrelated to that
+vehicle re-closing. Added to the precedence list (checked before
+`post_clear_adjustment`/`unclear`), to the Resolution class table (→ PASS,
+risk modifier), and wired to the `Brake` label modifier so `Brake Rear-end` is
+now derived from a named motive instead of being freehanded.
+
+**Consistency gap also found:** `interaction_resolution`, `control_response`,
+`primary_motive`, and `secondary_motives` had no explicit fill order or
+cross-field agreement rule, so a card could legally set e.g.
+`control_response: proactive` with `primary_motive: late_reaction` (contradicting
+each other) and nothing would catch it. Added (a) an explicit 1→4 fill order
+("who → how → why → what else") and (b) a closed
+`control_response` → allowed `primary_motive` pairing table to both
+`common_sense.txt` and directly above the YAML fence in
+`medoid_trial_prompt.txt`, with the rule that a disagreement is resolved in
+favor of the motive evidence, not left as a contradiction.
+
+Not yet done: re-running `--products medoid` against a batch containing a
+`braking-rear-end`-shaped medoid to confirm it now tags `post_clear_hard_brake`
+instead of `unclear` — deferred, prompt-only change for now.

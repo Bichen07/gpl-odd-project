@@ -795,7 +795,7 @@ export default function PerEgoSelection({
         if (!labeled) {
           const noiseRatio = noiseRatioMapping[index];
           if (
-            !uniqueResultIndices.has(index) ||
+          !uniqueResultIndices.has(index) ||
             noiseRatio > noiseFilterRatio
           ) {
             return false;
@@ -804,7 +804,7 @@ export default function PerEgoSelection({
 
         if (
           clusterCounts !== -1 &&
-          clusterCounts !== 1 &&
+            clusterCounts !== 1 &&
           Object.keys(infos[index] ?? {}).length !==
             ("-1" in (infos[index] ?? {})
               ? clusterCounts + 1
@@ -919,18 +919,18 @@ export default function PerEgoSelection({
       return;
     }
 
-    dispatch(
-      batchSlice.actions.setSelectedClusteringResults({
-        ...selectedClusteringResults,
-        [egoName]: null,
-      })
-    );
-    dispatch(
-      batchSlice.actions.setSelectedClusterInfos({
-        ...selectedClusterInfos,
-        [egoName]: null,
-      })
-    );
+      dispatch(
+        batchSlice.actions.setSelectedClusteringResults({
+          ...selectedClusteringResults,
+          [egoName]: null,
+        })
+      );
+      dispatch(
+        batchSlice.actions.setSelectedClusterInfos({
+          ...selectedClusterInfos,
+          [egoName]: null,
+        })
+      );
     dispatch(
       batchSlice.actions.setClusterAnalysisByEgo({
         ...(clusterAnalysisByEgo ?? {}),
@@ -1391,7 +1391,7 @@ export default function PerEgoSelection({
                 {scoreKeys.map((key) => (
                   <MenuItem key={key} value={key}>
                     {SORT_LABELS[key] ?? key}
-                  </MenuItem>
+                    </MenuItem>
                 ))}
               </Select>
             </Stack>
@@ -1474,8 +1474,8 @@ export default function PerEgoSelection({
               >
                 {availableClusterCounts.map((key) => (
                   <MenuItem key={key} value={key}>
-                    {key === -1 ? "all" : key}
-                  </MenuItem>
+                      {key === -1 ? "all" : key}
+                    </MenuItem>
                 ))}
               </Select>
             </Stack>

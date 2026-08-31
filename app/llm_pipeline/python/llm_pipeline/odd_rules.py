@@ -23,6 +23,8 @@ import numpy as np
 from sklearn.model_selection import StratifiedKFold, cross_val_score
 from sklearn.tree import DecisionTreeClassifier
 
+from .paths import run_artifact_path
+
 ALL_TRIALS_FILENAME = "odd_all_trials.json"
 EXPORT_FILENAME = "odd_boundary_export.json"
 RULES_FILENAME = "odd_parameter_rules.json"
@@ -38,7 +40,7 @@ class TrainingSet:
 
 
 def load_training_set(run_dir: Path) -> TrainingSet:
-    p = run_dir / ALL_TRIALS_FILENAME
+    p = run_artifact_path(run_dir, "odd_all_trials")
     if not p.is_file():
         raise FileNotFoundError(
             f"Missing {p} — run S2 first (odd_export.export_run_dir or the Dashboard "
@@ -81,7 +83,7 @@ def load_training_set(run_dir: Path) -> TrainingSet:
 
 
 def _load_boundary_trial_ids(run_dir: Path) -> Optional[set]:
-    p = run_dir / EXPORT_FILENAME
+    p = run_artifact_path(run_dir, "odd_boundary_export")
     if not p.is_file():
         return None
     doc = json.loads(p.read_text(encoding="utf-8"))
@@ -216,7 +218,7 @@ def train_rules(
         ],
     }
 
-    out_path = run_dir / RULES_FILENAME
+    out_path = run_artifact_path(run_dir, "odd_rules", write=True)
     out_path.write_text(json.dumps(doc, indent=2), encoding="utf-8")
     return {
         "rules_path": str(out_path),

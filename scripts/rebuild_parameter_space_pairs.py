@@ -25,13 +25,15 @@ from typing import Dict, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "app" / "analyzer" / "src"))
+from cluster_paths import run_source_dir, run_source_path
 
 
 def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
     """Map payload trial_id → (batch_id, esmini_index) from packs / manifest."""
     run_dir = Path(run_dir)
+    source_dir = run_source_dir(run_dir)
     batch_id = 7
-    for cj in run_dir.glob("cluster*/raw/cluster.json"):
+    for cj in source_dir.glob("cluster*/raw/cluster.json"):
         try:
             m = (json.loads(cj.read_text(encoding="utf-8")).get("medoid") or {})
             if m.get("batch_id") is not None:
@@ -43,7 +45,7 @@ def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
     idx: Dict[str, Tuple[int, int]] = {}
 
     # Prefer indices persisted on manifest pairs
-    man = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    man = json.loads(run_source_path(run_dir, "manifest.json").read_text(encoding="utf-8"))
     for bp in man.get("parameter_space_pairs") or []:
         ta, tb = str(bp.get("trial_a")), str(bp.get("trial_b"))
         if bp.get("trial_index_a") is not None:
@@ -58,7 +60,7 @@ def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
             )
 
     # New layout pair.json
-    for pj in (run_dir / "parameter_space_pairs").glob("c*-*/pair.json"):
+    for pj in (source_dir / "parameter_space_pairs").glob("c*-*/pair.json"):
         try:
             doc = json.loads(pj.read_text(encoding="utf-8"))
         except Exception:
@@ -74,7 +76,7 @@ def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
 
     # Legacy highlight_trials/param_boundary_c*
     folder_ti: Dict[Tuple[str, str], int] = {}
-    for p in run_dir.glob("cluster*/highlight_trials/param_boundary_c*/trial_*"):
+    for p in source_dir.glob("cluster*/highlight_trials/param_boundary_c*/trial_*"):
         m = re.match(r"cluster(\d+)$", p.parents[2].name)
         m2 = re.match(r"param_boundary_c(\d+)$", p.parent.name)
         m3 = re.match(r"trial_(\d+)$", p.name)
@@ -89,7 +91,7 @@ def _index_from_existing_packs(run_dir: Path) -> Dict[str, Tuple[int, int]]:
         if tb not in idx and (cb, ca) in folder_ti:
             idx[tb] = (batch_id, folder_ti[(cb, ca)])
 
-    for cj in run_dir.glob("cluster*/raw/cluster.json"):
+    for cj in source_dir.glob("cluster*/raw/cluster.json"):
         try:
             m = json.loads(cj.read_text(encoding="utf-8")).get("medoid") or {}
             tid = str(m.get("trial_id") or "")
@@ -116,10 +118,11 @@ def main() -> None:
     args = ap.parse_args()
 
     run_dir = args.results_dir.resolve()
-    manifest_path = run_dir / "manifest.json"
-    if not manifest_path.is_file():
-        raise SystemExit(f"manifest.json missing: {manifest_path}")
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest_read_path = run_source_path(run_dir, "manifest.json")
+    if not manifest_read_path.is_file():
+        raise SystemExit(f"manifest.json missing: {manifest_read_path}")
+    manifest = json.loads(manifest_read_path.read_text(encoding="utf-8"))
+    manifest_path = run_source_path(run_dir, "manifest.json", for_write=True)
     pairs = manifest.get("parameter_space_pairs") or []
     if not pairs:
         raise SystemExit("manifest has no parameter_space_pairs")

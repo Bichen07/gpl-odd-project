@@ -103,14 +103,20 @@ def _write_sidecar(index_map: Dict[str, Tuple[int, int]]) -> None:
     print(f"  wrote {SIDECAR.relative_to(REPO)} ({sum(len(v) for v in data.values())} entries)")
 
 
+def _source_dir(results_dir: Path) -> Path:
+    nested = results_dir / "source"
+    return nested if nested.is_dir() else results_dir
+
+
 def _needed_trial_ids(results_dir: Path) -> Set[str]:
     ids: Set[str] = set()
-    man = results_dir / "manifest.json"
+    source_dir = _source_dir(results_dir)
+    man = source_dir / "manifest.json"
     if man.is_file():
         for c in (json.loads(man.read_text()).get("clusters") or []):
             if c.get("trial_id") is not None:
                 ids.add(str(c["trial_id"]))
-    for cdir in results_dir.glob("cluster*"):
+    for cdir in source_dir.glob("cluster*"):
         cj = cdir / "cluster.json"
         if not cj.is_file():
             continue
@@ -199,7 +205,7 @@ def materialize(
     if results_dir and results_dir.is_dir():
         needed = _needed_trial_ids(results_dir)
         if only_medoids:
-            man = json.loads((results_dir / "manifest.json").read_text())
+            man = json.loads((_source_dir(results_dir) / "manifest.json").read_text())
             needed = {str(c["trial_id"]) for c in man.get("clusters") or []}
         print(f"needed trial ids: {len(needed)} (only_medoids={only_medoids})")
     else:

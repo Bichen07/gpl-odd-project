@@ -184,6 +184,7 @@ export type ReportData = {
 
 export type ChatTurn = {
   timestamp?: string;
+  conversation_id?: string;
   question: string;
   answer: string;
   citations: string[];

@@ -7,7 +7,7 @@ cluster A was doing X while cluster B was doing Y" directly, instead of
 cross-referencing two separate ``context.md`` documents itself.
 
 No new computation: every field rendered here (``d``, ``ttc``, ``v_ego``,
-``v_partner``, ``az``, ``closing``) was already computed by
+named vehicle speed, azimuth, and closing rate were already computed by
 ``_metrics_at()`` in ``conflict_frame_selector.py`` while building the synced
 BEV images — this module only stops discarding it and formats it as text.
 """
@@ -42,13 +42,24 @@ def _pick(fr: Dict[str, Any], *keys: str) -> Any:
     return None
 
 
+def _normalize_context_text(text: str) -> str:
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    try:
+        from agent_labels import normalize_vehicle_schema  # type: ignore
+        return str(normalize_vehicle_schema(text))
+    except Exception:
+        return text
+
+
 def _fmt_side(
     alive: Optional[bool],
     label: Optional[str],
     d: Optional[float],
     ttc: Optional[float],
     v_ego: Optional[float],
-    v_partner: Optional[float],
+    v_vehicle: Optional[float],
     az: Optional[float],
     closing: Optional[float],
     rel_long: Optional[float] = None,
@@ -56,6 +67,7 @@ def _fmt_side(
     clearance: Optional[float] = None,
     pass_state: Optional[str] = None,
     roll_speed: Optional[float] = None,
+    conflict_name: Optional[str] = None,
 ) -> str:
     if not alive:
         return "ended (out of frame / clip)"
@@ -75,7 +87,7 @@ def _fmt_side(
             d=d,
             ttc=ttc,
             v_ego=v_ego,
-            v_partner=v_partner,
+            v_vehicle=v_vehicle,
             az=az,
             closing=closing,
             rel_long_m=rel_long,
@@ -83,6 +95,7 @@ def _fmt_side(
             clearance_m=clearance,
             pass_state=pass_state,
             rolling_speed_1s_mps=roll_speed,
+            conflict_name=conflict_name,
         )
     else:
         bits = []
@@ -113,7 +126,7 @@ def build_merged_timeline_text(
         try:
             text = ctx_path.read_text(encoding="utf-8").strip()
             if text:
-                return text
+                return _normalize_context_text(text)
         except OSError:
             pass
 
@@ -127,6 +140,14 @@ def build_merged_timeline_text(
         doc: Dict[str, Any] = json.loads(idx_path.read_text(encoding="utf-8"))
     except Exception:
         return "(synced_bev_index.json unreadable)"
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    try:
+        from agent_labels import normalize_vehicle_schema  # type: ignore
+        doc = normalize_vehicle_schema(doc)
+    except Exception:
+        pass
 
     frames = doc.get("frames") or []
     if not frames:
@@ -139,11 +160,15 @@ def build_merged_timeline_text(
         f"time). [{left_lab}] and [{right_lab}] are read at the SAME shared "
         "t — this is the strongest anchor for 'who was doing what when the "
         "other side reached this instant'. Metrics use precise descriptions: "
-        "ego and partner speeds; center-to-center distance; estimated time to "
-        "collision; partner azimuth relative to ego heading; center-distance "
-        "closing/opening rate; partner position in ego coordinates; longitudinal "
+        "Ego and named conflict-vehicle speeds; center-to-center distance; estimated time to "
+        "collision; named vehicle azimuth relative to Ego heading; center-distance "
+        "closing/opening rate; named vehicle position in Ego coordinates; longitudinal "
         "relationship; minimum distance between vehicle boundaries; and Ego's "
         "average speed during the previous 1 second.",
+        "",
+        f"Named conflict vehicles: [{left_lab}] "
+        f"{doc.get('left_conflict_vehicle') or 'other vehicle'}; "
+        f"[{right_lab}] {doc.get('right_conflict_vehicle') or 'other vehicle'}.",
         "",
     ]
     truncated = len(frames) > max_lines
@@ -158,7 +183,7 @@ def build_merged_timeline_text(
             _pick(fr, "left_d", "left_d_m"),
             _pick(fr, "left_ttc", "left_ttc_s"),
             fr.get("left_v_ego"),
-            fr.get("left_v_partner"),
+            fr.get("left_v_vehicle"),
             _pick(fr, "left_az", "left_az_deg"),
             _pick(fr, "left_closing", "left_closing_mps"),
             fr.get("left_rel_long_m"),
@@ -166,6 +191,7 @@ def build_merged_timeline_text(
             fr.get("left_clearance_m"),
             fr.get("left_pass_state"),
             fr.get("left_rolling_speed_1s_mps"),
+            conflict_name=str(doc.get("left_conflict_vehicle") or "other vehicle"),
         )
         right_txt = _fmt_side(
             fr.get("right_alive"),
@@ -173,7 +199,7 @@ def build_merged_timeline_text(
             _pick(fr, "right_d", "right_d_m"),
             _pick(fr, "right_ttc", "right_ttc_s"),
             fr.get("right_v_ego"),
-            fr.get("right_v_partner"),
+            fr.get("right_v_vehicle"),
             _pick(fr, "right_az", "right_az_deg"),
             _pick(fr, "right_closing", "right_closing_mps"),
             fr.get("right_rel_long_m"),
@@ -181,6 +207,7 @@ def build_merged_timeline_text(
             fr.get("right_clearance_m"),
             fr.get("right_pass_state"),
             fr.get("right_rolling_speed_1s_mps"),
+            conflict_name=str(doc.get("right_conflict_vehicle") or "other vehicle"),
         )
         lines.append(
             f"- t={float(t_s):.2f}s: [{left_lab}] {left_txt} | "

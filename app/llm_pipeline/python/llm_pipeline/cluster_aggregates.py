@@ -447,12 +447,12 @@ def _frame_metric(frame: Dict[str, Any], key: str, *legacy: str) -> Any:
 
 
 def _impact_classification(
-    frame: Dict[str, Any], partner_name: Optional[str]
+    frame: Dict[str, Any], vehicle_name: Optional[str]
 ) -> Optional[Dict[str, Any]]:
     """Deterministic collision geometry from the COLLISION frame's kinematics.
 
     Answers "who hit whom, from which angle, at what speed" from the same
-    az/v_ego/v_partner/closing already computed upstream (see
+    az/v_ego/v_vehicle/closing already computed upstream (see
     ``conflict_frame_selector.SelectedFrame``) but never surfaced to the LLM.
     This is handed to the LLM as ground truth (not inferred by it) so the
     medoid/Parameter-space pair prompts can describe collisions precisely instead of
@@ -463,29 +463,34 @@ def _impact_classification(
         return None
     az = float(az)
     sector = _bearing_sector(az)
-    partner = partner_name or "the partner"
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from agent_labels import display_agent_name  # type: ignore
+
+    vehicle = display_agent_name(vehicle_name)
     v_ego = frame.get("v_ego")
-    v_partner = frame.get("v_partner")
+    v_vehicle = frame.get("v_vehicle")
     dv = None
-    if v_ego is not None and v_partner is not None:
-        dv = round(float(v_partner) - float(v_ego), 2)
+    if v_ego is not None and v_vehicle is not None:
+        dv = round(float(v_vehicle) - float(v_ego), 2)
 
     # Naming: `striking_vehicle` = the one whose FRONT made contact (the mover
     # that closed the gap); `struck_vehicle` = the one whose REAR/side was hit.
     if sector in ("BEHIND", "BEHIND LEFT", "BEHIND RIGHT"):
         impact_type = "rear-end"
-        striking_vehicle, struck_vehicle = partner, "Ego"
-        detail = f"{partner} approaches from behind (az={az:.1f}°) and strikes Ego's rear."
+        striking_vehicle, struck_vehicle = vehicle, "Ego"
+        detail = f"{vehicle} approaches from behind (az={az:.1f}°) and strikes Ego's rear."
     elif sector in ("FRONT", "FRONT LEFT", "FRONT RIGHT"):
         impact_type = "rear-end"
-        striking_vehicle, struck_vehicle = "Ego", partner
-        detail = f"Ego is trailing {partner} (az={az:.1f}°) and strikes {partner}'s rear."
+        striking_vehicle, struck_vehicle = "Ego", vehicle
+        detail = f"Ego is trailing {vehicle} (az={az:.1f}°) and strikes {vehicle}'s rear."
     elif sector in ("LEFT", "RIGHT"):
         impact_type = "side/lateral impact"
         striking_vehicle = struck_vehicle = None
         side = "left" if sector == "LEFT" else "right"
         detail = (
-            f"{partner} contacts Ego's {side} side (az={az:.1f}°) — "
+            f"{vehicle} contacts Ego's {side} side (az={az:.1f}°) — "
             f"side-swipe or T-bone geometry, not a straight-line rear-end."
         )
     else:
@@ -494,17 +499,20 @@ def _impact_classification(
         detail = f"Ambiguous impact geometry at az={az:.1f}°."
 
     if dv is not None:
-        faster = partner if dv > 0.1 else ("Ego" if dv < -0.1 else "neither (~equal)")
-        detail += f" At impact v_ego={v_ego:.2f} m/s, v_partner={v_partner:.2f} m/s (faster: {faster})."
+        faster = vehicle if dv > 0.1 else ("Ego" if dv < -0.1 else "neither (~equal)")
+        detail += (
+            f" At impact Ego speed={v_ego:.2f} m/s, "
+            f"{vehicle} speed={v_vehicle:.2f} m/s (faster: {faster})."
+        )
 
     return {
         "t": frame.get("t"),
-        "partner": partner_name,
+        "vehicle": vehicle_name,
         "az": round(az, 1),
         "bearing_sector": sector,
         "d": _frame_metric(frame, "d", "d_m"),
         "v_ego": v_ego,
-        "v_partner": v_partner,
+        "v_vehicle": v_vehicle,
         "closing": _frame_metric(frame, "closing", "closing_mps"),
         "impact_type": impact_type,
         "striking_vehicle": striking_vehicle,
@@ -551,7 +559,7 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
         "brake_t": None,
         "d": None,
         "ttc": None,
-        "partner": None,
+        "vehicle": None,
         "outcome_hint": None,
         "snapshot_count": 0,
         "impact": None,
@@ -563,9 +571,14 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
             doc = json.loads(snaps_path.read_text(encoding="utf-8"))
         except Exception:
             doc = {}
+        analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+        if str(analyzer_src) not in sys.path:
+            sys.path.insert(0, str(analyzer_src))
+        from agent_labels import normalize_vehicle_schema  # type: ignore
+        doc = normalize_vehicle_schema(doc)
         pack["peak_t"] = doc.get("peak_t")
         pack["relevance_t"] = doc.get("relevance_t")
-        pack["partner"] = doc.get("partner_name")
+        pack["vehicle"] = doc.get("vehicle_name")
         frames = doc.get("snapshots") or []
         pack["snapshot_count"] = len(frames)
         d_vals, ttc_vals = [], []
@@ -591,7 +604,7 @@ def extract_conflict_pack(trial_dir: Path) -> Dict[str, Any]:
             pack["ttc"] = round(min(ttc_vals), 3)
         pack["outcome_hint"] = "collision" if collided else "survive_or_near_miss"
         if collision_frame is not None:
-            pack["impact"] = _impact_classification(collision_frame, pack["partner"])
+            pack["impact"] = _impact_classification(collision_frame, pack["vehicle"])
 
     action_path = _resolve(trial_dir, "action.yaml")
     if action_path is not None:
@@ -675,7 +688,7 @@ def find_param_boundary_trial_dir(
         pass
 
     cp = _cluster_paths()
-    cluster_dir = run_dir / f"cluster{src_cluster}"
+    cluster_dir = _cluster_paths().run_source_dir(run_dir) / f"cluster{src_cluster}"
     base = cp.resolve_highlight_subdir(
         cluster_dir, f"param_boundary_c{tgt_cluster}", must_exist=True
     )

@@ -15,6 +15,8 @@ import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from .paths import run_artifact_path, run_source_dir
+
 
 _OUTPUT_FILE = "clustering_quality.json"
 
@@ -44,7 +46,7 @@ def _load_cluster_docs(run_dir: Path) -> List[Dict[str, Any]]:
     except Exception:
         yaml = None  # type: ignore
 
-    for cdir in sorted(run_dir.glob("cluster*")):
+    for cdir in sorted(run_source_dir(run_dir).glob("cluster*")):
         if not (cdir.is_dir() and cdir.name[len("cluster"):].isdigit()):
             continue
         cj = resolve_path(cdir, "cluster.json", must_exist=True)
@@ -260,7 +262,7 @@ def score_run_dir(run_dir: Path) -> Optional[Path]:
     and writes the composite score. Returns the output path.
     """
     run_dir = Path(run_dir)
-    out_path = run_dir / _OUTPUT_FILE
+    out_path = run_artifact_path(run_dir, "quality", write=True)
 
     docs = _load_cluster_docs(run_dir)
     if not docs:
@@ -281,7 +283,7 @@ def score_run_dir(run_dir: Path) -> Optional[Path]:
             sil_folder = float(m.group(2))
 
     cross_eval: Optional[Dict[str, Any]] = None
-    cross_path = run_dir / "cross_cluster_eval.json"
+    cross_path = run_artifact_path(run_dir, "cross_eval")
     if cross_path.is_file():
         try:
             cross_eval = json.loads(cross_path.read_text(encoding="utf-8"))

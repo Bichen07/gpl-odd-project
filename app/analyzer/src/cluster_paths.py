@@ -11,6 +11,38 @@ from typing import Literal, Optional, Union
 
 Kind = Literal["raw", "processed", "output"]
 
+
+def run_source_dir(run_dir: Union[str, Path], *, for_write: bool = False) -> Path:
+    """Resolve core artifacts at the run root, with legacy ``source/`` fallback."""
+    root = Path(run_dir)
+    nested = root / "source"
+    if for_write:
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+    if nested.is_dir() and not (root / "manifest.json").is_file():
+        return nested
+    return root
+
+
+def run_source_path(
+    run_dir: Union[str, Path],
+    *parts: str,
+    for_write: bool = False,
+) -> Path:
+    """Resolve a core artifact at the run root or in legacy ``source/``."""
+    root = Path(run_dir)
+    direct = root / Path(*parts)
+    if for_write:
+        direct.parent.mkdir(parents=True, exist_ok=True)
+        return direct
+    legacy = root / "source" / Path(*parts)
+    if direct.exists():
+        return direct
+    if legacy.exists():
+        return legacy
+    return direct
+
+
 # Logical artifact name → (kind, relative filename under that kind dir)
 _ARTIFACTS: dict[str, tuple[Kind, str]] = {
     "trajectory.csv": ("raw", "trajectory.csv"),

@@ -8,6 +8,8 @@ import {
   Alert,
   Box,
   Chip,
+  Collapse,
+  IconButton,
   Paper,
   Stack,
   Tab,
@@ -19,7 +21,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { ExpandMore } from "@mui/icons-material";
+import { Close, ExpandMore, HelpOutline } from "@mui/icons-material";
 import type { SplitAnalysis } from "../types";
 import { CONTRAST_FIELD_BODY_SX, CONTRAST_FIELD_LABEL_SX, fmtNum } from "../utils";
 import DigestTable from "./DigestTable";
@@ -43,6 +45,7 @@ export default function SplitCardsPanel({
   const clusters = split?.clusters ?? [];
   const [clusterIdx, setClusterIdx] = useState(0);
   const [pairIdx, setPairIdx] = useState(0);
+  const [showNeighborHelp, setShowNeighborHelp] = useState(false);
   const card = clusters[Math.min(clusterIdx, Math.max(0, clusters.length - 1))] ?? null;
   const agg = (card?.aggregate ?? null) as Record<string, unknown> | null;
   const summaryParsed = ((card?.summaryMeta as Record<string, unknown> | null | undefined)
@@ -230,18 +233,39 @@ export default function SplitCardsPanel({
           {Array.isArray(summaryParsed?.neighbor_comparison) &&
             (summaryParsed!.neighbor_comparison as any[]).length > 0 && (
               <Box sx={{ mt: 1.5, mb: 2 }}>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  gutterBottom
-                  sx={CONTRAST_FIELD_LABEL_SX}
+                <Stack
+                  direction="row"
+                  spacing={0.5}
+                  alignItems="center"
+                  sx={{ mb: 0.5 }}
+                  flexWrap="wrap"
                 >
-                  neighbor_comparison
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={CONTRAST_FIELD_LABEL_SX}
+                  >
+                    neighbor_comparison
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    aria-label={
+                      showNeighborHelp
+                        ? "Hide neighbor_comparison verdict meanings"
+                        : "Show neighbor_comparison verdict meanings"
+                    }
+                    onClick={() => setShowNeighborHelp((open) => !open)}
+                  >
+                    {showNeighborHelp ? (
+                      <Close fontSize="inherit" />
+                    ) : (
+                      <HelpOutline fontSize="inherit" />
+                    )}
+                  </IconButton>
                   {summaryParsed?.distinct_from_neighbors != null && (
                     <Chip
                       size="small"
-                      sx={{ ml: 1, verticalAlign: "middle" }}
+                      sx={{ verticalAlign: "middle" }}
                       color={summaryParsed.distinct_from_neighbors ? "success" : "warning"}
                       label={
                         summaryParsed.distinct_from_neighbors
@@ -250,7 +274,41 @@ export default function SplitCardsPanel({
                       }
                     />
                   )}
-                </Typography>
+                </Stack>
+                <Collapse in={showNeighborHelp}>
+                  <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
+                    <Typography variant="caption" display="block" gutterBottom>
+                      Per-neighbor verdict for this cluster (from cluster_summary.yaml).
+                      These are not the pair card&apos;s separation_call words.
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      <strong>distinct</strong> — keep apart: under matched scenario
+                      parameters the two sides take different paths (stay-behind vs
+                      overlap / go-through, or a different motive family) and/or
+                      different outcomes. Maps from pair{" "}
+                      <code>separation_call: justified</code>. The boundary trial
+                      need not match this cluster&apos;s medoid.
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      <strong>similar</strong> — merge evidence: same geometry family
+                      and outcome, only a weak/late geometric difference. Maps
+                      from pair <code>separation_call: over_fine</code>.
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      <strong>inconclusive</strong> — this edge cannot decide keep vs
+                      merge because the pair card itself was{" "}
+                      <code>separation_call: inconclusive</code> (unusable /
+                      contradictory evidence). Not used merely because a boundary
+                      trial differs from the medoid. The Analyze report&apos;s
+                      &quot;Inconclusive pair separations&quot; list is the pair
+                      field, not this verdict.
+                    </Typography>
+                    <Typography variant="caption" component="div">
+                      <strong>ambiguous</strong> — missing contrast.yaml / medoid card,
+                      not a behavior judgment.
+                    </Typography>
+                  </Alert>
+                </Collapse>
                 <Stack spacing={0.5}>
                   {(summaryParsed!.neighbor_comparison as any[]).map((nc, i) => (
                     <Stack key={i} direction="row" spacing={1} alignItems="baseline" flexWrap="wrap">
@@ -263,7 +321,9 @@ export default function SplitCardsPanel({
                             ? "success"
                             : nc.verdict === "similar"
                               ? "warning"
-                              : "default"
+                              : nc.verdict === "inconclusive"
+                                ? "info"
+                                : "default"
                         }
                       />
                       <Typography variant="caption" color="text.secondary">
