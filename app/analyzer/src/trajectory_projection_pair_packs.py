@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from cluster_paths import run_source_dir
+from cluster_paths import clear_pack_keep_output, run_source_dir
 from parameter_space_pair_packs import (
     PARAMETER_SPACE_EGO_ZOOM_RADIUS_M,
     PARAMETER_SPACE_SNAPSHOT_OUTPUT_PX,
@@ -168,17 +168,16 @@ def process_trajectory_projection_pair_packs(
         bp["trial_index_b"] = int(tib)
         bp["batch_id_b"] = int(bb)
         pack = trajectory_projection_pair_pack_dir(run_dir, ca, cb)
-        if pack.is_dir():
-            shutil.rmtree(pack, ignore_errors=True)
-        pack.mkdir(parents=True, exist_ok=True)
+        n_kept = clear_pack_keep_output(pack)
         left_dir = side_trial_dir(pack, ca, tia)
         right_dir = side_trial_dir(pack, cb, tib)
         role = str(bp.get("card_role") or "secondary")
         emb = bp.get("embedding_dist")
         emb_s = f"{float(emb):.4f}" if isinstance(emb, (int, float)) else "?"
+        keep_note = f", kept {n_kept} LLM file(s) in output/" if n_kept else ""
         print(
             f"  🔹 Trajectory-projection pair [{role}] c{ca}↔c{cb} embedding_dist={emb_s} "
-            f"→ {pack.relative_to(run_dir)}"
+            f"→ {pack.relative_to(run_dir)}{keep_note}"
         )
 
         ok_l = process_trial_to_dir(

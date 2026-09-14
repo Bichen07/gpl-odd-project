@@ -6,7 +6,8 @@ for each cluster medoid generates nested pack layout::
 
   clusterN/raw/{trajectory.csv,cluster.json}
   clusterN/processed/{action.yaml,description.txt,context_medoid.md,context_cluster.md,snapshots/,map_overview.jpg}
-  clusterN/output/   # LLM YAMLs (medoid_trial / cluster_summary / shim)
+  clusterN/output/   # LLM YAMLs (medoid_trial / cluster_summary) — preserved on rebuild
+  parameter_space_pairs/cA-cB/output/  # LLM contrast.yaml — preserved on rematerialize
 
 Examples::
 
@@ -320,7 +321,7 @@ def _fetch_payload_analysis(
         zip_path = Path(analysis_zip)
         if not zip_path.is_file():
             print(f"❌ ERROR: --analysis-zip not found: {zip_path}")
-        return None
+            return None
         print(f"  Using local analysis zip: {zip_path}")
         try:
             content = zip_path.read_bytes()
@@ -786,7 +787,10 @@ def backfill_cluster_stats_in_dir(
     from pipeline_imports import ensure_llm_pipeline
 
     ensure_llm_pipeline()
-    from llm_pipeline.cluster_stats import build_collision_cluster_stats
+    from llm_pipeline.cluster_stats import (
+        build_collision_cluster_stats,
+        trial_collision_flag,
+    )
 
     patched = 0
     for cdir in sorted(rd.glob("cluster*")):
@@ -813,11 +817,18 @@ def backfill_cluster_stats_in_dir(
         c["mean_spret"] = ms.get("mean_spret")
         c["parameter_ranges"] = ms.get("parameter_ranges") or {}
         doc["cluster"] = c
+        # Keep medoid.collided aligned with Payload collision KPI (not stale false).
+        m = doc.get("medoid", {}) or {}
+        tid = str(m.get("trial_id") or "")
+        if tid and collision_flags:
+            m["collided"] = trial_collision_flag(collision_flags, tid)
+            doc["medoid"] = m
         cj.write_text(json.dumps(doc, indent=2), encoding="utf-8")
         patched += 1
         print(
             f"  ✓ patched {cdir.name}/cluster.json "
-            f"(min_ttc={c.get('min_ttc')}, params={len(c['parameter_ranges'])})"
+            f"(collided={m.get('collided')}, min_ttc={c.get('min_ttc')}, "
+            f"params={len(c['parameter_ranges'])})"
         )
 
     print(f"✅ Backfilled {patched} cluster.json file(s) in {rd}")
@@ -975,12 +986,12 @@ def load_clustering_from_payload_save(
             distinct_sils = sorted({round(c[0], 4) for c in candidates if c[0] is not None}, reverse=True)
             print(f"  (k={k} silhouettes available: {distinct_sils})")
         else:
-        candidates.sort(reverse=True)
-        best_sil, best_idx, selected = candidates[0]
-        print(f"  Selected best k={k} result: index={best_idx}, "
-              f"silhouette={best_sil:.4f}, task={selected.get('task')}")
-        if len(candidates) > 1:
-            print(f"  ({len(candidates)} candidates with k={k} evaluated)")
+            candidates.sort(reverse=True)
+            best_sil, best_idx, selected = candidates[0]
+            print(f"  Selected best k={k} result: index={best_idx}, "
+                  f"silhouette={best_sil:.4f}, task={selected.get('task')}")
+            if len(candidates) > 1:
+                print(f"  ({len(candidates)} candidates with k={k} evaluated)")
 
     # 7. Build trial_index_map (sidecar first, then unsuffixed esminiDat.filename)
     trials_meta = ego_data.get("trials", {})
@@ -1694,10 +1705,21 @@ def write_context_md(
         medoid_lines.append(f"- **Agents**: {ag_str}")
     medoid_lines.append("")
 
-    if selection is not None and getattr(selection, "frames", None):
+    effective_selection = selection
+    if effective_selection is None and traj_df is not None and action_data is not None:
+        try:
+            from conflict_frame_selector import select_action_frames
+
+            effective_selection = select_action_frames(
+                traj_df, action_data=action_data
+            )
+        except Exception:
+            effective_selection = selection
+
+    if effective_selection is not None and getattr(effective_selection, "frames", None):
         medoid_lines.append(
             format_conflict_timeline_sentences(
-                selection,
+                effective_selection,
                 filenames=snap_filenames,
                 action_data=action_data,
                 traj_df=traj_df,
@@ -2042,7 +2064,7 @@ def process_medoid(
                 f"  ✓ Updated description.txt"
                 + (" (with BEV frame index)" if evidence else "")
             )
-    except Exception as e:
+        except Exception as e:
             print(f"  ⚠️  description.txt failed: {e}")
     
     # 8. Consolidated cluster.json (merges old meta.yaml + medoid.json + stats.json).
@@ -2979,7 +3001,12 @@ def main():
                 print(f"  Built trial→CSV map for {len(trial_index_map)} trials "
                       f"(enables outlier_trials / trajectory_projection_pairs/ / parameter_space_pairs/)")
             else:
-                print("  ⚠️  Could not fetch Payload analysis — cluster collision stats may be incomplete")
+                print("  ❌ Could not fetch/parse Payload analysis for --from-run rebuild")
+                if args.analysis_zip:
+                    print("     --analysis-zip was set but could not be parsed; aborting "
+                          "so medoid.collided is not written as false.")
+                    sys.exit(1)
+                print("  ⚠️  Cluster collision stats may be incomplete")
                 print("  ⚠️  Without embeddings, outlier/boundary aux trials will be skipped")
 
     elif args.trials:
@@ -3174,13 +3201,13 @@ def main():
         print(f"✓ Using collision KPI from Payload analysis "
               f"({n_coll}/{len(collision_flags)} trials collided)")
     else:
-    collision_path = PROJECT_ROOT / "alldatasets" / dataset_name / "collision.json"
-    if collision_path.is_file():
-        try:
-            collision_flags = json.loads(collision_path.read_text(encoding="utf-8"))
-            print(f"✓ Loaded collision flags from {collision_path.name}")
-        except Exception as e:
-            print(f"⚠️  Could not load collision.json: {e}")
+        collision_path = PROJECT_ROOT / "alldatasets" / dataset_name / "collision.json"
+        if collision_path.is_file():
+            try:
+                collision_flags = json.loads(collision_path.read_text(encoding="utf-8"))
+                print(f"✓ Loaded collision flags from {collision_path.name}")
+            except Exception as e:
+                print(f"⚠️  Could not load collision.json: {e}")
 
     from pipeline_imports import ensure_llm_pipeline
 

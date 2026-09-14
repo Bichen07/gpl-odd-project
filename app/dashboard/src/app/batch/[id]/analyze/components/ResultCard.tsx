@@ -18,7 +18,7 @@ import {
 } from "@mui/material";
 import { Close, ExpandMore, HelpOutline } from "@mui/icons-material";
 import type { ResultEntry } from "../types";
-import { normalizeEgoSummary } from "../utils";
+import { agentInteractionRows, normalizeEgoSummary } from "../utils";
 
 /**
  * Medoid analysis result card. Shows medoid_trial.yaml fields only —
@@ -65,28 +65,16 @@ export default function ResultCard({
     return cur ?? (timed.length ? timed[0] : null);
   }, [timed, scrub]);
 
-  const outcome = parsed.outcome ?? meta.outcome;
-  const primaryMotive = parsed.primary_motive ?? meta.primary_motive;
-  const interactionResolution =
-    parsed.interaction_resolution ?? meta.interaction_resolution;
-  const controlResponse = parsed.control_response ?? meta.control_response;
   const trialId = parsed.trial_id ?? meta.trial_id;
+  const outcome = parsed.outcome ?? meta.outcome;
   const conflictMetrics =
     (parsed.conflict_metrics as Record<string, unknown> | undefined) ??
     (meta.conflict_metrics as Record<string, unknown> | undefined) ??
     null;
-  const keyFacts = [
-    ["Resolution", interactionResolution],
-    ["Primary motive", primaryMotive],
-    ["Control response", controlResponse],
-  ].filter(([, value]) => value != null && String(value).trim() !== "");
-  const evidenceFacts = [
-    ["Named vehicle", conflictMetrics?.partner],
-    ["Peak time", conflictMetrics?.peak_t, "s"],
-    ["Brake time", conflictMetrics?.brake_t, "s"],
-    ["Distance", conflictMetrics?.d, "m"],
-    ["TTC", conflictMetrics?.ttc, "s"],
-  ].filter(([, value]) => value != null && String(value).trim() !== "");
+  const conflictPartner = String(
+    conflictMetrics?.vehicle ?? conflictMetrics?.partner ?? "",
+  ).trim();
+  const agentInteractions = agentInteractionRows(parsed);
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -113,11 +101,11 @@ export default function ResultCard({
         </Button>
       </Stack>
 
-      {keyFacts.length > 0 && (
-        <>
+      {agentInteractions.length > 0 && (
+        <Box sx={{ mb: 1.5 }}>
           <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
             <Typography variant="caption" color="text.secondary" fontWeight={700}>
-              Behavior summary
+              Agent interactions
             </Typography>
             <IconButton
               size="small"
@@ -138,91 +126,83 @@ export default function ResultCard({
           <Collapse in={showSummaryHelp}>
             <Alert severity="info" sx={{ mb: 1.5, py: 0.5 }}>
               <Typography variant="caption" component="div">
-                This card describes the <strong>medoid trial</strong>, one
-                representative journey for the cluster. Read the fields in
-                order: <strong>resolution → control response → primary
-                motive</strong>.
+                Each row is Ego vs{" "}
+                <strong>that agent</strong> (resolution → control → motive).
+                The first row is the pack partner
+                {conflictPartner ? ` (${conflictPartner})` : ""}. Extra rows
+                are other agents Ego actually responded to.
               </Typography>
               <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-                <strong>Resolution (WHO)</strong>: <code>yield</code> means Ego
-                decelerates or stops to give way and the named vehicle is not
-                behind Ego. It also includes a failed yield that reaches
-                FRONT–LEFT overlap while Ego is still braking.{" "}
-                <code>pass_first</code> means Ego goes through: the named
-                vehicle becomes behind, or Ego holds/increases speed into the
-                gap, or releases the brake and continues.{" "}
-                <code>unresolved</code> means neither state is clear.
+                <strong>Resolution</strong> (go-through vs give-way vs that
+                agent): <br /> <code>yield</code> — Ego
+                decelerates or stops to give way and that agent is not behind
+                (includes failed yield: FRONT–LEFT overlap while still
+                braking). <br /><code>pass_first</code> — that agent becomes behind,
+                or Ego holds/increases speed into the gap, or releases the
+                brake and continues. <code>unresolved</code> — neither state is
+                clear.
               </Typography>
               <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-                <strong>Control response (HOW)</strong>: how Ego managed speed,
-                not who went first. <code>proactive</code> = early braking;{" "}
-                <code>late</code> = braking near the conflict peak;{" "}
-                <code>slowdown</code> = gradual deceleration; <code>stop</code>{" "}
-                = deceleration to near-zero; <code>smooth</code> or{" "}
-                <code>maintain</code> = little/no braking; <code>brake</code> ={" "}
-                severe braking, often after a pass. Braking alone does not prove
-                yield.
+                <strong>Control</strong> (speed manner on{" "}
+                <em>that agent&apos;s conflict arc only</em>
+                — stamps concluded toward that agent until its pass/yield is
+                decided):{" "}
+                <code>proactive</code> = early braking vs that agent;{" "}
+                <code>late</code> = braking near that agent&apos;s peak;{" "}
+                <code>slowdown</code> = gradual deceleration during that
+                arc; <code>stop</code> = near-zero;{" "}
+                <code>smooth</code> / <code>maintain</code> = little/no
+                braking through that agent; <code>brake</code> = severe
+                braking <em>vs that agent</em> (a later Parking brake does
+                not make CuttingIn <code>brake</code>). Braking alone does
+                not prove yield.
               </Typography>
               <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-                <strong>Primary motive (WHY)</strong>: the dominant closed
-                motive code explaining Ego&apos;s behavior. For example,{" "}
-                <code>late_reaction</code> is a late strong brake near peak;{" "}
-                <code>assertive_gap_acceptance</code> is holding/increasing
-                speed into a closing gap; <code>yield_to_vehicle</code> means
-                giving way. The motive must agree with the resolution and
-                control response.
-              </Typography>
-              <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-                <strong>Conflict evidence</strong>: the named vehicle is the
-                vehicle analyzed; <code>peak time</code> is the closest-approach
-                or collision timestamp; <code>brake time</code> is the onset of
-                sustained Ego deceleration; <code>distance</code> is
-                center-to-center distance, not boundary clearance; and{" "}
-                <code>TTC</code> is a constant-rate estimate based on the
-                current closing rate, not a guarantee that collision will occur.
+                <strong>Motive</strong>: closed pattern name for that same
+                arc. Examples:{" "}
+                <code>late_reaction</code> (late strong brake near peak),{" "}
+                <code>assertive_gap_acceptance</code> /{" "}
+                <code>maintain_through</code> (pass styles: hold speed into a
+                closing gap vs nearly constant speed),{" "}
+                <code>yield_to_vehicle</code> (give-way stop). Must pair with
+                that row&apos;s resolution and control.
               </Typography>
             </Alert>
           </Collapse>
-          <Box
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
-              gap: 1,
-              mb: 1.5,
-            }}
-          >
-            {keyFacts.map(([label, value]) => (
-              <Box
-                key={String(label)}
-                sx={{ p: 1, bgcolor: "action.hover", borderRadius: 1, minWidth: 0 }}
+          <Stack spacing={0.75}>
+            {agentInteractions.map((row: Record<string, unknown>, i: number) => (
+              <Stack
+                key={`${String(row.agent)}-${i}`}
+                direction="row"
+                spacing={0.75}
+                flexWrap="wrap"
+                useFlexGap
+                alignItems="center"
               >
-                <Typography variant="caption" color="text.secondary" display="block">
-                  {label}
-                </Typography>
-                <Typography variant="body2" fontWeight={600} sx={{ overflowWrap: "anywhere" }}>
-                  {String(value)}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-        </>
-      )}
-
-      {evidenceFacts.length > 0 && (
-        <Box sx={{ mb: 1.5 }}>
-          <Typography variant="caption" color="text.secondary" display="block" gutterBottom>
-            Conflict evidence
-          </Typography>
-          <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            {evidenceFacts.map(([label, value, unit]) => (
-              <Chip
-                key={String(label)}
-                size="small"
-                variant="outlined"
-                label={`${label}: ${
-                  typeof value === "number" ? Number(value).toFixed(3) : String(value)
-                }${unit ? ` ${unit}` : ""}`}
-              />
+                <Chip size="small" label={String(row.agent)} />
+                {row.resolution != null && String(row.resolution).trim() !== "" && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`resolution: ${String(row.resolution)}`}
+                  />
+                )}
+                {row.control_response != null &&
+                  String(row.control_response).trim() !== "" && (
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={`control: ${String(row.control_response)}`}
+                    />
+                  )}
+                {row.motive != null && String(row.motive).trim() !== "" && (
+                  <Chip
+                    size="small"
+                    variant="outlined"
+                    label={`motive: ${String(row.motive)}`}
+                  />
+                )}
+              </Stack>
             ))}
           </Stack>
         </Box>

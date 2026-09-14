@@ -1134,9 +1134,9 @@ def main() -> int:
     ap.add_argument(
         "--max-llm-snapshots",
         type=int,
-        default=10,
+        default=0,
         metavar="N",
-        help="Evenly subsample BEV images sent to LLM (default: 10; 0 = all on disk)",
+        help="Evenly subsample BEV images sent to LLM (default: 0 = all on disk)",
     )
     args = ap.parse_args()
 

@@ -46,40 +46,41 @@ Two problems motivate a closed vocabulary instead of free-text motive descriptio
 The paper itself only defines a taxonomy at the **cluster** level (a human analyst
 names a whole heatmap-confirmed cluster, e.g. "late-yield", after visual inspection —
 `[Sec. III-D "Replayer"/IV, ~p.4,6-11]`). Our LLM pipeline needs a finer,
-**per-timestamp** taxonomy at the single-trial level so that the cluster-level label
-can later be *derived bottom-up* from the trial's timeline instead of being
-freehanded. That per-timestamp layer (`primary_motive` / `secondary_motives`) is our
-own design, built to be able to reconstruct every cluster label the paper uses. See
-§3.3's "Origin" column for which codes are paper-derived and which are our
-extension.
+**per-timestamp** taxonomy at the single-trial level. Cluster `label` is then
+invented as a short 2–4 word outcome archetype (§3.5), informed by that trial
+taxonomy (and reviewed across clusters in §3.7) — not composed by concatenating
+motive codes. The per-timestamp layer (`primary_motive` / `secondary_motives`) is
+our own design, built so every paper cluster name remains reconstructable from
+evidence. See §3.3's "Origin" column for which codes are paper-derived and which
+are our extension.
 
 ---
 
 ## 2. Logic graph — one medoid trial, field by field
 
 Decision order matters: each field is constrained by the ones before it. This
-mirrors `common_sense.txt`'s *"Filling `interaction_resolution` /
-`control_response` / `primary_motive` / `secondary_motives` together"* section and
-the fill-order note directly above the YAML fence in `medoid_trial_prompt.txt`.
+mirrors `common_sense.txt`'s *Filling `agent_interactions`* section (per-agent
+resolution / control / motive on that agent's conflict arc) and the fill-order note above the YAML
+fence in `medoid_trial_prompt.txt`. Pair contrast still uses per-side top-level
+fields.
 
 ```mermaid
 flowchart TD
     A["Evidence hierarchy (common_sense.txt)\n1. ground-truth outcome + min boundary distance\n2. longitudinal relationship / azimuth FRONT-to-BEHIND\n3. Ego distance/speed trend (prev 1s)\n4. instantaneous Ego speed / action stamps"]
-    A --> B["interaction_resolution\npass_first | yield | unresolved\n(WHO kept priority - geometry AND\nbrake/accel/hold/brake_release;\noverlap while still braking = failed yield)"]
-    B --> C["control_response\nsmooth/maintain | slowdown | proactive | late |\nstop | brake | recovery | none\n(HOW Ego managed speed)"]
-    C --> D["primary_motive (closed code)\nWHY - single dominant code,\ngated by causal locality (t <= t_a only)"]
-    D --> E["secondary_motives\n0-2 other distinct codes on the timeline"]
+    A --> B["per-agent resolution (agent_interactions)\npass_first | yield | unresolved\n(go-through vs give-way vs that agent)"]
+    B --> C["per-agent control_response\nsmooth/maintain | slowdown | proactive | late |\nstop | brake | none\n(speed manner on that agent's arc only)"]
+    C --> D["per-agent motive (closed pattern code)\nnot a free-text cause"]
+    D --> E["other motive codes live on\ndecision_timeline stamps"]
     C -. "must agree - see\ncontrol_response<->motive table" .-> D
-    B --> F["Resolution class (derived)\nPASS | YIELD | OTHER"]
+    B --> F["Resolution class (derived)\nPASS | YIELD | OTHER\n(caption / medoid reasoning only\n— not pasted into label)"]
     D -. "fallback when\ninteraction_resolution absent" .-> F
-    F --> G["Cluster label building blocks\nResolution + Modifier? + Collision/Near-miss suffix"]
-    C -. "supplies Modifier" .-> G
-    G --> H["cluster_summary.label\n(e.g. 'Late Yield', 'Brake Rear-end',\n'CuttingIn Collision')"]
+    F -. "informs caption, not the name" .-> H["cluster_summary.label\n(LLM-invented 2-4 word archetype;\nsee §3.5 / §3.7)"]
+    C -. "timing/quality words may\nappear in caption" .-> H
 
     D --> I["decision_timeline entries\n(per-stamp motive, causal locality)"]
     I --> J["motive_summary\n(phase = run of same motive => 1 paragraph)"]
 
-    H -. "same closed vocabulary re-used" .-> K["parameter_space_pair_prompt.txt\ncontrast.yaml boundary comparison"]
+    H -. "pair prompt reuses the same\ntrial fields, not the cluster name" .-> K["parameter_space_pair_prompt.txt\ncontrast.yaml boundary comparison"]
 ```
 
 ASCII fallback (identical structure, for viewers without Mermaid support):
@@ -88,37 +89,32 @@ ASCII fallback (identical structure, for viewers without Mermaid support):
 Evidence hierarchy (ground truth > geometry > speed trend > instantaneous speed)
         │
         ▼
-interaction_resolution (pass_first | yield | unresolved)   ── WHO ──┐
-        │                                                          │
-        ▼                                                          ▼
+per-agent resolution (pass_first | yield | unresolved) ── go-through vs give-way ──┐
+        │                                                                        │
+        ▼                                                                        ▼
 control_response (smooth/slowdown/proactive/late/stop/brake/   Resolution class
-   recovery/none)                          ── HOW ──┐            (PASS/YIELD/OTHER)
-        │                                            │                │
+   none) — that agent's arc only      ── speed manner ──┐      (PASS/YIELD/OTHER)
+        │                                            │           caption/reasoning only
         │  (must agree — control_response<->motive   │                │
         │   table in common_sense.txt)                ▼                │
-        └───────────────────────────────────►  primary_motive           │
-                                                (closed code)  ── WHY ──┘
+        └───────────────────────────────────►  per-agent motive           │
+                                                (closed pattern) ── code ─┘
                                                     │
                                     ┌───────────────┼─────────────────┐
                                     ▼               ▼                 ▼
-                          secondary_motives   decision_timeline   Cluster label
-                          (0-2 other codes)   entries (per-stamp,  building blocks
-                                               causal locality)   (Resolution +
-                                                    │              Modifier? +
-                                                    ▼              Collision suffix)
-                                             motive_summary              │
-                                          (1 paragraph per phase)        ▼
-                                                                  cluster_summary.label
-                                                                  (same closed vocabulary
-                                                                   reused by
-                                                                   parameter_space_pair_prompt.txt)
+                          secondary_motives   decision_timeline   cluster_summary.label
+                          (0-2 other codes)   entries (per-stamp,  (LLM-invented 2-4
+                                               causal locality)    word archetype;
+                                                    │              informed by, not
+                                                    ▼              concatenated from,
+                                             motive_summary        resolution/motive)
 ```
 
 ---
 
 ## 3. Field-by-field reference
 
-### 3.1 `interaction_resolution` (medoid_trial.yaml) — WHO kept priority
+### 3.1 `interaction_resolution` / row `resolution` — go-through vs give-way
 
 | Value | Meaning | Paper anchor |
 | --- | --- | --- |
@@ -126,7 +122,15 @@ control_response (smooth/slowdown/proactive/late/stop/brake/   Resolution class
 | `yield` | Ego decelerates/stops to give way and named vehicle is not behind. Includes completed stay-ahead **and** failed yield (overlap/collision while still braking). Covers `proactive-yield`, `late-yield`, `yield`, `yield-stop-collision`. | Case Study 1 C3/C4 "proactive-yield"/"late-yield" — angle shift green→blue `[Sec. IV-A, ~p.6, .txt L615-622]`; Case Study 2 C3 "yield" `[Sec. IV-B, ~p.9, .txt L826-827, L936-940]`; Case Study 3 C3/C5 "yield"/"yield-stop-collision" `[Sec. IV-C, ~p.9-10, .txt L916-918, L1052-1054]` |
 | `unresolved` | Conflict ends without a clear pass or yield state. | Our extension — not a named paper cluster; needed because some trials genuinely end ambiguous (e.g. collision mid-approach before any pass/yield state stabilizes). |
 
-### 3.2 `control_response` (medoid_trial.yaml) — HOW Ego managed speed
+The LLM authors **only** `agent_interactions` (named vehicle first, then any
+other agent Ego reacted to). Medoid YAML must not keep top-level
+`interaction_resolution` / `control_response` / `primary_motive` /
+`secondary_motives`; the pipeline strips them if the model still emits them.
+Secondary-agent metrics in context are facts; after the named vehicle is
+behind, a FRONT secondary on the same stamp/BEV is a separate row, not
+furniture.
+
+### 3.2 `control_response` — speed manner on that agent's arc
 
 | Value | Meaning | Paper anchor |
 | --- | --- | --- |
@@ -135,15 +139,20 @@ control_response (smooth/slowdown/proactive/late/stop/brake/   Resolution class
 | `proactive` | Brakes while named vehicle still far/early. | "proactive-yield" (C3, Case Study 1) — earlier braking, larger gaps than C4 `[Sec. IV-A, ~p.6, .txt L618-620, Fig.9 caption ~p.9 L897-906]` |
 | `late` | Brakes only near peak. | "late-yield" (C4, Case Study 1) — later braking, smaller gaps `[Sec. IV-A, ~p.6, .txt L621-622]` |
 | `stop` | Decelerates to near-zero. | "yield-stop-collision" (C5, Case Study 3) `[Sec. IV-C, ~p.9-10, .txt L917-918, L1052-1054]` |
-| `brake` | Severe/abrupt brake, often post-pass. | "braking-rear-end" (C4, Case Study 3) — abrupt stop after passing, triggered by a projected-boundary collision-check against a *third* object, not the passed vehicle `[Sec. IV-C + Appendix D, ~p.9-10 & ~p.14-15, .txt L916-918, L1697-1731, Fig.15 ~p.15 L1753-1797]` |
-| `recovery` | Post-clear accelerate / heading recover. | Implied by `post_clear_recovery` motive; not a named paper cluster label but appears as the resuming-speed segment inside "pass-first" arcs. |
-| `none` | No distinctive control. | Our extension, for timelines with no brake stamp at all (needed as a safe default so `control_response` is never left unset). |
+| `brake` | Severe/abrupt brake **vs this row's agent**. Paper "braking-rear-end" belongs on the agent ahead (third object / Parking), not on the vehicle already passed. | "braking-rear-end" (C4, Case Study 3) — abrupt stop after passing, triggered by a projected-boundary collision-check against a *third* object `[Sec. IV-C + Appendix D, ~p.9-10 & ~p.14-15, .txt L916-918, L1697-1731, Fig.15 ~p.15 L1753-1797]` |
+| `none` | No distinctive speed control vs this agent. | Our extension. |
 
-### 3.3 `primary_motive` / `secondary_motives` — closed motive codes (WHY)
+**Arc window.** `control_response` and row `motive` use only stamps concluded **toward that agent**, from first engagement until that agent's pass/yield/unresolved is decided. Later stamps toward another agent do not rewrite this row. Resume-driving (accel / heading change with nobody left in conflict) is timeline `motive: null`, not a `control_response` value.
+
+**Retired (2026-09-14):** `control_response=recovery` and motive `post_clear_recovery`. Under per-agent rows, hanging "resume after pass" on the passed vehicle ignored later agents (e.g. Parking). See §9.
+
+### 3.3 Closed motive codes — named pattern, not a causal why
 
 This is the finer, **per-timestamp** layer the paper does not define directly (it
-only labels whole clusters after the fact). Each code is designed so that, rolled
-up across a medoid's timeline, it reconstructs one of the paper's cluster labels.
+only labels whole clusters after the fact). Each code names a **pattern** so
+that, rolled up across a medoid's timeline, it reconstructs one of the paper's
+cluster labels. It is **not** a causal why (`assertive_gap_acceptance` /
+`maintain_through` are pass styles, same family as `smooth`/`maintain`).
 
 | Code | Meaning | Origin |
 | --- | --- | --- |
@@ -152,21 +161,25 @@ up across a medoid's timeline, it reconstructs one of the paper's cluster labels
 | `late_reaction` | First strong decelerate/EMERGENCY_BRAKE only near peak, Ego stays behind. | Paper-derived — the mechanism behind "late-yield" `[Sec. IV-A, ~p.6, .txt L621-622]` |
 | `gap_acceptance_creep` | Ego keeps a low non-zero speed into the conflict instead of stopping. | Our extension (project data pattern; distinguishes "still moving, still yielding" from a full `stop`). |
 | `assertive_gap_acceptance` | Ego holds/increases speed into a closing gap before peak, no brake. | Our extension — added after batch9/cluster1 had no legal code for "accelerates into a closing gap, ttc_min=0.36s" and fell to `unclear` (change-log §1). Rolls up into "pass-first"/"smooth-pass". |
-| `maintain_through` | \|Δv\| ≲ 2 m/s across the conflict window, no brake. | Paper-derived — "smooth-pass" mechanism `[Sec. IV-C, ~p.9, .txt L1044-1046]` |
-| `post_clear_recovery` | Accelerate or same-lane turn after peak, vehicle already behind. | Paper-adjacent — the "resuming speed" segment implicit in "pass-first" arcs; not a standalone paper label but needed to distinguish resuming from a new conflict. |
-| `post_clear_hard_brake` | Severe/abrupt decelerate strictly after peak, unrelated to the passed vehicle re-closing — creates rear-end risk. | **Paper-derived, added 2026-08-29.** Names the exact Case Study 3 "braking-rear-end" (C4) mechanism, including its *root cause* (a projected right-boundary check against a static obstacle, not the just-passed vehicle) `[Sec. IV-C + Appendix D, ~p.9-10 & ~p.14-15, .txt L916-918, L1697-1731]`. Gap found by re-reading the paper for this doc; see change-log §10. |
+| `maintain_through` | \|Δv\| ≲ 2 m/s across **this agent's** conflict window, no brake vs that agent. | Paper-derived — "smooth-pass" mechanism `[Sec. IV-C, ~p.9, .txt L1044-1046]` |
+| `post_clear_hard_brake` | Severe/abrupt decelerate toward the agent this row is about (often after someone else was already passed). Creates rear-end risk for whoever is behind Ego. | **Paper-derived.** Case Study 3 "braking-rear-end" (C4) — put this on the third object / Parking row, not on CuttingIn `[Sec. IV-C + Appendix D, ~p.9-10 & ~p.14-15, .txt L916-918, L1697-1731]`. |
+| ~~`post_clear_recovery`~~ | **Retired 2026-09-14.** Resume-driving is not an interaction with the passed agent. Timeline `motive: null` when nobody is left in conflict. | Was paper-adjacent "resuming speed"; multi-agent cards showed it mis-attributing later Parking brakes or resume segments to CuttingIn. |
 | `vehicle_driven_swerve` | Same-lane TURN_* inside the conflict window, moderate+ lateral effect. | Our extension (project data pattern; paper's case studies are longitudinal-dominant). |
 | `brake_release` | Ego ends/eases an active decelerate **before** peak/outcome while still near/very-close. | Our extension — added after 2 of 3 medoid cards in `batch8/3_cluster_s=0.8032` showed this exact pattern falling to `unclear` (change-log §9); renamed from `unresolved_brake_release` for clarity. Direct precursor to a collision. |
-| `post_clear_adjustment` | Light/moderate decelerate (or short accelerate) strictly after peak, vehicle not re-closing. | Our extension — same review as `brake_release`; distinguishes ordinary follow-distance correction from `post_clear_recovery` (change-log §9). |
-| `unclear` | Metrics/BEV genuinely disagree, or evidence is missing. | Fallback of last resort — gated behind the full precedence list above so it is never used just because an action "doesn't feel assertive or recovery." |
+| `post_clear_adjustment` | Light/moderate decelerate strictly after **this** agent's peak, that agent not re-closing, no other agent ahead. Follow-distance correction vs that agent — not resume-driving. | Our extension (change-log §9); short accelerate after clear is no longer this code (use `null`). |
+| `unclear` | Metrics/BEV genuinely disagree, or evidence is missing. | Fallback of last resort — gated behind the precedence list so it is never used just because an action "doesn't feel assertive." |
 
-### 3.4 Resolution class (derived, closed set — used to build `cluster_summary.label`)
+### 3.4 Resolution class (derived, closed set — caption / medoid reasoning only)
+
+Not pasted into `cluster_summary.label` (that field is an LLM-invented 2–4 word
+archetype; see §3.5). This table is the fallback map when a prompt needs to talk
+PASS vs YIELD vs OTHER without dumping motive codes into the name.
 
 | Source | Resolution class | Paper anchor |
 | --- | --- | --- |
 | `interaction_resolution=pass_first` | PASS | See §3.1 |
 | `interaction_resolution=yield` | YIELD | See §3.1 |
-| `assertive_gap_acceptance` / `maintain_through` / `post_clear_recovery` | PASS | fallback when `interaction_resolution` absent |
+| `assertive_gap_acceptance` / `maintain_through` | PASS | fallback when `interaction_resolution` absent |
 | `post_clear_hard_brake` | PASS (risk modifier) | "braking-rear-end" is still a *pass* that goes wrong afterward, not a yield `[Sec. IV-C, ~p.9-10]` |
 | `yield_to_vehicle` (Ego remains behind) | YIELD | fallback |
 | `early_brake` + still behind | YIELD | fallback |
@@ -175,28 +188,41 @@ up across a medoid's timeline, it reconstructs one of the paper's cluster labels
 | `vehicle_driven_swerve` | OTHER (lateral resolution) | our extension |
 | `unclear` / `unresolved` | OTHER | fallback |
 
-### 3.5 Cluster label building blocks (`[Resolution][ Modifier][ Collision\|Near-miss]`)
+### 3.5 Cluster labels (LLM-composed — open vocabulary)
 
-| Block | Values | Paper anchor |
-| --- | --- | --- |
-| Resolution | `Pass-First`, `Pass`, `Yield`, or `<Named vehicle> Collision` | Direct paper cluster names, Title Case `[Sec. IV, ~p.6-10]` |
-| Modifier | `Smooth`, `Slowdown`, `Proactive`, `Late`, `Creep`, `Stop`, `Brake` | Direct paper cluster names except `Creep` (our extension for `gap_acceptance_creep`, no paper equivalent) |
-| Outcome suffix | `Collision`, `Near-miss`, or omitted | Paper's `*-collision` clusters map to the suffix; `Near-miss` is our extension (paper only reports safe/collision, not a near-miss class) |
+`cluster_summary.yaml` `label` is **invented by the summary LLM**, one cluster
+at a time (each call sees only that cluster's medoid/pair evidence — no
+sibling labels, no cross-cluster context). There is no deterministic Pass
+A/Pass B name assignment and no hardcoded actor→label table.
 
-Named-vehicle collision labels (`CuttingIn Collision`, `Oncoming Collision`,
-`Parking Collision`) mirror the paper's `cut-in-collision` (Case Study 3),
-`opposite-collision` (Case Study 2, renamed here to `Oncoming` per this project's
-agent-naming convention — see `agent_labels.py`), and `parked-collision` (Case
-Study 2, renamed to `Parking`) `[Sec. IV-B/C, ~p.9-10, .txt L825-827, L917]`.
+Target: 2–4 words, one outcome archetype, paper-heatmap style — not a readout
+of the motive codes above. Pasting motive codes into the name
+(`assertive_gap_acceptance` → "Assertive Gap…") or chaining more than one
+mechanism ("Assertive Gap Late Yield Collision") is a defect, not a feature;
+motive/timing detail belongs in `caption` only.
+
+Closed style set (prefer these; invent a new 2–4 word archetype only if none fit):
+
+| Example label | Typical evidence (sketch) |
+| --- | --- |
+| `Brake Rear-end` | Following vehicle strikes Ego from behind after pass / post-pass brake |
+| `Yield-Stop Collision` | Yield family + ego near-stop at contact |
+| `Side Collision` | Lateral / side impact geometry |
+| `Stationary Collision` | Partner ≈ stopped at contact |
+| `Smooth Pass` / `Pass-Slowdown` / `Yield` / `Proactive Yield` / `Late Yield` | Safe / timing arcs |
+| `Cut-in Collision` | Useful when naming the actor helps and geometry is unclear |
+
+Paper names such as `cut-in-collision` / `parked-collision` / `opposite-collision`
+are historical references only — not forced pipeline outputs.
+
+Because each cluster is labeled independently, duplicate or near-duplicate
+names across clusters, or one cluster's label drifting into a mechanism
+chain, are only caught **after the fact** — see §3.7.
 
 ### 3.6 Reuse in `parameter_space_pair_prompt.txt` and `cluster_summary_prompt.txt`
 
-Both prompts re-use the *same* closed vocabulary rather than defining their own:
-`cluster_summary_prompt.txt` looks up the medoid's `interaction_resolution` /
-`primary_motive` in the Resolution-class table (§3.4) and composes `label` only from
-§3.5's blocks (see its own §"Label (deterministic, closed vocabulary)"). This is
-intentional — it is what lets a cluster's label be *derived*, not freehanded, from
-the same terms a human analyst would use when reading the paper's figures.
+`cluster_summary_prompt.txt` invents `label` plus caption / neighbor verdicts,
+per cluster, independently — no sibling-label input.
 
 `parameter_space_pair_prompt.txt` fills `interaction_resolution` /
 `control_response` / `primary_motive` **per side** (`left`/`right`), one closed
@@ -204,6 +230,23 @@ motive code each (no `secondary_motives` — a boundary-comparison side is
 intentionally coarser than a full medoid timeline). It follows the same fill
 order and the same `control_response`↔motive consistency table as
 `medoid_trial_prompt.txt` (§3.2) — see §7.2 for a gap found and fixed here.
+
+### 3.7 Cross-cluster label review (`cluster_reviewer_prompt.txt`)
+
+Runs **once per run**, after every requested cluster's `cluster_summary.yaml`
+exists, via `cluster_label_reviewer.py` (CLI: `label-review`; product flag
+`label-review`, included in `all`). Single LLM call, text-only, over every
+`label` + caption excerpt + `risk_level` already on disk — never re-derives
+behavior from `medoid_trial.yaml` / `contrast.yaml`. It only:
+
+1. rewrites mechanism-chained labels to a short 2–4 word archetype, and
+2. renames one of a duplicate/near-duplicate pair whose captions describe
+   different behavior.
+
+Renames patch `label` in place on `cluster_summary.yaml` and add a
+`label_review: {previous_label, reason, reviewed_at}` audit block; the full
+row set (changed and unchanged) is written to
+`analysis/quality/cluster_label_review.json`.
 
 ---
 
@@ -239,59 +282,56 @@ order and the same `control_response`↔motive consistency table as
 
 ---
 
-## 5. External literature consulted (context only — not adopted 1:1)
+## 5. External literature (supports the axes — not adopted 1:1)
 
-The paper (§0) is the primary authority for this project's vocabulary because its
-case-study labels are this pipeline's target output. The following were checked
-for additional grounding but deliberately **not** merged into the closed set,
-to keep it small enough for an LLM to apply consistently under the causal-locality
-rule:
+The IEEE T-ITS paper (§0) is the **primary authority** for this project's cluster
+names. The sources below support *why* WHO / HOW / WHY is a valid split for AV
+conflict analysis. They were **not** copied into the closed set: a game-theoretic
+or standards taxonomy is too fine (or too broad) for one LLM call under causal
+locality. Mapping:
 
-- Markkula et al. (2020), general taxonomy of human road-user interaction
-  strategies, and its refinement in Rothenbücher/Sadigh et al., *"A taxonomy of
-  strategic human interactions in traffic conflicts,"* arXiv:2109.13367 —
-  right-of-way claiming / responsive vs. unresponsive adherence / assertive
-  adherence. Conceptually similar to our `interaction_resolution` +
-  `control_response` split (who claims priority vs. how), but at a finer
-  game-theoretic grain than needed here.
-- van Haperen et al. (2018) yielding classification (no-yield / active-yield /
-  passive-yield), as used in Fu, Farah et al., *"Analysis of Implicit
-  Communication of Motorists and Cyclists..."*, Frontiers in Psychology, 2022 —
-  the active/passive distinction (already-ahead-but-yields vs.
-  already-behind-and-stays-behind) is partially captured by our
-  `control_response` proactive/late timing axis, but we did not add it as a
-  separate field since it would duplicate information already recoverable from
-  `interaction_resolution` + the timeline's brake-onset timing.
-- ISO 34502:2022, ISO 21448:2022, UN Regulation No. 157 — cited directly by the
-  paper as scenario-based safety-evaluation standards `[paper refs 1-3]`; these
-  define ODD/scenario framework concepts, not per-trial behavior codes.
-- BSI Flex 1891:2025 ("Behaviour taxonomy for ADS applications") and ISO
-  34504:2024 ("Scenario categorization") — broader, hierarchical
-  signaling/positioning/maneuver taxonomies for whole ADS competencies. Useful
-  future reference if this pipeline ever needs to classify *maneuver-level*
-  competencies rather than single-conflict motives, but out of scope for the
-  current closed set.
+| Our field | What literature supports | What we did **not** take |
+| --- | --- | --- |
+| `interaction_resolution` (WHO / order of access) | Markkula et al. (2020): an interaction is a space-sharing conflict resolved by who occupies the space first. Sarkar, Larson, Czarnecki (2021): first taxonomy axis = response to right-of-way (claim / relinquish / violate). Sadigh et al. (2016) and Schwarting et al. (2019): AV vs human merge/yield as competing claims of priority (assertive vs yielding). | Sarkar's full game tree (responsive vs unresponsive, aggressive variants). Schwarting's numeric Social Value Orientation. |
+| `control_response` (HOW / manner) | Paper CS1 proactive-yield vs late-yield (brake timing, not a different WHO). Fu et al. (2022) / van Haperen: active vs passive yield is largely *when* the give-way happens — already recoverable from brake-onset + geometry. | A separate active/passive-yield field (would duplicate `proactive`/`late`/`stop`). |
+| `primary_motive` (WHY / mechanism code) | Lefèvre, Vasquez, Laugier (2014): distinguish intended maneuver from expected maneuver and from instantaneous motion. Gap-acceptance (creep vs assert vs reject) is the classical merge/cut-in mechanism layer; we keep a small closed list gated by metrics. | Lefèvre's full probabilistic intention stack. |
+| Failed yield stays `yield` | Paper CS3 "yield-stop-collision": the trial is still a yield that collides. ISO 21448 (SOTIF): outcome ≠ intended control. | Treating every overlap/collision as `pass_first`. |
+| TTC / closing-rate evidence | Hayward (1972): time-to-collision as a near-miss danger scale. Our `early_brake` (TTC > 3.5 s) / `late_reaction` (TTC < 1.5 s) gates are **heuristics**, not a standard cutoff. | Adopting any one TTC threshold as certified safety. |
+| Scenario / ODD envelope | Ulbrich et al. (2015) scene/situation/scenario; Menzel et al. (2018) functional/logical/concrete; ISO 34502:2022 scenario-based ADS evaluation; UN R157. | Per-trial motive codes — those standards do not define them. |
+| Broader ADS behaviour catalogues | BSI Flex 1891:2025, ISO 34504:2024 | Hierarchical maneuver/competency trees; out of scope for a single-conflict timeline. |
+
+**No prompt change required (2026-09-14):** `common_sense.txt` lines 178–279 already implement this three-axis split plus the pairing table that ties HOW to WHY. See §8.
 
 ---
 
-## 6. References
+## 6. References (with links)
 
-- Chiu, S.-Y., Lin, W.-C., Wang, Y.-S., Hu, C.-H., Wang, C.-C. *"Behavior-Centric
-  Visual Analytics for Scenario-Based Safety Evaluation of Autonomous Vehicles."*
-  IEEE Transactions on Intelligent Transportation Systems, 2026. Local copy in
-  this repo (see header of this document).
-- Rothenbücher, D. et al. *"A taxonomy of strategic human interactions in traffic
-  conflicts."* [arXiv:2109.13367](https://arxiv.org/abs/2109.13367)
-- Fu, T. et al. *"Analysis of Implicit Communication of Motorists and Cyclists in
-  Intersection Using Video and Trajectory Data."* Frontiers in Psychology, 2022.
-  [DOI link](https://www.frontiersin.org/articles/10.3389/fpsyg.2022.864488/pdf)
-- BSI Flex 1891:2025-01, *"Behaviour taxonomy for automated driving system (ADS)
-  applications — Specification."*
-  [knowledge.bsigroup.com](https://knowledge.bsigroup.com/products/behaviour-taxonomy-for-automated-driving-system-ads-applications-specification)
-- ISO 34504:2024, *"Road vehicles — Test scenarios for automated driving systems —
-  Scenario categorization."* [iso.org/standard/78953.html](https://www.iso.org/standard/78953.html)
-- ISO 21448:2022 (SOTIF), ISO 34502:2022, UN Regulation No. 157 — cited via the
-  reference paper's own bibliography [1]-[3].
+**Primary (this project's vocabulary)**
+
+- Chiu, S.-Y., Lin, W.-C., Wang, Y.-S., Hu, C.-H., Wang, C.-C. *"Behavior-Centric Visual Analytics for Scenario-Based Safety Evaluation of Autonomous Vehicles."* IEEE Transactions on Intelligent Transportation Systems, 2026 (submitted/in review). Local copy: repo root PDF + `.txt` extraction (see header).
+
+**WHO / HOW interaction taxonomies (AV + human traffic)**
+
+- Markkula, G. et al. *"Defining interactions: a conceptual framework for understanding interactive behaviour in human and automated road traffic."* Theoretical Issues in Ergonomics Science, 21(6), 728–752, 2020. [DOI](https://doi.org/10.1080/1463922X.2020.1736686) · [open PDF](https://eprints.whiterose.ac.uk/id/eprint/158075/14/1463922X.2020.pdf)
+- Sarkar, A., Larson, K., Czarnecki, K. *"A taxonomy of strategic human interactions in traffic conflicts."* arXiv:2109.13367, 2021. [arXiv](https://arxiv.org/abs/2109.13367) *(previously mis-attributed in this file to Rothenbücher/Sadigh)*
+- Sadigh, D., Sastry, S., Seshia, S. A., Dragan, A. D. *"Planning for Autonomous Cars that Leverage Effects on Human Actions."* Robotics: Science and Systems (RSS), 2016. [DOI](https://doi.org/10.15607/RSS.2016.XII.029) · [PDF](https://roboticsproceedings.org/rss12/p29.pdf)
+- Schwarting, W., Pierson, A., Alonso-Mora, J., Karaman, S., Rus, D. *"Social behavior for autonomous vehicles."* PNAS, 116(50), 24972–24978, 2019. [DOI](https://doi.org/10.1073/pnas.1820676116)
+
+**Yielding / intention / conflict metrics**
+
+- Fu, T. et al. *"Analysis of Implicit Communication of Motorists and Cyclists in Intersection Using Video and Trajectory Data."* Frontiers in Psychology, 2022. [DOI](https://www.frontiersin.org/articles/10.3389/fpsyg.2022.864488)
+- Lefèvre, S., Vasquez, D., Laugier, C. *"A survey on motion prediction and risk assessment for intelligent vehicles."* ROBOMECH Journal, 1(1), 2014. [DOI](https://doi.org/10.1186/s40648-014-0001-z)
+- Hayward, J. C. *"Near-miss determination through use of a scale of danger."* Highway Research Record 384, 24–34, 1972. [PDF](https://onlinepubs.trb.org/Onlinepubs/hrr/1972/384/384-004.pdf)
+
+**Scenario-based ADS evaluation (envelope, not motive codes)**
+
+- Ulbrich, S., Menzel, T., Reschka, A., Schuldt, F., Maurer, M. *"Defining and Substantiating the Terms Scene, Situation, and Scenario for Automated Driving."* IEEE ITSC, 2015, pp. 982–988. [IEEE Xplore](https://ieeexplore.ieee.org/document/7313256)
+- Menzel, T., Bagschik, G., Maurer, M. *"Scenarios for Development, Test and Validation of Automated Vehicles."* IEEE IV, 2018. [arXiv:1801.08598](https://arxiv.org/abs/1801.08598)
+- ISO 34502:2022, *"Road vehicles — Test scenarios for automated driving systems — Scenario based safety evaluation framework."* [iso.org/standard/78951.html](https://www.iso.org/standard/78951.html)
+- ISO 21448:2022 (SOTIF), *"Road vehicles — Safety of the intended functionality."* [iso.org/standard/77490.html](https://www.iso.org/standard/77490.html)
+- ISO 34504:2024, *"Road vehicles — Test scenarios for automated driving systems — Scenario categorization."* [iso.org/standard/78953.html](https://www.iso.org/standard/78953.html)
+- UN Regulation No. 157 (ALKS). [UNECE](https://unece.org/transport/documents/2021/03/standards/un-regulation-no-157-automated-lane-keeping-systems-alks)
+- BSI Flex 1891:2025-01, *"Behaviour taxonomy for automated driving system (ADS) applications — Specification."* [BSI Knowledge](https://knowledge.bsigroup.com/products/behaviour-taxonomy-for-automated-driving-system-ads-applications-specification)
 
 ---
 
@@ -366,3 +406,126 @@ Line 53 (§1) referenced "§4" for where paper-derived vs. our-extension codes a
 distinguished; that information actually lives in §3.3's "Origin" column. Fixed
 the cross-reference. §3.6 was also expanded to describe
 `parameter_space_pair_prompt.txt`'s fill order now that §7.2 added it.
+
+---
+
+## 8. Review of `common_sense.txt` L178–279 (2026-09-14)
+
+Re-read the WHO / HOW / WHY block plus the pairing table and resolution-class
+map. **No prompt edit.** Logic is consistent; remaining items are documented
+design choices, not contradictions.
+
+### 8.1 What the three fields actually distinguish
+
+Do **not** call these WHO / HOW / WHY. That slogan misnamed the fields.
+
+| Field | Question | Closed set |
+| --- | --- | --- |
+| `resolution` | Go-through or give-way vs that agent? | `pass_first` \| `yield` \| `unresolved` |
+| `control_response` | Speed manner on that agent's conflict arc only? | `smooth`/`maintain` \| `slowdown` \| `proactive` \| `late` \| `stop` \| `brake` \| `none` |
+| `motive` | Which closed **pattern** names that same arc? | table in §3.3 |
+| timeline other codes | Other distinct patterns on stamps | not a top-level list |
+
+Worked example (paper CS1 C4 / our failed late yield): Ego brakes only near
+peak, still behind, collides in overlap → `yield` (failed yield stays yield) +
+`late` + `primary_motive=late_reaction`. Do **not** flip to `pass_first` just
+because there is overlap.
+
+Worked example (paper CS3 C4 braking-rear-end, multi-agent): CuttingIn row is
+`pass_first` + `smooth`/`maintain` (or `slowdown` if Ego braked **during** that
+pass). The later hard brake is the **third object's** row (`brake` +
+`post_clear_hard_brake` / `late_reaction`). Do **not** set CuttingIn's
+`control_response` to `brake`. Braking after that agent is already behind is
+never yield vs that agent.
+
+### 8.2 Logic checks (no error found)
+
+1. **Failed yield ⊂ `yield`.** Overlap/collision while still braking is explicitly
+   not `pass_first`. Matches paper "yield-stop-collision" and SOTIF (outcome ≠
+   intended control).
+2. **Braking after pass is not yield.** Stated twice (resolution bullets + the
+   "Do not infer yield from braking if Ego already passed" line). Consistent
+   with `post_clear_hard_brake` → PASS in the resolution-class table.
+3. **`pass_first` OR-list is intentional, not contradictory.** Behind-bin, hold/
+   accel into the gap, `brake_release` then continue, or FRONT→BEHIND while
+   continuing can each establish go-through without requiring azimuth BEHIND.
+   `brake_release` can therefore sit on a `pass_first` + `late` card — started
+   yielding, released, went through.
+4. **Pairing table is the tie-break, not a second taxonomy.** Fill order says
+   WHO then HOW then WHY; if HOW and WHY disagree, trust motive evidence and
+   **correct `control_response`**. That is a consistency repair, not a cycle:
+   the timeline codes are the evidence; HOW is a manner bucket that must match
+   them. This is what closed the `yield_to_vehicle` vs `early_brake` vs
+   `late_reaction` hole in §7.3.
+5. **Resolution class is not a fourth independent field.** It is a derived PASS/
+   YIELD/OTHER view for caption/reasoning. `late_reaction` / `brake_release` are
+   "modifier only" there because they do not decide WHO by themselves. They
+   must not be pasted into `label` (that is now an LLM-invented 2–4 word
+   archetype; §3.5 / §3.7).
+
+### 8.3 Design choices (not bugs — do not "fix" without new data)
+
+- `smooth` and `maintain` share the same motive partners. Harmless; paper uses
+  both "smooth-pass" and a maintain-speed story.
+- `post_clear_adjustment` is absent from the resolution-class table. It is a
+  post-peak secondary, not a WHO decision. Leave it off unless it starts
+  appearing as `primary_motive`.
+- `vehicle_driven_swerve` only pairs with `control_response=none`. Acceptable
+  while case studies are longitudinal-dominant; add a lateral HOW value only if
+  a real card has a swerve *and* a distinctive speed manner that cannot be
+  expressed with the current set.
+- TTC gates 3.5 s (`early_brake`) and 1.5 s (`late_reaction`) are project
+  heuristics. Hayward (1972) justifies using TTC as a danger scale, not these
+  exact cutoffs. Do not treat them as a certified SOTIF threshold.
+- Fill-order sentence "each constrained by the one before it" is slightly
+  stronger than the pairing-table repair (WHY can revise HOW). Wording is
+  good enough for the LLM; do not duplicate the whole table into
+  `medoid_trial_prompt.txt`.
+
+### 8.4 Paper support vs our extension (summary)
+
+Supported by literature + the IEEE paper: WHO vs HOW split; failed yield;
+proactive vs late timing; smooth-pass / pass-slowdown / braking-rear-end as
+HOW values; TTC as evidence, not as a label.
+
+Our extensions, kept because project cards needed them: `unresolved`,
+`assertive_gap_acceptance`, `gap_acceptance_creep`, `brake_release`,
+`post_clear_adjustment`, `vehicle_driven_swerve`, `control_response=none`.
+Rule in §4 still applies: add a code only when a recurring pattern keeps
+landing in `unclear`. Retired: `post_clear_recovery` / `control_response=recovery`
+(§9).
+
+---
+
+## 9. Per-agent arc window; retire `post_clear_recovery` (2026-09-14)
+
+§8.3 said not to "fix" without new data. Multi-agent `agent_interactions` **is**
+that data.
+
+**Problem 1 — `control_response` had no time window.** It was described as
+"manner of speed on that same arc" without saying which stamps belong to the
+arc. Models rolled a later Parking brake onto CuttingIn (`pass_first` + `brake`
++ `post_clear_hard_brake` on CuttingIn). That was the old one-agent trial
+rollup.
+
+**Rule now:** each row's `control_response` / `motive` use only stamps concluded toward **that**
+agent, until that agent's conflict is decided. Smooth pass of CuttingIn then
+brake for Parking → CuttingIn `smooth`/`maintain`; Parking gets the brake.
+
+**Problem 2 — `post_clear_recovery` / `control_response=recovery`.** "Resume after clear"
+was defined as pairing with the passed vehicle. After per-agent split, that
+attaches resume-driving (or a later unrelated brake) to CuttingIn and ignores
+Parking. Resume with nobody left in conflict is not an interaction.
+
+**Rule now:** delete those codes. Timeline `motive: null` for resume-driving.
+Keep `post_clear_hard_brake` / `post_clear_adjustment` on the agent the action
+is **toward**. Pair `contrast.yaml` still has per-side top-level fields;
+drop `recovery` from that fence too. Do not bulk-rewrite existing
+`medoid_trial.yaml`; re-run the LLM to refresh cards.
+
+**Problem 3 — WHO / HOW / WHY slogan.** `pass_first`/`yield` is go-through vs
+give-way, not “who”. `assertive_gap_acceptance` / `maintain_through` are pass
+patterns, not a why. Prompts now say resolution / speed manner / closed
+pattern. Literature table in §4 still maps older names; do not copy that
+slogan into new prompt text.
+

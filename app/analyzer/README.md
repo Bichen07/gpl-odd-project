@@ -13,15 +13,17 @@ Medoid / trial packs under `results/batch*/…/clusterN/` use nested layout:
 clusterN/
   raw/          trajectory.csv, cluster.json
   processed/    action.yaml, description.txt, context_medoid.md, context_cluster.md, snapshots/, map_overview.jpg
-  output/       medoid_trial*.yaml, cluster_summary*, cluster_interpretation*
+  output/       medoid_trial.yaml, cluster_summary.yaml  (LLM — kept across dataset rebuild)
   highlight_trials/
     outlier_trials/trial_*/
-    boundary_c*/trial_*/
-    param_boundary_c*/trial_*/
 ```
 
-Build order (xosc_gen Steps 1 → 2 → 2.5):
+Parameter-space packs (`parameter_space_pairs/cA-cB/`): rematerialize rewrites
+`process/`, `synced_bev/`, and thin side trials, but **never deletes**
+`output/contrast.yaml`. Far pairs that are dropped archive any LLM files under
+`parameter_space_pairs/_preserved_llm_output/`.
 
+Build order (xosc_gen Steps 1 → 2 → 2.5):
 ```text
 esmini CSV
   → labeller.py (+ collision_vehicle) → processed/action.yaml  [single source of truth]

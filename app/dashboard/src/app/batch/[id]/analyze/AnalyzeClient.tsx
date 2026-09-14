@@ -37,6 +37,7 @@ import ModelSetup from "./panels/ModelSetup";
 import MedoidAnalysis from "./panels/MedoidAnalysis";
 import ParameterSpacePairs from "./panels/ParameterSpacePairs";
 import ClusterAnalysis from "./panels/ClusterAnalysis";
+import CrossClusterAnalysis from "./panels/CrossClusterAnalysis";
 import Report from "./panels/Report";
 import OddQA from "./panels/OddQA";
 
@@ -801,8 +802,9 @@ export default function AnalyzeClient({
             splitAnalysis?.icPairs?.length ? ` (${splitAnalysis.icPairs.length})` : ""
           }`}
         />
+        <Tab label="Cluster analysis" />
         <Tab
-          label={`Cluster analysis${
+          label={`Cross-cluster analysis${
             currentQuality?.final_score != null
               ? ` (score ${currentQuality.final_score.toFixed(1)})`
               : ""
@@ -874,6 +876,14 @@ export default function AnalyzeClient({
           icPairsForPrereq={icPairsForPrereq}
           clustersMissingIcContrasts={clustersMissingIcContrasts}
           summaryBlocked={summaryBlocked}
+        />
+      )}
+
+      {activeTab === TAB.CROSS_CLUSTER && (
+        <CrossClusterAnalysis
+          config={config}
+          batchId={batchId}
+          splitAnalysis={splitAnalysis}
           evalRunning={evalRunning}
           evalError={evalError}
           evalLogs={evalLogs}
@@ -885,6 +895,7 @@ export default function AnalyzeClient({
           evalConfigs={evalConfigs}
           currentCrossEval={currentCrossEval}
           currentBoundaryPairs={currentBoundaryPairs}
+          currentQuality={currentQuality ?? null}
         />
       )}
 

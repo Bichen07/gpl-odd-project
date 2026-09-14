@@ -1,0 +1,63 @@
+<Your Task>
+You are reviewing the LABELS already invented for every cluster in ONE run —
+you are not writing new labels from raw evidence. Each cluster's `label` and
+`caption` were written independently (one LLM call per cluster, with no view
+of any other cluster). Your job is to look at all of them together and fix
+only two problems:
+
+1. **Mechanism-chained label** — the label pastes motive codes or strings
+   together more than one mechanism instead of naming one outcome archetype
+   (e.g. "Assertive Gap Late Yield Collision", "Late Reaction Failed Yield
+   Collision"). Target: 2–4 words, paper-heatmap style (`Smooth Pass`,
+   `Yield`, `Cut-in Collision`, `Brake Rear-end`, `Yield-Stop Collision`,
+   `Pass-Slowdown`).
+2. **Duplicate / near-duplicate label** — two or more clusters use the same
+   or a confusingly similar name, but their captions describe different
+   behavior (different collision rate, different stop / rear-end / timing
+   mechanism). Keep the SAME name only when the captions genuinely describe
+   the same behavior family.
+
+Do not touch a label that is already a short, distinct 2–4 word archetype —
+most labels need no change. Do not invent new evidence beyond what is already
+in the caption / collision_rate / risk_level shown to you.
+</Your Task>
+
+<Workflow>
+1. Read every cluster's label + caption excerpt + collision_rate + risk_level.
+2. Flag mechanism-chained labels (rule 1). Rewrite each to the closest 2–4
+   word outcome archetype from the caption's own outcome family (Pass / Yield
+   / Collision / Stop / Slowdown / Rear-end), optionally + one timing word
+   (Late / Proactive).
+3. Flag duplicate/near-duplicate labels (rule 2). Compare their captions:
+   - If genuinely the same behavior family and similar collision_rate, leave
+     both as-is (do not force an artificial difference).
+   - If different, rename the more mechanism-chained one, or — if both are
+     already short — the one whose caption reads as the less typical /
+     smaller-count case, to a distinct 2–4 word name that still matches its
+     own caption.
+4. Output one row per cluster, changed or not, with a one-line reason that
+   cites which rule applied (or "no change needed").
+</Workflow>
+
+<Clusters in this run (label + risk_level + caption excerpt, from cluster_summary.yaml)>
+{cluster_cards}
+</Clusters in this run>
+
+<Output>
+After a short scan (1-2 sentences) noting which rows need a change and why,
+ONE fenced ```json block: an array with exactly one row per cluster listed
+above, in the same order.
+
+```json
+[
+  {
+    "cluster_id": 0,
+    "original_label": "<label exactly as shown above>",
+    "new_label": "<same as original_label if unchanged, else your 2-4 word replacement>",
+    "changed": false,
+    "reason": "<one line: 'no change needed' or which rule (1 or 2) fired and why>"
+  }
+]
+```
+No prose after the fence.
+</Output>

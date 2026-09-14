@@ -80,6 +80,16 @@ def _primary_motive(cluster_dir: Path) -> Optional[str]:
         doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except Exception:
         return None
+    partner = str((doc.get("conflict_metrics") or {}).get("vehicle") or "").strip()
+    for row in doc.get("agent_interactions") or []:
+        if not isinstance(row, dict):
+            continue
+        if partner and str(row.get("agent") or "").strip() != partner:
+            continue
+        m = row.get("motive")
+        if isinstance(m, str) and m.strip() and m.strip() != "unclear":
+            return m.strip()
+        break
     val = doc.get("primary_motive")
     if isinstance(val, str) and val.strip() and val.strip() != "unclear":
         return val.strip()
@@ -357,6 +367,12 @@ def medoid_card_block(cluster_dir: Path) -> Optional[str]:
     except Exception:
         return None
     cm = doc.get("conflict_metrics") or {}
+    interactions = doc.get("agent_interactions") or []
+    ix_txt = "; ".join(
+        f"{row.get('agent')}: {row.get('resolution')}/{row.get('control_response')}/{row.get('motive')}"
+        for row in interactions
+        if isinstance(row, dict) and row.get("agent")
+    )
     # Motives live on decision_timeline entries (no separate motive_evidence list).
     tl = doc.get("decision_timeline") or []
     ev_txt = "; ".join(
@@ -377,10 +393,7 @@ def medoid_card_block(cluster_dir: Path) -> Optional[str]:
     clab = cname.replace("cluster", "c") if cname.startswith("cluster") else cname
     return (
         f"### [{clab}] cluster medoid\n"
-        f"- interaction_resolution: {doc.get('interaction_resolution')}\n"
-        f"- control_response: {doc.get('control_response')}\n"
-        f"- primary_motive: {doc.get('primary_motive')}\n"
-        f"- secondary_motives: {doc.get('secondary_motives')}\n"
+        f"- agent_interactions: {ix_txt or 'n/a'}\n"
         f"- peak_t={cm.get('peak_t')} brake_t={cm.get('brake_t')} "
         f"ttc={cm.get('ttc')} d={cm.get('d')}\n"
         f"- outcome: {_trim(doc.get('outcome'), 200)}\n"

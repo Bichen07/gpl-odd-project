@@ -2,8 +2,9 @@
 
 Gates pairs by z-scored L2 caliper ``param_dist ≤ PARAMETER_SPACE_DIST_TAU``, writes
 thin per-side trial dirs (raw + action.yaml) + pack-level ``process/context.md``,
-``synced_bev/``, and ``output/``, and removes the legacy
-``cluster*/highlight_trials/param_boundary_c*`` layout.
+``synced_bev/``, and ``output/`` (LLM ``contrast.yaml``). Rematerialize clears
+deterministic children only — ``output/`` is preserved across dataset rebuilds.
+Legacy ``cluster*/highlight_trials/param_boundary_c*`` folders are removed.
 """
 from __future__ import annotations
 
@@ -15,7 +16,11 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from agent_labels import display_agent_name, normalize_vehicle_schema
-from cluster_paths import run_source_dir
+from cluster_paths import (
+    clear_pack_keep_output,
+    remove_pack_keep_output_archive,
+    run_source_dir,
+)
 
 # Z-scored L2 caliper in 2D parameter space (OncomingSpeed, OncomingStartDelay).
 PARAMETER_SPACE_DIST_TAU = 0.1
@@ -224,13 +229,108 @@ def write_pair_process_context_md(
         )
         header.append("")
 
-    header.append("## Merged timeline (shared clock)")
+    header.append(
+        "## Layer 1 — Synchronized boundary comparison (shared clock)"
+    )
+    header.append(
+        "Compare geometry only while both sides are alive. "
+        "Primary conflict-vehicle metrics appear on every line; secondary agents "
+        "(e.g. Parking) appear on the same line only when within 40 m at that "
+        "timestamp. `separation_call` must use this section only."
+    )
     header.append("")
 
     if not frames:
         header.append("(synced_bev_index.json has no frames)")
         out.write_text("\n".join(header) + "\n", encoding="utf-8")
         return out
+
+    from secondary_context import _layer1_end_t_from_frames
+
+    layer1_end = _layer1_end_t_from_frames(frames)
+    layer1_frames = frames
+    if layer1_end is not None:
+        layer1_frames = [
+            fr for fr in frames if float(fr.get("t_s", 0)) <= float(layer1_end) + 1e-6
+        ]
+
+    # Side trajectories for inline secondary metrics (Layer 1) + Layer 2 summary
+    pair_side_ctx: Dict[str, Any] = {}
+    try:
+        import yaml
+        import pandas as pd
+        from secondary_context import (
+            discover_pair_side_paths,
+            select_secondary_agents,
+            secondary_inline_clauses,
+            _tid_for_name,
+        )
+
+        side_paths = discover_pair_side_paths(pack_dir)
+        for lab, veh, peak_key, clip_key in (
+            (left_lab, left_vehicle_name, "left_peak_s", "left_clip_start_s"),
+            (right_lab, right_vehicle_name, "right_peak_s", "right_clip_start_s"),
+        ):
+            paths = side_paths.get(lab, {})
+            traj = (
+                pd.read_csv(paths["trajectory"])
+                if paths.get("trajectory")
+                else None
+            )
+            action = None
+            if paths.get("action"):
+                action = yaml.safe_load(
+                    paths["action"].read_text(encoding="utf-8")
+                )
+            peak = doc.get(peak_key)
+            ptid = _tid_for_name(traj, action, str(veh)) if traj is not None else None
+            sec_agents = (
+                select_secondary_agents(
+                    traj,
+                    action,
+                    primary_tid=ptid,
+                    primary_name=str(veh),
+                    peak_t=peak,
+                )
+                if traj is not None
+                else []
+            )
+            pair_side_ctx[lab] = {
+                "traj": traj,
+                "action": action,
+                "clip": float(doc.get(clip_key) or 0.0),
+                "primary_tid": ptid,
+                "primary_name": str(veh),
+                "secondary_agents": sec_agents,
+            }
+    except Exception:
+        pair_side_ctx = {}
+
+    def _inline_secondary(side_lab: str, side_txt: str, t_s: float, alive: bool) -> str:
+        if not alive:
+            return side_txt
+        ctx = pair_side_ctx.get(side_lab) or {}
+        traj = ctx.get("traj")
+        agents = ctx.get("secondary_agents") or []
+        if traj is None or not agents:
+            return side_txt
+        try:
+            from secondary_context import secondary_inline_clauses
+
+            t_esmini = float(t_s) + float(ctx.get("clip") or 0.0)
+            clauses = secondary_inline_clauses(
+                traj,
+                ctx.get("action"),
+                t_esmini,
+                primary_tid=ctx.get("primary_tid"),
+                primary_name=ctx.get("primary_name") or "",
+                secondary_agents=agents,
+            )
+            if clauses:
+                return side_txt + "; " + "; ".join(clauses)
+        except Exception:
+            pass
+        return side_txt
 
     def _fmt(
         alive: Optional[bool],
@@ -302,8 +402,8 @@ def write_pair_process_context_md(
         return None
 
     lines = list(header)
-    truncated = len(frames) > max_lines
-    shown = frames[:max_lines] if truncated else frames
+    truncated = len(layer1_frames) > max_lines
+    shown = layer1_frames[:max_lines] if truncated else layer1_frames
     for fr in shown:
         t_s = fr.get("t_s")
         if t_s is None:
@@ -342,12 +442,69 @@ def write_pair_process_context_md(
             t=float(t_s),
             conflict_name=right_vehicle_name,
         )
+        left_txt = _inline_secondary(left_lab, left_txt, float(t_s), bool(fr.get("left_alive", True)))
+        right_txt = _inline_secondary(right_lab, right_txt, float(t_s), bool(fr.get("right_alive", True)))
         lines.append(
             f"- t={float(t_s):.2f}s: [{left_lab}] {left_txt} | "
             f"[{right_lab}] {right_txt}"
         )
     if truncated:
-        lines.append(f"…[{len(frames) - max_lines} more frames omitted]")
+        lines.append(f"…[{len(layer1_frames) - max_lines} more Layer 1 frames omitted]")
+
+    # Layer 2 continuation + trajectory-shape summary (A2)
+    try:
+        from secondary_context import (
+            discover_pair_side_paths,
+            format_pair_continuation_sections,
+            format_trajectory_shape_section,
+            build_trajectory_shape_summary,
+        )
+
+        side_paths = discover_pair_side_paths(pack_dir)
+        left_paths = side_paths.get(left_lab, {})
+        right_paths = side_paths.get(right_lab, {})
+
+        l1_end = layer1_end if layer1_end is not None else (
+            float(layer1_frames[-1]["t_s"]) if layer1_frames else 0.0
+        )
+        lines.append("")
+        lines.append(
+            format_pair_continuation_sections(
+                pack_dir,
+                left_lab=left_lab,
+                right_lab=right_lab,
+                layer1_end_t=float(l1_end),
+                left_conflict_vehicle=left_vehicle_name,
+                right_conflict_vehicle=right_vehicle_name,
+                left_peak_t=doc.get("left_peak_s"),
+                right_peak_t=doc.get("right_peak_s"),
+            ).rstrip()
+        )
+        lines.append("")
+        summary = build_trajectory_shape_summary(
+            left_label=left_lab,
+            right_label=right_lab,
+            layer1_end_t=float(l1_end),
+            left_action_path=left_paths.get("action"),
+            right_action_path=right_paths.get("action"),
+            left_traj_path=left_paths.get("trajectory"),
+            right_traj_path=right_paths.get("trajectory"),
+            left_peak_t=doc.get("left_peak_s"),
+            right_peak_t=doc.get("right_peak_s"),
+            left_conflict_vehicle=left_vehicle_name,
+            right_conflict_vehicle=right_vehicle_name,
+        )
+        lines.append(
+            format_trajectory_shape_section(summary, left_lab, right_lab).rstrip()
+        )
+        # Persist for downstream YAML / dashboard
+        (process_dir / "trajectory_shape_summary.json").write_text(
+            json.dumps(summary, indent=2), encoding="utf-8"
+        )
+    except Exception as exc:
+        lines.append("")
+        lines.append(f"(extended context unavailable: {exc})")
+
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
     return out
 
@@ -1250,14 +1407,26 @@ def process_parameter_space_pair_packs(
     built = 0
     for bp in annotated:
         if not bp.get("parameter_space_match", bp.get("ic_match")):
-            # Remove stale pack if a prior run materialised a far pair
+            # Far pair: drop deterministic pack, but archive any LLM output.
             stale = pair_pack_dir(run_dir, bp["cluster_a"], bp["cluster_b"])
             if stale.is_dir():
-                shutil.rmtree(stale, ignore_errors=True)
-            print(
-                f"  ⏭  Parameter-space pair c{bp['cluster_a']}↔c{bp['cluster_b']} "
-                f"param_dist={bp.get('param_dist')} > τ={tau} (skipped)"
-            )
+                archived = remove_pack_keep_output_archive(
+                    stale, root / "_preserved_llm_output"
+                )
+                note = (
+                    " (LLM output archived under _preserved_llm_output/)"
+                    if archived
+                    else ""
+                )
+                print(
+                    f"  ⏭  Parameter-space pair c{bp['cluster_a']}↔c{bp['cluster_b']} "
+                    f"param_dist={bp.get('param_dist')} > τ={tau} (skipped){note}"
+                )
+            else:
+                print(
+                    f"  ⏭  Parameter-space pair c{bp['cluster_a']}↔c{bp['cluster_b']} "
+                    f"param_dist={bp.get('param_dist')} > τ={tau} (skipped)"
+                )
             continue
         ca, cb = int(bp["cluster_a"]), int(bp["cluster_b"])
         if not (cluster_in_scope(ca, scope) or cluster_in_scope(cb, scope)):
@@ -1274,15 +1443,14 @@ def process_parameter_space_pair_packs(
         bp["trial_index_b"] = int(tib)
         bp["batch_id_b"] = int(bb)
         pack = pair_pack_dir(run_dir, ca, cb)
-        if pack.is_dir():
-            shutil.rmtree(pack, ignore_errors=True)
-        pack.mkdir(parents=True, exist_ok=True)
+        n_kept = clear_pack_keep_output(pack)
         left_dir = side_trial_dir(pack, ca, tia)
         right_dir = side_trial_dir(pack, cb, tib)
         role = str(bp.get("card_role") or "primary")
+        keep_note = f", kept {n_kept} LLM file(s) in output/" if n_kept else ""
         print(
             f"  🔹 Parameter-space pair [{role}] c{ca}↔c{cb} param_dist={bp.get('param_dist'):.4f} "
-            f"→ {pack.relative_to(run_dir)}"
+            f"→ {pack.relative_to(run_dir)}{keep_note}"
         )
 
         ok_l = process_trial_to_dir(

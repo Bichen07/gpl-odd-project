@@ -2,6 +2,9 @@
 
 Names not listed in the legacy alias table pass through unchanged, so new
 scenario vehicle names do not require code changes.
+
+Cluster *labels* are invented by the summary LLM from evidence (open
+vocabulary) — do not hardcode actor→label maps here.
 """
 
 from __future__ import annotations

@@ -14,17 +14,16 @@ import {
   Stack,
   Tab,
   Tabs,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   Typography,
 } from "@mui/material";
 import { Close, ExpandMore, HelpOutline } from "@mui/icons-material";
 import type { SplitAnalysis } from "../types";
-import { CONTRAST_FIELD_BODY_SX, CONTRAST_FIELD_LABEL_SX, fmtNum } from "../utils";
-import DigestTable from "./DigestTable";
+import {
+  agentInteractionRows,
+  CONTRAST_FIELD_BODY_SX,
+  CONTRAST_FIELD_LABEL_SX,
+  fmtNum,
+} from "../utils";
 
 export default function SplitCardsPanel({
   split,
@@ -52,6 +51,7 @@ export default function SplitCardsPanel({
     ?.parsed ?? null) as Record<string, unknown> | null;
   const medoidParsed = ((card?.medoidMeta as Record<string, unknown> | null | undefined)
     ?.parsed ?? null) as Record<string, unknown> | null;
+  const medoidAgentInteractions = agentInteractionRows(medoidParsed);
   const icPairs = split?.icPairs ?? [];
   const pair = icPairs[Math.min(pairIdx, Math.max(0, icPairs.length - 1))] ?? null;
 
@@ -120,52 +120,6 @@ export default function SplitCardsPanel({
               />
             )}
           </Stack>
-          <DigestTable title="TTC (all)" digest={agg?.ttc as Record<string, unknown>} />
-          <DigestTable
-            title="TTC (collide)"
-            digest={agg?.ttc_collide as Record<string, unknown>}
-          />
-          <DigestTable
-            title="TTC (survive)"
-            digest={agg?.ttc_survive as Record<string, unknown>}
-          />
-          {typeof agg?.ic === "object" && agg?.ic !== null && (
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="subtitle2" gutterBottom>
-                Initial conditions
-              </Typography>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>param</TableCell>
-                    <TableCell>mean</TableCell>
-                    <TableCell>std</TableCell>
-                    <TableCell>p10</TableCell>
-                    <TableCell>p90</TableCell>
-                    <TableCell>range</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {Object.entries(agg.ic as Record<string, Record<string, unknown>>).map(
-                    ([name, d]) => (
-                      <TableRow key={name}>
-                        <TableCell>{name}</TableCell>
-                        <TableCell>{fmtNum(d.mean)}</TableCell>
-                        <TableCell>{fmtNum(d.std)}</TableCell>
-                        <TableCell>{fmtNum(d.p10)}</TableCell>
-                        <TableCell>{fmtNum(d.p90)}</TableCell>
-                        <TableCell>
-                          {Array.isArray(d.range)
-                            ? `[${fmtNum(d.range[0])}, ${fmtNum(d.range[1])}]`
-                            : "—"}
-                        </TableCell>
-                      </TableRow>
-                    ),
-                  )}
-                </TableBody>
-              </Table>
-            </Box>
-          )}
           {summaryParsed?.caption != null && (
             <Box sx={{ mb: 2 }}>
               <Typography
@@ -363,49 +317,22 @@ export default function SplitCardsPanel({
             Medoid trial
             {medoidParsed?.trial_id != null ? ` ${String(medoidParsed.trial_id)}` : ""}
           </Typography>
-          {medoidParsed != null &&
-            (medoidParsed.conflict_metrics != null ||
-              medoidParsed.outcome != null ||
-              medoidParsed.primary_motive != null ||
-              medoidParsed.interaction_resolution != null) && (
+          {medoidParsed?.outcome != null && (
             <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mb: 2 }}>
-              {medoidParsed.outcome != null && (
-                <Chip size="small" label={`outcome: ${String(medoidParsed.outcome)}`} />
-              )}
-              {medoidParsed.interaction_resolution != null && (
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  label={`interaction_resolution: ${String(medoidParsed.interaction_resolution)}`}
-                />
-              )}
-              {medoidParsed.primary_motive != null && (
-                <Chip
-                  size="small"
-                  color="primary"
-                  variant="outlined"
-                  label={`primary_motive: ${String(medoidParsed.primary_motive)}`}
-                />
-              )}
-              {medoidParsed.control_response != null && (
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  label={`control_response: ${String(medoidParsed.control_response)}`}
-                />
-              )}
-              {typeof medoidParsed.conflict_metrics === "object" &&
-                medoidParsed.conflict_metrics !== null &&
-                Object.entries(medoidParsed.conflict_metrics as Record<string, unknown>).map(
-                  ([k, v]) => (
-                    <Chip
-                      key={k}
-                      size="small"
-                      variant="outlined"
-                      label={`${k}=${typeof v === "number" ? fmtNum(v) : String(v)}`}
-                    />
-                  ),
-                )}
+              <Chip size="small" label={`outcome: ${String(medoidParsed.outcome)}`} />
+            </Stack>
+          )}
+          {medoidAgentInteractions.length > 0 && (
+            <Stack spacing={0.5} sx={{ mb: 2 }}>
+              <Typography variant="caption" color="text.secondary">
+                agent_interactions
+              </Typography>
+              {medoidAgentInteractions.map((row: Record<string, unknown>, i: number) => (
+                <Typography key={`${String(row?.agent)}-${i}`} variant="body2">
+                  {String(row?.agent ?? "?")}: resolution={String(row?.resolution ?? "—")},
+                  control={String(row?.control_response ?? "—")}, motive={String(row?.motive ?? "—")}
+                </Typography>
+              ))}
             </Stack>
           )}
           {medoidParsed?.motive_summary != null &&

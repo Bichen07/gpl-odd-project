@@ -72,6 +72,72 @@ def output_dir(cluster_dir: Union[str, Path]) -> Path:
     return Path(cluster_dir) / "output"
 
 
+def clear_pack_keep_output(pack_dir: Union[str, Path]) -> int:
+    """Delete everything under *pack_dir* except ``output/`` (LLM cards).
+
+    Dataset rebuilds rematerialize ``raw/``, ``processed/``, ``process/``,
+    ``synced_bev/``, side trials, and ``pair.json`` — they must not wipe
+    ``output/contrast.yaml`` / medoid YAMLs. Returns number of preserved files
+    under ``output/`` (0 if none / missing).
+    """
+    import shutil
+
+    root = Path(pack_dir)
+    if not root.is_dir():
+        root.mkdir(parents=True, exist_ok=True)
+        (root / "output").mkdir(parents=True, exist_ok=True)
+        return 0
+
+    out = root / "output"
+    preserved = 0
+    if out.is_dir():
+        preserved = sum(1 for p in out.rglob("*") if p.is_file())
+    else:
+        out.mkdir(parents=True, exist_ok=True)
+
+    for child in list(root.iterdir()):
+        if child.name == "output":
+            continue
+        if child.is_dir():
+            shutil.rmtree(child, ignore_errors=True)
+        else:
+            try:
+                child.unlink()
+            except OSError:
+                pass
+    return preserved
+
+
+def remove_pack_keep_output_archive(
+    pack_dir: Union[str, Path],
+    archive_root: Union[str, Path],
+) -> bool:
+    """Remove a stale pack but archive its ``output/`` if it has LLM files.
+
+    Used when a pair falls outside the match caliper: deterministic sides go
+    away, but prior ``contrast.yaml`` remains under
+    ``archive_root/<pack_name>/``. Returns True if anything was archived.
+    """
+    import shutil
+
+    root = Path(pack_dir)
+    if not root.is_dir():
+        return False
+    out = root / "output"
+    files = [p for p in out.rglob("*") if p.is_file()] if out.is_dir() else []
+    archived = False
+    if files:
+        dest = Path(archive_root) / root.name
+        dest.mkdir(parents=True, exist_ok=True)
+        dest_out = dest / "output"
+        if dest_out.exists():
+            shutil.rmtree(dest_out, ignore_errors=True)
+        shutil.copytree(out, dest_out)
+        archived = True
+    shutil.rmtree(root, ignore_errors=True)
+    return archived
+
+
 def highlight_trials_dir(cluster_dir: Union[str, Path]) -> Path:
     """Parent for outlier / trajectory-projection / IC-boundary trial packs."""
     return Path(cluster_dir) / "highlight_trials"

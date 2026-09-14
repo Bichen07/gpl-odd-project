@@ -70,20 +70,88 @@ Do these **before** writing production code. Status updated 2026-08-21.
 
 #### B. Literature (read what the paper *actually* claims)
 
+Full titles + links so you can open the source directly. Status = how thoroughly *we* have read it for this plan.
 
-| #   | Source                                                     | Status      | Simple “what it says”                                                                                                                                                                                                                                       | Supports us?                                                                                                  | Overclaim risk                                                                                                                                                                                                |
-| --- | ---------------------------------------------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B1  | **SAE J3016** ODD                                          | **Done**    | ODD = conditions under which the driving automation feature is *designed* to function (geo, road, weather, traffic, speed, time, …).                                                                                                                        | Motivation: engineers need to name operating limits.                                                          | Calling our collision frontier “the ODD” is too strong. Ours is an **empirical fail envelope in sampled scenario parameters** for one logical scenario — a *piece* of ODD-related evidence, not the full ODD. |
-| B2  | **Koopman J3016 user guide**                               | **Done**    | Distinguishes ODD (design intent) vs real operational domain; exiting ODD ⇒ system outside design.                                                                                                                                                          | Thesis should say we help *discover candidate limits* to put into an ODD discussion, not certify ODD exit.    | Same as B1.                                                                                                                                                                                                   |
-| B3  | **Song et al., Softw. Qual. J. 2023** critical scenario ID | **Done**    | Real traffic testing does not scale; prioritize **critical** scenarios (params that likely expose failure). Workflow: specs → params + objective (e.g. TTC) → simulate → **optimize** to find critical concrete scenarios. Validated on industry functions. | Supports: search/analyze **parameter space** for fail-inducing concrete scenarios; use measurable objectives. | They **search/optimize** for new critical points. We only **label frontier trials already sampled**. Do not claim we “identify critical scenarios” the same way.                                              |
-| B4  | **Lewis et al., NeurIPS 2020 RAG**                         | **Done**    | LLMs alone hallucinate / can’t update knowledge; RAG retrieves documents from an external index and generates conditioned on them; more factual than parametric-only on knowledge tasks.                                                                    | Supports: **ground answers on an external run corpus** (our briefing) instead of free chat.                   | Their system uses dense retrieval + fine-tuning over Wikipedia. Ours is **prompt-grounding / light RAG** (fixed JSON + router). Say “RAG-*style* grounding,” not “we implement RAG.”                          |
-| B5  | **RAG hallucination reviews** (2025+)                      | **Done**    | RAG reduces but does **not** remove hallucination; bad retrieval still yields wrong answers; need faithfulness checks.                                                                                                                                      | Supports: citations, refuse if missing, gold Q/A eval.                                                        | Do not sell chat as “truth.”                                                                                                                                                                                  |
-| B6  | **Atakishiyev et al., XAI for safe AD review**             | **Done**    | Black-box AD models hurt trust/safety argumentation; XAI paradigms include **interpretable-by-design** (trees, rules) and surrogates; interpretability = user can follow input→output causality. Also notes L3 ODD handovers need agency/explanations.      | Supports: shallow CART/rules for auditable fail regions; chat as explanation medium for engineers.            | Trees for **scenario-param → collision** are not the same as explaining the AV neural planner. Be clear: we explain **test outcomes**, not the controller weights.                                            |
-| B7  | **Tree XAI in AD** (e.g. GRIT, ICCT)                       | **Skimmed** | Decision trees used so humans can read and sometimes verify policies.                                                                                                                                                                                       | Supports preference for shallow trees over DL for *stated* limits.                                            | Those papers learn **driving policies**; we learn **outcome classifiers** on test params. Analogy only.                                                                                                       |
-| B8  | **ISO 21448 SOTIF**                                        | **Todo**    | (To confirm in thesis write-up) Known unsafe scenarios / triggering conditions beyond random hardware faults.                                                                                                                                               | Likely supports “find triggering parameter conditions.”                                                       | Read official text before citing chapter numbers.                                                                                                                                                             |
-| B9  | **Warwick ODD+behavior scenario papers**                   | **Todo**    | ODD alone misses behavior; scenarios need ODD elements + maneuvers.                                                                                                                                                                                         | Supports pairing parameter envelope with **behavioral** medoid/pair cards.                                    | Don’t treat parameter rules as complete scenario coverage.                                                                                                                                                    |
+##### B1 — SAE J3016 (ODD definition)
+- **Status:** Done
+- **Full name:** SAE J3016™_202104 — *Taxonomy and Definitions for Terms Related to Driving Automation Systems for On-Road Motor Vehicles* (Recommended Practice, Apr 2021 update of the levels/ODD taxonomy).
+- **Links:** [SAE Mobilus (paywalled official)](https://www.sae.org/standards/content/j3016_202104/) · [UNECE-hosted PDF mirror of J3016_202104](https://wiki.unece.org/download/attachments/128418539/SAE%20J3016_202104.pdf)
+- **What it actually says:** §3.21 defines **Operational Design Domain (ODD)** as the *operating conditions under which a given driving automation system or feature is specifically designed to function*, including but not limited to environmental, geographical, and time-of-day restrictions, and/or presence/absence of certain traffic or roadway characteristics. Levels 1–4 are ODD-limited; Level 5 is defined without ODD limitations. Transient environment changes are not automatically an “ODD exit” — the ADS decides when fallback is required.
+- **Supports us?** Motivation: engineers need named operating limits for a feature.
+- **Overclaim risk:** Calling our collision frontier “the ODD” is too strong. Ours is an **empirical fail envelope in sampled scenario parameters** for one logical scenario — a *piece* of ODD-related evidence, not a full ODD (geo/weather/road type/… as in J3016).
 
+##### B2 — Koopman J3016 user guide
+- **Status:** Done
+- **Full name:** Philip Koopman — *SAE J3016 User Guide* (informal companion commentary on J3016; not the standard itself).
+- **Link:** https://users.ece.cmu.edu/~koopman/j3016/index.html
+- **What it actually says:** ODD is the *design* view of capability (not “the real world”). Informally introduces **Operational Domain (OD)** = what the world actually is; when OD is outside ODD the vehicle has exited design intent (one reason to initiate Fallback). ODD is more than geography (lighting, precipitation, lane-paint condition, ice, maps, …). One feature → one ODD; a vehicle may host multiple features with different ODDs.
+- **Supports us?** Thesis language: we help *discover candidate limits* for an ODD discussion, not certify ODD exit.
+- **Overclaim risk:** Same as B1 — do not equate sampled collision frontiers with certified ODD exit.
 
+##### B3 — Song et al. critical-scenario identification
+- **Status:** Done
+- **Full name:** Qunying Song, Kaige Tan, Per Runeson, Stefan Persson — *Critical scenario identification for realistic testing of autonomous driving systems*. **Software Quality Journal** 31(2):441–469, 2023.
+- **Links:** [Springer](https://link.springer.com/article/10.1007/s11219-022-09604-2) · [DOI](https://doi.org/10.1007/s11219-022-09604-2) · [Lund record](https://portal.research.lu.se/en/publications/critical-scenario-identification-for-realistic-testing-of-autonom/)
+- **What it actually says:** Real traffic testing does not scale (infinite concrete scenarios). They implement an end-to-end **critical-scenario identification** toolchain: specs → parameters + measurable objectives (e.g. TTC, PET) → SPAS simulation → **modeFrontier optimization** to search for critical concrete scenarios. Validated on two Volvo Cars functions (parking + driving). Explicitly: *not* claiming the best optimizer — feasibility of the workflow.
+- **Supports us?** Analyzing **parameter space** for fail-inducing concrete scenarios; using measurable objectives.
+- **Overclaim risk:** They **search/optimize for new** critical points. We mainly **label / explain frontier trials already sampled**. Do not claim we “identify critical scenarios” the same way.
+
+##### B4 — Lewis et al. RAG (NeurIPS 2020)
+- **Status:** Done
+- **Full name:** Patrick Lewis, Ethan Perez, Aleksandra Piktus, Fabio Petroni, Vladimir Karpukhin, Naman Goyal, Heinrich Küttler, Mike Lewis, Wen-tau Yih, Tim Rocktäschel, Sebastian Riedel, Douwe Kiela — *Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks*. **NeurIPS 2020**.
+- **Links:** [arXiv](https://arxiv.org/abs/2005.11401) · [NeurIPS PDF](https://proceedings.nips.cc/paper_files/paper/2020/file/6b493230205f780e1bc26945df7481e5-Paper.pdf) · [NeurIPS abstract](https://proceedings.nips.cc/paper/2020/hash/6b493230205f780e1bc26945df7481e5-Abstract.html)
+- **What it actually says:** Parametric LLMs alone struggle on knowledge-intensive tasks (limited precise knowledge access, hard provenance, hard knowledge update). **RAG** = parametric seq2seq (BART) + **non-parametric dense Wikipedia index** via a neural retriever; generation is conditioned on retrieved passages. Improves open-domain QA and factuality vs parametric-only baselines; knowledge can be updated by swapping the index.
+- **Supports us?** Ground answers on an **external run corpus** (our briefing) instead of free chat.
+- **Overclaim risk:** Their system is dense retrieval + fine-tuning over Wikipedia. Ours is **prompt-grounding / light RAG-style** (fixed JSON briefing + router). Say “RAG-*style* grounding,” not “we implement RAG.”
+
+##### B5 — RAG hallucination / faithfulness reviews
+- **Status:** Done (survey-level)
+- **Primary cites (use both):**
+  1. Hao Yu et al. — *Evaluation of Retrieval-Augmented Generation: A Survey*. arXiv:2405.07437, 2024. [arXiv](https://arxiv.org/abs/2405.07437) · [HTML](https://arxiv.org/html/2405.07437) — surveys RAG eval; **faithfulness** = claims supported by retrieved context; bad retrieval ⇒ bad answers.
+  2. Wan Zhang, Jing Zhang — *Hallucination Mitigation for Retrieval-Augmented Large Language Models: A Review*. **Mathematics** 13(5):856, 2025. [MDPI](https://www.mdpi.com/2227-7390/13/5/856) · [DOI](https://doi.org/10.3390/math13050856) — RAG reduces but does **not** remove hallucination; distinguishes factuality vs faithfulness failures; mitigation spans retrieve + generate + detect/correct.
+- **Also useful:** Ruichen et al. / industry practice via [RAGAS faithfulness metric](https://docs.ragas.io/en/stable/concepts/metrics/available_metrics/faithfulness/) — operational definition of “claims entailed by context.”
+- **What they actually say:** External retrieval helps but **wrong/noisy/irrelevant retrieval still yields wrong answers**; need faithfulness checks, citations, and refusal when evidence is missing.
+- **Supports us?** Citations in chat, refuse if missing, gold Q/A faithfulness eval (C3).
+- **Overclaim risk:** Do not sell ODD Q&A as “truth.”
+
+##### B6 — Atakishiyev et al. XAI for autonomous driving (review)
+- **Status:** Done
+- **Full name:** Shahin Atakishiyev, Mohammad Salameh, Hengshuai Yao, Randy Goebel — *Explainable Artificial Intelligence for Autonomous Driving: A Comprehensive Overview and Field Guide for Future Research Directions*. **IEEE Access** 12:101603–101625, 2024.
+- **Links:** [IEEE Xplore](https://ieeexplore.ieee.org/document/10604830/) · [DOI](https://doi.org/10.1109/ACCESS.2024.3431437) · [arXiv HTML](https://arxiv.org/html/2112.11561v3)
+- **Related (safety focus):** Atakishiyev, Salameh, Goebel — *Safety Implications of Explainable Artificial Intelligence in End-to-End Autonomous Driving*. **IEEE T-ITS** 26(10):14516–14535, 2025. [DOI](https://doi.org/10.1109/tits.2025.3574738)
+- **What it actually says:** End-to-end AD decisions are not generally human-understandable → hurts trust, regulation, post-incident analysis. Surveys XAI paradigms for AVs (interpretable-by-design models such as **trees/rules**, post-hoc surrogates, interactive explanations). Argues explanations matter for safety argumentation and stakeholder acceptance; L3-style handovers / agency need intelligible reasons.
+- **Supports us?** Shallow CART/rules for auditable fail regions; chat as an explanation medium for engineers.
+- **Overclaim risk:** Trees for **scenario-param → collision** are not explaining the AV neural planner. Be clear: we explain **test outcomes**, not controller weights.
+
+##### B7 — Tree XAI in AD (GRIT, ICCT)
+- **Status:** Skimmed → upgraded notes below
+- **GRIT — full name:** Cillian Brewitt, Balint Gyevnar, Samuel Garcin, Stefano V. Albrecht — *GRIT: Fast, Interpretable, and Verifiable Goal Recognition with Learned Decision Trees for Autonomous Driving*. **IROS 2021**.
+  - **Links:** [arXiv](https://arxiv.org/abs/2103.06113) · [DOI](https://doi.org/10.1109/iros51168.2021.9636279)
+  - **Says:** Decision trees for **other-vehicle goal recognition** (not ego control); aims to be fast, accurate, human-interpretable, and SMT-verifiable.
+- **ICCT — full name:** Rohan Paleja, Yaru Niu, Andrew Silva, Chien Chern Cheah, Matthew Gombolay — *Learning Interpretable, High-Performing Policies for Autonomous Driving* (Interpretable Continuous Control Trees). **RSS 2022**.
+  - **Links:** [arXiv](https://arxiv.org/abs/2202.02352) · [RSS PDF](https://roboticsproceedings.org/rss18/p068.pdf) · [DOI](https://doi.org/10.15607/rss.2022.xviii.068)
+  - **Says:** Tree-structured **continuous control policies** trained with RL (steering/accel); sparse readable trees that match/beat deep policies with far fewer parameters; physical robot demo.
+- **Supports us?** Preference for shallow trees over opaque DL when limits must be **stated and audited**.
+- **Overclaim risk:** GRIT/ICCT learn **driving / prediction policies**. We learn **outcome classifiers** on test parameters. Analogy only.
+
+##### B8 — ISO 21448 SOTIF
+- **Status:** Todo (read official text before citing clause numbers in the thesis)
+- **Full name:** **ISO 21448:2022** — *Road vehicles — Safety of the intended functionality* (SOTIF).
+- **Links:** [ISO catalog](https://www.iso.org/standard/77490.html) · [iteh catalog entry](https://standards.iteh.ai/catalog/standards/iso/51ac264d-8f3f-4beb-afd1-eb526ff1e98c/iso-21448-2022) (paywalled official PDF)
+- **What secondary sources consistently attribute:** Complements functional safety (ISO 26262) by covering hazards from **functional insufficiencies** / performance limits even without random E/E faults. Key notion: **triggering condition** (≈ specific scenario condition that initiates a hazardous system reaction or inability to mitigate misuse). Clause family ~7 covers identification/evaluation of potential functional insufficiencies and triggering conditions (confirm clause numbers from the official PDF).
+- **Supports us?** Framing “find triggering parameter conditions” for hazardous behavior in simulation.
+- **Overclaim risk:** Do not cite chapter numbers until the official text is checked. Our sampled-parameter collision frontier ≠ full SOTIF assurance argument.
+
+##### B9 — Warwick ODD + behavior scenario papers
+- **Status:** Done (abstracts + open PDFs skimmed)
+- **Paper 1 — full name:** Xizhe Zhang, Siddartha Khastgir, Justin-Kiyoshi Tiele, Kazuhito Takenaka, Tasuku Hayakawa, Paul Jennings — *ODD and Behavior Based Scenario Generation for Automated Driving Systems*. **IEEE Access** 12:10652–10663, 2024. (WMG, University of Warwick + DENSO)
+  - **Links:** [DOI](https://doi.org/10.1109/ACCESS.2024.3350512) · [WRAP open PDF](https://wrap.warwick.ac.uk/id/eprint/182979/19/ODD_and_Behavior_Based_Scenario_Generation_for_Automated_Driving_Systems.pdf)
+  - **Says:** Scenario-based testing for ADS safety evidence must consider the system’s **claimed ODD**. ODD attributes alone are not enough — combine with a **behaviour competency** library; filter compatible behaviours for selected ODD scenery; apply construction rules → logical then concrete scenarios (OpenSCENARIO/OpenDRIVE-oriented workflow).
+- **Paper 2 — full name:** Xizhe Zhang et al. — *ODD and Behavior-Based Approach to Scenario Coverage for Automated Driving Systems Testing*. **IEEE Access**, 2026 (early access / published record).
+  - **Links:** [DOI](https://doi.org/10.1109/ACCESS.2026.3665396) · [WRAP open PDF](https://wrap.warwick.ac.uk/id/eprint/198883/1/ODD_and_Behavior-Based_Approach_to_Scenario_Coverage_for_Automated_Driving_Systems_Testing.pdf)
+  - **Says:** Multi-level **coverage** metrics for whether a scenario suite tests the ODD: attribute-range coverage, ODD+behaviour competency coverage, out-of-ODD cases, rules-of-the-road compliance. Case study: ALKS.
+- **Supports us?** Pairing a parameter envelope with **behavioral** medoid/pair cards (ODD-ish params ≠ complete scenario story).
+- **Overclaim risk:** Don’t treat our shallow parameter rules as complete ODD/behaviour scenario coverage.
 
 
 #### C. Critical experiments (before locking S3/S5)

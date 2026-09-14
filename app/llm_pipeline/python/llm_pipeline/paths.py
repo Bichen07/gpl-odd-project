@@ -37,6 +37,7 @@ _RUN_ARTIFACTS = {
     "selection_eval": ("cross_cluster/input", "cluster_selection_eval.json"),
     "cross_eval": ("cross_cluster/output", "cross_cluster_eval.json"),
     "quality": ("analysis/quality", "clustering_quality.json"),
+    "label_review": ("analysis/quality", "cluster_label_review.json"),
     "split_summary": ("analysis/logs", "split_analysis_summary.json"),
     "odd_all_trials": ("analysis/odd/input", "odd_all_trials.json"),
     "odd_boundary_export": ("analysis/odd/output", "odd_boundary_export.json"),

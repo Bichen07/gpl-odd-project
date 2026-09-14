@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import { ExpandMore } from "@mui/icons-material";
 import type { ReportData } from "../../types";
+import { TAB } from "../../constants";
 import { riskColor } from "../../utils";
 
 export default function Report({
@@ -148,7 +149,7 @@ export default function Report({
                 key={c.id}
                 hover
                 sx={{ cursor: "pointer" }}
-                onClick={() => onNavigateTab(1)}
+                onClick={() => onNavigateTab(TAB.MEDOID)}
               >
                 <TableCell>
                   <Chip label={`C${c.id}`} size="small" />
@@ -309,7 +310,7 @@ export default function Report({
                       variant="outlined"
                       onDoubleClick={(e) => {
                         e.stopPropagation();
-                        onNavigateTab(2);
+                        onNavigateTab(TAB.PAIRS);
                       }}
                     />
                   </TableCell>
@@ -536,9 +537,9 @@ export default function Report({
           variant="text"
           size="small"
           sx={{ mt: 1 }}
-          onClick={() => onNavigateTab(3)}
+          onClick={() => onNavigateTab(TAB.CROSS_CLUSTER)}
         >
-          View detailed cluster analysis →
+          View detailed cross-cluster analysis →
         </Button>
       </Paper>
 

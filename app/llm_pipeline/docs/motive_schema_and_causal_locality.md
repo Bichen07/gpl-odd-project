@@ -1,6 +1,11 @@
 # Closed motive codes + causal locality in medoid analysis
 
-**Status:** implemented (prompt-level, Phase 0 + Phase 1). Applied 2026-08-08.
+**Status:** implemented (prompt-level). **2026-09-14:** retired
+`post_clear_recovery` and `control_response=recovery`. Per-agent
+`agent_interactions` `control_response` / `motive` use only stamps toward that agent; resume-driving
+with nobody left in conflict is timeline `motive: null`. See
+`prompt_templates/TAXONOMY.md` §9. Historical sections below still mention the
+old codes as they existed at the time of each change.
 **Scope:** `medoid_trial.yaml` production only. No change to clustering, BEV packs,
 `context.md`, `v_lat` thresholds, or the Explore/Analyze contracts.
 

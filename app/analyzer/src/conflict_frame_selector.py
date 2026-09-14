@@ -1576,6 +1576,19 @@ def format_conflict_timeline_sentences(
 
     Does **not** pre-label pass/yield; the LLM infers that from the timeline.
     """
+    gate_m = 40
+    try:
+        from secondary_context import (
+            SECONDARY_DISTANCE_GATE_M,
+            select_secondary_agents,
+            secondary_inline_clauses,
+        )
+
+        gate_m = int(SECONDARY_DISTANCE_GATE_M)
+    except Exception:
+        select_secondary_agents = None  # type: ignore
+        secondary_inline_clauses = None  # type: ignore
+
     clock_note = (
         f" Times use the {clock_name} clock (esmini − {float(clock_offset_s):.2f} s)."
         if clock_name
@@ -1585,13 +1598,33 @@ def format_conflict_timeline_sentences(
         "## Conflict timeline",
         "",
         "Chronological action and BEV stamps for this cluster medoid. Metric names "
-        "are defined in the domain glossary. Infer pass/yield from how the "
-        "longitudinal relationship changes over time — this header is not a "
-        f"verdict.{clock_note}",
+        "are defined in the domain glossary. The primary conflict vehicle appears "
+        "on every line; secondary agents (e.g. Parking) appear on the same line "
+        f"only when within {gate_m} m at that timestamp. "
+        "Infer pass/yield from how the longitudinal relationship changes over time "
+        f"— this header is not a verdict.{clock_note}",
         "",
     ]
     vehicle_fallback = display_agent_name(selection.vehicle_name)
     off = float(clock_offset_s or 0.0)
+
+    secondary_agents: List[Any] = []
+    if (
+        traj_df is not None
+        and not getattr(traj_df, "empty", True)
+        and select_secondary_agents is not None
+    ):
+        try:
+            secondary_agents = select_secondary_agents(
+                traj_df,
+                action_data,
+                primary_tid=selection.vehicle_track_id,
+                primary_name=selection.vehicle_name or "",
+                peak_t=selection.peak_t,
+            )
+        except Exception:
+            secondary_agents = []
+
     for i, fr in enumerate(selection.frames):
         gloss = (
             fr.timeline_gloss(
@@ -1683,6 +1716,19 @@ def format_conflict_timeline_sentences(
                 closing_tok = format_closing_token(float(fr.closing))
                 if closing_tok:
                     parts.append(closing_tok)
+        if secondary_agents and traj_df is not None and secondary_inline_clauses is not None:
+            try:
+                for clause in secondary_inline_clauses(
+                    traj_df,
+                    action_data,
+                    float(fr.t),
+                    primary_tid=selection.vehicle_track_id,
+                    primary_name=selection.vehicle_name or "",
+                    secondary_agents=secondary_agents,
+                ):
+                    parts.append(clause)
+            except Exception:
+                pass
         sentence = "; ".join(parts) + "."
         lines.append(f"- {sentence}")
         if filenames is not None and i < len(filenames):

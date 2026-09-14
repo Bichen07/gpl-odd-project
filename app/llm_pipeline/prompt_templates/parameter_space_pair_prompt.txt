@@ -38,7 +38,12 @@ in the glossary. Do not invent abbreviations like `rel=`, `roll1s=`, `az=`, or `
 
 <How to read>
 - <Pair context> (`parameter_space_pairs/cA-cB/process/context.md`) is the ONLY numeric timeline
-  (shared clock). Prefer time-range phases ("t=9.8–11.0, [cA] … while [cB] …");
+  (shared clock). It has three parts:
+  **Layer 1** — synchronized comparison while both sides are alive (`separation_call`
+  uses this only). **Secondary obstacles** — Parking etc. per side. **Layer 2** —
+  independent full-trial continuation after one side ends (`trajectory_shape_difference`
+  block is deterministic). `over_fine` + material `downstream_behavior_difference` is
+  a normal MFPCA boundary pattern.
   anchor a synced BEV when helpful. The **Deterministic interaction geometry**
   block (resolution, minimum distance between vehicle boundaries, first persistent divergence)
   is authoritative
@@ -80,14 +85,10 @@ Do not close the fence until `separation_call` + `separation_reason` are written
    geometry / minimum distance between vehicle boundaries / longitudinal
    relationship diverges
    (critical_divergence.at + metric_delta).
-   When one side’s line is `ended (out of frame / clip)`, stop pairing. That
-   tail is **not** contrast evidence and must not move `critical_divergence`.
-   The unpaired tail may be used only as a clearly marked, optional
-   boundary-side-versus-medoid consistency note. One optional sentence in
-   `contrast_explanation` may name the survivor’s post-clear control
-   (`post_clear_hard_brake` / `post_clear_recovery` /
-   `post_clear_adjustment`) — it is often a new obstacle (e.g. Parking), not
-   a second yield to the named vehicle already behind.
+   When one side’s line is `ended (out of frame / clip)`, stop Layer 1 pairing.
+   Read **Layer 2 — Full-trial continuation** for each side independently.
+   Use `trajectory_shape_difference` / `downstream_behavior_difference` for
+   whole-trial cluster-split evidence — do not treat Layer 2 as synchronized geometry.
 3. BEV confirm: name the synced frame nearest that earliest t (filename token).
 4. Left mini-motive (this boundary side, not the medoid): interaction_resolution +
    control_response + 1 closed motive code + evidence at/before its time. Causal
@@ -189,20 +190,21 @@ After CoT, ONE YAML fence with **interpretation fields only**.
 Field order = CoT order: motives → timeline → divergence → explanation →
 **final** `separation_call` / `separation_reason` / `hypothesis` (required; do not omit).
 For each side, fill `interaction_resolution` then `control_response` then
-`primary_motive`, in that order (same dependency chain as medoid_trial_prompt —
-see common_sense's "Filling interaction_resolution / control_response /
-primary_motive / secondary_motives together").
+`primary_motive`, in that order (go-through vs give-way → speed manner on
+that side's named-vehicle arc → closed pattern code). Do not use
+`control_response: recovery` or motive `post_clear_recovery` (retired). See
+common_sense fill order and pairing table.
 (Pipeline attaches clusters / outcomes / params / trial refs / conflict_metrics.)
 
 ```yaml
 left:
   interaction_resolution: "pass_first" | "yield" | "unresolved"
-  control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "recovery" | "none"
+  control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "none"
   primary_motive: "<one closed motive code>"
   motive_evidence: "<cite [cA] metrics or pair-context row; must be at/before its own time>"
 right:
   interaction_resolution: "pass_first" | "yield" | "unresolved"
-  control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "recovery" | "none"
+  control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "none"
   primary_motive: "<one closed motive code>"
   motive_evidence: "<cite [cB] metrics or pair-context row; must be at/before its own time>"
 
@@ -213,7 +215,7 @@ contrast_timeline:
     interpretation: |
       Interpretive contrast for this shared-clock range. Name sides as [cA] / [cB].
       Cite a few decisive metrics; do not dump every number.
-  # 4–8 phases spanning approach → brake/divergence → outcome.
+  # 6–15 phases spanning approach → brake/divergence → outcome.
   # Do not add phases after one side is `ended (out of frame / clip)`.
 
 critical_divergence:

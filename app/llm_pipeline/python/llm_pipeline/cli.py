@@ -30,9 +30,11 @@ def main() -> None:
     ci.add_argument(
         "--products",
         default="medoid",
-        help="Comma list: medoid[,summary][,parameter-space-pairs][,cross-eval]. Default is medoid "
-             "only (one YAML: output/medoid_trial.yaml). cross-eval grades the whole "
-             "partition from the medoid + Parameter-space pair cards. Use 'all' for all products.",
+        help="Comma list: medoid[,summary][,parameter-space-pairs][,label-review][,cross-eval]. "
+             "Default is medoid only (one YAML: output/medoid_trial.yaml). label-review runs "
+             "once per invocation after all cluster_summary.yaml exist and renames "
+             "mechanism-chained / duplicate labels. cross-eval grades the whole partition "
+             "from the medoid + Parameter-space pair cards. Use 'all' for all products.",
     )
     ci.add_argument("--api-key", default=None, help="API key (overrides env; ephemeral)")
     ci.add_argument("--clusters", default=None,
@@ -48,8 +50,8 @@ def main() -> None:
     ci.add_argument("--images-json", default=None,
                     help="Path to JSON mapping cluster id -> [snapshot file names]")
     ci.add_argument("--temperature", type=float, default=0.1)
-    ci.add_argument("--max-llm-snapshots", type=int, default=10,
-                    help="Even-subsample cap when no explicit image selection (0 = all)")
+    ci.add_argument("--max-llm-snapshots", type=int, default=0,
+                    help="Even-subsample cap when no dashboard image selection (0 = all BEV)")
     ci.add_argument(
         "--dry-run",
         action="store_true",
@@ -70,6 +72,16 @@ def main() -> None:
     se = sub.add_parser("selection-eval")
     se.add_argument("--run-dir", required=True,
                     help="results/batch<id>/<k>_cluster_s=.../ directory to evaluate")
+
+    # label-review: one LLM call reviewing ALL cluster_summary.yaml labels in a
+    # run (mechanism-chained / duplicate names) — renames in place where justified.
+    lr = sub.add_parser("label-review", help="Review + rename cluster_summary.yaml labels across one run")
+    lr.add_argument("--run-dir", required=True,
+                    help="results/batch<id>/<k>_cluster_s=.../ directory to review")
+    lr.add_argument("--model", default="gemini-2.5-flash")
+    lr.add_argument("--api-key", default=None)
+    lr.add_argument("--temperature", type=float, default=0.1)
+    lr.add_argument("--dry-run", action="store_true")
 
     # odd-export (S2 Python twin): deterministic, no LLM. Needs network (saved
     # analysis zip) unless --analysis-zip is a local file.
@@ -121,6 +133,21 @@ def main() -> None:
             f"cluster_selection_eval written to {path}"
             if path
             else "selection-eval failed (no cluster dirs)"
+        )
+    elif args.cmd == "label-review":
+        from .cluster_label_reviewer import review_run_dir
+
+        result_path = review_run_dir(
+            Path(args.run_dir),
+            model=getattr(args, "model", "gemini-2.5-flash"),
+            temperature=getattr(args, "temperature", 0.1),
+            api_key=getattr(args, "api_key", None),
+            dry_run=getattr(args, "dry_run", False),
+        )
+        out = (
+            f"cluster_label_review written to {result_path}"
+            if result_path
+            else "label-review skipped (fewer than 2 labeled clusters)"
         )
     elif args.cmd == "cross-cluster-eval":
         from .cross_cluster_evaluator import run_cross_cluster_eval
@@ -231,7 +258,7 @@ def main() -> None:
         pr = getattr(args, "pairs", None)
         if pr:
             pairs = [x.strip() for x in str(pr).split(",") if x.strip()]
-        max_snaps = getattr(args, "max_llm_snapshots", 10)
+        max_snaps = getattr(args, "max_llm_snapshots", 0)
         products = getattr(args, "products", "medoid")
         result = run_split_analysis(
             Path(args.results_dir),
@@ -245,6 +272,7 @@ def main() -> None:
             dry_run=getattr(args, "dry_run", False),
             temperature=getattr(args, "temperature", 0.1),
             max_llm_snapshots=max_snaps if max_snaps and max_snaps > 0 else None,
+            images_by_cluster=images_by_cluster,
         )
         out = (
             f"Split analysis done: clusters={list((result.get('clusters') or {}).keys())} "

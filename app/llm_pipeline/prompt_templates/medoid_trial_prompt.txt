@@ -5,15 +5,24 @@ Inputs: medoid context timeline (`processed/context_medoid.md`) and **single-pan
 frames (Ego-centered, half-extent = Ego–named vehicle distance + 2 m, fixed initial-yaw
 up; titles include burst timing e.g. `0p5s_before_APPROACH_Oncoming` — see
 common_sense BEV guide).
-First name **interaction_resolution** (pass_first / yield / unresolved) from
-geometry AND control (see common_sense): `yield` if Ego decelerates/stops to
-give way and the named vehicle is not behind — including overlap collision
-while still braking. `pass_first` if named vehicle is behind Ego, OR Ego holds
-/ increases speed into the gap, OR brake_release then continues, OR azimuth
-FRONT→BEHIND while continuing. Then deduce Ego motives near the conflict:
-why it slowed / sped up / braked / yielded / resumed / turned on the same lane.
-Ignore junction enter/exit filler. Braking during a committed pass is control
-(`slowdown`/`brake`), not a reason to call a completed pass a yield.
+First fill **agent_interactions** (common_sense): one row per agent Ego
+responded to. Named / primary conflict vehicle first. On that row,
+`resolution` is pass_first / yield / unresolved: `yield` if Ego
+decelerates/stops to give way and that named vehicle is not behind — including
+overlap collision while still braking. `pass_first` if that named vehicle is
+behind Ego, OR Ego holds / increases speed into the gap, OR brake_release then
+continues, OR azimuth FRONT→BEHIND while continuing. That row's
+`control_response` and `motive` cover **only that agent's conflict arc**
+(stamps concluded toward that agent until its pass/yield/unresolved). Extra
+rows (e.g. Parking) do not change the named-vehicle row's
+`control_response` / `motive`.
+Then walk Ego vs **each** agent that appears with metrics: why it slowed /
+sped up / braked / yielded / turned. Ignore junction enter/exit filler.
+Braking during a committed pass of the named vehicle is that vehicle's control
+(`slowdown`/`late`), not a reason to call that completed pass a yield. A brake
+after that vehicle is already behind, with another agent ahead, belongs on the
+ahead agent's row — not on the passed vehicle. Resume-driving with nobody
+ahead is timeline `motive: null`, not a motive on the passed vehicle.
 
 If context shows a collision outcome, describe the collision anatomy in the LAST
 `decision_timeline` entry and in `collision_detail.narrative` (who struck whom,
@@ -38,40 +47,39 @@ Keep CoT terse — telegraphic bullets, no restating the inputs. The YAML fence 
 be reached; never end without it.
 
 Step 0 — Notable features (EXTRACT, do not invent). List 6-12 one-line bullets
-taken from medoid context / BEV with their times:
-brake or decelerate onsets, speed rise/drop across the conflict window, named vehicle
-center-to-center distance / estimated time to collision / distance trend at
-approach, same-lane TURN_*
-(Δheading + lateral_speed), named vehicle
-LANE_CHANGE_* that forces ego response, outcome stamp, post-peak accelerate or turn.
-Tag each `pre-peak` / `post-peak` vs peak conflict time in context, or `setup` when
+taken from medoid context / BEV with their times. Read the header **Agents:**
+list. Include: brake or decelerate onsets, speed rise/drop, named-vehicle
+geometry, same-lane TURN_*, named vehicle LANE_CHANGE_* that Ego reacts to,
+outcome stamp, post-peak accelerate or turn, **and** any secondary-agent
+metrics on those stamps (Parking distance/clearance/speed). Tag each
+`pre-peak` / `post-peak` vs peak conflict time in context, or `setup` when
 the named vehicle is still d ≳ 100 m (setup features must not become motives).
 
 Then walk the medoid chronologically. **Before any motive**, state pass/yield
-from geometry AND control (common_sense gate): `yield` if Ego is still in a
-give-way decelerate and the named vehicle is not behind (failed overlap
-collision stays `yield`). `pass_first` if named vehicle is behind Ego, OR Ego
-holds/increases speed into the gap, OR brake_release then continues, OR
-azimuth FRONT→BEHIND while continuing. Do **not** wait for azimuth BEHIND.
-Do **not** call FRONT→LEFT overlap + collision `pass_first` when Ego is still
-braking to give way.
-For each salient stamp that becomes a `decision_timeline` entry, one CoT bullet
-covering ALL of:
+**vs the named vehicle** (common_sense gate). For each salient stamp that
+becomes a `decision_timeline` entry, one CoT bullet covering ALL of:
 1. Action — lexicon verb + intensity + quoted speed / Δheading.
-2. Situation — center-to-center distance / azimuth sector / distance trend /
-   estimated time to collision / longitudinal relationship / minimum distance
-   between vehicle boundaries from context;
-   confirm on BEV.
-3. Conclude — one CLOSED motive code (or null if named-vehicle-only / outcome stamp),
-   with the metric or stamp it rests on. Causal locality: evidence only at
-   t ≤ this stamp. Before defaulting to `unclear`, run common_sense's brake-release
-   / post-peak precedence check (`brake_release`, `post_clear_hard_brake`,
-   `post_clear_adjustment`).
+2. Situation — quote the relevant agent(s) from context (named vehicle and any
+   secondary clause on that line); confirm on BEV (secondary may be off-crop).
+3. Conclude — one CLOSED motive code (or null) **toward a named agent**
+   (`⇒ late_reaction toward CuttingIn`). Causal locality: evidence only at
+   t ≤ this stamp. Quote secondary metrics from **this stamp's** clause, not
+   an earlier line. Before defaulting to `unclear`, run common_sense's
+   brake-release / post-peak precedence check.
    Only use `unclear` when evidence itself is contradictory or missing, and log it
-   in open_questions. Never assign `yield_to_vehicle` or `interaction_resolution:
-   yield` if the named vehicle is behind Ego (the behind bin, not the overlap
+    in open_questions. Never assign `yield_to_vehicle` or `resolution:
+   yield` if the named vehicle is behind Ego (the behind bin, not the overlap)
    band) or Ego released the brake and continued through. Overlap while still
    braking is failed yield, not a bar on `yield`.
+
+After the walk, **always** fill `agent_interactions` (never omit the key).
+Named-vehicle row first (resolution → control_response → motive). Extra rows
+only for other agents Ego actually responded to.
+A second decelerate after the named vehicle is behind is its own stamp.
+If that stamp (context clause or BEV) shows another agent **ahead** of Ego
+(e.g. Parking FRONT, clearance shrinking), conclude **toward that agent**,
+not toward the vehicle already behind. That ahead agent **must** have an
+`agent_interactions` row. Do not park it in `open_questions` as furniture.
 
 If outcome is collision: the LAST CoT bullet states impact geometry from
 context/BEV and feeds the final timeline entry + `collision_detail.narrative`.
@@ -94,23 +102,28 @@ Situation clause (REQUIRED on every non-trivial entry — quote from context_med
 - when near/very-close (<15 m) or at COLLISION: also quote the named vehicle speed and gap
   closing/opening rate so "who is catching up" is explicit
 - optional TTC when the stamp provides it
+- Also quote any secondary-agent metrics on the same line (e.g. `Parking
+  (secondary, stationary): …` — distance, clearance, speed). Those are facts.
+  A secondary agent can be off the BEV crop and still be in the text. If the
+  named vehicle is already behind and BEV or the secondary clause shows an
+  agent ahead, the conclude for that decelerate/slowdown is toward the ahead
+  agent. Do not treat any context flag as a pre-assigned cause.
 
 Conclude clause (end of every Ego-action description; omit on named-vehicle-only /
 outcome-only stamps that carry no ego motive):
-- name the closed motive code in plain words once, e.g. "⇒ assertive_gap_acceptance
-  into a closing gap" / "⇒ late_reaction to CuttingIn" /
-  "⇒ post_clear_recovery once CuttingIn is behind" / "⇒ brake_release
-  (eases off before the conflict clears)" / "⇒ post_clear_hard_brake (hard stop
-  for a new obstacle, risking a rear-end from CuttingIn)" / "⇒ post_clear_adjustment
-  (minor follow-distance correction, CuttingIn not re-closing)" / "⇒ unclear (no closed
-  code fits)"
+- name the closed motive code **and the agent it is toward**, e.g.
+  "⇒ assertive_gap_acceptance toward CuttingIn" /
+  "⇒ late_reaction toward CuttingIn" /
+  "⇒ post_clear_adjustment toward Parking" /
+  "⇒ unclear (no closed code fits)". Do not invent a required cause from
+  secondary metrics; only name an agent you actually used.
 - when it clarifies who resolves first, name it using common_sense's PASS/YIELD
   resolution class, e.g. "⇒ assertive_gap_acceptance (PASS: ego proceeds before
   CuttingIn)" — optional, only add this when several named vehicles are in play.
 - before writing `unclear`, check common_sense's brake-release / post-peak
   precedence rules — `brake_release`, `post_clear_hard_brake`, and
-  `post_clear_adjustment` cover the most common "doesn't feel assertive or
-  recovery" cases.
+  `post_clear_adjustment` cover the most common "doesn't feel assertive"
+  cases. Resume-driving after clear with nobody ahead ⇒ `motive: null`.
 
 Collision phrasing (LAST entry only when outcome: collision):
   "<named vehicle> rear-ends Ego" | "Ego rear-ends <named vehicle>" |
@@ -136,28 +149,24 @@ There is NO separate motive_evidence list — motives live on the timeline entri
 structured `collision_detail` fields from ground truth. Author only
 `collision_detail.narrative`.)
 
-Fill the first four fields in this order — each is constrained by the one
-before it (see common_sense's "Filling interaction_resolution / control_response
-/ primary_motive / secondary_motives together"):
-1. `interaction_resolution` — WHO kept priority, from geometry AND control.
-2. `control_response` — HOW Ego managed speed while that happened.
-3. `primary_motive` — WHY, the single dominant code consistent with (1)+(2).
-4. `secondary_motives` — every other distinct non-null code used on the
-   timeline besides `primary_motive`; `[]` only if one code covers the arc.
-`control_response` must agree with `primary_motive` per common_sense's
-control-response/motive table — fix `control_response` rather than leave a
-contradiction.
+Author **only** `agent_interactions` (see common_sense: resolution =
+go-through vs give-way; control = speed manner; motive = closed pattern).
+Named-vehicle row first, then extra agents Ego responded to. Never omit the
+list. Each row: `resolution` → `control_response` → `motive` (must agree per
+common_sense's table). Author only the keys in the fence below.
 
 ```yaml
-interaction_resolution: "pass_first" | "yield" | "unresolved"
-control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "recovery" | "none"
-primary_motive: "<one closed motive code>"   # the single dominant ego motive across the arc
-secondary_motives: []                        # 0-2 other closed codes used on the timeline, else []
+agent_interactions:
+  - agent: "<named vehicle, e.g. CuttingIn>"
+    resolution: "pass_first" | "yield" | "unresolved"
+    control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "none"
+    motive: "<closed motive code>"
+  # more rows only for agents Ego actually responded to (e.g. Parking)
 decision_timeline:
   - timestamp: <float>        # same clock as context_medoid.md / Replayer
     description: "<action + speed/Δheading + situation + ⇒ motive conclude>"
     motive: "<closed code | null>"
-  # 8-20 entries spanning approach → conflict → outcome.
+  # 6-15 entries spanning approach → conflict → outcome.
   # LAST entry = final outcome. If collision, LAST uses collision phrasing;
   # set motive: null on that LAST collision anatomy entry.
 collision_detail:            # omit entirely (or null) when outcome != collision
@@ -189,7 +198,9 @@ Each paragraph covers, in order:
    anchor speeds, and WHY this closed code applies (causal locality). Phrase this
    as behavior/intent ("holds speed into a closing gap because…"), not a bare
    number dump.
-3. SITUATION — the anchor named-vehicle geometry only (start/end distance, azimuth, gap trend, TTC).
+3. SITUATION — geometry for the agent this phase is toward (start/end distance,
+   azimuth, gap trend, TTC). If this phase is toward a secondary agent, use that
+   agent's metrics, not only the named vehicle.
 4. LINK — how this phase sets up, changes, or fails relative to the next phase / outcome.
 
 Rules:
@@ -197,9 +208,9 @@ Rules:
   `brake_release`, `post_clear_hard_brake`, `post_clear_adjustment`, …). Use the
   standard arc phrasing (`pass-first`, `smooth-pass`, `late-yield`, `pass-slowdown`,
   `yield-stop-collision`, `braking-rear-end`) alongside the closed codes.
-- State pass/yield order in the first paragraph (give-way brake while not
-  behind = yield, including failed overlap; named vehicle behind or hold/accel
-  / brake_release-then-continue = pass-first; do not require azimuth BEHIND).
+- State pass/yield order **vs the named vehicle** in the first paragraph. If a
+  later phase is toward another agent, say so (that does not change the
+  named-vehicle resolution).
 - Quote numbers from context / BEV — but only the anchors for the phase, not a
   restatement of every decision_timeline row.
 - Do NOT invent actions absent from context/BEV. Do NOT narrate junction enter/exit.
@@ -225,9 +236,10 @@ When overlap becomes very close on the left, Ego brakes only then, so the
 conflict response is `late_reaction`. The near-miss confirms the brake came late
 but still avoided contact for this medoid.
 
-After clearance, a short slowdown plus a same-lane turn are post-conflict
-stabilization (`post_clear_adjustment` then `post_clear_recovery`), not a new
-evasive phase, because CuttingIn stays behind and separation continues opening.
+After the named-vehicle pass, if Parking (or another agent) is ahead and Ego
+changes speed, that is a **new** phase toward that agent — not post-clear
+stabilization of CuttingIn. If Ego only resumes speed/heading with nobody
+ahead, timeline `motive: null` (resume driving is not a closed motive).
 </Motive summary guide>
 
 <!-- Filled by the pipeline from processed/context_medoid.md (INPUT — not part of YAML output) -->

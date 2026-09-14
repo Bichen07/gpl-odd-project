@@ -62,6 +62,44 @@ export function stringifyValue(v: unknown): string {
   return String(v);
 }
 
+/** Named-vehicle row may be back-filled from legacy top-level resolution/control/motive. */
+export function agentInteractionRows(
+  parsed: Record<string, unknown> | null | undefined,
+): Record<string, unknown>[] {
+  if (parsed == null) return [];
+  const cm = parsed.conflict_metrics;
+  const partner = String(
+    (cm && typeof cm === "object"
+      ? (cm as { vehicle?: unknown; partner?: unknown }).vehicle ??
+        (cm as { vehicle?: unknown; partner?: unknown }).partner
+      : "") ?? "",
+  ).trim();
+  const raw = Array.isArray(parsed.agent_interactions)
+    ? parsed.agent_interactions.filter(
+        (row: unknown) =>
+          row != null &&
+          typeof row === "object" &&
+          String((row as { agent?: unknown }).agent || "").trim() !== "",
+      )
+    : [];
+  const rows = raw as Record<string, unknown>[];
+  if (
+    partner &&
+    !rows.some((row) => String(row.agent || "").trim() === partner)
+  ) {
+    return [
+      {
+        agent: partner,
+        resolution: parsed.interaction_resolution,
+        control_response: parsed.control_response,
+        motive: parsed.primary_motive,
+      },
+      ...rows,
+    ];
+  }
+  return rows;
+}
+
 export function fmtNum(v: unknown, digits = 3): string {
   if (typeof v !== "number" || !Number.isFinite(v)) return "—";
   return v.toFixed(digits);

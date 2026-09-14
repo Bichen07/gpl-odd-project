@@ -46,6 +46,12 @@ def _heading_deg(h_val: float) -> float:
 
 def _dims_for_name(df: pd.DataFrame, name: str) -> Tuple[float, float]:
     w_def, ln_def = _AGENT_DEFAULTS.get(name, (2.0, 4.5))
+    if df is None or "name" not in df.columns:
+        # trackId-only trajectory frames (no "name" column) — fall back to
+        # named defaults rather than raising, so callers keying off trackId
+        # (e.g. secondary-agent clearance) still get a usable dims estimate
+        # instead of silently losing all boundary-clearance evidence.
+        return w_def, ln_def
     sub = df[df["name"].astype(str).str.strip() == name]
     if sub.empty:
         return w_def, ln_def
@@ -106,6 +112,8 @@ def _track_to_name(meta_agents: Sequence[dict]) -> Dict[int, str]:
 
 
 def _ego_name(df: pd.DataFrame) -> str:
+    if df is None or "name" not in df.columns:
+        return "Ego"
     names = {str(x).strip() for x in df["name"].unique() if str(x).strip()}
     return "Ego" if "Ego" in names else (sorted(names)[0] if names else "Ego")
 

@@ -52,6 +52,73 @@ def _cp():
     return cp
 
 
+def ensure_named_vehicle_agent_interaction(
+    parsed: Dict[str, Any], pack: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """Keep ``agent_interactions`` as the authoring list; copy named row to top-level.
+
+    The LLM writes per-agent rows only. Named-vehicle resolution / control /
+    motive live on that
+    row, not as top-level ``interaction_resolution`` / ``control_response`` /
+    ``primary_motive``. Older YAML still using those keys is folded into the
+    named-vehicle row, then the keys are dropped.
+    """
+    if not isinstance(parsed, dict):
+        return parsed
+    cm = parsed.get("conflict_metrics") if isinstance(parsed.get("conflict_metrics"), dict) else {}
+    src = pack if isinstance(pack, dict) else {}
+    partner = str(
+        src.get("vehicle") or cm.get("vehicle") or src.get("partner") or cm.get("partner") or ""
+    ).strip()
+    rows = parsed.get("agent_interactions")
+    if not isinstance(rows, list):
+        rows = []
+    cleaned = [r for r in rows if isinstance(r, dict)]
+    named = next(
+        (r for r in cleaned if partner and str(r.get("agent") or "").strip() == partner),
+        None,
+    )
+    if partner and named is None:
+        named = {
+            "agent": partner,
+            "resolution": parsed.get("interaction_resolution"),
+            "control_response": parsed.get("control_response"),
+            "motive": parsed.get("primary_motive"),
+        }
+        cleaned = [named] + cleaned
+    parsed["agent_interactions"] = cleaned
+    if named:
+        if named.get("resolution") not in (None, ""):
+            parsed["interaction_resolution"] = named.get("resolution")
+        if named.get("control_response") not in (None, ""):
+            parsed["control_response"] = named.get("control_response")
+        if named.get("motive") not in (None, ""):
+            parsed["primary_motive"] = named.get("motive")
+    if parsed.get("secondary_motives") in (None, "", "parse_failed"):
+        named_motive = (named or {}).get("motive")
+        extras: List[str] = []
+        for entry in parsed.get("decision_timeline") or []:
+            if not isinstance(entry, dict):
+                continue
+            m = entry.get("motive")
+            if not isinstance(m, str) or not m.strip() or m.strip() in ("null", "unclear"):
+                continue
+            if m == named_motive or m in extras:
+                continue
+            extras.append(m)
+            if len(extras) >= 2:
+                break
+        parsed["secondary_motives"] = extras
+    for k in (
+        "interaction_resolution",
+        "control_response",
+        "primary_motive",
+        "secondary_motives",
+    ):
+        parsed.pop(k, None)
+    return parsed
+
+
 def resolve_parameter_space_contrast_path(pack_dir: Path) -> Optional[Path]:
     """Prefer ``output/contrast.yaml``; fall back to legacy pack-root file."""
     pack_dir = Path(pack_dir)
@@ -138,10 +205,14 @@ PRODUCT_ALIASES = {
     "cross-eval": "cross-eval",
     "cross_eval": "cross-eval",
     "selection": "cross-eval",
+    "label-review": "label-review",
+    "label_review": "label-review",
+    "review": "label-review",
+    "cluster-review": "label-review",
     "all": "all",
 }
 
-_ALL_PRODUCTS = {"medoid", "summary", "parameter-space-pairs", "cross-eval"}
+_ALL_PRODUCTS = {"medoid", "summary", "parameter-space-pairs", "cross-eval", "label-review"}
 
 # Default: medoid trial narrative only. Summary / Parameter-space pairs are opt-in.
 DEFAULT_PRODUCTS = frozenset({"medoid"})
@@ -249,6 +320,7 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
             "hypothesis",
             "delta",
             "open_questions",
+            "agent_interactions",
             "clusters",
             "param_names",
         ):
@@ -294,6 +366,11 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
                 llm_meta[k] = v
     if llm_meta:
         final["llm_meta"] = llm_meta
+
+    if path.name == "medoid_trial.yaml":
+        final = ensure_named_vehicle_agent_interaction(
+            final, final.get("conflict_metrics") if isinstance(final.get("conflict_metrics"), dict) else None
+        )
 
     body = yaml.safe_dump(final or {"empty": True}, sort_keys=False)
     path.write_text(body if body.endswith("\n") else body + "\n", encoding="utf-8")
@@ -455,6 +532,19 @@ def _params_for_trial(
     return out
 
 
+def _apply_bev_selection(
+    paths: List[str], selection: Optional[List[str]]
+) -> List[str]:
+    """Keep dashboard-selected filenames; empty/missing selection means all paths."""
+    if not selection:
+        return paths
+    wanted = {Path(s).name for s in selection if str(s).strip()}
+    if not wanted:
+        return paths
+    filtered = [p for p in paths if Path(p).name in wanted]
+    return filtered if filtered else paths
+
+
 def _outcome_from_pack_and_flags(
     tid: str, pack: Dict[str, Any], flags: Optional[Dict[str, bool]]
 ) -> str:
@@ -480,7 +570,8 @@ def run_split_analysis(
     pairs: Optional[List[str]] = None,
     dry_run: bool = False,
     temperature: float = 0.1,
-    max_llm_snapshots: Optional[int] = 8,
+    max_llm_snapshots: Optional[int] = None,
+    images_by_cluster: Optional[Dict[str, List[str]]] = None,
 ) -> Dict[str, Any]:
     """Run selected products on a builder results dir."""
     results_dir = Path(results_dir)
@@ -625,9 +716,6 @@ def run_split_analysis(
                     "empty). Medoid YAML times stay on the pack trajectory clock."
                 )
             ctx = action_log_from_description(cluster_dir)
-            # Truncate travelogue-heavy context for LLM
-            if len(ctx) > 6000:
-                ctx = ctx[:6000] + "\n…[truncated]"
             prompt = _with_common_sense(
                 _safe_replace(
                     medoid_tpl,
@@ -637,6 +725,11 @@ def run_split_analysis(
             bev = collect_bev_snapshot_paths(
                 cluster_dir, max_llm_snapshots=max_llm_snapshots
             )
+            sel = None
+            if images_by_cluster:
+                sel = images_by_cluster.get(str(cid)) or images_by_cluster.get(cid)  # type: ignore[arg-type]
+            bev = _apply_bev_selection(bev, sel)
+            print(f"  BEV snapshots sent: {len(bev)}")
             out_path = _cp().write_path(cluster_dir, "medoid_trial.yaml")
             if dry_run or interpreter is None:
                 stub = {
@@ -646,6 +739,8 @@ def run_split_analysis(
                     "interaction_resolution": "unresolved",
                     "control_response": "none",
                     "primary_motive": "unclear",
+                    "secondary_motives": [],
+                    "agent_interactions": [],
                     "motive_summary": "stub (dry_run)",
                     "decision_timeline": [],
                     "open_questions": [],
@@ -655,6 +750,7 @@ def run_split_analysis(
                     stub["clip_start_esmini_s"] = round(float(clip_start), 3)
                     stub["time_origin"] = "payload_observation_clip"
                 stub = apply_collision_detail(stub, pack)
+                stub = ensure_named_vehicle_agent_interaction(stub, pack)
                 _write_yaml_doc(out_path, None, stub, {"stub": True})
                 medoid_parsed = stub
             else:
@@ -693,6 +789,7 @@ def run_split_analysis(
                 # the model still emits it so the on-disk schema stays single-timeline.
                 if isinstance(parsed, dict):
                     parsed.pop("motive_evidence", None)
+                    parsed = ensure_named_vehicle_agent_interaction(parsed, pack)
                 medoid_parsed = _write_yaml_doc(
                     out_path, raw, parsed, {"token_usage": tokens}
                 )
@@ -1030,6 +1127,7 @@ def run_split_analysis(
         )
 
         print("\n[split-analysis] cluster summaries…")
+
         for cid, pc in per_cluster.items():
             cluster_dir = pc["cluster_dir"]
             aggregate = pc["aggregate"]
@@ -1060,8 +1158,6 @@ def run_split_analysis(
                 if cluster_ctx_path is not None
                 else "(no context_cluster.md yet — rebuild processed/)"
             )
-            # LLM sees: this cluster medoid_trial.yaml + touching contrasts
-            # + optional context_cluster.md. No numeric/relative digest dumps.
             neighbor_cards = neighbor_cards_for_cluster(results_dir, cid)
             prompt = _with_common_sense(
                 _safe_replace(
@@ -1105,6 +1201,11 @@ def run_split_analysis(
                         "neighbor_comparison": [],
                     }
                 parsed["cluster_id"] = cid
+                # LLM owns label — keep parsed value; only fill if missing.
+                if not str(parsed.get("label") or "").strip():
+                    parsed["label"] = f"Cluster {cid}"
+                if not str(parsed.get("confidence") or "").strip():
+                    parsed["confidence"] = "medium"
                 parsed["numeric_digest_ref"] = True
                 # risk_level from cluster collision rate (rule-based GT).
                 rate = float(aggregate.get("collision_rate") or 0.0)
@@ -1137,7 +1238,26 @@ def run_split_analysis(
                     out_path, raw, parsed, {"token_usage": tokens}
                 )
             cluster_out["cluster_summary"] = str(out_path)
-            print(f"  ✓ {out_path.name}")
+            print(f"  ✓ {out_path.name} label={summary_parsed.get('label')}")
+
+    # --- Cluster label review (LLM; once per invocation, after ALL cluster_summary.yaml
+    # on disk — not just clusters touched by this call — so renames stay consistent). ---
+    if "label-review" in prods:
+        print("\n[split-analysis] cluster label review")
+        try:
+            from .cluster_label_reviewer import review_run_dir
+
+            review_path = review_run_dir(
+                results_dir,
+                model=model,
+                temperature=temperature,
+                api_key=api_key,
+                dry_run=dry_run,
+            )
+            if review_path is not None:
+                outputs["label_review"] = str(review_path)
+        except Exception as exc:
+            print(f"  ⚠️  label review failed: {exc}")
 
     # --- Deterministic selection quality (always; no LLM, no network) ---------
     try:

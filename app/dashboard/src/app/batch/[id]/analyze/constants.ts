@@ -23,8 +23,9 @@ export const TAB = {
   MEDOID: 1,
   PAIRS: 2,
   CLUSTER: 3,
-  REPORT: 4,
-  ODD_QA: 5,
+  CROSS_CLUSTER: 4,
+  REPORT: 5,
+  ODD_QA: 6,
 } as const;
 
 export type AnalyzeProduct = "medoid" | "parameter-space-pairs" | "summary";
