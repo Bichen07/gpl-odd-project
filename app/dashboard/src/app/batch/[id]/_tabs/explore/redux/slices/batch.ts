@@ -9,6 +9,7 @@ import { kdTree } from "kd-tree-javascript";
 import { Trial } from "@/app/_shared/graphql/queries/trials";
 import { Batch } from "@/app/_shared/graphql/queries/batches";
 import { O } from "ts-toolbelt";
+import { pickPreferredClustering } from "@/app/batch/[id]/_tabs/explore/utils/clusteringUniqueness";
 
 export const viewerModes = ["pass/fail", "interaction-cluster"] as const;
 export type ViewerMode = (typeof viewerModes)[number];
@@ -531,8 +532,8 @@ export const batchSlice = createSlice({
           const results =
             state.trajectoryAnalysis![egoName]?.mfpca?.[durationMode]
               ?.clustering ?? [];
-          const first = results.find((r) => r != null) ?? null;
-          const idx = first != null ? results.findIndex((r) => r === first) : -1;
+          // Prefer k≤8 so Heatmap/Replayer do not open ~20 cluster panes on load.
+          const { result: first, index: idx } = pickPreferredClustering(results);
           selectedResults[egoName] = first;
           selectedInfos[egoName] =
             idx >= 0

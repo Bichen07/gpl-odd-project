@@ -4,6 +4,7 @@ import path from "path";
 import { resolveClusterArtifact } from "../_lib/clusterPaths";
 import { readYamlDoc } from "../_lib/readYaml";
 import { runArtifactPath, runSourceDir, runSourcePath } from "../_lib/runArtifactPaths";
+import { resolveResultsBatchDir } from "../_lib/resultsBatchDir";
 
 /**
  * GET /api/cluster-evaluate?batchId=2
@@ -43,6 +44,7 @@ function readJsonSafe(p: string): Record<string, unknown> | null {
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const batchId = searchParams.get("batchId");
+  const egoName = searchParams.get("egoName");
 
   if (!batchId) {
     return NextResponse.json(
@@ -52,8 +54,7 @@ export async function GET(req: NextRequest) {
   }
 
   const root = findProjectRoot(process.cwd());
-  const batchDir = path.join(root, "results", `batch${batchId}`);
-
+  const batchDir = resolveResultsBatchDir(root, batchId, egoName);
   if (!fs.existsSync(batchDir)) {
     return NextResponse.json({ configs: [] });
   }

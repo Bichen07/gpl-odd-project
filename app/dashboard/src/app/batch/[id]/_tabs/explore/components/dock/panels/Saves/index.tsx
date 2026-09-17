@@ -36,11 +36,16 @@ import {
   getTrajectoryAnalysis,
 } from "@/app/_shared/graphql/queries/clustering";
 // import { IDockviewPanelProps } from "dockview";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../../../redux/hooks";
 import { batchSlice } from "../../../../redux/slices/batch";
 import JSZip from "jszip";
 import LZString from "lz-string";
+import {
+  ensureTrajectoryAnalysisUniqueness,
+  isUniquenessDerivativeFilename,
+  uniquenessDerivativeFilename,
+} from "@/app/batch/[id]/_tabs/explore/utils/clusteringUniqueness";
 
 type Props = {
   batchId: string;
@@ -78,10 +83,53 @@ export default function Saves(props: Props) {
     new Set(),
   );
   const [deletingSaves, setDeletingSaves] = useState(false);
+  /** Prevent double auto-save of the same raw→uniqueness pair (Strict Mode / re-clicks). */
+  const autoSavingUniquenessRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setSaveItems(saves);
   }, [saves]);
+
+  const uploadTrajectoryZip = async (
+    analysis: Record<string, any>,
+    zipFilename: string,
+    currentItems: NonNullable<SavedTrajectoryAnalysis>,
+  ) => {
+    const zip = new JSZip();
+    zip.file("trajectories.json", JSON.stringify(analysis));
+    const zipBlob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+    });
+    const form = new FormData();
+    form.append("file", zipBlob, zipFilename);
+    const uploadResponse = await postDocument(form);
+    const doc = (
+      uploadResponse.data as {
+        doc?: {
+          id: number;
+          url?: string | null;
+          filename?: string | null;
+        };
+      }
+    ).doc;
+    if (doc?.id == null) {
+      throw new Error("Upload succeeded but document id is missing.");
+    }
+    const existingIds = (currentItems ?? [])
+      .map((item) => Number(item?.id))
+      .filter((id) => Number.isFinite(id));
+    await appendBatchTrajectoryAnalysisSave(
+      Number(batchId),
+      Number(doc.id),
+      existingIds,
+    );
+    return {
+      id: Number(doc.id),
+      url: doc.url ?? null,
+      filename: doc.filename ?? zipFilename,
+    };
+  };
 
   const formatElapsed = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -328,17 +376,47 @@ export default function Saves(props: Props) {
             </Stack>
           )}
           <Stack sx={{ mb: 2, width: "100%" }} rowGap={1}>
+            <Typography variant="caption" color="text.secondary">
+              Click a filename to load. Prefer{" "}
+              <code>*.with-uniqueness.zip</code> when present (skips recompute).
+              Clicking the raw zip also uses that sibling if it already exists —
+              originals are never overwritten. Manual save:{" "}
+              <strong>Create New</strong> → <strong>save</strong>.
+            </Typography>
             {saveItems?.map((item, index) => {
               const saveId = String(item.id ?? index);
               const loadSave = async () => {
                 setLoadingFilename(item.filename);
                 try {
+                  // If this is a raw paper zip and a sibling with uniqueness
+                  // already exists, load that instead — do not re-run the
+                  // uniqueness algorithm on the raw file.
+                  let loadItem = item;
+                  let loadSaveId = saveId;
+                  if (!isUniquenessDerivativeFilename(item.filename)) {
+                    const derivativeName = uniquenessDerivativeFilename(
+                      item.filename,
+                    );
+                    const sibling = (saveItems ?? []).find(
+                      (s) =>
+                        (s.filename ?? "").toLowerCase() ===
+                        derivativeName.toLowerCase(),
+                    );
+                    if (sibling?.url) {
+                      loadItem = sibling;
+                      loadSaveId = String(sibling.id ?? saveId);
+                      toast.info(
+                        `Using existing "${derivativeName}" (skip uniqueness recompute).`,
+                      );
+                    }
+                  }
+
                   // Fetch via the same-origin proxy (/api/payload-file) instead of
                   // hitting the Payload host directly: the browser may be unable to
                   // reach that LAN host or be blocked by CORS, but the dashboard
                   // server can reach Payload.
-                  const fetchUrl = item?.url
-                    ? `/api/payload-file?url=${encodeURIComponent(item.url)}`
+                  const fetchUrl = loadItem?.url
+                    ? `/api/payload-file?url=${encodeURIComponent(loadItem.url)}`
                     : "";
                   const response = await axios.get(fetchUrl, {
                     responseType: "arraybuffer",
@@ -347,7 +425,7 @@ export default function Saves(props: Props) {
                   let jsonObject: any;
 
                   const isZip =
-                    item.filename?.toLowerCase().endsWith(".zip") ||
+                    loadItem.filename?.toLowerCase().endsWith(".zip") ||
                     (fileBlob.byteLength >= 2 &&
                       new Uint8Array(fileBlob)[0] === 0x50 &&
                       new Uint8Array(fileBlob)[1] === 0x4b);
@@ -370,13 +448,65 @@ export default function Saves(props: Props) {
                   }
 
                   for (const key of Object.keys(jsonObject)) {
-                    jsonObject[key]["id"] = item.id;
+                    jsonObject[key]["id"] = loadItem.id;
                   }
+                  // Old paper saves lack uniqueResultIndices; compute k≤8 only
+                  // so Clustering Selection / Heatmap do not freeze or open
+                  // ~20 cluster panes. Raw zip is never overwritten — when we
+                  // compute, auto-save a sibling "*.with-uniqueness.zip".
+                  // If uniqueness fields already match the current algorithm,
+                  // ensure* is a no-op (didCompute=false).
+                  const { analysis, didCompute } =
+                    ensureTrajectoryAnalysisUniqueness(jsonObject);
                   dispatch(
-                    batchSlice.actions.setTrajectoryAnalysis(jsonObject),
+                    batchSlice.actions.setTrajectoryAnalysis(analysis),
                   );
-                  setActiveSaveId(saveId);
+                  setActiveSaveId(loadSaveId);
                   setLoadingFilename(null);
+
+                  if (
+                    didCompute &&
+                    !isUniquenessDerivativeFilename(loadItem.filename) &&
+                    !isUniquenessDerivativeFilename(item.filename)
+                  ) {
+                    const derivativeName = uniquenessDerivativeFilename(
+                      item.filename,
+                    );
+                    const alreadyListed = (saveItems ?? []).some(
+                      (s) =>
+                        (s.filename ?? "").toLowerCase() ===
+                        derivativeName.toLowerCase(),
+                    );
+                    const gateKey = `${batchId}:${derivativeName}`;
+                    if (
+                      !alreadyListed &&
+                      !autoSavingUniquenessRef.current.has(gateKey)
+                    ) {
+                      autoSavingUniquenessRef.current.add(gateKey);
+                      void (async () => {
+                        try {
+                          const uploaded = await uploadTrajectoryZip(
+                            analysis as Record<string, any>,
+                            derivativeName,
+                            saveItems ?? [],
+                          );
+                          setSaveItems((prev) => [
+                            ...(prev ?? []),
+                            uploaded,
+                          ]);
+                          toast.success(
+                            `Auto-saved "${derivativeName}" (original kept). Next load can use this file.`,
+                          );
+                        } catch (error) {
+                          console.error(error);
+                          toast.warn(
+                            "Uniqueness computed in memory, but auto-save failed. Use Create New → save.",
+                          );
+                          autoSavingUniquenessRef.current.delete(gateKey);
+                        }
+                      })();
+                    }
+                  }
                 } catch (err) {
                   setLoadingFilename(null);
                   dispatch(batchSlice.actions.setTrajectoryAnalysis(null));
@@ -650,9 +780,23 @@ export default function Saves(props: Props) {
                         }
                         try {
                           const zip = new JSZip();
+                          // Ensure uniqueResultIndices are in the zip (analyzer may
+                          // already have set them; otherwise compute once here).
+                          const { analysis: toSave } =
+                            ensureTrajectoryAnalysisUniqueness(
+                              structuredClone(trajectoryAnalysis) as Record<
+                                string,
+                                any
+                              >,
+                            );
+                          // Keep in-memory analysis in sync so Clustering Selection
+                          // can skip the client uniqueness loop without reload.
+                          dispatch(
+                            batchSlice.actions.setTrajectoryAnalysis(toSave),
+                          );
                           zip.file(
                             "trajectories.json",
-                            JSON.stringify(trajectoryAnalysis),
+                            JSON.stringify(toSave),
                           );
 
                           // Persist the user's current cluster selection so that

@@ -25,6 +25,13 @@ import {
   ClusteringResult,
   TrialClusterItem,
 } from "@/app/_shared/graphql/queries/clustering";
+import {
+  canUsePrecomputedUniqueness,
+  clusterCountFromResult,
+  computeClusteringUniqueness,
+  DEFAULT_MAX_CLUSTER_COUNT,
+  pickPreferredClustering,
+} from "@/app/batch/[id]/_tabs/explore/utils/clusteringUniqueness";
 import { batchSlice, ClusterInfo, ClusterAnalysisContext } from "../../../../../redux/slices/batch";
 import _ from "lodash";
 import { getClusterInfos } from "@/app/_shared/utils";
@@ -183,6 +190,9 @@ export default function PerEgoSelection({
     [index: number]: number;
   }>({});
   const [clusterCounts, setClusterCounts] = useState(-1);
+  /** When false, k > 8 are hidden and excluded from uniqueness work. */
+  const [includeHighK, setIncludeHighK] = useState(false);
+  const MAX_CLUSTER_COUNT_DEFAULT = DEFAULT_MAX_CLUSTER_COUNT;
 
   // Composite quality scores from /api/cluster-evaluate
   const [compositeScores, setCompositeScores] = useState<
@@ -200,7 +210,8 @@ export default function PerEgoSelection({
 
   useEffect(() => {
     if (!batchId) return;
-    fetch(`/api/cluster-evaluate?batchId=${batchId}`)
+    const egoQ = `egoName=${encodeURIComponent(egoName)}`;
+    fetch(`/api/cluster-evaluate?batchId=${batchId}&${egoQ}`)
       .then((r) => r.json())
       .then((data) => {
         const map: Record<string, CompositeScoreEntry> = {};
@@ -210,27 +221,26 @@ export default function PerEgoSelection({
         setCompositeScores(map);
       })
       .catch(() => {/* best-effort */});
-    fetch(`/api/cluster-analysis-status?batchId=${batchId}`)
+    fetch(`/api/cluster-analysis-status?batchId=${batchId}&${egoQ}`)
       .then((r) => r.json())
       .then((data) => {
         setAnalysisStatus((data.folders ?? {}) as Record<string, AnalysisStatusEntry>);
       })
       .catch(() => {/* best-effort */});
-  }, [batchId]);
+  }, [batchId, egoName]);
 
   // Build folder key for a clustering result: "<k>_cluster_s=<sil>"
   const resultFolderKey = useCallback(
-    (result: ClusteringResult, resultIndex: number): string => {
+    (result: ClusteringResult, _resultIndex: number): string => {
       const sil = (result.scores as Record<string, number> | undefined)
         ?.silhouetteScore;
-      const k =
-        infos[resultIndex] != null
-          ? clusterCountFromInfo(infos[resultIndex])
-          : 0;
+      // Prefer result.data — infos can lag and used to drop the folder key
+      // (no Dataset built / Analysis done badge on batch 7).
+      const k = clusterCountFromResult(result);
       if (k < 1 || sil == null) return "";
       return `${k}_cluster_s=${sil.toFixed(4)}`;
     },
-    [infos]
+    [],
   );
 
   const requestTaskForIndex = useCallback(
@@ -649,18 +659,35 @@ export default function PerEgoSelection({
 
   const availableClusterCounts = useMemo(() => {
     const fromApi = mfpca?.availableClusterCounts;
+    let counts: number[];
     if (fromApi != null && fromApi.length > 0) {
-      return [-1, ...fromApi];
-    }
-    const counts = new Set<number>();
-    for (let index = 0; index < (results?.length ?? 0); index++) {
-      const k = clusterCountFromInfo(infos[index]);
-      if (k >= 1) {
-        counts.add(k);
+      counts = [...fromApi];
+    } else {
+      const set = new Set<number>();
+      for (let index = 0; index < (results?.length ?? 0); index++) {
+        const k = clusterCountFromInfo(infos[index]);
+        if (k >= 1) {
+          set.add(k);
+        }
       }
+      counts = Array.from(set).sort((a, b) => a - b);
     }
-    return [-1, ...Array.from(counts).sort((a, b) => a - b)];
-  }, [mfpca?.availableClusterCounts, results, infos]);
+    if (!includeHighK) {
+      counts = counts.filter((k) => k <= MAX_CLUSTER_COUNT_DEFAULT);
+    }
+    // Prefer counting from results when infos lag behind.
+    if (counts.length === 0 && results != null) {
+      const set = new Set<number>();
+      for (const r of results) {
+        const k = clusterCountFromResult(r);
+        if (k >= 1 && (includeHighK || k <= MAX_CLUSTER_COUNT_DEFAULT)) {
+          set.add(k);
+        }
+      }
+      counts = Array.from(set).sort((a, b) => a - b);
+    }
+    return [-1, ...counts];
+  }, [mfpca?.availableClusterCounts, results, infos, includeHighK]);
 
   useEffect(() => {
     if (!availableClusterCounts.includes(clusterCounts)) {
@@ -683,87 +710,81 @@ export default function PerEgoSelection({
     }
     setLoading(true);
 
-    const newNoiseRatioMapping: { [index: number]: number } = {};
-    const uniqueMappings: {
-      [index: number]: { [label: string]: Set<string> };
-    } = {};
-    for (const [i, result] of results.entries()) {
-      if (result == null) {
-        continue;
-      }
+    const isEligibleIndex = (index: number) => {
+      if (includeHighK) return true;
+      const result = results[index];
+      if (result == null) return false;
+      // Count from result.data — do not wait on clusterInfos (k===0 used to
+      // incorrectly keep every high-k candidate).
+      const k = clusterCountFromResult(result);
+      return k >= 1 && k <= MAX_CLUSTER_COUNT_DEFAULT;
+    };
 
-      newNoiseRatioMapping[i] = 1;
-
-      const mapping: { [label: string]: Set<string> } = {};
-      for (const [trialId, item] of Object.entries(result.data)) {
-        if (!(item.label in mapping)) {
-          mapping[item.label] = new Set<string>();
-        }
-        mapping[item.label].add(trialId);
-      }
-
-      newNoiseRatioMapping[i] =
-        "-1" in mapping
-          ? mapping["-1"].size /
-            trajectoryAnalysis.mfpca[durationMode].trialOrder.length
-          : 0;
-
-      let foundDuplicated = false;
-      let duplicateOf: number | null = null;
-      for (const [uniqueIndex, unique] of Object.entries(uniqueMappings)) {
-        let differentCounts = 0;
-        const visited = new Set<string>();
-        for (const [label, set] of Object.entries(unique)) {
-          let minSetDifferenceCounts = Infinity;
-          let minSetDifferenceLabel = null;
-          for (const [label2, set2] of Object.entries(mapping)) {
-            if (visited.has(label2)) {
-              continue;
-            }
-            let setDifferenceCounts = set.difference(set2).size;
-            if (setDifferenceCounts < minSetDifferenceCounts) {
-              minSetDifferenceCounts = setDifferenceCounts;
-              minSetDifferenceLabel = label2;
-            }
-          }
-          if (minSetDifferenceLabel) {
-            visited.add(minSetDifferenceLabel);
-          }
-          differentCounts += minSetDifferenceCounts;
-        }
-        const differentRatio =
-          differentCounts /
-          trajectoryAnalysis.mfpca[durationMode].trialOrder.length;
-        if (differentRatio < duplicatedFilterRatio) {
-          foundDuplicated = true;
-          duplicateOf = Number(uniqueIndex);
-        }
-        if (foundDuplicated) {
-          break;
-        }
-      }
-      if (foundDuplicated && duplicateOf != null) {
-        const curRank = resultLabelRank(result, i);
-        const dupRank = resultLabelRank(results[duplicateOf], duplicateOf);
-        if (curRank > dupRank) {
-          delete uniqueMappings[duplicateOf];
-          uniqueMappings[i] = mapping;
-        }
-        continue;
-      }
-      if (foundDuplicated) {
-        continue;
-      }
-
-      uniqueMappings[i] = mapping;
-    }
-    setNoiseRatioMapping(newNoiseRatioMapping);
-    setUniqueResultIndices(
-      new Set(Object.keys(uniqueMappings).map((k) => Number(k)))
+    // Prefer analyzer/Saves precompute (same algorithm, default ratio 0.005).
+    // Skip precompute when any preprocess/analysis-ranked result exists — those
+    // ranks can replace duplicates and are only known in the dashboard.
+    const anyLabeled = results.some(
+      (r, i) => r != null && resultLabelRank(r, i) > 0,
     );
+    if (
+      !anyLabeled &&
+      canUsePrecomputedUniqueness(mfpca, duplicatedFilterRatio, {
+        includeHighK,
+      }) &&
+      mfpca?.uniqueResultIndices != null
+    ) {
+      const noise: { [index: number]: number } = {};
+      for (const [k, v] of Object.entries(mfpca.noiseRatioByIndex ?? {})) {
+        noise[Number(k)] = v;
+      }
+      if (Object.keys(noise).length === 0) {
+        for (const [i, result] of results.entries()) {
+          if (result == null) continue;
+          let noiseCount = 0;
+          for (const item of Object.values(result.data ?? {})) {
+            if (item?.label === "-1") noiseCount += 1;
+          }
+          noise[i] =
+            noiseCount /
+            (trajectoryAnalysis.mfpca[durationMode].trialOrder.length || 1);
+        }
+      }
+      const filteredIndices = mfpca.uniqueResultIndices.filter(isEligibleIndex);
+      setNoiseRatioMapping(noise);
+      setUniqueResultIndices(new Set(filteredIndices));
+      setLoading(false);
+      return;
+    }
+
+    // Only run uniqueness on eligible (k≤8 unless includeHighK) candidates.
+    const maxK = includeHighK ? null : MAX_CLUSTER_COUNT_DEFAULT;
+    const computed = computeClusteringUniqueness(
+      results,
+      trajectoryAnalysis.mfpca[durationMode].trialOrder.length,
+      duplicatedFilterRatio,
+      resultLabelRank,
+      maxK,
+    );
+    const noise: { [index: number]: number } = {};
+    for (const [k, v] of Object.entries(computed.noiseRatioByIndex)) {
+      noise[Number(k)] = v;
+    }
+    // Still record noise for skipped high-k rows (display filters).
+    for (const [i, result] of results.entries()) {
+      if (result == null || i in noise) continue;
+      let noiseCount = 0;
+      for (const item of Object.values(result.data ?? {})) {
+        if (item?.label === "-1") noiseCount += 1;
+      }
+      noise[i] =
+        noiseCount /
+        (trajectoryAnalysis.mfpca[durationMode].trialOrder.length || 1);
+    }
+    setNoiseRatioMapping(noise);
+    setUniqueResultIndices(new Set(computed.uniqueResultIndices));
 
     setLoading(false);
-  }, [results, duplicatedFilterRatio, analysisStatus, resultFolderKey, resultLabelRank, trajectoryAnalysis, durationMode]);
+  }, [results, duplicatedFilterRatio, analysisStatus, resultFolderKey, resultLabelRank, trajectoryAnalysis, durationMode, mfpca, includeHighK]);
 
   useEffect(() => {
     if (!Object.keys(clusterInfos).includes(egoName)) {
@@ -791,26 +812,31 @@ export default function PerEgoSelection({
 
         const labeled = resultLabelRank(result, index) > 0;
 
+        // Hide k > 8 unless user opted in.
+        if (!includeHighK) {
+          const k = clusterCountFromResult(result);
+          if (k < 1 || k > MAX_CLUSTER_COUNT_DEFAULT) {
+            return false;
+          }
+        }
+
         // Preprocess / analysis results bypass Noise Under + Unique Over filters.
         if (!labeled) {
           const noiseRatio = noiseRatioMapping[index];
           if (
-          !uniqueResultIndices.has(index) ||
+            !uniqueResultIndices.has(index) ||
             noiseRatio > noiseFilterRatio
           ) {
             return false;
           }
         }
 
-        if (
-          clusterCounts !== -1 &&
-            clusterCounts !== 1 &&
-          Object.keys(infos[index] ?? {}).length !==
-            ("-1" in (infos[index] ?? {})
-              ? clusterCounts + 1
-              : clusterCounts)
-        ) {
-          return false;
+        if (clusterCounts !== -1 && clusterCounts !== 1) {
+          // Use result.data (same as Cluster Counts menu), not infos key length —
+          // infos can lag / disagree and cleared the k=4 list.
+          if (clusterCountFromResult(result) !== clusterCounts) {
+            return false;
+          }
         }
         return true;
       })
@@ -859,6 +885,7 @@ export default function PerEgoSelection({
     resultFolderKey,
     analysisStatus,
     resultLabelRank,
+    includeHighK,
   ]);
 
   useEffect(() => {
@@ -899,9 +926,11 @@ export default function PerEgoSelection({
       return;
     }
 
-    const first = (results ?? []).find((v) => v != null) ?? null;
+    const { result: first, index } = pickPreferredClustering(
+      results ?? [],
+      MAX_CLUSTER_COUNT_DEFAULT,
+    );
     if (first != null) {
-      const index = results?.findIndex((v) => v === first) ?? -1;
       dispatch(
         batchSlice.actions.setSelectedClusteringResults({
           ...selectedClusteringResults,
@@ -1478,6 +1507,14 @@ export default function PerEgoSelection({
                     </MenuItem>
                 ))}
               </Select>
+              <Button
+                size="small"
+                variant={includeHighK ? "contained" : "outlined"}
+                onClick={() => setIncludeHighK((v) => !v)}
+                sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+              >
+                {includeHighK ? "Hide k > 8" : "Show k > 8"}
+              </Button>
             </Stack>
           </Stack>
         </AccordionDetails>
@@ -1620,12 +1657,7 @@ export default function PerEgoSelection({
             if (
               index == null ||
               result == null ||
-              results == null ||
-              // !uniqueResultIndices.has(index) ||
-              // noiseRatio > noiseFilterRatio ||
-              (clusterCounts !== -1 &&
-                Object.keys(infos[index]).length !==
-                  ("-1" in infos[index] ? clusterCounts + 1 : clusterCounts))
+              results == null
             ) {
               return null;
             }
@@ -1635,7 +1667,7 @@ export default function PerEgoSelection({
             const statusLabel = hasAnalysis
               ? "Analysis done"
               : hasPreprocess
-                ? "Preprocess done"
+                ? "Dataset built"
                 : "Nothing";
 
             return (

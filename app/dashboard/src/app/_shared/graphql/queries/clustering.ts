@@ -125,6 +125,17 @@ export type Mfpca = {
   moreToVizSeconds: number;
   /** Distinct k values (non-noise clusters) present in ``clustering`` results. */
   availableClusterCounts?: number[];
+  /**
+   * Precomputed Clustering Selection uniqueness (analyzer / Saves).
+   * When present and uniquenessMeta matches the UI ratio, PerEgoSelection
+   * skips the O(N^2) client filter. See explore/utils/clusteringUniqueness.ts.
+   */
+  uniqueResultIndices?: number[];
+  noiseRatioByIndex?: { [index: string]: number };
+  uniquenessMeta?: {
+    duplicatedFilterRatio: number;
+    algorithm: string;
+  };
 };
 
 export type TrajectoryAnalysisResponse = {

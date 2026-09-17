@@ -196,9 +196,13 @@ export default function Filtering() {
     resetPassFailChecked();
   };
 
+  // Full filter reset only when a new analysis is loaded — NOT on every
+  // Clustering Selection click. Resetting filteredTrialIds on clusterInfo
+  // used to cascade into Heatmap recrop + Replayer WebGL rebuild and freeze
+  // batch-7 dual-ego when switching between k=4 results.
   useEffect(() => {
     reset();
-  }, [trajectoryAnalysis, clusterInfo]);
+  }, [trajectoryAnalysis]);
 
   useEffect(() => {
     resetClusterChecked();

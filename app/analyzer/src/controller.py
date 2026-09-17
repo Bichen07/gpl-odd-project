@@ -75,6 +75,7 @@ from graphql import batch_query, trials_query
 from timer import Timer
 from env import PAYLOAD_API, PAYLOAD_GRAPHQL_API, PAYLOAD_API_KEY
 import analysis_progress
+from clustering_uniqueness import attach_uniqueness_to_mfpca_dict
 from predict import train_surrogate_model
 from TwoDimTTC import getpoints, getpoints_np
 from collections import defaultdict
@@ -1212,6 +1213,10 @@ class Mfpca:
     durationIndices: Optional[Dict[str, List[int]]]
     trialOrder: List[str]
     availableClusterCounts: List[int] = field(default_factory=list)
+    # Precomputed Clustering Selection uniqueness (dashboard PerEgoSelection-v2).
+    uniqueResultIndices: Optional[List[int]] = None
+    noiseRatioByIndex: Optional[Dict[str, float]] = None
+    uniquenessMeta: Optional[Dict[str, Any]] = None
     # moreToVizTrialOrder: List[str]
     # moreToVizSeconds: float
     # dendrogram: Dict[str, Dendrogram]
@@ -1483,6 +1488,10 @@ class TrajectoryAnalysisController(Controller):
                         "trial_mappings": trial_mappings,
                         "batch_mappings": batch_mappings,
                     }
+
+            # Precompute Clustering Selection uniqueness into mfpca (analysis.zip /
+            # live API). Dashboard skips the O(N^2) browser filter when present.
+            attach_uniqueness_to_mfpca_dict(mfpca_dict)
 
             batch = list(batch_mappings.values())[0]
             parameters = batch["scenario"]["parameters"]

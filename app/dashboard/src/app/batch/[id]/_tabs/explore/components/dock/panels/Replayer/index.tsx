@@ -229,6 +229,7 @@ const Replayer = () => {
   } | null>(null);
 
   const [redrawHandled, setRedrawHandled] = useState(false);
+  const replayerPaneKeyRef = useRef<string>("");
 
   const clusterInfo = useAppSelector(
     (state) => state.batch.selectedClusterInfos,
@@ -1311,11 +1312,30 @@ const Replayer = () => {
   }, [redrawHandled]);
 
   useEffect(() => {
-    // Clustering / filter changes need a full Pixi rebuild. Highlight-driven
-    // visibleClusterKey changes do NOT — those only toggle display:none and
-    // resize via the effect above.
+    // Full Pixi rebuild only when pane labels (or the trial filter) change.
+    // Switching between two k=4 clusterings keeps the same panes — just
+    // re-run DRAW AGENTS (deps include clusteringResult) without destroying
+    // WebGL contexts (that freeze was killing batch-7 dual-ego selects).
+    const paneKey =
+      clusterInfo == null
+        ? ""
+        : Object.keys(clusterInfo)
+            .sort()
+            .map(
+              (ego) =>
+                `${ego}:${Object.keys(clusterInfo[ego] ?? {})
+                  .sort()
+                  .join(",")}`,
+            )
+            .join("|");
+    const filterKey = `${filteredTrialIds.length}:${filteredTrialIds[0] ?? ""}:${filteredTrialIds[filteredTrialIds.length - 1] ?? ""}`;
+    const next = `${paneKey}||${filterKey}`;
+    if (replayerPaneKeyRef.current === next && viewers != null) {
+      return;
+    }
+    replayerPaneKeyRef.current = next;
     setRedrawHandled(false);
-  }, [clusterInfo, filteredTrialIds]);
+  }, [clusterInfo, filteredTrialIds, viewers]);
 
   useEffect(() => {
     // Switching time↔s mode needs a rebuild once. Do NOT rebuild on every
@@ -1802,6 +1822,9 @@ const Replayer = () => {
     timeSliderRef.current,
     timeTypographyRef.current,
     showFullTimeline,
+    clusteringResult,
+    clusterInfo,
+    filteredTrialIds,
     // colorMode,
   ]);
 

@@ -8,6 +8,7 @@ import {
 } from "../_lib/clusterPaths";
 import { metaFromYamlPath } from "../_lib/readYaml";
 import { runSourceDir, runSourcePath } from "../_lib/runArtifactPaths";
+import { resolveResultsBatchDir, resultsBatchDirName } from "../_lib/resultsBatchDir";
 
 /**
  * GET /api/cluster-analysis-status?batchId=2
@@ -111,63 +112,63 @@ function scanClusterDirs(runDir: string): string[] {
     .sort((a, b) => Number(a.replace("cluster", "")) - Number(b.replace("cluster", "")));
 }
 
+function checkDatasetBuilt(
+  runDir: string,
+  clusterNames: string[],
+): boolean {
+  /**
+   * Dataset_builder medoid packs are ready when each clusterN has action.yaml.
+   * Boundary / outlier packs are optional — incomplete emb/IC pairs must not
+   * hide the Clustering Selection "Dataset built" badge (batch7 paper builds).
+   */
+  if (clusterNames.length === 0) return false;
+  for (const name of clusterNames) {
+    const clusterDir = path.join(runSourceDir(runDir), name);
+    if (!clusterArtifactExists(clusterDir, "action.yaml")) return false;
+  }
+  return true;
+}
+
 function checkPreprocessComplete(
   runDir: string,
   clusterNames: string[],
   boundaryPairs: BoundaryPair[],
   paramBoundaryPairs: ParamBoundaryPair[],
 ): boolean {
-  if (clusterNames.length === 0) return false;
-  const sourceDir = runSourceDir(runDir);
+  // Medoid dataset packs are the badge/sort signal. Full emb/IC pair
+  // completeness is tracked separately via has_parameter_space_pairs etc.
+  if (!checkDatasetBuilt(runDir, clusterNames)) return false;
 
+  // Keep a light check: if outlier/pair dirs were materialized, they should
+  // not be empty stubs — but missing optional pairs do not fail preprocess.
+  const sourceDir = runSourceDir(runDir);
   for (const name of clusterNames) {
     const clusterDir = path.join(sourceDir, name);
     const cjPath = resolveClusterArtifact(clusterDir, "cluster.json");
     const cj = cjPath ? readJsonSafe(cjPath) : null;
-    const medoid = cj?.medoid as Record<string, unknown> | undefined;
-    if (medoid?.trial_id == null) return false;
-    if (!clusterArtifactExists(clusterDir, "action.yaml")) return false;
-
     const clusterMeta = (cj?.cluster ?? {}) as Record<string, unknown>;
     const intra = (clusterMeta.intra_variance ?? {}) as Record<string, unknown>;
     const outlierIds = (intra.outlier_trial_ids ?? []) as unknown[];
     if (outlierIds.length > 0) {
       const od = resolveHighlightSubdir(clusterDir, "outlier_trials");
-      if (!od || !hasTrialSubdirs(od)) return false;
-    }
-
-    const neighbors = (intra.boundary_neighbors ?? {}) as Record<string, string>;
-    for (const tgt of Object.keys(neighbors)) {
-      const a = Number(name.replace(/^cluster/, ""));
-      const b = Number(tgt);
-      if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-      const lo = Math.min(a, b);
-      const hi = Math.max(a, b);
-      const pack = path.join(sourceDir, "trajectory_projection_pairs", `c${lo}-c${hi}`);
-      if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
-      const sides = fs
-        .readdirSync(pack, { withFileTypes: true })
-        .filter((e) => e.isDirectory() && /^c\d+_trial_/.test(e.name));
-      if (sides.length < 2) return false;
+      // Outliers are optional materialization; only fail if dir exists but empty.
+      if (od && !hasTrialSubdirs(od)) return false;
     }
   }
 
-  // Every declared trajectory-projection closest-pair must have trajectory_projection_pairs/cA-cB/ on disk.
   for (const bp of boundaryPairs) {
     const a = Number(bp.cluster_a);
     const b = Number(bp.cluster_b);
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
     const pack = path.join(sourceDir, "trajectory_projection_pairs", `c${lo}-c${hi}`);
-    if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
+    if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) continue;
     const sides = fs
       .readdirSync(pack, { withFileTypes: true })
       .filter((e) => e.isDirectory() && /^c\d+_trial_/.test(e.name));
-    if (sides.length < 2) return false;
+    if (sides.length > 0 && sides.length < 2) return false;
   }
 
-  // Parameter-space matched pairs live under parameter_space_pairs/cA-cB/ (gated by param_dist).
-  // Preprocess ready when process/context.md + synced_bev exist.
   for (const bp of paramBoundaryPairs) {
     const matched = (bp as ParamBoundaryPair & { parameter_space_match?: boolean }).parameter_space_match;
     if (matched === false) continue;
@@ -176,14 +177,8 @@ function checkPreprocessComplete(
     const lo = Math.min(a, b);
     const hi = Math.max(a, b);
     const pack = path.join(sourceDir, "parameter_space_pairs", `c${lo}-c${hi}`);
-    if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) return false;
-    if (!fs.existsSync(path.join(pack, "process", "context.md"))) return false;
-    const synced = path.join(pack, "synced_bev");
-    if (!fs.existsSync(synced) || !fs.statSync(synced).isDirectory()) return false;
-    const bevs = fs
-      .readdirSync(synced)
-      .filter((n) => /\.(jpg|jpeg|png)$/i.test(n));
-    if (bevs.length === 0) return false;
+    if (!fs.existsSync(pack) || !fs.statSync(pack).isDirectory()) continue;
+    // Partial packs (missing synced_bev) are ok for the dataset badge.
   }
 
   return true;
@@ -191,14 +186,18 @@ function checkPreprocessComplete(
 
 export async function GET(req: NextRequest) {
   const batchId = req.nextUrl.searchParams.get("batchId");
+  const egoName = req.nextUrl.searchParams.get("egoName");
   if (!batchId || !/^\d+$/.test(batchId)) {
     return NextResponse.json({ error: "valid batchId required" }, { status: 400 });
   }
 
   const root = findProjectRoot(process.cwd());
-  const batchDir = path.join(root, "results", `batch${batchId}`);
+  const batchDir = resolveResultsBatchDir(root, batchId, egoName);
   if (!fs.existsSync(batchDir)) {
-    return NextResponse.json({ folders: {} });
+    return NextResponse.json({
+      folders: {},
+      resultsDir: resultsBatchDirName(batchId, egoName),
+    });
   }
 
   const folders: Record<string, FolderStatus> = {};
@@ -440,5 +439,8 @@ export async function GET(req: NextRequest) {
     };
   }
 
-  return NextResponse.json({ folders });
+  return NextResponse.json({
+    folders,
+    resultsDir: resultsBatchDirName(batchId, egoName),
+  });
 }

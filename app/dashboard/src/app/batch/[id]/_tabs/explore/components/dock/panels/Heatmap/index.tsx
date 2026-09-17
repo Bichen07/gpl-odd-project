@@ -150,11 +150,12 @@ export default function TrajectoryHeatmap() {
       return null;
     }
     let result: { [egoName: string]: Mfpca } = {};
-    for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+    for (const egoName of egos) {
+      if (trajectoryAnalysis[egoName]?.mfpca?.[durationMode] == null) continue;
       result[egoName] = trajectoryAnalysis[egoName].mfpca[durationMode];
     }
     return result;
-  }, [trajectoryAnalysis, durationMode]);
+  }, [trajectoryAnalysis, durationMode, egos]);
 
   const clusterInfo = useAppSelector(
     (state) => state.batch.selectedClusterInfos
@@ -416,7 +417,7 @@ export default function TrajectoryHeatmap() {
     const counter: { [egoName: string]: { [clusterLabel: string]: number } } =
       {};
 
-    for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+    for (const egoName of egos) {
       // if ( clusteringResult[egoName] == null) {
       //   continue;
       // }
@@ -447,7 +448,7 @@ export default function TrajectoryHeatmap() {
       }
     }
     return counter;
-  }, [clusterInfo, filteredTrialIds, mfpca]);
+  }, [clusterInfo, filteredTrialIds, mfpca, egos, clusteringResult, trajectoryAnalysis, batchTrials, savedTrials]);
 
   const passFailCounter = useMemo(() => {
     if (clusteringResult == null || clusterInfo == null || mfpca == null) {
@@ -466,7 +467,7 @@ export default function TrajectoryHeatmap() {
         ? trials.map((t) => String(t?.id))
         : filteredTrialIds;
 
-    for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+    for (const egoName of egos) {
       if (clusteringResult[egoName] == null) {
         continue;
       }
@@ -517,7 +518,7 @@ export default function TrajectoryHeatmap() {
 
       const result: { [egoName: string]: { [label: string]: string[] } } = {};
 
-      for (const egoName of Object.keys(trajectoryAnalysis)) {
+      for (const egoName of egos) {
         if (filteredTrialIds.length === 0) {
           // No filter: keep label→trialOrder from the selected clustering when
           // available, else a single bucket with the MFPCA trialOrder. Previously
@@ -532,7 +533,7 @@ export default function TrajectoryHeatmap() {
             }
           } else {
             result[egoName] = {
-              "0": [...(mfpca[egoName].trialOrder ?? [])],
+              "0": [...(mfpca[egoName]?.trialOrder ?? [])],
             };
           }
           continue;
@@ -555,7 +556,30 @@ export default function TrajectoryHeatmap() {
 
             body[item.label][trialId] = mfpca[egoName].scores[trialId];
           }
-          result[egoName] = await heatmapOrdering(body);
+          // Payload heatmap_ordering is a Python endpoint and takes ~10–15s on
+          // large paper saves (~thousands of trials). Keep existing trialOrder.
+          const trialCount = Object.values(body).reduce(
+            (n, m) => n + Object.keys(m).length,
+            0,
+          );
+          if (trialCount > 400) {
+            const ordered: { [label: string]: string[] } = {};
+            for (const [label, trials] of Object.entries(
+              clusteringResult[egoName]?.trialOrder ?? {},
+            )) {
+              ordered[label] = [...(trials as string[])].filter(
+                (id) => id in (body[label] ?? {}),
+              );
+            }
+            for (const label of Object.keys(body)) {
+              if (!(label in ordered) || ordered[label].length === 0) {
+                ordered[label] = Object.keys(body[label]);
+              }
+            }
+            result[egoName] = ordered;
+          } else {
+            result[egoName] = await heatmapOrdering(body);
+          }
         } else {
           result[egoName] = {
             "0": [...(mfpca[egoName].trialOrder ?? [])].filter((trialId) =>
@@ -575,7 +599,7 @@ export default function TrajectoryHeatmap() {
     return () => {
       cancelled = true;
     };
-  }, [clusteringResult, mfpca, filteredTrialIds, trajectoryAnalysis]);
+  }, [clusteringResult, mfpca, filteredTrialIds, trajectoryAnalysis, egos]);
 
   let viewerTrialIds = useMemo(() => {
     setSelected({});
@@ -585,7 +609,7 @@ export default function TrajectoryHeatmap() {
     }
     let result: { [egoName: string]: { [viewerName: string]: string[] } } = {};
 
-    for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+    for (const egoName of egos) {
       result[egoName] = {};
 
       if (isBaseline) {
@@ -603,7 +627,7 @@ export default function TrajectoryHeatmap() {
           trialOrder = [...labelOrder, ...trialOrder];
         }
       } else {
-        trialOrder = [...(mfpca[egoName].trialOrder ?? [])];
+        trialOrder = [...(mfpca[egoName]?.trialOrder ?? [])];
       }
 
       if (clusteringResult == null || clusteringResult[egoName] == null) {
@@ -696,8 +720,14 @@ export default function TrajectoryHeatmap() {
   }>({});
 
   const [heatmapImages, setHeatmapImages] = useState<
-    Record<string, HTMLImageElement>
+    Record<string, HTMLCanvasElement>
   >({});
+  /** Avoid re-encoding crops when re-selecting a previously viewed clustering. */
+  const heatmapCropCacheRef = useRef<Map<string, HTMLCanvasElement>>(new Map());
+
+  useEffect(() => {
+    heatmapCropCacheRef.current.clear();
+  }, [trajectoryAnalysis]);
 
   const [viewersRef, setViewersRef] = useState<
     React.RefObject<ReactZoomPanPinchRef>[]
@@ -826,7 +856,7 @@ export default function TrajectoryHeatmap() {
     }
     const newSelected: typeof selected = {};
     const selectedSet = new Set(selectedTrialIds.value);
-    for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+    for (const egoName of egos) {
       for (const [name, viewer] of Object.entries(
         viewerTrialIds[egoName] ?? {}
       )) {
@@ -899,8 +929,9 @@ export default function TrajectoryHeatmap() {
         ...attributes.filter((a) => !filteredAttributes.includes(a)),
       ];
 
-      for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+      for (const egoName of egos) {
         if (cancelled) return;
+        if (trajectoryAnalysis[egoName] == null) continue;
         newHeatmapImages[egoName] = {};
         for (const [attrIndex, attribute] of attrOrder.entries()) {
           if (cancelled) return;
@@ -949,13 +980,13 @@ export default function TrajectoryHeatmap() {
     mfpca,
     isBaseline,
     params,
+    egos,
   ]);
 
   useEffect(() => {
     if (
       trajectoryAnalysis == null ||
       clusteringResultIndex == null ||
-      cropMergeCanvas.current == null ||
       viewerTrialIds == null ||
       mfpca == null
     ) {
@@ -964,11 +995,7 @@ export default function TrajectoryHeatmap() {
     }
     console.log("RERUNNING CROP MERGE IMAGES");
 
-    const canvas = cropMergeCanvas.current;
-
-    const ctx = canvas.getContext("2d");
-    if (!canvas || !ctx) return;
-
+    let cancelled = false;
     const newHeatmapImages: typeof heatmapImages = {};
 
     let modes = isBaseline
@@ -978,7 +1005,7 @@ export default function TrajectoryHeatmap() {
         : [];
     if (modes.length === 0 && clusterInfo != null) {
       modes = [];
-      for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+      for (const egoName of egos) {
         if (clusterInfo[egoName] == null) {
           continue;
         }
@@ -988,7 +1015,7 @@ export default function TrajectoryHeatmap() {
       }
     }
     if (modes.length == 0) {
-      for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
+      for (const egoName of egos) {
         modes.push(egoName + "_" + "0");
       }
     }
@@ -999,6 +1026,7 @@ export default function TrajectoryHeatmap() {
     setLoading(true);
 
     const cropOneLabel = async (key: string) => {
+      if (cancelled) return;
       const egoName = key.split("_")[0];
       const label = key.split("_")[1];
       const trialIds = viewerTrialIds[egoName][label] ?? [];
@@ -1013,9 +1041,16 @@ export default function TrajectoryHeatmap() {
 
       const cropRows = async (
         fullImage: HTMLImageElement,
-        out: Record<string, HTMLImageElement>,
-        key: string
+        out: Record<string, HTMLCanvasElement>,
+        imageKey: string,
+        cacheKey: string,
       ) => {
+        const cached = heatmapCropCacheRef.current.get(cacheKey);
+        if (cached != null) {
+          out[imageKey] = cached;
+          return;
+        }
+
         // Prefer exact match to trialOrder; fall back to the panel constant.
         // Wrong Payload PNGs (short height) used to make every crop OOB.
         let rowRes = resolution;
@@ -1040,7 +1075,7 @@ export default function TrajectoryHeatmap() {
 
         if (fullImage == null || usedIndices.length === 0) {
           console.warn(
-            `heatmap crop skipped for ${key}: ${usedIndices.length} in-range rows ` +
+            `heatmap crop skipped for ${imageKey}: ${usedIndices.length} in-range rows ` +
               `(image ${fullImage.width}x${fullImage.height}, rowRes=${rowRes}, ` +
               `trialOrder=${trialOrder.length}, clusterTrials=${trialIds.length})`,
           );
@@ -1048,8 +1083,12 @@ export default function TrajectoryHeatmap() {
         }
 
         // Cap canvas height — drawing thousands of OOB rows used to hang the
-        // tab (toDataURL on a multi-thousand-px canvas) when no clustering was
-        // selected yet and trialOrder >> fullheatmap rows.
+        // tab when no clustering was selected yet and trialOrder >> fullheatmap rows.
+        // Per-task canvas so labels can run in parallel; keep the pixel buffer
+        // (no toDataURL) — PNG encode was the main freeze on batch-7 selects.
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
         canvas.width = fullImage.width;
         canvas.height = usedIndices.length * rowRes;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1069,50 +1108,24 @@ export default function TrajectoryHeatmap() {
           );
         }
 
-        const dataUrl = canvas.toDataURL("image/png");
-        return loadImageAsync(dataUrl).then((img) => {
-          out[key] = img;
-        });
+        heatmapCropCacheRef.current.set(cacheKey, canvas);
+        out[imageKey] = canvas;
       };
 
       // Crop heatmaps by attribute
       const heatmapTasks = filteredAttributes.map(async (attr) => {
-        const key = `${egoName}_${label}_${attr}`;
-
-        // const egoClusteringResultIndex = clusteringResultIndex[egoName];
-        // const imageName = `${params["id"]}-TA${trajectoryAnalysis[egoName].id}-clustering${egoClusteringResultIndex}-${key}-${timeOrS}_heatmap`;
-        // imageName.includes();
-        // const imgInfo = await getDocs<{ docs: Document[] }>("documents", {
-        //   where: { filename: { equals: imageName + ".png" } },
-        // }).then((response) => response.data.docs[0]);
-        // const imgInfo = batchImages?.images?.find((v) =>
-        //   v.filename?.includes(imageName)
-        // );
-        // const viewerSet = new Set(viewerTrialIds[egoName][label]);
-        // if (
-        //   imgInfo != null &&
-        //   imgInfo.url != null &&
-        //   clusterInfo != null &&
-        //   clusterInfo[egoName] != null &&
-        //   viewerSet.size === clusterInfo[egoName][label].count
-        // ) {
-        //   console.log(
-        //     `Batch images already have this crop merged image ${imageName}`
-        //   );
-        //   const img = document.createElement("img");
-        //   img.src = imgInfo.url;
-        //   img.crossOrigin = "anonymous";
-        //   newHeatmapImages[key] = img;
-        //   return;
-        // }
+        const imageKey = `${egoName}_${label}_${attr}`;
+        const egoIdx = clusteringResultIndex?.[egoName] ?? "none";
+        const cacheKey = `${egoName}|${egoIdx}|${label}|${attr}|${trialIds.length}`;
 
         const fullImage = fullHeatmapImages[egoName]?.[attr]?.[0];
         if (!fullImage) return;
 
-        return cropRows(fullImage, newHeatmapImages, key).then((_res) => {
-          console.log(`drawed crop merge image ${key}`);
-          // uploadImageElement(newHeatmapImages[key], imageName);
-        });
+        return cropRows(fullImage, newHeatmapImages, imageKey, cacheKey).then(
+          (_res) => {
+            console.log(`drawed crop merge image ${imageKey}`);
+          },
+        );
       });
 
       await Promise.all(heatmapTasks);
@@ -1120,22 +1133,36 @@ export default function TrajectoryHeatmap() {
 
     const cropMergeImages = async () => {
       try {
-        for (const label of labels) {
-          await cropOneLabel(label);
+        // Parallel label crops (each uses its own canvas) + yield so the UI
+        // stays responsive while switching clusterings on large batches.
+        const chunk = 2;
+        for (let i = 0; i < labels.length; i += chunk) {
+          if (cancelled) return;
+          await Promise.all(labels.slice(i, i + chunk).map((l) => cropOneLabel(l)));
+          await new Promise<void>((r) => requestAnimationFrame(() => r()));
         }
       } catch (err) {
         console.warn("heatmap crop failed", err);
       } finally {
-        setHeatmapImages(newHeatmapImages);
-        setLoading(false);
+        if (!cancelled) {
+          setHeatmapImages(newHeatmapImages);
+          setLoading(false);
+        }
       }
     };
     void cropMergeImages();
+    return () => {
+      cancelled = true;
+    };
   }, [
     viewerTrialIds,
     filteredAttributes,
     fullHeatmapImages,
-    cropMergeCanvas.current,
+    egos,
+    clusterInfo,
+    isBaseline,
+    viewerMode,
+    clusteringResultIndex,
   ]);
 
   useEffect(() => {
@@ -1735,9 +1762,25 @@ export default function TrajectoryHeatmap() {
                                       );
                                     })
                                     : null}
-                                  <img
+                                  <canvas
                                     key={`heatmap-${key}`}
-                                    src={heatmapImages[key].src}
+                                    width={heatmapImages[key].width}
+                                    height={heatmapImages[key].height}
+                                    ref={(el) => {
+                                      if (el == null) return;
+                                      const src = heatmapImages[key];
+                                      if (
+                                        el.width !== src.width ||
+                                        el.height !== src.height
+                                      ) {
+                                        el.width = src.width;
+                                        el.height = src.height;
+                                      }
+                                      const ctx = el.getContext("2d");
+                                      if (ctx == null) return;
+                                      ctx.clearRect(0, 0, el.width, el.height);
+                                      ctx.drawImage(src, 0, 0);
+                                    }}
                                     style={{
                                       imageRendering: "crisp-edges",
                                     }}
