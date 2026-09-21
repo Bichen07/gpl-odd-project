@@ -146,7 +146,6 @@ def test_inject_collision_agent_actions():
     text = build_description({
         "location": "hct_6",
         "duration": 31.69,
-        "junction_aware": True,
         "agents": agents,
         "interactions": [iv],
     })

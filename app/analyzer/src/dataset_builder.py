@@ -73,7 +73,9 @@ CSV_INDEX_SIDECAR = (
 )
 
 
-def _load_csv_index_sidecar() -> Dict[str, Tuple[int, int]]:
+def _load_csv_index_sidecar(
+    prefer_batch_id: Optional[int] = None,
+) -> Dict[str, Tuple[int, int]]:
     """Load trialId → (batch_id, csv_index) written by the paper materializer.
 
     Payload appends ``-N`` to an uploaded filename when it collides with an
@@ -81,6 +83,11 @@ def _load_csv_index_sidecar() -> Dict[str, Tuple[int, int]]:
     in Case Study 3, 3869 trials carry only 2129 distinct embedded indices. The
     materializer therefore allocates a unique index per trial and records it
     here; this map takes precedence over parsing the filename.
+
+    Paper case studies share Payload trial-id space across lab batches 7/8/9.
+    When the same trial id appears under multiple batch keys in the sidecar,
+    later JSON keys used to overwrite earlier ones (batch 9 stole batch 7
+    medoids). Pass ``prefer_batch_id`` so the active build wins.
     """
     if not CSV_INDEX_SIDECAR.is_file():
         return {}
@@ -90,7 +97,14 @@ def _load_csv_index_sidecar() -> Dict[str, Tuple[int, int]]:
         print(f"  ⚠️  Could not read {CSV_INDEX_SIDECAR.name}: {exc}")
         return {}
     out: Dict[str, Tuple[int, int]] = {}
-    for batch_id, entries in (raw or {}).items():
+    # Load non-preferred batches first, then preferred last so it wins.
+    items = list((raw or {}).items())
+    if prefer_batch_id is not None:
+        pref = str(prefer_batch_id)
+        items = [(b, e) for b, e in items if str(b) != pref] + [
+            (b, e) for b, e in items if str(b) == pref
+        ]
+    for batch_id, entries in items:
         if not isinstance(entries, dict):
             continue
         for tid, idx in entries.items():
@@ -101,14 +115,19 @@ def _load_csv_index_sidecar() -> Dict[str, Tuple[int, int]]:
     return out
 
 
-def _build_trial_index_map(trials_meta: Dict[str, Any]) -> Dict[str, Tuple[int, int]]:
+def _build_trial_index_map(
+    trials_meta: Dict[str, Any],
+    prefer_batch_id: Optional[int] = None,
+) -> Dict[str, Tuple[int, int]]:
     """Resolve trialId → (batch_id, csv_index) for every trial we can place.
 
     Sidecar entries win; trials absent from it fall back to an unsuffixed
     ``esmini_<batch>_<index>.dat`` filename, which is unambiguous by definition.
     """
     dat_pat = re.compile(r"esmini_(\d+)_(\d+)\.dat$")
-    sidecar = _load_csv_index_sidecar()
+    # Suffixed Payload collisions: esmini_7_1522-2.dat → still batch 7 / index 1522
+    dat_suf_pat = re.compile(r"esmini_(\d+)_(\d+)(?:-\d+)?\.dat$")
+    sidecar = _load_csv_index_sidecar(prefer_batch_id=prefer_batch_id)
     out: Dict[str, Tuple[int, int]] = {}
     n_sidecar = 0
     for tid, t_info in (trials_meta or {}).items():
@@ -122,7 +141,8 @@ def _build_trial_index_map(trials_meta: Dict[str, Any]) -> Dict[str, Tuple[int, 
         edat = t_info.get("esminiDat")
         if not isinstance(edat, dict):
             continue
-        m = dat_pat.match(str(edat.get("filename") or ""))
+        fn = str(edat.get("filename") or "")
+        m = dat_pat.match(fn) or dat_suf_pat.match(fn)
         if m:
             out[tid] = (int(m.group(1)), int(m.group(2)))
     if n_sidecar:
@@ -993,9 +1013,13 @@ def load_clustering_from_payload_save(
             if len(candidates) > 1:
                 print(f"  ({len(candidates)} candidates with k={k} evaluated)")
 
-    # 7. Build trial_index_map (sidecar first, then unsuffixed esminiDat.filename)
+    # 7. Build trial_index_map (sidecar first, then unsuffixed esminiDat.filename).
+    # Prefer this Payload batch so paper CS1/CS2/CS3 trial-id collisions in the
+    # sidecar do not steal CSVs from another case study (batch7→batch9 bug).
     trials_meta = ego_data.get("trials", {})
-    trial_index_map = _build_trial_index_map(trials_meta)
+    trial_index_map = _build_trial_index_map(
+        trials_meta, prefer_batch_id=batch_id
+    )
 
     print(f"  Built trial→CSV map for {len(trial_index_map)} of {len(trials_meta)} trials.")
 
@@ -2997,9 +3021,38 @@ def main():
                       f"({n_coll} collided)")
                 # Enable outlier / boundary aux trials (same as fresh payload-save).
                 embeddings_data = {"embeddings": scores}
-                trial_index_map = _build_trial_index_map(trials_meta)
+                trial_index_map = _build_trial_index_map(
+                    trials_meta,
+                    prefer_batch_id=int(args.batch_id) if args.batch_id else None,
+                )
                 print(f"  Built trial→CSV map for {len(trial_index_map)} trials "
                       f"(enables outlier_trials / trajectory_projection_pairs/ / parameter_space_pairs/)")
+                # Manifest medoids may still point at a colliding batch (e.g. batch9
+                # stole batch7 trial-ids). Remap via prefer_batch_id map; if
+                # embeddings are available, recompute so CSV fallback ranking
+                # also respects the preferred batch.
+                if trial_index_map and embeddings_data is not None:
+                    print("  Recomputing medoids with preferred-batch CSV map…")
+                    remapped = compute_medoids(
+                        embeddings_data,
+                        result_data,
+                        dataset=None,
+                        trial_index_map=trial_index_map,
+                    )
+                    if remapped:
+                        medoids = remapped
+                elif trial_index_map:
+                    n_fix = 0
+                    for m in medoids:
+                        tid = str(m.get("trial_id", ""))
+                        if tid in trial_index_map:
+                            b, ti = trial_index_map[tid]
+                            if (b, ti) != (m.get("batch_id"), m.get("trial_index")):
+                                m["batch_id"], m["trial_index"] = b, ti
+                                n_fix += 1
+                    if n_fix:
+                        print(f"  Remapped {n_fix} manifest medoid(s) → prefer batch "
+                              f"{args.batch_id} CSVs")
             else:
                 print("  ❌ Could not fetch/parse Payload analysis for --from-run rebuild")
                 if args.analysis_zip:

@@ -967,7 +967,9 @@ def render_synced_parameter_space_pair_bevs(
         return 0.0
 
     def _panel_caption(label: str, half_m: float) -> str:
-        return f"{label} ego \u00b1{half_m:.0f}m"
+        # half_m still drives the camera crop; do not print ±Xm on the panel.
+        _ = half_m
+        return str(label)
 
     def _render_ended_panel(path: str, side, label: str, half_m: float) -> None:
         """Same BEV panel pipeline as live side; t past end → map only, no cars."""

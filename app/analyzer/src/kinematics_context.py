@@ -63,7 +63,6 @@ def primary_vehicle_track_id(action_data: Optional[Dict[str, Any]]) -> Optional[
         if iv.get("with_track_id") is not None and str(iv.get("type", "")) in (
             "NEAR_MISS",
             "COLLISION",
-            "DANGEROUS_CUT_IN",
             "CLOSEST_APPROACH",
         ):
             return int(iv["with_track_id"])

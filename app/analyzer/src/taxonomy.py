@@ -45,7 +45,6 @@ class InteractionAction(str, Enum):
     """Composite, multi-agent labels produced by the Interactive Action Detector."""
     COLLISION = "COLLISION"
     NEAR_MISS = "NEAR_MISS"
-    DANGEROUS_CUT_IN = "DANGEROUS_CUT_IN"
     CLOSEST_APPROACH = "CLOSEST_APPROACH"
 
 
@@ -89,8 +88,6 @@ class Thresholds:
     ROUTE_MIN_DISP = 0.1   # m    → skip a junction passage with displacement below this
     # Interactive Action Detector (composite, multi-agent).
     TTC_NEAR_MISS = 2.5    # s    → TTC below this while closing ⇒ near_miss
-    CUT_IN_REACTION_S = 2.0  # s   → ego must react within this after NPC cut-in
-    CUT_IN_DECEL = -1.5    # m/s² → ego decel sharper than this ⇒ dangerous cut-in
     # Polygon clearance thresholds (collision vehicle + conflict focus).
     CONTACT_CLEARANCE_M = 0.5   # m → polygon gap ≤ this ⇒ contact / collision
     CONFLICT_RELEVANCE_M = 5.0  # m → moving-agent focus window for CLOSEST_APPROACH

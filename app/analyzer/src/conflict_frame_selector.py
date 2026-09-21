@@ -1,10 +1,9 @@
-"""Action-derived BEV frame pack for Path A (xosc_gen Steps 1→2→2.5).
+"""Action-derived BEV frame pack (xosc_gen Steps 1→2→2.5).
 
 BEV timestamps come from ``action.yaml`` (agent action boundaries + interaction
-key times) plus optional **burst samples** around labelled COLLISION / NEAR_MISS
-peaks (offsets like −2…+1 s). Metrics (d/ttc/az) annotate those times for
-``description.txt`` evidence — they must never invent new event labels such as
-``HARD_BRAKE`` / ``MAX_CLOSING`` from raw kinematics.
+key times) plus **burst samples** around labelled COLLISION / NEAR_MISS peaks
+(offsets like −2…+1 s). Metrics (d/ttc/az) annotate those times — they do not
+create new event labels.
 """
 from __future__ import annotations
 
@@ -42,12 +41,12 @@ ADAPTIVE_BEV_FOOTPRINT_PAD_M = 2.6
 # Discrete burst offsets around labelled COLLISION / NEAR_MISS peak (seconds).
 _BURST_OFFSETS = (-2.0, -1.0, -0.5, -0.2, 0.0, 0.2, 0.5, 1.0)
 
-# Geometry peaks that earn a ± burst ring. DANGEROUS_CUT_IN / CLOSEST_APPROACH
-# may still appear as single stamps, but must not spawn a second burst fan.
+# Geometry peaks that earn a ± burst ring. CLOSEST_APPROACH may still appear
+# as a single stamp, but must not spawn a second burst fan.
 _BURST_TYPES = frozenset({"COLLISION", "NEAR_MISS"})
 
 _CONFLICT_TYPES = frozenset(
-    {"COLLISION", "NEAR_MISS", "CLOSEST_APPROACH", "DANGEROUS_CUT_IN"}
+    {"COLLISION", "NEAR_MISS", "CLOSEST_APPROACH"}
 )
 _JUNCTION_ACTIONS = frozenset({"ENTER_JUNCTION", "EXIT_JUNCTION"})
 
@@ -63,13 +62,7 @@ SEMANTIC_ACTION_TYPES = frozenset({
     "STOPPED",
 })
 
-# Ego actions kept even outside the conflict window (route-level turns matter
-# after the near-miss as much as during it).
-_ALWAYS_KEEP_EGO_ACTIONS = frozenset({
-    "COLLISION",
-    "TURN_LEFT",
-    "TURN_RIGHT",
-})
+# (Former F5a always-keep set removed with the conflict time-window filter.)
 
 AZIMUTH_GLOSSARY = (
     "Named conflict-vehicle azimuth relative to ego heading: bearing of the named "
@@ -108,7 +101,7 @@ def _burst_offset_slug(offset_s: float) -> str:
 
 
 def _combine_labels(prev: str, new: str, max_parts: int = 3) -> str:
-    for key in ("COLLISION", "NEAR_MISS", "DANGEROUS_CUT_IN", "CLOSEST_APPROACH"):
+    for key in ("COLLISION", "NEAR_MISS", "CLOSEST_APPROACH"):
         if key in new:
             extras = [p for p in prev.split("+") if p and key not in p][: max(0, max_parts - 1)]
             return "+".join([new] + extras) if extras else new
@@ -659,16 +652,6 @@ def _conflict_anchors(
         tid_i = int(tid) if tid is not None else None
         pname = str(iv.get("with_name") or (id_to_name.get(tid_i, "") if tid_i is not None else ""))
         anchors.append((float(kt), typ, tid_i, pname))
-        ct = iv.get("cut_in_time")
-        # Lane-entry stamp is useful only when it precedes (or equals) the
-        # min-distance peak. Post-peak cut_in_time is usually a lane-ID flicker
-        # after the vehicle has already passed — do not promote it to a peak.
-        if (
-            ct is not None
-            and typ == "DANGEROUS_CUT_IN"
-            and float(ct) <= float(kt) + 1e-6
-        ):
-            anchors.append((float(ct), f"{typ}_start", tid_i, pname))
     for agent in action_data.get("agents") or []:
         if int(agent.get("track_id", -1)) != 0:
             continue
@@ -891,7 +874,7 @@ def extract_action_timestamps(
     """Extract ``(t, label)`` from action.yaml — sole BEV timestamp source.
 
     Mirrors xosc_gen ``extract_action_timestamps`` for the gpl-odd schema
-    (top-level start/end + interactions key_time / cut_in_time).
+    (top-level start/end + interactions key_time).
     """
     if action_data is None:
         action_data = _load_action(action_yaml_path)
@@ -931,17 +914,13 @@ def extract_action_timestamps(
 
     for inter in action_data.get("interactions") or []:
         name = str(inter.get("type", "interaction"))
+        if name not in _CONFLICT_TYPES:
+            continue
         vehicle = inter.get("with_name") or id_to_token.get(inter.get("with_track_id"))
         suffix = f" with {vehicle}" if vehicle else ""
         kt = inter.get("key_time")
         if kt is not None:
             raw.append((float(kt), f"{name}{suffix}"))
-        ct = inter.get("cut_in_time")
-        # Same gate as _conflict_anchors: only pre-/at-peak lane entry.
-        if ct is not None and (
-            kt is None or float(ct) <= float(kt) + 1e-6
-        ):
-            raw.append((float(ct), f"{name} start{suffix}"))
 
     if not raw:
         return []
@@ -986,20 +965,15 @@ def _noise_filtered_action_times(
     Never invents times — only removes stamps that are not useful for the LLM pack.
     Conflict interaction / COLLISION times are always kept via
     ``extract_action_timestamps`` merge with anchors in ``select_action_frames``.
+
+    ``conflict_times`` / ``window_*`` are kept for API compatibility but are **not**
+    used to drop stamps (former F5 time window removed — full-trial action bounds).
     """
     if not action_data:
         return []
     out: List[Tuple[float, str]] = []
     id_to_name = _agent_name_map(action_data)
-    before = float(window_before_s)
-    after = float(window_after_s)
-
-    def in_window(t: float) -> bool:
-        if not conflict_times:
-            return True
-        return any(
-            (float(tc) - before) <= t <= (float(tc) + after) for tc in conflict_times
-        )
+    _ = (conflict_times, window_before_s, window_after_s)  # unused (ex-F5)
 
     for agent in action_data.get("agents") or []:
         tid = int(agent.get("track_id", -1))
@@ -1017,10 +991,6 @@ def _noise_filtered_action_times(
             if st is None:
                 continue
             st_f, et_f = float(st), float(et if et is not None else st)
-            if conflict_times and not (in_window(st_f) or in_window(et_f)):
-                # Always keep ego COLLISION / same-lane TURN_* even slightly outside W.
-                if not (tid == 0 and name in _ALWAYS_KEEP_EGO_ACTIONS):
-                    continue
             if name == "COLLISION":
                 # Ego (and interactions) already emit the conflict peak — skip the
                 # mirrored NPC-side COLLISION (vehicle=Ego) which garbles the slug.
@@ -1051,11 +1021,11 @@ def select_action_frames(
     """Build BEV pack from action.yaml + burst around labelled conflict peaks.
 
     Burst offsets (−2…+1 s) sample geometry around COLLISION / NEAR_MISS
-    ``key_time`` only. DANGEROUS_CUT_IN / CLOSEST_APPROACH keep at most a
-    single non-burst stamp; post-peak ``cut_in_time`` is dropped upstream.
+    ``key_time`` only. CLOSEST_APPROACH keeps at most a single non-burst stamp.
+    Cut-in composites are not used; rely on ``LANE_CHANGE_*`` + ego speed actions.
 
-    Action stamps are kept in ``[peak − before, peak + after]`` (defaults 15 s /
-    8 s). Pass ``conflict_window_s`` for legacy symmetric ±W.
+    Action-boundary stamps are taken for the **full trial** (no peak±window drop).
+    ``conflict_window_*`` args are accepted for CLI compatibility but ignored.
     """
     df = _normalize_traj_df(traj_df)
     action_data = normalize_vehicle_schema(action_data) if action_data is not None else None
@@ -1104,7 +1074,7 @@ def select_action_frames(
     for tc, typ, _tid, pname in anchors:
         label = f"{typ}_{pname}" if pname else typ
         # ± burst only for COLLISION / NEAR_MISS. If neither exists, burst around
-        # the primary fallback once (CLOSEST_APPROACH / DANGEROUS_CUT_IN key_time).
+        # the primary fallback once (CLOSEST_APPROACH key_time).
         # *_start stamps are never peaks and never get a burst ring.
         is_start = typ.endswith("_start")
         gets_burst = (typ in _BURST_TYPES) or (
@@ -1133,7 +1103,7 @@ def select_action_frames(
 
     for t, lab in extract_action_timestamps(action_data=action_data, min_gap=min_gap_s):
         upper = lab.upper()
-        if any(k in upper for k in ("NEAR_MISS", "DANGEROUS_CUT_IN", "CLOSEST_APPROACH")):
+        if any(k in upper for k in ("NEAR_MISS", "CLOSEST_APPROACH")):
             add(t, lab.replace(" ", "_"), "interaction")
 
     role_priority = {"peak": 0, "burst": 1, "interaction": 2, "action": 3}

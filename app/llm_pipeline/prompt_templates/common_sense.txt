@@ -78,7 +78,7 @@
 - Title / filename event token (same rule everywhere): includes burst timing when
   present, e.g. `0p5s_before_APPROACH_Oncoming`, `0p5s_after_POST_Oncoming`,
   `COLLISION_Oncoming`. Context lines use the same timing in words
-  (“0.5s before approach phase…”). Caption `±Xm` is the camera half-extent.
+  (“0.5s before approach phase…”). Panel captions show `t` and the event token.
 - Agents: Ego = orange box; other vehicles = blue. On-car ID circle = legend ID.
 - Velocity arrows (from vehicle nose): **length ∝ speed**; Ego = dark green;
   others = cyan/blue. No arrow ≈ stationary / near-zero speed.

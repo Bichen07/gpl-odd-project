@@ -943,23 +943,23 @@ class Tier2BevRenderer:
         if center is None and view_bounds is not None:
             xmin, xmax, ymin, ymax = view_bounds
             center = ((xmin + xmax) / 2.0, (ymin + ymax) / 2.0)
-        self._plotter.render_scene(
-            self.map_tracks_csv,
-            out_path,
-            highlight_road_ids_list=highlight,
+                self._plotter.render_scene(
+                    self.map_tracks_csv,
+                    out_path,
+                    highlight_road_ids_list=highlight,
             view_bounds=view_bounds,
             draw_labels=draw_labels,
-            typography=self.typography,
-            tracks_csv_path=str(traj_csv),
-            metadata_yaml_path=str(meta_yaml),
-            timestamp=float(t),
-            ego_id=0,
-            heading_in_degrees=True,
-            draw_trajectory_trails=True,
+                    typography=self.typography,
+                    tracks_csv_path=str(traj_csv),
+                    metadata_yaml_path=str(meta_yaml),
+                    timestamp=float(t),
+                    ego_id=0,
+                    heading_in_degrees=True,
+                    draw_trajectory_trails=True,
             time_label=time_label,
             scope_bounds=view_bounds,
-            output_px=self.snapshot_output_px,
-            white_border_frac=self.snapshot_border_frac,
+                    output_px=self.snapshot_output_px,
+                    white_border_frac=self.snapshot_border_frac,
             label_anchors=label_anchors,
             metric_chip=metric_chip,
             label_avoid_xy=label_avoid_xy,
@@ -1034,7 +1034,7 @@ class Tier2BevRenderer:
         half = adaptive_half_extent(d_m)
         bounds = ego_centered_square_bounds(ego_xy, half)
         yaw = self.fixed_view_yaw_deg
-        caption = f"t = {t:.2f}s  {short}  ±{half:.0f}m".strip()
+        caption = f"t = {t:.2f}s  {short}".strip()
         self._render_one_panel(
             out_path, traj_csv=traj_csv, meta_yaml=meta_yaml,
             highlight=highlight, view_bounds=bounds, t=t,

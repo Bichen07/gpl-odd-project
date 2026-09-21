@@ -477,15 +477,17 @@ def _classify_npc_relation(
 
 
 def detect_interactions(df: pd.DataFrame) -> List[Dict]:
-    """Interactive Action Detector — composite, multi-agent labels (V1-5).
+    """Interactive Action Detector — composite, multi-agent labels.
 
     Reads the full multi-agent trajectory (all trackIds) and emits ego-relative
     interaction events that single-agent kinematics cannot express:
 
-      * NEAR_MISS         — TTC < 2.5 s while ego–NPC distance is decreasing.
-                            Key timestamp = moment of absolute minimum distance.
-      * DANGEROUS_CUT_IN  — an NPC changes into the ego's lane and the ego is
-                            forced into a sharp deceleration within 2 s.
+      * NEAR_MISS — TTC < 2.5 s while ego–NPC distance is decreasing.
+                    Key timestamp = moment of absolute minimum distance.
+
+    Cut-in / brake composites are not detected here: NPC ``LANE_CHANGE_*`` and
+    ego ``DECELERATE`` / ``EMERGENCY_BRAKE`` already appear as per-agent actions;
+    the LLM composes that story from the timeline.
 
     Each event records the peak-intensity timestamp so the BEV/keyframe layer can
     snapshot the exact conflict moment.
@@ -494,18 +496,6 @@ def detect_interactions(df: pd.DataFrame) -> List[Dict]:
     ego = df[df["trackId"] == 0].sort_values("time").reset_index(drop=True)
     if ego.empty:
         return events
-    ego_t = ego["time"].to_numpy(dtype=float)
-
-    # Ego longitudinal acceleration (for cut-in reaction test).
-    ego_v = ego["velocity"].to_numpy(dtype=float)
-    if len(ego_t) > 1:
-        ego_acc = np.gradient(ego_v, ego_t)
-    else:
-        ego_acc = np.zeros(len(ego_t))
-
-    def ego_min_accel(t0: float, t1: float) -> Optional[float]:
-        mask = (ego_t >= t0) & (ego_t <= t1)
-        return float(ego_acc[mask].min()) if mask.any() else None
 
     for tid in sorted(int(x) for x in df["trackId"].unique() if int(x) != 0):
         npc = df[df["trackId"] == tid].sort_values("time").reset_index(drop=True)
@@ -516,10 +506,9 @@ def detect_interactions(df: pd.DataFrame) -> List[Dict]:
         # NEAR_MISS each, which also pollutes BEV keyframe selection).
         npc_moving = float(npc["velocity"].abs().max()) > Thresholds.STOPPED_SPEED
         merged = pd.merge_asof(
-            ego[["time", "x", "y", "road_id", "lane_id"]].sort_values("time"),
-            npc[["time", "x", "y", "road_id", "lane_id"]].sort_values("time")
-            .rename(columns={"x": "x_n", "y": "y_n",
-                             "road_id": "road_n", "lane_id": "lane_n"}),
+            ego[["time", "x", "y"]].sort_values("time"),
+            npc[["time", "x", "y"]].sort_values("time")
+            .rename(columns={"x": "x_n", "y": "y_n"}),
             on="time", direction="nearest", tolerance=0.06,
         ).dropna(subset=["x_n"])
         if len(merged) < 2:
@@ -532,7 +521,6 @@ def detect_interactions(df: pd.DataFrame) -> List[Dict]:
         closing = -ddt  # >0 ⇒ approaching
         ttc = np.where(closing > 1e-3, dist / np.maximum(closing, 1e-3), np.inf)
 
-        # --- NEAR_MISS ---------------------------------------------------
         nm_mask = (ttc < Thresholds.TTC_NEAR_MISS) & (closing > 0)
         if npc_moving and nm_mask.any():
             i_md = int(np.argmin(dist))  # absolute minimum distance = key frame
@@ -543,29 +531,6 @@ def detect_interactions(df: pd.DataFrame) -> List[Dict]:
                 "min_distance_m": round(float(dist[i_md]), 2),
                 "min_ttc_s": round(float(np.min(ttc[nm_mask])), 2),
             })
-
-        # --- DANGEROUS_CUT_IN --------------------------------------------
-        road_n = merged["road_n"].to_numpy(float)
-        lane_n = merged["lane_n"].to_numpy(float)
-        road_e = merged["road_id"].to_numpy(float)
-        lane_e = merged["lane_id"].to_numpy(float)
-        for k in range(1, len(merged)):
-            npc_changed_lane = (lane_n[k] != lane_n[k - 1])
-            into_ego_lane = (road_n[k] == road_e[k] and lane_n[k] == lane_e[k])
-            if npc_changed_lane and into_ego_lane and dist[k] < Thresholds.NEAR_GAP:
-                t_cut = float(tt[k])
-                amin = ego_min_accel(t_cut, t_cut + Thresholds.CUT_IN_REACTION_S)
-                if amin is not None and amin <= Thresholds.CUT_IN_DECEL:
-                    i_md = int(np.argmin(dist))
-                    events.append({
-                        "type": InteractionAction.DANGEROUS_CUT_IN.value,
-                        "with_track_id": tid,
-                        "key_time": round(float(tt[i_md]), 2),
-                        "cut_in_time": round(t_cut, 2),
-                        "ego_reaction_accel": round(float(amin), 2),
-                        "min_distance_m": round(float(dist.min()), 2),
-                    })
-                    break  # one cut-in per NPC is enough
 
     return events
 
@@ -648,7 +613,6 @@ def label_trajectory(
         "dataset": meta.get("dataset"),
         "location": meta.get("location"),
         "duration": meta.get("duration"),
-        "junction_aware": bool(junction_roads),
         "agents": agents_out,
         "interactions": interactions,
     }

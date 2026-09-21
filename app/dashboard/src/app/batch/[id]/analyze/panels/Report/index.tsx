@@ -359,7 +359,7 @@ export default function Report({
         )}
       </Paper>
 
-      {/* ── E. Rules / Boundary (S2 + S3 + S4) ──────────────────────────── */}
+      {/* ── E. Rules / Boundary (S2 + S3) ──────────────────────────────── */}
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="h6" gutterBottom>
           ODD Boundary Export &amp; Parameter Rules
@@ -397,13 +397,6 @@ export default function Report({
                     label={`${data.boundaryExport.nTrialsWithoutClusterLabel} trials outside clustering fit`}
                   />
                 )}
-              {data.boundaryPairsJoin && (
-                <Chip
-                  size="small"
-                  variant="outlined"
-                  label={`${data.boundaryPairsJoin.nPairsTouchingBoundary}/${data.boundaryPairsJoin.nPairs} pairs touch the boundary`}
-                />
-              )}
             </Stack>
             <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
               From <code>odd_boundary_export.json</code>

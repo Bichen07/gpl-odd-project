@@ -1,131 +1,359 @@
-# Plan v3: one closed `archetype` field per agent (paper vocabulary), not resolution+control_response+motive
+# Plan v5: medoid = kinematic time sections; cluster label stays at cluster summary
 
-**Status:** proposal — implement only after this file is approved. **Supersedes** the "delete motive, keep only resolution+prose" version of this file — that version overcorrected and is wrong (see §0).  
-**Does not change:** clustering, BEV, `context_medoid.md` metrics, Python inventing causes.
+**Status:** proposal — **not implement-ready** (see §9–10 self-review).  
+**Does not change:** clustering, BEV crop rules, Python inventing causes.
 
----
+**Hard vocabulary split**
 
-## 0. Where the previous version of this plan was wrong
-
-Appendix D of the paper (`_IEEE_ITS_2026...txt` lines 1694–1791) says `pass-slowdown` (C6) and `braking-rear-end` (C4) are caused by **the parked vehicle** — a real second agent, matching this project's `Parking`. But the paper still gives the **whole trajectory one archetype name**. It does not split the trial into a CuttingIn row and a Parking row with independent codes. The distinguishing fact between C4 and C6 is **timing**: braking that starts early/gently after the pass (C6) vs abrupt braking right at/after the pass (C4) — the *same* early-vs-late logic the paper already uses for `proactive-yield` vs `late-yield` (C3 vs C4, Case Study 1), just applied to a different reference event (the pass, not the approach).
-
-Previous version of this plan deleted the closed field entirely and pushed everything into free prose + a separate `cluster_summary` re-invention step. That throws away exactly the structure the paper uses to name its own clusters, and makes cluster-summary re-derive from prose what the medoid model already had better evidence to decide. Wrong call — retracted.
-
----
-
-## 1. The fix: one closed field, paper vocabulary, per agent row
-
-Delete `control_response` (whole field) and the long `motive` codebook (`early_brake`, `late_reaction`, `assertive_gap_acceptance`, `gap_acceptance_creep`, `yield_to_vehicle`, `post_clear_hard_brake`, `post_clear_adjustment`, `post_clear_recovery`, …). Replace with **one field: `archetype`**, using the same vocabulary already reserved for `cluster_summary.label`:
-
-`smooth_pass` · `pass_slowdown` · `brake_rear_end` · `proactive_yield` · `late_yield` · `yield` · `yield_stop_collision` · `cut_in_collision` · `side_collision` · `stationary_collision` · `swerve` · `unclear`
-
-This is not a new vocabulary. It is the paper's cluster-name list, applied one level down (per agent row instead of per whole medoid-implies-cluster). `control_response` and `motive` overlapped because they were two independent guesses at the same fact (`proactive` ≈ `early_brake`, `brake` ≈ `post_clear_hard_brake`, …). One list removes the possibility of disagreeing with itself — there is nothing left to pair against.
-
-### Why this differs from a second copy of `resolution`
-
-It doesn't just re-say pass/yield: it also encodes the **timing decision** (early vs late, gentle vs abrupt) that used to require `control_response` + a pairing table. `resolution` becomes **derived**, not authored:
-
-| `archetype` | derived `resolution` |
-| --- | --- |
-| `smooth_pass`, `pass_slowdown`, `brake_rear_end` | `pass_first` |
-| `proactive_yield`, `late_yield`, `yield`, `yield_stop_collision` | `yield` |
-| `cut_in_collision`, `side_collision`, `stationary_collision` | depends on anatomy (pipeline fills from collision ground truth, same as today) |
-| `swerve`, `unclear` | `unresolved` (or keep last known pass/yield if the swerve happens on top of one) |
-
-That table lives in **Python**, not as a second LLM opinion. No pairing table in the prompt anymore — there is nothing to keep consistent because only one thing was said.
-
----
-
-## 2. Structured decision order (replaces the freeform-only motive_summary)
-
-The CoT in `medoid_trial_prompt.txt` must follow this order, per agent row, before writing `archetype`:
-
-1. **Resolve vs the named vehicle** using the existing evidence hierarchy (ground truth → longitudinal relationship/azimuth → speed trend → instantaneous speed). Get pass / yield / collision-during-approach.
-2. **If pass:** look for a **post-pass brake phase** — any DECELERATE after that vehicle is in the behind-bin, before the trial ends. If none → `smooth_pass`. If present, classify its **onset timing relative to the pass moment**, same style as step 3:
-   - starts soon after the pass, gentle (moderate decelerate, following-distance style) → `pass_slowdown`
-   - starts abrupt / at-or-right-after the pass, severe (EMERGENCY_BRAKE or |Δv| ≳ 5 m/s) → `brake_rear_end`
-   Quote whatever is on that stamp as the cause (Parking clearance, a boundary note, anything in context) in the timeline description. This does **not** require a separate `agent_interactions` row just to hold the cause.
-3. **If yield:** classify the give-way brake's **onset timing relative to the conflict** (same idea as today's `early_brake`/`late_reaction` gate, but now it feeds one label instead of two fields):
-   - sustained decelerate begins while still far / TTC high → `proactive_yield`
-   - first strong decelerate/EMERGENCY_BRAKE only near peak / TTC low → `late_yield`
-   - give-way happened but timing is not a clean early/late story (e.g. low steady creep, or a stop with no useful onset signal) → plain `yield`
-4. **If collision:** pick from the collision family using the anatomy paragraph already required (unchanged from today).
-5. **If a same-lane turn is the dominant effect** (moderate+ lateral speed) and no clean speed-family code fits → `swerve`.
-6. **Only if none of the above fit and evidence genuinely conflicts** → `unclear`.
-7. Write the **one** resulting code as that row's `archetype`.
-8. **Then** decide whether another agent needs its **own row**: only when that agent has its own materially separate conflict (its own clearance/peak minima, its own near-miss), not merely because it was cited as evidence in step 2/3. Give that row the same 7-step treatment independently, on its own arc.
-
-`brake_release` (started a give-way brake, eased it before the conflict resolved) stays as a **timeline** event, described in prose on the stamp where it happens — it is evidence for how a row ended up `pass_first` (via "brake_release then continued"), not a separate archetype.
-
----
-
-## 3. Worked examples
-
-**Smooth pass, then Parking-caused slowdown (your original question):**
-
-| Row | archetype | derived resolution |
+| Layer | What it is | Where it lives |
 | --- | --- | --- |
-| CuttingIn | `pass_slowdown` (if the post-pass brake is gentle/early) or `brake_rear_end` (if abrupt/late) | `pass_first` |
+| Medoid stamp / phase | Ego **maneuver** tied to Labeller kinematics | `decision_timeline`, `behavior_summary` |
+| Named-vehicle interaction | pass vs give-way (thin) | one field on medoid — not a motive codebook |
+| Cluster name | Paper heatmap **cluster label** | `cluster_summary.label` only |
 
-No separate Parking row is required just to hold this — the timeline stamp says "decelerates moderately at t=…, Parking ahead at clearance … m ⇒ pass_slowdown toward CuttingIn's post-pass phase." Add a Parking row only if Parking's own clearance/near-miss numbers are worth analyzing as their own conflict.
-
-**Case Study 1 style (proactive vs late yield vs collision), one named vehicle:**
-
-| trial | archetype |
-| --- | --- |
-| brakes early, big gaps | `proactive_yield` |
-| brakes late, small gaps | `late_yield` |
-| still braking, collides in overlap | `yield_stop_collision` (or `cut_in_collision` if collision happens before any give-way state stabilizes) |
-
-**Multi-agent, genuinely separate conflicts:**
-
-| Row | archetype |
-| --- | --- |
-| CuttingIn | `late_yield` |
-| Parking (own clearance minima, Ego reacts to it independently later) | `proactive_yield` or `smooth_pass`, on its own arc |
+Do **not** put Proactive Yield / Late Yield / Pass-Slowdown / … on the medoid card.
 
 ---
 
-## 4. YAML after change
+## 0. What cluster1 proves
 
-```yaml
-agent_interactions:
-  - agent: CuttingIn
-    archetype: smooth_pass | pass_slowdown | brake_rear_end | proactive_yield | late_yield | yield | yield_stop_collision | cut_in_collision | side_collision | stationary_collision | swerve | unclear
-  # extra rows only for agents with their own materially separate conflict
-decision_timeline:
-  - timestamp: <float>
-    description: "<lexicon + numbers + toward <agent>; quote cause of any post-pass brake even if that cause is a different agent>"
-motive_summary: |
-  <explains WHY the archetype was assigned — quotes the timing evidence from step 2/3, not a re-guess>
+Timeline already narrates Ego by time (accel → brake → pass → decelerate for Parking). That is medoid analysis.
+
+`agent_interactions` then crushed it into invented motive codes (`late_reaction`, `gap_acceptance_creep`) plus overlapping `resolution`/`control_response`. Wrong layer.
+
+Also wrong: treating paper cluster labels as if they were per-stamp motives.
+
+---
+
+## 1. Medoid flow (Labeller kinematics + LLM phases)
+
+```text
+action.yaml (Labeller) ──Python map──► stamp.longitudinal / stamp.lateral
+context + BEV          ──► toward agent, pass_state, v/a quotes
+LLM                    ──► description + phase paragraphs
+                       + named_vehicle_interaction: pass_first|yield|unresolved
+→ behavior_summary
+
+NO paper cluster label on medoid YAML.
+NO LLM inventing accelerate/hard_brake when Labeller did not emit them.
 ```
 
-No `control_response`. No `motive` per stamp (the row `archetype` already carries the pattern; `motive_summary` is prose explaining it, not a second code).
+Cluster summary (separate product) invents paper `label` from **phases + thin interaction + outcome**. That step is **not** medoid analysis.
 
 ---
 
-## 5. Cluster label becomes near-mechanical
+## 2. Stamp taxonomy: refer literature, do not invent a v×a name grid
 
-`cluster_summary_prompt` reads the named-vehicle row's `archetype`, Title-Cases the same word (`pass_slowdown` → "Pass-Slowdown", `late_yield` → "Late Yield"), and uses that as the default `label`. The reviewer/label-review pass still runs across the whole run to catch two clusters landing on the same archetype (splits them using the two `motive_summary` timing stories) or to note when a cluster's medoid archetype doesn't represent its neighbors well. This is much cheaper than reconstructing a label from prose, and it can't drift from the medoid's own evidence-based decision.
+### Why not “8 labels = high/low speed × +/0/− accel (+ lateral)”?
 
-`common_sense.txt`'s existing "Cluster label" closed style set (`Smooth Pass · Pass-Slowdown · Yield · Proactive Yield · Late Yield · Cut-in Collision · Yield-Stop Collision · Brake Rear-end · Side Collision · Stationary Collision`) is kept as-is — it is now literally the same enum as the row `archetype`, just Title-Cased. One vocabulary, two capitalizations, no separate invention step needed in the common case.
+That grid **invents compound words** (`high_speed_high_accel`, …). Published maneuver catalogs do **not** do that. They keep axes **orthogonal and simultaneous**:
+
+- At every time, Ego has **one longitudinal state** and **one lateral state**.
+- Speed level (high/low) is a **quantity to quote**, not a separate enum axis that multiplies the label set.
+
+So: quote `v` and `a` in the description; pick the maneuver from a small closed set grounded in papers.
+
+### Literature to follow
+
+**1. Hartjen, Sonntag, Schuldt, Fahrenkrog (IV 2020 / TUM) — *Classification of Driving Maneuvers in Urban Traffic***  
+[PDF](https://mediatum.ub.tum.de/doc/1535131/document.pdf)
+
+Three **parallel** layers (not one 8-cell grid):
+
+| Layer | Closed set (basic) |
+| --- | --- |
+| Vehicle state (longitudinal) | `Accelerate` · `KeepVelocity` · `Decelerate` · `Reversing` (+ specials `Driveaway`, `Halt`, `Standstill`) |
+| Infrastructure (lateral / road) | `FollowLane` · `LaneChange{L,R}` · `Turn{L,R,U}` · junction/crosswalk/park variants |
+| Object-related | `FollowObject` · `ApproachObject` · `FallBehind` · `Passing` |
+
+This matches the user’s axes without inventing compounds: **v / a → Layer 1**; **lateral velocity / heading → Layer 2**; interaction with CuttingIn/Parking → Layer 3 (**required** on conflict stamps — see §9E).
+
+**2. Torstensson et al. — *Defining Fundamental Vehicle Actions…***  
+[PDF](https://www.diva-portal.org/smash/get/diva2:1454057/FULLTEXT01.pdf)
+
+Same idea: always one longitudinal + one lateral action; accel/decel defined by significant Δv, not by inventing “high-speed-brake” as a new word.
+
+**3. This project’s action log (already in `common_sense`)**  
+`ACCELERATE` / `DECELERATE` / `EMERGENCY_BRAKE` / `STOPPED` / `TURN_LEFT|RIGHT` / `LANE_CHANGE_*` — already Hartjen-compatible. Prefer these verbs over project neologisms (`assertive_gap_acceptance`, `maintain_through`, `late_reaction`).
+
+**4. Lefèvre, Vasquez, Laugier (2014)** — [survey](https://doi.org/10.1186/s40648-014-0001-z)  
+Separates physics (kinematics) vs maneuver intention vs interaction. Medoid stamp layer = physics/maneuver. Pass vs yield vs cluster heatmap names = higher layers (resolution / cluster summary), not stamp motives.
+
+### Stamp closed set = Labeller actions only (Python maps; LLM does not invent)
+
+**Longitudinal (exactly one per Labeller stamp; omit if no action at that t):**
+
+| Code | Maps from `action.yaml` only |
+| --- | --- |
+| `accelerate` | ACCELERATE |
+| `decelerate` | DECELERATE |
+| `hard_brake` | EMERGENCY_BRAKE only (Labeller threshold −4 m/s²) |
+| `standstill` / halt | STOPPED (and related stop events Labeller emits) |
+
+Do **not** invent `keep_velocity` stamps in Labeller gaps unless Labeller later emits KEEP.  
+Do **not** put `brake_release` in this enum — that is interaction narrative, not Layer 1.
+
+**Lateral (exactly one):**
+
+| Code | Maps from |
+| --- | --- |
+| `follow_lane` | no TURN_*, no LANE_CHANGE_* on that stamp |
+| `turn_left` / `turn_right` | TURN_* |
+| `lane_change_left` / `lane_change_right` | LANE_CHANGE_* |
+
+**Not stamp codes:** paper cluster labels; project motives (`late_reaction`, `assertive_gap_acceptance`, …); `brake_release` as a longitudinal code.
+
+Intensity stays in numbers: quote `v`, Δv, Δheading in the description.
+
+**Object / interaction (required on conflict stamps, not optional):**
+
+- toward named agent + quote pass_state / clearance from context  
+- medoid-level thin field: `named_vehicle_interaction: pass_first | yield | unresolved`  
+- no `control_response` / motive codebook
 
 ---
 
-## 6. Pair contrast (`contrast.yaml`)
+## 3. Cluster labels (cluster_summary only — not medoid)
 
-Each side gets `archetype` (same enum) instead of `interaction_resolution` + `control_response` + `primary_motive`. `contrast_timeline` / `critical_divergence` unchanged (geometry + speed evidence, not a code).
+Paper names stay **only** here:
+
+`Smooth Pass` · `Pass-Slowdown` · `Yield` · `Proactive Yield` · `Late Yield` · `Cut-in Collision` · `Yield-Stop Collision` · `Brake Rear-end` · `Side Collision` · `Stationary Collision`
+
+Cluster summary invents `label` from medoid **phase story + outcome**, using that menu. Medoid YAML does **not** author these strings.
 
 ---
 
-## 7. Implementation order
+## 4. Suggested medoid YAML
 
-1. `common_sense.txt` — delete `control_response` block + pairing table + long motive codebook; add the single `archetype` decision tree (§2) with the paper vocabulary; keep `brake_release` as a timeline-only event description.
-2. `medoid_trial_prompt.txt` — YAML fence: `archetype` per row, no `control_response`, no per-stamp `motive`; CoT restructured to the 7-step order in §2; examples updated to `pass_slowdown` / `brake_rear_end` etc.
-3. Python (`split_analysis.py`): derive `resolution` from `archetype` via the §1 lookup table; strip any leftover `control_response` / old motive keys the model still emits; alias old YAML on read (`early_brake`+behind → `proactive_yield`, `late_reaction`+behind → `late_yield`, `assertive_gap_acceptance`/`maintain_through` → `smooth_pass`, `post_clear_hard_brake` → `brake_rear_end`, `post_clear_adjustment` → `pass_slowdown`, `yield_to_vehicle`/`gap_acceptance_creep` → `yield`, `vehicle_driven_swerve` → `swerve`).
-4. `cluster_summary_prompt.txt` — default `label` = Title-Case of named-vehicle `archetype`; keep neighbor/pair verdict logic unchanged; drop "restate primary_motive."
-5. Dashboard (`ResultCard.tsx`, `SplitCardsPanel.tsx`, `IcPairPanel.tsx`) — one chip per row: `archetype` (+ derived resolution shown alongside if useful, computed client-side or read from Python output).
-6. `cluster_selection_eval.py` / `odd_briefing.py` — read `archetype` (or derived resolution) instead of `primary_motive`.
-7. `TAXONOMY.md` — rewrite §3.1–3.3 as one section describing `archetype`; keep the paper-anchor citations (they already map almost 1:1); note the Appendix D correction from §0.
+```yaml
+# longitudinal/lateral prefilled from action.yaml (or LLM must copy action lines only)
+decision_timeline:
+  - timestamp: 4.7
+    phase: approach          # gated: before named-vehicle conflict window
+    longitudinal: accelerate # ← ACCELERATE in action.yaml
+    lateral: follow_lane
+    toward: CuttingIn
+    description: "Ego accelerating at 5.65 m/s; CuttingIn ahead 18.2 m …"
+  - timestamp: 9.2
+    phase: conflict          # until named vehicle first behind-bin
+    longitudinal: decelerate
+    lateral: follow_lane
+    toward: CuttingIn
+    description: "Ego decelerating at 7.21 m/s; CuttingIn 4.8 m LEFT; Parking 30.8 m ahead …"
+  - timestamp: 11.0
+    phase: post_pass         # after CuttingIn behind-bin; may decelerate for Parking
+    longitudinal: decelerate
+    lateral: follow_lane
+    toward: Parking
+    description: "CuttingIn behind; Ego decelerating; Parking 19.0 m ahead …"
+  - timestamp: 19.0
+    phase: resume
+    longitudinal: accelerate # only if Labeller stamped ACCELERATE
+    lateral: turn_right
+    description: "Right turn same lane at 3.29 m/s …"
 
-**Out of scope:** re-run all clusters until prompts are signed off. No Python-invented causes — Python only derives `resolution` from the LLM's own `archetype`, and only aliases old codes on read.
+named_vehicle_interaction: pass_first   # thin; vs named vehicle only
+# optional extra agents: short notes in phases, not a motive triple table
+
+behavior_summary: |
+  Approach: …
+  Conflict: … (quote brake_t vs peak_t; behind-bin)
+  Post-pass: decelerate with Parking ahead …
+  Resume: …
+```
+
+No medoid `label: Pass-Slowdown`. No `agent_interactions` resolution/control/motive triple.
+
+---
+
+## 5. CoT order (medoid)
+
+1. Use stamps ⊆ `action.yaml` / context action lines; tag phase with behind-bin gate (§9G).  
+2. Copy Labeller longitudinal + lateral; quote v / a / Δheading; name toward agent.  
+3. Set `named_vehicle_interaction` from geometry + control arc vs named vehicle only.  
+4. Write phase paragraphs.  
+5. Stop. Do **not** assign paper cluster labels here.
+
+---
+
+## 6. Cluster summary + label-review handoff
+
+| Medoid | Downstream |
+| --- | --- |
+| timeline + phases + `named_vehicle_interaction` | summary invents paper `label` from §3 menu |
+| same structured fields in caption / review pack | label-review must see interaction + phase evidence, not label+caption only |
+
+Also migrate: pair contrast, selection-eval, cross-eval, ODD briefing, dashboard chips, shared `common_sense` (§9F).
+
+---
+
+## 7. Delete from medoid authoring
+
+- Paper cluster labels as stamp/row “motives”  
+- `control_response` + long project motive codebook  
+- Agent-row resolution/control/motive triple as the main product  
+- Invented 8-cell names like `high_speed_zero_accel`  
+- LLM inventing Labeller kinematics (`keep_velocity` / `hard_brake` without EMERGENCY)
+
+## Keep
+
+- Time sections with behind-bin phase gate  
+- Longitudinal ⊕ lateral **from Labeller** (+ numbers)  
+- Thin `named_vehicle_interaction`  
+- Paper cluster label menu **only** on cluster summary  
+
+---
+
+## 8. Implementation order (when §9–10 accepted)
+
+1. Python: map `action.yaml` → stamp long/lat; define phase gate from `pass_state`.  
+2. Rewrite medoid prompt: phases + narrative + thin interaction; ban paper labels + motive triple.  
+3. Stage adapters or migrate: pairs, summary, label-review inputs, evals, dashboard, `common_sense`.  
+4. Re-run medoids → summary labels → label-review on one paper batch before full rollout.
+
+---
+
+## 9. Critical review vs real pipeline (self-check)
+
+Plan v5 is **not** ready to implement as written. Issues found by reading
+`app/analyzer/README.md`, `app/llm_pipeline/README.md`, `action.yaml`, and
+`labeller`/`taxonomy` — not by waiting for review.
+
+### Mistake A — LLM would re-invent what Labeller already owns
+
+Analyzer Path A:
+
+```text
+esmini CSV → labeller → action.yaml  [single source of truth]
+  → conflict_frame_selector (timestamps ⊆ action.yaml only)
+  → BEV + context_medoid.md
+```
+
+Hard rule in analyzer README: **do not invent kinematic labels Labeller never
+emitted.** `EMERGENCY_BRAKE` only when mean accel ≤ −4 m/s².
+
+v5 asks the LLM to author `longitudinal: accelerate|decelerate|hard_brake|…`
+from context. That **duplicates** `action.yaml` and can disagree with it (e.g.
+LLM says `hard_brake` when Labeller only emitted `DECELERATE`). That violates
+the Path A contract.
+
+**Fix direction:** stamp longitudinal/lateral codes should be **copied or
+mapped from `action.yaml` in Python** (or quoted from context lines that already
+come from Labeller). LLM writes interpretation (toward whom, phase story), not
+a second kinematics classifier.
+
+### Mistake B — `brake_release` is not a Hartjen vehicle-state
+
+Hartjen Layer 1 is Accelerate / KeepVelocity / Decelerate / ….  
+`brake_release` is a **project interaction event** (end of decelerate while
+still near conflict). Putting it in the same enum as `accelerate` mixes layers
+and breaks the “refer literature, don’t invent” claim.
+
+**Fix:** longitudinal = Labeller actions only. `brake_release` stays a rare
+**interpretation** note in description, or a separate optional flag — not a
+Hartjen code.
+
+### Mistake C — `keep_velocity` often has no Labeller stamp
+
+Labeller emits ACCELERATE / DECELERATE segments; gaps between them are not
+always labelled KEEP. Asking the LLM to fill `keep_velocity` invents stamps
+where Path A has silence.
+
+**Fix:** only emit longitudinal codes on stamps that exist in `action.yaml` /
+context action lines. Between actions: no fake keep stamp, or Python inserts
+KEEP if we add that to Labeller later.
+
+### Mistake D — interaction layer (pass/yield) was dropped too hard
+
+Lefèvre: physics ≠ maneuver ≠ interaction.  
+Markkula/Sarkar: space-sharing / ROW is not kinematics.
+
+v5 leaves pass vs give-way as “optional / caption.” Then cluster summary must
+invent `Late Yield` vs `Smooth Pass` from accel paragraphs alone — weaker than
+today’s (flawed) `resolution`, and worse for pair contrast (`separation_call`
+needs pass vs yield families).
+
+**Fix:** keep a thin **interaction** field vs named vehicle (`pass_first` |
+`yield` | `unresolved`) — geometry + control arc — **separate** from kinematic
+stamp codes. Not three overlapping motive fields; one interaction outcome +
+Labeller kinematics.
+
+### Mistake E — Hartjen Layer 3 made “optional” but that is the product
+
+Object-related (approach / pass / follow CuttingIn or Parking) is why we run
+medoid analysis. Making it optional leaves only ego kinematics, which
+`action.yaml` already provides without an LLM.
+
+**Fix:** require “toward agent” + pass_state / clearance quotes on conflict
+stamps; that is Layer 3 evidence, not a new invented motive codebook.
+
+### Mistake F — whole LLM product chain ignored
+
+`llm_pipeline/README.md` order: medoid → pairs → summary → label-review →
+selection-eval → cross-eval → ODD.
+
+v5 only sketches medoid + summary. Broken if unchanged:
+
+| Downstream | Still expects |
+| --- | --- |
+| Pair `contrast.yaml` | per-side interaction / motive-like fields from medoid extract |
+| Selection-eval `motive_distinctness` | `primary_motive` / row motive |
+| Cross-eval / odd briefing | medoid motive fields |
+| Dashboard ResultCard / IcPairPanel | resolution / control / motive chips |
+| `common_sense.txt` | shared by **all** products — Hartjen-only rewrite without pair/summary updates breaks pairs |
+
+**Fix:** plan must include pair + eval + dashboard + shared `common_sense`
+migration, or explicitly stage “medoid-only first” with temporary adapters.
+
+### Mistake G — phase tags are underspecified
+
+`post_pass` needs a definition: first time named vehicle enters behind-bin
+(`pass_state` already computed in context). If LLM invents phases without that
+gate, Parking decelerate could be mis-tagged or CuttingIn conflict extended.
+
+**Fix:** Python or prompt rule — `conflict` until behind-bin; then `post_pass`
+until resume; don’t free-form invent.
+
+### Mistake H — cluster label handoff too weak
+
+Removing structured medoid rollup then asking summary LLM to invent paper
+labels from prose-only phases recreates the old failure mode (label drifts from
+evidence). Label-review only sees label+caption excerpt — **no** medoid re-read
+(`llm_pipeline/README` §4.4). Bad medoid prose → bad labels → weak review.
+
+**Fix:** either (1) keep a small structured medoid interaction outcome for the
+named vehicle, or (2) feed phase summary + interaction outcome into summary
+**and** strengthen label-review inputs. Do not rely on kinematics-only prose.
+
+### Mistake I — “does not change context metrics” understates work
+
+If stamps must track `action.yaml`, dataset_builder / context sentence formatter
+may need to expose Labeller actions more cleanly for mapping — not only prompt
+edits.
+
+---
+
+## 10. Revised verdict
+
+| Claim in v5 | Verdict |
+| --- | --- |
+| Split cluster labels off medoid | **Keep** |
+| Time sections as primary medoid story | **Keep** |
+| Hartjen long ⊕ lat as stamp taxonomy | **Keep direction**, but codes must come from **Labeller**, not LLM invention |
+| Delete resolution/control/motive triple | **Keep delete of control+motive overlap**; **keep thin interaction outcome** |
+| LLM authors accelerate/hard_brake/keep_velocity | **Reject** — Path A violation |
+| Paper labels only on cluster summary | **Keep** |
+| Plan complete for implement | **No** — fix A–I first |
+
+### Corrected target shape (sketch)
+
+```text
+action.yaml (Labeller) ──map──► stamp.longitudinal / stamp.lateral   [Python]
+context geometry        ──► stamp.toward agent, pass_state quotes   [already in context]
+LLM                     ──► description narrative + phase paragraphs
+                         + named_vehicle_interaction: pass_first|yield|unresolved
+cluster summary         ──► paper label from interaction + phases + outcome
+```
+
+Not: LLM re-labelling kinematics. Not: paper labels on medoid. Not: ignore pairs/eval.
+

@@ -35,9 +35,6 @@ The system provides a deterministic, auditable pipeline for discovering and expl
 - Train shallow decision trees (CART, depth $\le 3$) on scenario parameter space across all trials.
 - Generate human-auditable predicates with precision, support, and boundary coverage stored in `odd_parameter_rules.json`.
 
-### S4 — Boundary & Pair Correlation
-- Map parameter-space pairs to extracted boundary trials using trial ID matching to correlate behavioral contrasts with global boundary regions.
-
 ### S5 — Grounded ODD Q&A
 - Generate a compact run briefing (`odd_chat_briefing.json`) combining cluster cards, rules, boundary statistics, and pair summaries.
 - Implement `POST /api/odd-chat` to serve grounded interactive consultations with explicit citations and fallback responses for missing data.

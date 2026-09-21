@@ -246,7 +246,7 @@ degrees (esmini CCW). "Junction" = `road_id ∈ JunctionRoads` (from `hct_6.yaml
 #### `action.yaml` shape
 
 ```yaml
-dataset / location / duration / junction_aware
+dataset / location / duration
 agents:                      # one block per agent that appears in the medoid
 - track_id, name, type, role(ego|npc)
   enter_time, exit_time, initial_speed
@@ -361,7 +361,7 @@ Checklist:
 
 #### Rule group 3 — Junction passage: one ENTER (with intent) + one EXIT · every agent (needs map)
 
-Only active when `hct_6.yaml` supplies `JunctionRoads` (`junction_aware: true`).
+Only active when `hct_6.yaml` supplies `JunctionRoads`.
 Each contiguous run of junction frames is **one passage** emitting at most two
 events. Standalone `TURN_*` / `GO_STRAIGHT` events are folded into `ENTER_JUNCTION`.
 
@@ -423,20 +423,24 @@ Checklist:
 | Action | Trigger | Recorded |
 |--------|---------|----------|
 | `NEAR_MISS` | vehicle is **moving** (max speed `> 0.3`) **and** any frame has `TTC < 2.5 s` while closing (`TTC_NEAR_MISS`) | `key_time` = absolute-min-distance moment, `min_distance_m`, `min_ttc_s`, `with_name` |
-| `DANGEROUS_CUT_IN` | NPC changes lane into the ego's exact `(road_id, lane_id)` within 30 m, **and** ego then brakes `≤ -1.5 m/s²` within 2 s (`CUT_IN_DECEL`, `CUT_IN_REACTION_S`) | `key_time`, `cut_in_time`, `ego_reaction_accel`, `min_distance_m` |
 | `COLLISION` | medoid `collided` KPI **or** Payload `events[].name = collisionWith{Name}` **or** polygon clearance `≤ CONTACT_CLEARANCE_M` (0.5 m) when KPI true | `key_time`, `with_name`, `min_clearance_m`, `source`, `ego_at_collision` / `vehicle_at_collision` (speed, road/lane, x/y) |
 | `CLOSEST_APPROACH` | moving NPC with polygon gap `< CONFLICT_RELEVANCE_M` (5 m), cap 2, excluding tier-A vehicles | `key_time`, `min_clearance_m`, `with_name` |
+
+~~`DANGEROUS_CUT_IN`~~ **removed** — redundant with NPC `LANE_CHANGE_*` + ego
+`DECELERATE` / `EMERGENCY_BRAKE`; do not reintroduce the intersection detector or
+`cut_in_time` BEV stamps.
 
 `collision_vehicle.py` resolves the vehicle (GT first, polygon fallback). Spurious
 `NEAR_MISS` rows with `min_distance_m > 5 m` are dropped. These `key_time`s are
 force-fed into BEV keyframe selection so the conflict moment is always rendered.
 
-*vs xosc_gen:* xosc_gen has **no** composite multi-agent detector — this whole
-group is our addition.
+*vs xosc_gen:* xosc_gen has **no** composite multi-agent detector — `NEAR_MISS` /
+`COLLISION` / `CLOSEST_APPROACH` are our addition.
 
 Checklist:
 - [x] **(OURS)** `NEAR_MISS` detector.
-- [x] **(OURS)** `DANGEROUS_CUT_IN` detector.
+- [x] ~~**(OURS)** `DANGEROUS_CUT_IN` detector.~~ **removed**
+- [x] **(OURS)** `COLLISION` + `CLOSEST_APPROACH` via `collision_vehicle.py`.
 - [x] **(OURS)** Interaction `key_time`s force-injected into BEV keyframe selection.
 - [ ] **(OURS, optional future)** `YIELD` / `AGGRESSIVE_PASS` at merges (designed, not yet built).
 
@@ -451,7 +455,7 @@ Checklist:
 - Stops shorter than `1.0 s` (`STOPPED_MIN_DURATION`).
 - Lane changes whose grown maneuver lasts `< 1.0 s` (`LANE_CHANGE_MIN_S`) — spurious flicker.
 - Standalone `TURN_*` / `GO_STRAIGHT` events — folded into `ENTER_JUNCTION.intent`.
-- Junction events when the map has no `JunctionRoads` (`junction_aware: false`).
+- Junction events when the map has no `JunctionRoads`.
 - Interactions whose triggers never fire (e.g. no moving conflict vehicle).
 
 #### Status vs xosc_gen — what remains

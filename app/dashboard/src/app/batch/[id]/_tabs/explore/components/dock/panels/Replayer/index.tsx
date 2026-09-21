@@ -673,9 +673,39 @@ const Replayer = () => {
         if (jsonFileName == null) throw new Error("No JSON file found in ZIP");
 
         const jsonText = await zip.file(jsonFileName)?.async("text");
-        const jsonObject = JSON.parse(jsonText ?? "");
+        const jsonObject = JSON.parse(jsonText ?? "") as Record<
+          string,
+          TrajectoryResponseData
+        >;
 
-        updated[egoName] = jsonObject;
+        // Payload trajectories zip is keyed by trial id. Only keep ids that
+        // exist in this save's clustering — otherwise a different experiment's
+        // pack (Case Study 1 trajectories-270 vs ITRI clustering) would draw
+        // the wrong cars. If overlap is tiny, show nothing rather than leftovers.
+        const analysis = trajectoryAnalysis[egoName];
+        const allowed = new Set<string>();
+        for (const tid of Object.keys(analysis?.trials ?? {})) {
+          allowed.add(String(tid));
+        }
+        for (const mode of Object.keys(analysis?.mfpca ?? {})) {
+          for (const tid of Object.keys(analysis.mfpca[mode]?.scores ?? {})) {
+            allowed.add(String(tid));
+          }
+        }
+        const kept: Record<string, TrajectoryResponseData> = {};
+        for (const [tid, traj] of Object.entries(jsonObject ?? {})) {
+          if (allowed.has(String(tid)) || allowed.has(String(Number(tid)))) {
+            kept[String(tid)] = traj;
+          }
+        }
+        const ratio = allowed.size > 0 ? Object.keys(kept).length / allowed.size : 0;
+        updated[egoName] = ratio >= 0.2 ? kept : {};
+        if (ratio < 0.2) {
+          console.warn(
+            `[Replayer] ${egoName}: trajectories zip overlap ${Object.keys(kept).length}/${allowed.size} ` +
+              `(${(ratio * 100).toFixed(1)}%). Refusing to draw — ids do not match this clustering save.`,
+          );
+        }
       }
       setTrajectories(updated);
     }
@@ -686,11 +716,16 @@ const Replayer = () => {
   // ---------------------------------------------------------------------------
   // Analysis-stage clip from esmini CSV + clip_conditions.yaml
   // ---------------------------------------------------------------------------
-  // true  = Replayer uses config-clipped CSV (same rule as LLM timelines).
-  // false = keep Payload / analysis-zip only (sim-upload clip).
-  // Toggle by commenting/uncommenting the two lines below:
-  const USE_ANALYSIS_CLIP_CSV = true;
-  // const USE_ANALYSIS_CLIP_CSV = false;
+  // Overlay local records/esmini_*.csv only for lab sims with no Payload
+  // trajectories zip. Paper saves (batch 7/8/9) must keep the zip: leftover
+  // CSVs share esmini_7_* names across case studies and drew the wrong cars.
+  const hasPayloadTrajectoriesZip = useMemo(() => {
+    if (trajectoryAnalysis == null) return false;
+    return Object.values(trajectoryAnalysis).some(
+      (ego) => Boolean(ego?.trajectoriesFileinfo?.url),
+    );
+  }, [trajectoryAnalysis]);
+  const USE_ANALYSIS_CLIP_CSV = !hasPayloadTrajectoriesZip;
   //
   // Switch clip geometry in: app/analyzer/config/clip_conditions.yaml
   //   active: current_startvalid      # legacy road-92
@@ -751,7 +786,10 @@ const Replayer = () => {
           if (egoBucket == null) continue;
 
           for (const [label, trialId] of Object.entries(ctx.medoids)) {
-            const existing = egoBucket[trialId] as
+            const tid = String(trialId);
+            const existing = (egoBucket[tid] ??
+              egoBucket[trialId] ??
+              egoBucket[String(Number(tid))]) as
               | (TrajectoryResponseData & {
                   source?: string;
                   clipProfile?: string | null;
@@ -759,7 +797,6 @@ const Replayer = () => {
                   heatmapClipOffsetSec?: number;
                 })
               | undefined;
-            if (existing == null) continue;
             try {
               const resp = await fetch(
                 `/api/esmini-trajectory?batchId=${encodeURIComponent(
@@ -775,6 +812,7 @@ const Replayer = () => {
               // Use Object.is so missing clipStart (NaN) still compares equal —
               // `NaN === NaN` is false and used to re-fetch forever.
               if (
+                existing != null &&
                 existing.source === "esmini" &&
                 Object.is(
                   Number(data.clipStartEsminiS ?? NaN),
@@ -785,10 +823,12 @@ const Replayer = () => {
                   Number(existing.heatmapClipOffsetSec ?? 0),
                 )
               ) {
-                noteOffset(trialId, data);
+                noteOffset(tid, data);
                 continue;
               }
-              ingestEsmini(egoBucket, trialId, data);
+              // Insert even when Payload zip omitted this medoid — otherwise
+              // selection alpha blanks the pane and the car never appears.
+              ingestEsmini(egoBucket, tid, data);
             } catch {
               /* keep Payload trajectory */
             }
@@ -812,16 +852,18 @@ const Replayer = () => {
           );
 
           for (const trialId of selectedIds) {
-            const existing = egoBucket[trialId] as
+            const tid = String(trialId);
+            const existing = (egoBucket[tid] ??
+              egoBucket[String(Number(tid))]) as
               | (TrajectoryResponseData & {
                   source?: string;
                   clipStartEsminiS?: number | null;
                   heatmapClipOffsetSec?: number;
                 })
               | undefined;
-            if (existing == null) continue;
 
-            const meta = egoTrials?.[trialId] as
+            const meta = (egoTrials?.[tid] ??
+              egoTrials?.[String(Number(tid))]) as
               | { batchId?: string; esminiDat?: { filename?: string }; trialIndex?: number }
               | undefined;
             const filename = meta?.esminiDat?.filename ?? "";
@@ -833,7 +875,7 @@ const Replayer = () => {
 
             let url = `/api/esmini-trajectory?batchId=${encodeURIComponent(
               String(csvBatch),
-            )}&trialId=${encodeURIComponent(trialId)}`;
+            )}&trialId=${encodeURIComponent(tid)}`;
             if (csvIndex != null) {
               url += `&trialIndex=${encodeURIComponent(csvIndex)}`;
             }
@@ -848,6 +890,7 @@ const Replayer = () => {
                     return;
                   }
                   if (
+                    existing != null &&
                     existing.source === "esmini" &&
                     Object.is(
                       Number(data.clipStartEsminiS ?? NaN),
@@ -858,10 +901,10 @@ const Replayer = () => {
                       Number(existing.heatmapClipOffsetSec ?? 0),
                     )
                   ) {
-                    noteOffset(trialId, data);
+                    noteOffset(tid, data);
                     return;
                   }
-                  ingestEsmini(egoBucket, trialId, data);
+                  ingestEsmini(egoBucket, tid, data);
                 } catch {
                   /* keep Payload */
                 }
@@ -1060,7 +1103,8 @@ const Replayer = () => {
       if (data == null) continue;
       const labels = new Set<string>();
       for (const tid of selectedTrialIds.value) {
-        const label = data[tid]?.label;
+        const key = String(tid);
+        const label = data[key]?.label ?? data[tid as keyof typeof data]?.label;
         if (label != null) labels.add(String(label));
       }
       if (labels.size > 0) result[egoName] = labels;
@@ -1442,14 +1486,14 @@ const Replayer = () => {
         } = {};
 
         const egoTrajectories = trajectories[egoName] ?? {};
+        const filteredSet = new Set((filteredTrialIds ?? []).map(String));
         for (const [trialIndex, [trialId, trajectory]] of Object.entries(
           egoTrajectories,
         ).entries()) {
           if (
             trajectoryAnalysis != null &&
-            filteredTrialIds.length !== 0 &&
-            filteredTrialIds != null &&
-            !filteredTrialIds.includes(trialId)
+            filteredSet.size !== 0 &&
+            !filteredSet.has(String(trialId))
           ) {
             continue;
           }
@@ -1457,7 +1501,8 @@ const Replayer = () => {
             clusteringResult != null &&
             egoName in clusteringResult &&
             clusteringResult[egoName] != null
-              ? clusteringResult[egoName].data?.[trialId]?.label
+              ? clusteringResult[egoName].data?.[String(trialId)]?.label ??
+                clusteringResult[egoName].data?.[trialId]?.label
               : "0";
           if (trajectoryAnalysis != null && label == null) {
             continue;
@@ -1483,9 +1528,8 @@ const Replayer = () => {
         ).entries()) {
           if (
             trajectoryAnalysis != null &&
-            filteredTrialIds.length !== 0 &&
-            filteredTrialIds != null &&
-            !filteredTrialIds.includes(trialId)
+            filteredSet.size !== 0 &&
+            !filteredSet.has(String(trialId))
           ) {
             continue;
           }
@@ -1494,7 +1538,8 @@ const Replayer = () => {
             clusteringResult != null &&
             egoName in clusteringResult &&
             clusteringResult[egoName] != null
-              ? clusteringResult[egoName].data?.[trialId]?.label
+              ? clusteringResult[egoName].data?.[String(trialId)]?.label ??
+                clusteringResult[egoName].data?.[trialId]?.label
               : "0";
 
           if (trajectoryAnalysis != null && clusteringResult?.[egoName] != null && label == null) {
@@ -1832,21 +1877,48 @@ const Replayer = () => {
     if (trajectoryAnalysis == null || viewerData == null) {
       return;
     }
+    // Selection sources mix string/number trial ids; agentsData keys are always
+    // strings. Strict Array.includes hid EVERY car (including the selected one).
+    const selected = new Set<string>();
+    for (const raw of selectedTrialIds.value) {
+      const s = String(raw);
+      selected.add(s);
+      const n = Number(s);
+      if (Number.isFinite(n)) selected.add(String(n));
+    }
+    const trialSelected = (trialId: string) => {
+      if (selected.has(trialId)) return true;
+      const n = Number(trialId);
+      return Number.isFinite(n) && selected.has(String(n));
+    };
     for (const egoName of Object.keys(viewerData)) {
       for (const viewerName of Object.keys(viewerData[egoName])) {
-        for (const [trialId, item] of Object.entries(
-          viewerData[egoName][viewerName].agentsData,
-        )) {
-          let alpha = 0.75;
-          if (selectedTrialIds.by !== "" && selectedTrialIds.value.length > 0) {
-            alpha = selectedTrialIds.value.includes(trialId)
-              ? 0.75
-              : clipTimePaused
-                ? 0.75
-                : 0.0;
-            if (timeOrS && selectedTrialIds.value.length > 0) {
-              alpha = selectedTrialIds.value.includes(trialId) ? 0.75 : 0.0;
+        const agentsData = viewerData[egoName][viewerName].agentsData;
+        const paneIds = Object.keys(agentsData);
+        // If the selected medoid/trial is not drawn in this pane (wrong ego,
+        // not in trajectories, or substitute medoid id), do NOT blank the pane.
+        const selectedInPane =
+          selected.size === 0 || paneIds.some((id) => trialSelected(id));
+        // Safety: if we would dim everyone but no drawn trial matches selection,
+        // keep the pane lit (ID namespace mismatch).
+        let matchedDrawn = false;
+        if (selectedInPane && selected.size > 0) {
+          for (const id of paneIds) {
+            if (trialSelected(id)) {
+              matchedDrawn = true;
+              break;
             }
+          }
+        }
+        const dimOthers =
+          selectedTrialIds.by !== "" &&
+          selected.size > 0 &&
+          selectedInPane &&
+          matchedDrawn;
+        for (const [trialId, item] of Object.entries(agentsData)) {
+          let alpha = 0.75;
+          if (dimOthers) {
+            alpha = trialSelected(String(trialId)) ? 0.75 : 0.0;
           }
           // Keep camera-follow trial(s) visible even if selection alpha dims others.
           const traced = new Set(
@@ -1856,8 +1928,10 @@ const Replayer = () => {
           );
           if (replayerTraceTrialId != null) {
             traced.add(String(replayerTraceTrialId));
+            const n = Number(replayerTraceTrialId);
+            if (Number.isFinite(n)) traced.add(String(n));
           }
-          if (traced.has(String(trialId))) {
+          if (traced.has(String(trialId)) || traced.has(String(Number(trialId)))) {
             alpha = Math.max(alpha, 0.85);
           }
           for (const agent of Object.values(item)) {

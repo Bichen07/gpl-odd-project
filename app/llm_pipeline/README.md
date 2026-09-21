@@ -47,7 +47,7 @@ llm_pipeline.cli cluster-interpret
         └─ cross-eval (optional LLM) → cross_cluster_eval.json + rescore quality
         │
         ▼
-odd-export → odd-rules → odd-join → odd-briefing → odd-chat   (S2–S5)
+odd-export → odd-rules → odd-briefing → odd-chat   (S2, S3, S5)
 ```
 
 `cluster-interpret` is the umbrella CLI. Products are selected with `--products`
@@ -95,7 +95,7 @@ $RUN/
     ├── quality/{clustering_quality.json, cluster_label_review.json}
     ├── odd/
     │   ├── input/odd_all_trials.json
-    │   ├── output/{odd_boundary_export,odd_parameter_rules,odd_boundary_pairs_join,odd_chat_briefing}.json
+    │   ├── output/{odd_boundary_export,odd_parameter_rules,odd_chat_briefing}.json
     │   └── snapshots/odd_boundary_export.kNN<k>.json
     ├── metadata/PAPER_SOURCE.json
     └── logs/{split_analysis_summary.json, odd_chat_log.jsonl, *.log}
@@ -300,29 +300,37 @@ Analyze → **Report** loads `GET /api/cluster-run-report` (no LLM) from files o
 |-------|--------|-------|
 | **F Clustering Trust** | `cross_cluster/input/cluster_selection_eval.json` | `merge_candidates`, `findings`; link jumps to Cross-cluster tab |
 | **G Recommended Next Tests** | client heuristics on report DTO | inconclusive `separation_call` packs; high-collision clusters missing contrast |
-| **E ODD boundary / rules** | S2/S3/S4 JSON under `analysis/odd/output/` | chips + CART rules table; min–max kNN ≠ pair z-score distance |
+| **E ODD boundary / rules** | S2/S3 JSON under `analysis/odd/output/` | CART rules table; min–max kNN ≠ pair z-score distance |
 
 Produce E’s files:
 
 ```bash
 python -m llm_pipeline.cli odd-export --run-dir "$RUN"
 python -m llm_pipeline.cli odd-rules  --run-dir "$RUN"
-python -m llm_pipeline.cli odd-join   --run-dir "$RUN"
 ```
 
 ---
 
-## 6. S2–S5 — ODD boundary, rules, join, Q&A
+## 6. S2, S3, S5 — ODD boundary, rules, Q&A
 
-Run **after** medoid / pairs / summary as needed. S2–S5 do not rewrite those YAMLs.
-Paths: see §2 layout under `analysis/odd/`.
+Run **after** medoid / pairs / summary as needed. S2, S3, and S5 do **not** rewrite those
+YAMLs. They answer a different question from the cluster stack: *where in the
+sampled scenario-parameter box do pass/fail (and cluster labels) change, and
+can an engineer read that as a few predicates?* That is **ODD-related evidence
+for one logical scenario**, not a SAE J3016 certificate (weather, map, road
+class, … are not in the trial table). See
+[`post_medoid_analysis_method_study.md`](post_medoid_analysis_method_study.md)
+§2.5 / §7.
+
+Paths: §2 layout under `analysis/odd/`. Numbers below are the shipped
+`results/batch8/6_cluster_s=0.6113` artifacts (kNN=10, 2 params:
+`OncomingSpeed`, `OncomingStartDelay`).
 
 ```text
-S2 odd-export  → boundary export + odd_all_trials.json   (needs Payload zip / --analysis-zip)
-S3 odd-rules   → shallow CART (max_depth=3) odd_parameter_rules.json
-S4 odd-join    → trial-id join of boundary ∩ parameter_space_pairs
-S5a odd-briefing → odd_chat_briefing.json (deterministic KB)
-S5b odd-chat   → one LLM call per question + odd_chat_log.jsonl
+S2 odd-export    → odd_all_trials.json + odd_boundary_export.json (+ kNN snapshot)
+S3 odd-rules     → odd_parameter_rules.json          (CART depth ≤ 3)
+S5a odd-briefing → odd_chat_briefing.json            (deterministic KB, no LLM)
+S5b odd-chat     → one LLM call per question + odd_chat_log.jsonl
 ```
 
 ```bash
@@ -330,56 +338,135 @@ conda activate analyzer
 export PYTHONPATH="app/llm_pipeline/python:app/analyzer/src"
 python -m llm_pipeline.cli odd-export   --run-dir "$RUN" --kNN 10
 python -m llm_pipeline.cli odd-rules    --run-dir "$RUN"
-python -m llm_pipeline.cli odd-join     --run-dir "$RUN"
 python -m llm_pipeline.cli odd-briefing --run-dir "$RUN"
 python -m llm_pipeline.cli odd-chat --run-dir "$RUN" \
   --question "What is the weakness of this AV system?"
 ```
 
-### S2 — `odd_export.py`
+Explore Filtering → **Export ODD boundary** writes the same S2 files as
+`odd-export` (Python twin of `explore/lib/boundaryExport.ts`). S3 and S5 are CLI
+(and Report / OddQA read them).
 
-Python twin of Explore Filtering **Export ODD boundary** (min–max normalized
-kd-tree kNN — **not** parameter-space z-score L2). Flags trials with any of k
-neighbors differing in pass/fail (**collision boundary**) or cluster label
-(**cluster boundary**). See `implementation_plan.md` §2.1 C1.
+### S2 — `odd_export.py` (frontier **points**, not a sentence)
 
-### S3 — `odd_rules.py`
+**Job.** Twin of Explore’s kNN filter. For each trial in the saved analysis zip,
+build a min–max-normalized kd-tree over scenario parameters (same metric as
+the heatmap, **not** pair z-score L2). Flag a trial if any of *k* neighbors
+differs in KPI pass/fail (**collision boundary**) or in cluster label
+(**cluster boundary**). Those two lists must stay separate: a trial can be
+one, both, or neither.
 
-`DecisionTreeClassifier` on `odd_all_trials.json` → auditable predicates
-(support/precision/boundary hits). Hypothesis about sampled trials — **not** a
-certified ODD. Default `max_depth=3` (C2 ablation).
+**Writes** (under `$RUN/analysis/odd/`):
 
-### S4 — `odd_join.py`
+| File | Role |
+|------|------|
+| `input/odd_all_trials.json` | Training table for S3. Every considered trial: `trial_id`, `parameters{}`, `passed`, `cluster_label` (label may be `null` if the trial was not in the HDBSCAN fit). Example: **3869** trials, ~824 KB. |
+| `output/odd_boundary_export.json` | Latest export. Header + `collision_boundary.{boundary_trials,edges}` + `cluster_boundary.{…}` + `distance_note`. Example: **650** collision-boundary trials / 996 edges, **741** cluster-boundary trials / 1333 edges; **869** trials have no cluster label (excluded from cluster-boundary matching). ~718 KB. |
+| `snapshots/odd_boundary_export.kNN<k>.json` | Copy of that export so a later k=25 run does not erase k=10. |
 
-Join by **trial id only** (never distance). Writes
-`odd_boundary_pairs_join.json`.
+A **boundary trial** record is `{trial_id, parameters, passed, cluster_label, neighbor_ids}`.
+An **edge** is `{trial_a, trial_b, param_dist}` where `param_dist` is **min–max L2**
+(do not compare to `pair.json`’s z-scored `param_dist`).
+
+**How it helps an engineer (this is useful, not decoration):**
+
+1. **Persists the heatmap filter.** Without S2, “the frontier” exists only as a
+   live Explore checkbox. The Report panel E chips (`650 collision-boundary`,
+   `741 cluster-boundary`) and S5 “what to test next” need a file.
+2. **Scales past 1:1 pairs.** Parameter-space packs are ~9 closest
+   inter-cluster trials. S2 lists **hundreds** of mixed-neighbor points — the
+   rest of the fail envelope, including trials that never got a pair card.
+3. **Separates two questions.** Collision-boundary = *where the KPI flips in
+   sampled params*. Cluster-boundary = *where HDBSCAN labels flip*. Mixing them
+   into one “ODD” sentence is the usual overclaim.
+4. **CI / no-browser.** `odd-export --run-dir` rebuilds the same JSON the UI
+   button writes, from the analysis zip (not live Payload Trial REST — those
+   docs are empty for paper casestudies).
+
+**What it is not.** Not SAE ODD, not a certified limit, not Song-style CSI
+search. Sampling density is the scenario sampler, not real-world exposure.
+Trials with `cluster_label: null` are in `odd_all_trials` (S3 trains on them)
+but are **not** collision-boundary-matched the same way clustered trials are —
+the export header `n_trials_without_cluster_label` is the honest count.
+
+### S3 — `odd_rules.py` (frontier **sentences**)
+
+**Job.** Fit a shallow CART (`sklearn.tree.DecisionTreeClassifier`, default
+`max_depth=3`, `min_samples_leaf=10`) on `odd_all_trials.json`: `y = 1` iff
+`passed` is false. Walk every root→leaf path to an AND-predicate. Count how
+many of that leaf’s trials sit on the S2 **collision** boundary
+(`boundary_trial_hits`).
+
+**Writes:** `$RUN/analysis/odd/output/odd_parameter_rules.json` (~3 KB).
+
+Example (batch8 k=6, 3869 trials, 1771 fail / 2098 pass, train acc 0.857,
+5-fold cv 0.842):
+
+| id | predicate (abbrev.) | predicts | support | precision | boundary hits |
+|----|---------------------|----------|---------|-----------|---------------|
+| R4 | delay ∈ (3.855, 4.388] ∧ speed > 2.374 | collision | 1688 | 0.819 | 339 |
+| R5 | delay ∈ (4.388, 4.643] ∧ speed ≤ 2.382 | collision | 189 | 0.873 | 35 |
+| R8 | delay > 4.388 ∧ speed > 2.571 | safe | 867 | 0.986 | 55 |
+| R1 | delay ≤ 3.855 ∧ speed ≤ 3.342 | safe | 397 | 0.990 | 22 |
+| … | 4 more leaves | … | … | … | … |
+
+**How it helps an engineer:** staring at 650 kNN points is not a thesis
+sentence. R4 is: *in this sample, the large delay–speed box is ~82% collision
+and eats 339 of the kNN frontier points.* R8 is a high-precision **safe** box.
+Report panel E renders this as a table. Chat intent `fail condition / odd /
+limit` attaches these rows. That is the XAI reason to keep CART (Atakishiyev
+et al. — interpretable-by-design) instead of a boosted black box.
+
+**What it is not.** Not “the ODD.” Depth 3 is a **readability** choice (plan
+C2), not max accuracy. Axis-aligned splits ≠ the true curved frontier. Class
+balance follows the sampler. `boundary_trial_hits` uses S2 min–max IDs, not
+pair z-score. Do not quote a threshold the tree never emitted.
 
 ### S5a — `odd_briefing.py`
 
-Assembles one compact `odd_chat_briefing.json` from cluster/pair/ODD/selection
-artifacts (long text truncated). Missing pieces listed in `missing[]` for honest
-“unknown — run step X” answers.
+No LLM. Assembles one compact `odd_chat_briefing.json` (~15 KB, target 8–15k
+tokens) from cluster summaries, pair folders, S2/S3, selection-eval
+findings / merge candidates. Long captions truncated. `missing[]` lists absent
+products so chat can say “unknown — run S3” instead of guessing.
 
-### S5b — `odd_chat.py` (grounded Q&A)
+### S5b — `odd_chat.py` (grounded Q&A — **not** full RAG)
 
-**Not full RAG** — fixed briefing + keyword router (“light RAG” / grounded
-prompting). API key via CLI `--api-key` / env / dashboard ephemeral field (same
-pattern as other Analyze products); missing key → dry-run stub still logged.
+**Why not RAG?** Lewis et al. 2020 RAG = *retrieve from a large, changing
+document index* (dense retriever + generator), then generate. This run’s
+knowledge is already **one structured JSON** (~6 clusters, ~9 pairs, ~8 rules,
+boundary counts). There is nothing to index at Wikipedia scale. Full RAG
+(chunk YAMLs / `context.md` / BEV, embeddings, GraphRAG as in VEHITS 2025)
+would (a) retrieve prose the system prompt forbids as a number source, (b)
+make citations un-auditable, (c) burn tokens on timelines we deliberately
+exclude. Plan §2.4: briefing JSON = non-parametric memory for **this** `$RUN`;
+do not claim we trained DPR/BART.
 
-Each turn: system prompt + **routed slice** of briefing + last 8 dialog turns +
-question. Never raw trajectories / full BEV / full context timelines.
+**What we have (“light RAG” / grounded prompting):**
+
+Each turn: system prompt + **keyword-routed slice** of the briefing + last 8
+dialog turns + question. Numbers only from the briefing; `missing[]` → unknown.
+Never raw trajectories / full BEV / full context timelines / live web.
 
 | Intent keywords | Sections attached |
 | --- | --- |
 | `cluster N` / `cA-cB` | that cluster + touching pairs |
 | weak / failure / worst | top collision clusters + sample pairs |
 | fail condition / odd / limit | rules + boundary |
-| test next / coverage | boundary, rules, merge candidates, pairs∩boundary |
+| test next / coverage | boundary, rules, merge candidates |
 | merge / separat… | separation notes + pair calls + merge candidates |
 | (else) | run header + cluster id/label/rates |
 
-Persists `$RUN/analysis/logs/odd_chat_log.jsonl` (`conversation_id` partitions chats).
-Dashboard: `GET/POST /api/odd-chat` → `scripts/run_odd_chat.sh`.
+API key via CLI `--api-key` / env / dashboard ephemeral field (same pattern as
+other Analyze products); missing key → dry-run stub still logged.
+
+Persists `$RUN/analysis/logs/odd_chat_log.jsonl` (`conversation_id` partitions
+chats). Dashboard: `GET/POST /api/odd-chat` → `scripts/run_odd_chat.sh`.
+
+**Would RAG help later?** Only if the corpus grows (many runs, paper text,
+intra-cluster members). Then: embed **briefing sections** (not raw traj),
+replace the regex router, keep “cite or say unknown.” Do **not** retrieve
+Payload dumps. Faithfulness eval (gold Q/A vs citations) is higher value than
+a vector DB. See study §7.
 
 ---
 
@@ -416,7 +503,7 @@ python -m llm_pipeline.cli selection-eval --run-dir "$RUN"
 python -m llm_pipeline.cli label-review --run-dir "$RUN" --model gemini-2.5-flash
 python -m llm_pipeline.cli cross-cluster-eval --run-dir "$RUN" --model gemini-2.5-flash
 
-python -m llm_pipeline.cli odd-export|odd-rules|odd-join|odd-briefing --run-dir "$RUN"
+python -m llm_pipeline.cli odd-export|odd-rules|odd-briefing --run-dir "$RUN"
 python -m llm_pipeline.cli odd-chat --run-dir "$RUN" --question "…" [--dry-run]
 ```
 
@@ -446,7 +533,7 @@ python -m llm_pipeline.cli odd-chat --run-dir "$RUN" --question "…" [--dry-run
 | `cross_cluster_evaluator.py` | Whole-partition LLM verdict |
 | `clustering_quality_scorer.py` | Rule (+ optional LLM blend) ranking score |
 | Analyzer `dataset_builder.py` / `parameter_space_pair_packs.py` | Packs, BEV, context rebuild |
-| `odd_export.py` / `odd_rules.py` / `odd_join.py` | S2–S4 |
+| `odd_export.py` / `odd_rules.py` | S2–S3 |
 | `odd_briefing.py` / `odd_chat.py` | S5a–S5b |
 | `scripts/run_odd_chat.sh` + dashboard `api/odd-chat` | ODD Q&A UI wrapper |
 

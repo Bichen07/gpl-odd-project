@@ -13,7 +13,7 @@ import {
  *   Body: { batchId, folder, kNN, kpi: {id, name}, clustersIncluded: string[],
  *           collision_boundary, cluster_boundary, all_trials? }
  *   Writes (all read-then-write only — no LLM call):
- *     - $RUN/odd_boundary_export.json            (latest — what report / S4 read)
+ *     - $RUN/odd_boundary_export.json            (latest — what report / S3 read)
  *     - $RUN/odd_boundary_export.kNN{k}.json     (dated snapshot, so re-exporting
  *       with a different kNN does not silently erase the previous one; useful
  *       for a kNN sensitivity check before trusting one value)

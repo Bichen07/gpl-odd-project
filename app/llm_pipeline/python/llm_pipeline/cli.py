@@ -101,10 +101,6 @@ def main() -> None:
     orl.add_argument("--min-samples-leaf", type=int, default=10)
     orl.add_argument("--cv-folds", type=int, default=5)
 
-    # odd-join (S4): deterministic, no LLM, no network.
-    oj = sub.add_parser("odd-join", help="S4 — join boundary trials <-> parameter_space_pairs")
-    oj.add_argument("--run-dir", required=True)
-
     # odd-briefing (S5 part 1): deterministic, no LLM, no network.
     ob = sub.add_parser("odd-briefing", help="S5 — assemble odd_chat_briefing.json")
     ob.add_argument("--run-dir", required=True)
@@ -187,10 +183,6 @@ def main() -> None:
             cv_folds=args.cv_folds,
         )
         out = _json.dumps(summary, indent=2)
-    elif args.cmd == "odd-join":
-        from .odd_join import join_run_dir
-
-        out = _json.dumps(join_run_dir(Path(args.run_dir)), indent=2)
     elif args.cmd == "odd-briefing":
         from .odd_briefing import build_briefing
         from .paths import run_artifact_path

@@ -369,6 +369,11 @@ export default function PerEgoSelection({
           value: next,
         }),
       );
+      // Keep Replayer camera + alpha on the first highlighted trial even when
+      // that id is missing from a given cluster pane's agentsData.
+      dispatch(
+        batchSlice.actions.setReplayerTraceTrialId(next[0] ?? null),
+      );
       dispatch(interactionSlice.actions.record(recordKey));
     },
     [currentAnalysis, dispatch],

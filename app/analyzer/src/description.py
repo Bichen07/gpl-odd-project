@@ -54,11 +54,10 @@ _INTENT_PHRASES = {
 _INTERACTION_PHRASES = {
     "COLLISION": "collision",
     "NEAR_MISS": "near miss",
-    "DANGEROUS_CUT_IN": "dangerous cut-in",
     "CLOSEST_APPROACH": "closest approach",
 }
 
-_CRITICAL_TIER_A = frozenset({"COLLISION", "NEAR_MISS", "DANGEROUS_CUT_IN"})
+_CRITICAL_TIER_A = frozenset({"COLLISION", "NEAR_MISS"})
 _CRITICAL_TIER_B = frozenset({"CLOSEST_APPROACH"})
 
 _RELATION_PHRASES = {
@@ -368,11 +367,6 @@ def build_description(
     loc = action_data.get("location", "unknown")
     dur = action_data.get("duration", "?")
     parts.append(f"Scenario on map '{loc}', duration {dur}s.")
-    if not action_data.get("junction_aware", False):
-        parts.append(
-            "(Map junction info unavailable — junction transitions omitted; "
-            "run app/analyzer/src/dataset_builder.py --map-only to enable.)"
-        )
     parts.append("")
 
     vehicle_tid = primary_vehicle_track_id(action_data) if traj_df is not None else None
@@ -444,7 +438,10 @@ def build_description(
 
         parts.append("Interactions:")
         for iv in interactions:
-            phrase = _INTERACTION_PHRASES.get(iv.get("type"), str(iv.get("type")).lower())
+            typ = str(iv.get("type", ""))
+            if typ not in _INTERACTION_PHRASES:
+                continue
+            phrase = _INTERACTION_PHRASES[typ]
             kt = iv.get("key_time")
             vehicle = display_agent_name(_vehicle_label(iv), "unknown vehicle")
             parts.append(

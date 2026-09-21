@@ -30,10 +30,6 @@ const ARTIFACTS: Record<string, { directory: string; name: string }> = {
     directory: path.join("analysis", "odd", "output"),
     name: "odd_parameter_rules.json",
   },
-  oddJoin: {
-    directory: path.join("analysis", "odd", "output"),
-    name: "odd_boundary_pairs_join.json",
-  },
   oddBriefing: {
     directory: path.join("analysis", "odd", "output"),
     name: "odd_chat_briefing.json",
@@ -51,7 +47,6 @@ const PREVIOUS_DIRECTORIES: Partial<Record<RunArtifact, string>> = {
   oddAllTrials: path.join("odd", "input"),
   oddBoundaryExport: path.join("odd", "output"),
   oddRules: path.join("odd", "output"),
-  oddJoin: path.join("odd", "output"),
   oddBriefing: path.join("odd", "output"),
   oddChatLog: "logs",
   paperSource: "metadata",
@@ -65,7 +60,6 @@ export type RunArtifact =
   | "oddAllTrials"
   | "oddBoundaryExport"
   | "oddRules"
-  | "oddJoin"
   | "oddBriefing"
   | "paperSource"
   | "oddChatLog";

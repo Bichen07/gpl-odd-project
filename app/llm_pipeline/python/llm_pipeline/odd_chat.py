@@ -129,7 +129,6 @@ def route(question: str, briefing: Dict[str, Any]) -> RoutedContext:
         ctx["boundary"] = briefing.get("boundary")
         ctx["rules"] = briefing.get("rules")
         ctx["merge_candidates"] = briefing.get("merge_candidates")
-        ctx["pairs_touching_boundary"] = briefing.get("pairs_touching_boundary")
         citations = ["boundary export", "parameter rules"]
     elif intent == "why_clustering":
         ctx["clusters"] = [

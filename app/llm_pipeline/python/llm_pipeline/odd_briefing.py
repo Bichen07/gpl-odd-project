@@ -143,7 +143,7 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
     if not pairs:
         missing.append("no parameter_space_pairs — pair contrast evidence unavailable")
 
-    # ── S2/S3/S4 (may not exist yet) ──────────────────────────────────────
+    # ── S2/S3 (may not exist yet) ──────────────────────────────────────────
     boundary_doc = _read_json(run_artifact_path(run_dir, "odd_boundary_export"))
     if boundary_doc is None:
         missing.append("no odd_boundary_export.json — run S2 (odd_export.export_run_dir)")
@@ -171,9 +171,6 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
             for r in (rules_doc.get("rules") or [])
         ]
 
-    join_doc = _read_json(run_artifact_path(run_dir, "odd_join"))
-    pairs_touching_boundary = join_doc.get("n_pairs_touching_boundary") if join_doc else None
-
     findings = (selection or {}).get("findings") or []
     merge_candidates = (selection or {}).get("merge_candidates") or []
 
@@ -192,7 +189,6 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
         "pairs": pairs,
         "rules": rules,
         "boundary": boundary,
-        "pairs_touching_boundary": pairs_touching_boundary,
         "findings": findings,
         "merge_candidates": merge_candidates,
         "open_questions": _harvest_open_questions(run_dir),

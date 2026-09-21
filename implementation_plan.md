@@ -26,7 +26,6 @@ not a full SAE ODD certificate).
 - [x] **S1** Run report tab (assemble artifacts; no new trajectory LLM)
 - [x] **S2** ODD boundary export from Explore filters (+ Python CLI twin)
 - [x] **S3** Parameter rules (shallow CART on scenario params)
-- [x] **S4** Join boundary ↔ parameter-space pairs
 - [x] **S5** ODD Q&A over a compact briefing (CLI shipped; browser chat UI not built — see §9 S5)
 
 
@@ -58,7 +57,7 @@ Do these **before** writing production code. Status updated 2026-08-21.
 | #   | Check                                                          | Status   | Finding                                                                                                                                                                                                                                                       |
 | --- | -------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | A1  | Does Explore boundary kNN use scenario parameters or MFPCA?    | **Done** | Scenario parameters only (`trial.parameters` → KD-tree in `batch.ts`). Not embedding coords.                                                                                                                                                                  |
-| A2  | Is Explore distance the same as parameter-space pair distance? | **Done** | **No.** Explore: L2 after **min–max normalize** by each param’s `[min,max]`. Pairs: L2 on **z-scored** matrix in `dataset_builder.compute_parameter_space_boundaries`. Same *features*, different *metric*. S4 join must not pretend distances are identical. |
+| A2  | Is Explore distance the same as parameter-space pair distance? | **Done** | **No.** Explore: L2 after **min–max normalize** by each param’s `[min,max]`. Pairs: L2 on **z-scored** matrix in `dataset_builder.compute_parameter_space_boundaries`. Same *features*, different *metric*. Do not treat those distances as equal. |
 | A3  | What is “collision boundary” label?                            | **Done** | KPI `passed` from `boundaryMetric` / `criticalityMetrics` — not necessarily identical string to `cluster.json` collision_rate. **Must document which KPI** in export JSON.                                                                                    |
 | A4  | Can we rebuild filter offline without React?                   | **Done** | `app/llm_pipeline/python/llm_pipeline/odd_export.py` (CLI: `odd-export`) is a verified Python twin — see §9 S2 "Python twin" note for the parity check.                                                                                                       |
 | A5  | Auth path for chat                                             | **Done** | Analyze already uses pasted API key / env (`GOOGLE_API_KEY`, `OPENAI_API_KEY`). No OAuth.                                                                                                                                                                     |
@@ -187,7 +186,7 @@ Full titles + links so you can open the source directly. Status = how thoroughly
 | “Discover the ODD boundary”                       | Discover an **empirical pass/fail frontier in sampled scenario parameters** for one case study. Full ODD (J3016) includes weather, map, traffic, … we do not have. |
 | “Same as critical scenario identification papers” | Those papers often **optimize** new critical points. We **post-process** an existing sample + optional rules. Related goal, different method.                      |
 | “We use RAG”                                      | We use **grounded prompting** on a run briefing. Full RAG = learned retriever + doc index (Lewis). Ours is weaker but enough if citations + refusal work.          |
-| “Explore distance = pair distance”                | **False** (min–max vs z-score). S4 must join on **trial ids**, not distance equality.                                                                              |
+| “Explore distance = pair distance”                | **False** (min–max vs z-score). Do not equate those distances.                                                                              |
 | “CART defines the ODD”                            | CART gives **auditable hypotheses** about fail regions. Thesis must report precision/support and sampling bias.                                                    |
 | “Chat replaces analysis”                          | Chat **discusses** frozen analysis. Without S0–S3 artifacts it invents.                                                                                            |
 
@@ -224,8 +223,8 @@ a `kind` tag. The **actual** implementation keeps two separate sections,
 `collision_boundary` and `cluster_boundary`, each with its own `boundary_trials[]` / `edges[]`.
 Reason: a trial can be a collision-boundary case, a cluster-boundary case, both, or neither —
 a single flat list with a `kind` field per *edge* (not per trial) made "which trials belong to
-which set" harder to read back out. Two named sections is simpler for both the Run report UI
-and a future S4 join. `implementation_plan.md` §6.2/§9 schemas below are updated to match what
+which set" harder to read back out. Two named sections is simpler for the Run report UI.
+`implementation_plan.md` §6.2/§9 schemas below are updated to match what
 was actually shipped.
 
 
@@ -240,7 +239,6 @@ was actually shipped.
 | S1 Run report                 | **Keep**               | Necessary engineer view                         |
 | S2 Boundary export            | **Keep**               | Makes UI scientific                             |
 | S3 Shallow rules              | **Keep with humility** | Good XAI fit; not full ODD; train on all trials |
-| S4 Join on trial id           | **Keep**               | Do not equate distance metrics                  |
 | S5 Grounded Q&A               | **Keep as light RAG**  | Cite briefing; evaluate faithfulness            |
 | Deep learning ODD             | **Out**                | Weak for auditable limits                       |
 | Claiming “full ODD discovery” | **Out**                | Violates J3016 scope                            |
@@ -368,8 +366,6 @@ kNN boundary detection  (same semantics as Filtering UI)
         ▼
 odd_boundary_export.json
         │
-        ├─► (optional) join to parameter_space_pairs/pair.json     [S4]
-        │
         ▼
 Train shallow classifier on ALL trials
   X = scenario params (OncomingSpeed, OncomingStartDelay, …)
@@ -464,7 +460,7 @@ Chat (S5) may polish this wording but **must cite R1 / N / pair folder**.
 - Sampled 2–3 scenario parameters ≠ full real-world ODD.
 - Frontier is empirical on the sample, not a continuous proof.
 - Collision-boundary ≠ cluster-boundary.
-- Explore vs pair **distance mismatch** — join on trial id only.
+- Explore vs pair **distance mismatch** — min–max kNN L2 is not pair z-score L2.
 
 ---
 
@@ -668,12 +664,12 @@ Links into existing Medoid / Pair / Cluster tabs.
 - [x] No medoid/pair prompt edits made
 - [x] Also spot-checked `results/batch8/6_cluster_s=0.6113/` and `results/batch9/4_cluster_s=0.7482/`
   ```
-  (2026-08-21, while running the S2–S5 CLI end-to-end) — both have complete
+  (2026-08-21, while running the S2/S3/S5 CLI end-to-end) — both have complete
   medoid/summary/pair/quality/selection artifacts.
   ```
 - [ ] Not yet checked: **every remaining** thesis `$RUN` beyond these 3 — do before writing up
   ```
-  final results, not before building more of S2–S5.
+  final results, not before building more of S2/S3/S5.
   ```
 
 **Done when:** all thesis clusters show saved summary cards. *(sample run only so far)*
@@ -681,7 +677,7 @@ Links into existing Medoid / Pair / Cluster tabs.
 ### S1 — Run report
 
 - [x] Tab + `GET /api/cluster-run-report` — `src/app/api/cluster-run-report/route.ts`
-- [x] Sections A–G (E now shows S2 boundary export summary, S3 rules table, and S4 pairs-touching-boundary chip — all read-only, all written by the Python CLI)
+- [x] Sections A–G (E now shows S2 boundary export summary and S3 rules table — all read-only, all written by the Python CLI)
 - [x] Section H — ODD Q&A panel (S5b UI, see §9.3) — `GET`/`POST /api/odd-chat` + `OddChatPanel`
 - [x] Deep links to existing tabs (`onNavigateTab`)
 
@@ -740,31 +736,13 @@ Implementation notes (deviations from §6.2's sketch, reasoned):
 1.5.2 — same env `dataset_builder.py` runs in) rather than hand-rolling CART. `min_samples_leaf`
 defaults to 10 to avoid single-digit-support "rules" that would look precise but be noise.
 - `boundary_trial_hits` per rule = count of that leaf's training trials that also appear in S2's
-`collision_boundary.boundary_trials` (join by trial id, computed inline, not via S4's join file
-— S4 joins *pairs*, not CART leaves).
+`collision_boundary.boundary_trials` (join by trial id, computed inline in `odd_rules.py`).
 - Ran the C2 depth ablation (1–4) — see §2.1 C2 above — and kept `max_depth=3` as the default:
 best readability/accuracy trade-off, not an arbitrary choice.
 
 **Done when:** auditable predicates with support/precision. **Done** — e.g. for
 `batch8/3_cluster_s=0.8032`: rule R4 `OncomingStartDelay <= 4.388 AND OncomingStartDelay > 3.855 AND OncomingSpeed > 2.374` → predicts `collision`, support 1688, precision 0.8193, 339 boundary
 trial hits.
-
-### S4 — Boundary ↔ pairs join
-
-- [x] Mark which boundary trials appear in pair packs (**join on trial id only** — Explore
-  ```
-  min–max distance ≠ pair z-score distance) — `odd_join.py::join_run_dir` (CLI: `odd-join`)
-  ```
-- [x] Table on report; include in briefing — surfaced as a chip
-  ```
-  ("N/M pairs touch the boundary") in section E, and as `pairs_touching_boundary` in
-  `odd_chat_briefing.json`
-  ```
-
-Every parameter-space pair pack in the three test runs touched at least one boundary trial (2/2,
-9/9, 4/4) — expected, since pairs are explicitly chosen as *closest cross-cluster* trials, which
-is almost definitionally where the kNN boundary filter also fires. This is a sanity check that
-the two products agree qualitatively, not a novel finding.
 
 ### S5 — ODD Q&A
 
@@ -853,7 +831,6 @@ RUN="results/batch8/3_cluster_s=0.8032"
 python -m llm_pipeline.cli odd-export   --run-dir "$RUN" --kNN 10   # S2 (needs Payload reachable,
                                                                       # or --analysis-zip <path>)
 python -m llm_pipeline.cli odd-rules    --run-dir "$RUN"            # S3, deterministic, offline
-python -m llm_pipeline.cli odd-join     --run-dir "$RUN"            # S4, deterministic, offline
 python -m llm_pipeline.cli odd-briefing --run-dir "$RUN"            # S5a, deterministic, offline
 python -m llm_pipeline.cli odd-chat --run-dir "$RUN" \
   --question "What is the weakness of this AV system?"              # S5b, needs GOOGLE_API_KEY/
@@ -871,11 +848,11 @@ existing env avoids adding a second, redundant dependency surface for the same p
 S5, real (non-dry-run) chat questions:
 
 
-| Run                         | n trials | n clusters | collision-boundary | cluster-boundary | CART cv_acc | pairs touching boundary |
-| --------------------------- | -------- | ---------- | ------------------ | ---------------- | ----------- | ----------------------- |
-| `batch8/3_cluster_s=0.8032` | 3869     | 3          | 650                | 628              | 0.8418      | 2/2                     |
-| `batch8/6_cluster_s=0.6113` | 3869     | 6          | 650                | 741              | 0.8418      | 9/9                     |
-| `batch9/4_cluster_s=0.7482` | 2980     | 4          | 839                | 1043             | 0.6966      | 4/4                     |
+| Run                         | n trials | n clusters | collision-boundary | cluster-boundary | CART cv_acc |
+| --------------------------- | -------- | ---------- | ------------------ | ---------------- | ----------- |
+| `batch8/3_cluster_s=0.8032` | 3869     | 3          | 650                | 628              | 0.8418      |
+| `batch8/6_cluster_s=0.6113` | 3869     | 6          | 650                | 741              | 0.8418      |
+| `batch9/4_cluster_s=0.7482` | 2980     | 4          | 839                | 1043             | 0.6966      |
 
 
 (`batch8`'s two runs share the same 3869-trial pool + CART result because both clustering results
@@ -898,7 +875,7 @@ file, the browser only ever reads JSON off disk.
 ### 9.2 — Full pipeline run + gap found in parameter-space pairs (2026-08-21, later session)
 
 Re-ran the full chain "dataset build → medoid → parameter-space pair → cluster summary →
-boundary filter → rules → join → briefing → chat" for all three requested folders, as a genuine
+boundary filter → rules → briefing → chat" for all three requested folders, as a genuine
 end-to-end check rather than assuming prior work was complete. First, per **§1 "do not
 change (frozen)"**, `dataset_builder.py`'s raw build + the LLM `medoid_trial.yaml` /
 `cluster_summary.yaml` outputs were **not** regenerated — re-running `cluster-interpret
@@ -933,18 +910,18 @@ rule:
    (`c1-c2, c1-c3, c1-c5, c2-c3, c2-c5, c3-c5, c4-c5`). The `--pairs` flag scopes the run to
    *only* the named packs — the 2 already-complete `batch8/6_cluster` pairs (`c0-c4`, `c0-c5`)
    and both `batch8/3_cluster` pairs were never touched.
-3. Re-ran `odd-join` (S4) and `odd-briefing` (S5a) for both changed folders to pick up the new
+3. Re-ran `odd-briefing` (S5a) for both changed folders to pick up the new
    `contrast.yaml` files. Result: `odd_chat_briefing.json`'s `missing: []` for **all three**
    folders now (previously it implicitly under-represented pair evidence for 2 of 3 — the
    briefing builder doesn't require contrast.yaml to run, it just silently has less "contrast"
    coverage per pair, so this wasn't flagged as `missing` before either; the fix is a genuine
    coverage improvement, not a bugfix to `odd_briefing.py`).
 
-| Run | pairs with `contrast.yaml` **after** | `odd-join` pairs_touching_boundary | briefing `missing` |
-| --- | --- | --- | --- |
-| `batch8/3_cluster_s=0.8032` | 2/2 (unchanged) | 2/2 | `[]` |
-| `batch8/6_cluster_s=0.6113` | **9/9** | 9/9 | `[]` |
-| `batch9/4_cluster_s=0.7482` | **4/4** | 4/4 | `[]` |
+| Run | pairs with `contrast.yaml` **after** | briefing `missing` |
+| --- | --- | --- |
+| `batch8/3_cluster_s=0.8032` | 2/2 (unchanged) | `[]` |
+| `batch8/6_cluster_s=0.6113` | **9/9** | `[]` |
+| `batch9/4_cluster_s=0.7482` | **4/4** | `[]` |
 
 Confirmed via the Run Report tab (§S1) for each folder that section D (Parameter-space pairs)
 now shows a real `separation_call` / `contrast_explanation` for every pair, and section H (ODD
@@ -1023,14 +1000,14 @@ without claiming a full SAE J3016 ODD certificate.
 | 2026-08-21 | Expand Q&A / boundary designs + paper links.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | 2026-08-21 | **Validation pass:** checked repo (Explore = scenario params, min–max distance ≠ pair z-score); read Lewis RAG, Song CSI, J3016/Koopman, XAI AD review. Corrected overclaims (full ODD, full RAG, CSI-equivalence). Remaining todos: ISO 21448 skim, Warwick skim, C1–C4 experiments.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | 2026-08-21 | S0/S1 built (Run report tab + `cluster-run-report` API), verified additive/read-only via `git diff --stat` + `tsc --noEmit` + lints.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| 2026-08-21 | S2 built: `boundaryExport.ts` helper + `odd-boundary-export` route + Filtering export button + Run report section E wiring. Export schema changed from one flat list to two named sections (`collision_boundary`, `cluster_boundary`) — see §2.4/§6.2 note. C1 (spot-check vs Explore UI) still open before trusting it for S3/S4.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| 2026-08-21 | S2 built: `boundaryExport.ts` helper + `odd-boundary-export` route + Filtering export button + Run report section E wiring. Export schema changed from one flat list to two named sections (`collision_boundary`, `cluster_boundary`) — see §2.4/§6.2 note. C1 (spot-check vs Explore UI) still open before trusting it for S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 2026-08-21 | S2 bugfix pass (user-reported on live export): raw Mongo-hash parameter keys → human names (positional match, TS side); `cluster_label: null` for unclustered trials → gated collision-boundary on non-null labels both sides + added `n_trials_without_cluster_label`; single filename regardless of kNN/filter type → added `.kNN{k}` snapshot + separate `odd_all_trials.json`; default kNN 25→10 (boundary-detection literature uses small k for local precision).                                                                                                                                                                                                                                                                                                                           |
 | 2026-08-21 | **S2 Python CLI twin built** (`odd_export.py`, closes A4): discovered Payload's live `Trial` REST collection has zero docs for this dataset — trial parameters/KPIs only exist inside the saved Dashboard analysis zip, so the twin reuses `dataset_builder._fetch_payload_analysis` (not a new GraphQL/REST path) and resolves parameter names from each trial's own embedded `batch.scenario.parameters` (self-consistent, sidesteps the ObjectId-epoch mismatch entirely rather than working around it positionally). Verified byte-for-byte identical output vs the browser-produced export on `batch8/3_cluster_s=0.8032` — this supersedes/satisfies C1. Ran on all 3 user-requested test folders (`batch8/3_cluster_s=0.8032`, `batch8/6_cluster_s=0.6113`, `batch9/4_cluster_s=0.7482`). |
 | 2026-08-21 | **S3 built** (`odd_rules.py`, sklearn `DecisionTreeClassifier`, analyzer conda env). Ran C2 depth ablation (1–4) on `batch8/3_cluster_s=0.8032`: kept `max_depth=3` default (best readability/accuracy trade-off — see §9 S3). Wired into `cluster-run-report` route + `AnalyzeClient.tsx` Run Report section E (rules table with predicate/predicted/support/precision/boundary-hits), verified with a live screenshot showing real CART output rendered from the CLI-written JSON.                                                                                                                                                                                                                                                                                                             |
-| 2026-08-21 | **S4 built** (`odd_join.py`) — joins S2 boundary trial ids with `parameter_space_pairs/*/pair.json` by trial id only (never compares min-max vs z-score distances directly, per §2.1 A2). Wired into Run Report as a chip + into the S5 briefing as `pairs_touching_boundary`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 2026-09-21 | **Removed unused ODD join** (`odd_join.py`, CLI `odd-join`, `odd_boundary_pairs_join.json`, Report chip, briefing field). Pair trial-id membership in the kNN boundary set was unused. Pipeline is S2 export → S3 CART → S5 briefing/chat. |
 | 2026-08-21 | **S5 built** (`odd_briefing.py` + `odd_chat.py`): deterministic briefing assembly (no LLM) + keyword-router grounded chat (reuses `llm_factory.py`, same API-key contract as Analyze; last-8-turn memory; logs to `odd_chat_log.jsonl`). Ran all 4 practical gold-question categories for real against `gemini-2.5-flash` on 2 of the 3 test runs — answers cited real cluster/pair/rule ids and kept LLM-authored vs deterministic language separate. **Deliberately did not build the browser** `/api/odd-chat` **route + chat UI this pass** — user explicitly asked for a working code/CLI version first; `odd-chat` CLI is the verified, working S5 interface today, and a thin route that shells out to it is the natural (undone) follow-up.                                              |
-| 2026-08-21 | All 5 new CLI subcommands (`odd-export`, `odd-rules`, `odd-join`, `odd-briefing`, `odd-chat`) added to `llm_pipeline/cli.py`, run end-to-end on all 3 user-requested test folders. Dashboard changes (`cluster-run-report/route.ts`, `AnalyzeClient.tsx`) are additive reads of the new JSON files only — verified via `tsc --noEmit` (no new errors) + `ReadLints` (clean) + a live screenshot.                                                                                                                                                                                                                                                                                                                                                                                                 |
-| 2026-08-21 | **Full-pipeline verification pass** (later session, on explicit request): did **not** re-run `dataset_builder.py` / `cluster-interpret --products medoid` on the 3 test folders (frozen, non-deterministic LLM re-run would risk changing tuned output for no benefit) — verified completeness by reading the on-disk layout instead. This found a genuine gap: parameter-space **pair** contrasts were only 2/9 done for `batch8/6_cluster_s=0.6113` and 0/4 for `batch9/4_cluster_s=0.7482` (medoid + summary were 100% done for all 3). Filled the gap additively (`--rebuild-context-texts` for batch9's missing `process/context.md`, then `cluster-interpret --products parameter-space-pairs --pairs <missing-only>` — never touched the 11 already-complete pairs/clusters), then re-ran `odd-join`/`odd-briefing` for the 2 changed folders. All 3 folders now show `odd_chat_briefing.json` → `missing: []`. See §9.2. |
+| 2026-08-21 | All 4 new CLI subcommands (`odd-export`, `odd-rules`, `odd-briefing`, `odd-chat`) added to `llm_pipeline/cli.py`, run end-to-end on all 3 user-requested test folders. Dashboard changes (`cluster-run-report/route.ts`, `AnalyzeClient.tsx`) are additive reads of the new JSON files only — verified via `tsc --noEmit` (no new errors) + `ReadLints` (clean) + a live screenshot.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 2026-08-21 | **Full-pipeline verification pass** (later session, on explicit request): did **not** re-run `dataset_builder.py` / `cluster-interpret --products medoid` on the 3 test folders (frozen, non-deterministic LLM re-run would risk changing tuned output for no benefit) — verified completeness by reading the on-disk layout instead. This found a genuine gap: parameter-space **pair** contrasts were only 2/9 done for `batch8/6_cluster_s=0.6113` and 0/4 for `batch9/4_cluster_s=0.7482` (medoid + summary were 100% done for all 3). Filled the gap additively (`--rebuild-context-texts` for batch9's missing `process/context.md`, then `cluster-interpret --products parameter-space-pairs --pairs <missing-only>` — never touched the 11 already-complete pairs/clusters), then re-ran `odd-briefing` for the 2 changed folders. All 3 folders now show `odd_chat_briefing.json` → `missing: []`. See §9.2. |
 | 2026-08-21 | **Built the browser Q&A UI** (previously deferred): `app/dashboard/.../api/odd-chat/route.ts` (GET history / POST ask) + `scripts/run_odd_chat.sh` (new, mirrors `run_cluster_analyze.sh`'s conda-env pattern) + `OddChatPanel` component appended to the bottom of the Run Report tab in `AnalyzeClient.tsx`. Both the CLI and the browser route call the exact same `python -m llm_pipeline.cli odd-chat` — one LLM-calling implementation. Deviated from §7.1's "reuse Analyze model/API-key state": gave the panel its own independent model+key fields instead, since `RunReportTab` doesn't currently receive those two as props (see §9.3 for the full reasoning). Verified with `tsc --noEmit` + `ReadLints` (clean) and a live browser test: asked a real question, got a grounded answer with citations, reloaded the page, confirmed the history persisted (read back from `odd_chat_log.jsonl`, not browser storage). See §9.3 for the full answer to "does it need an API key / login / does history persist" written out explicitly. |
 
 

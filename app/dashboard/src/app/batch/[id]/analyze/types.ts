@@ -176,10 +176,6 @@ export type ReportData = {
       boundaryTrialHits: number | null;
     }>;
   } | null;
-  boundaryPairsJoin: {
-    nPairs: number;
-    nPairsTouchingBoundary: number;
-  } | null;
 };
 
 export type ChatTurn = {

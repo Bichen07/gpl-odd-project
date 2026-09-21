@@ -471,10 +471,28 @@ export const batchSlice = createSlice({
             // Keep index alignment with mfpca.clustering (including null slots)
             // so findIndex(result) matches clusterInfos[index].
             const updated: Array<ClusterInfo | null> = [];
-            const target = trajectoryAnalysis.mfpca[durationMode].clustering;
-            for (const result of target ?? []) {
+            const mfpca = trajectoryAnalysis.mfpca[durationMode];
+            const target = mfpca.clustering;
+            // With uniqueness already in the zip, only materialize colors/counts
+            // for uniqueResultIndices (+ preferred pick). Scanning every HDBSCAN
+            // candidate × all trials is what made "*.with-uniqueness.zip" loads
+            // feel as slow as a raw recompute.
+            const uniqueIdx = mfpca.uniqueResultIndices;
+            const uniqueSet =
+              Array.isArray(uniqueIdx) && uniqueIdx.length > 0
+                ? new Set(uniqueIdx.map(Number))
+                : null;
+            const preferred = pickPreferredClustering(target ?? []);
+            if (uniqueSet != null && preferred.index >= 0) {
+              uniqueSet.add(preferred.index);
+            }
+            for (const [resultIndex, result] of (target ?? []).entries()) {
               if (result == null) {
                 updated.push(null);
+                continue;
+              }
+              if (uniqueSet != null && !uniqueSet.has(resultIndex)) {
+                updated.push({});
                 continue;
               }
               const clusters: ClusterInfo = {};

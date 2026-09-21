@@ -542,7 +542,6 @@ def augment_interactions(
         if iv.get("with_track_id") is not None
         and iv.get("type") in {
             InteractionAction.NEAR_MISS.value,
-            InteractionAction.DANGEROUS_CUT_IN.value,
             InteractionAction.COLLISION.value,
         }
     }

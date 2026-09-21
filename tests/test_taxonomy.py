@@ -133,7 +133,7 @@ def test_enter_exit_junction(tmp_path):
     actions = [a["action"] for a in data["agents"][0]["actions"]]
     assert "ENTER_JUNCTION" in actions
     assert "EXIT_JUNCTION" in actions
-    assert data["junction_aware"] is True
+    assert "junction_aware" not in data
 
 
 def test_world_xy_aliases_accepted(tmp_path):

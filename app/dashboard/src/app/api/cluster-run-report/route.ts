@@ -116,11 +116,6 @@ type ReportDTO = {
       boundaryTrialHits: number | null;
     }>;
   } | null;
-  // S4 — present once `odd-join` (CLI) has been run for this folder.
-  boundaryPairsJoin: {
-    nPairs: number;
-    nPairsTouchingBoundary: number;
-  } | null;
 };
 
 // ── Handler ──────────────────────────────────────────────────────────────────
@@ -307,19 +302,6 @@ export async function GET(req: NextRequest) {
       }
     : null;
 
-  // ── S4 boundary <-> pairs join (optional, written by `odd-join` CLI) ──
-
-  const joinJson = readJsonSafe(
-    runArtifactPath(runDir, "oddJoin"),
-  ) as Record<string, any> | null;
-
-  const boundaryPairsJoin = joinJson
-    ? {
-        nPairs: joinJson.n_pairs ?? 0,
-        nPairsTouchingBoundary: joinJson.n_pairs_touching_boundary ?? 0,
-      }
-    : null;
-
   // ── Assemble DTO ──────────────────────────────────────────────────────
 
   const dto: ReportDTO = {
@@ -345,7 +327,6 @@ export async function GET(req: NextRequest) {
     ),
     boundaryExport,
     parameterRules,
-    boundaryPairsJoin,
   };
 
   return NextResponse.json(dto);
