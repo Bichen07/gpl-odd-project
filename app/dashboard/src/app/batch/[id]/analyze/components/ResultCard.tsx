@@ -126,46 +126,26 @@ export default function ResultCard({
           <Collapse in={showSummaryHelp}>
             <Alert severity="info" sx={{ mb: 1.5, py: 0.5 }}>
               <Typography variant="caption" component="div">
-                Each row is Ego vs{" "}
-                <strong>that agent</strong> (resolution → control → motive).
-                The first row is the pack partner
+                Each row is Ego vs <strong>that agent</strong>:{" "}
+                <code>agent</code> and <code>resolution</code>. The first row
+                is the pack partner
                 {conflictPartner ? ` (${conflictPartner})` : ""}. Extra rows
                 are other agents Ego actually responded to.
               </Typography>
               <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
                 <strong>Resolution</strong> (go-through vs give-way vs that
-                agent): <br /> <code>yield</code> — Ego
-                decelerates or stops to give way and that agent is not behind
-                (includes failed yield: FRONT–LEFT overlap while still
-                braking). <br /><code>pass_first</code> — that agent becomes behind,
-                or Ego holds/increases speed into the gap, or releases the
-                brake and continues. <code>unresolved</code> — neither state is
-                clear.
+                agent): <code>yield</code> — Ego decelerates or stops to give
+                way and that agent is not behind (includes failed yield:
+                FRONT–LEFT overlap while still braking).{" "}
+                <code>pass_first</code> — that agent becomes behind, or Ego
+                holds/increases speed into the gap, or releases the brake and
+                continues. <code>unresolved</code> — neither state is clear.
+                A name such as Late Yield is the cluster summary label, not
+                this row.
               </Typography>
               <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-                <strong>Control</strong> (speed manner on{" "}
-                <em>that agent&apos;s conflict arc only</em>
-                — stamps concluded toward that agent until its pass/yield is
-                decided):{" "}
-                <code>proactive</code> = early braking vs that agent;{" "}
-                <code>late</code> = braking near that agent&apos;s peak;{" "}
-                <code>slowdown</code> = gradual deceleration during that
-                arc; <code>stop</code> = near-zero;{" "}
-                <code>smooth</code> / <code>maintain</code> = little/no
-                braking through that agent; <code>brake</code> = severe
-                braking <em>vs that agent</em> (a later Parking brake does
-                not make CuttingIn <code>brake</code>). Braking alone does
-                not prove yield.
-              </Typography>
-              <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-                <strong>Motive</strong>: closed pattern name for that same
-                arc. Examples:{" "}
-                <code>late_reaction</code> (late strong brake near peak),{" "}
-                <code>assertive_gap_acceptance</code> /{" "}
-                <code>maintain_through</code> (pass styles: hold speed into a
-                closing gap vs nearly constant speed),{" "}
-                <code>yield_to_vehicle</code> (give-way stop). Must pair with
-                that row&apos;s resolution and control.
+                The why is <code>motive_summary</code> (2–4 sentences) and the
+                last clause of each timeline <code>description</code>.
               </Typography>
             </Alert>
           </Collapse>

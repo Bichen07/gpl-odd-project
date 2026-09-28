@@ -1,11 +1,10 @@
 # Critique: ChatGPT architecture notes vs this repo
 
-ChatGPT never saw `gpl-odd-project`. Gemini’s
-[`architecture_refactor_plan.md`](architecture_refactor_plan.md) mostly agreed
-with ChatGPT and did **not** check the live pipeline. This file is the
-repo-grounded verdict.
-
-Living execution plan: [`../../../implementation_plan.md`](../../../implementation_plan.md).
+ChatGPT never saw `gpl-odd-project`. A superseded architecture-refactor plan
+mostly agreed with ChatGPT and did **not** check the live pipeline. That plan
+and the August implementation plan were removed. This file is the
+repo-grounded verdict. Current score formulas are in
+[`../README.md`](../README.md) §4.5.
 
 Legend: **keep** / **already done** / **adapt** / **reject** / **radar**.
 
@@ -292,7 +291,7 @@ parameters without laundering its own medoid labels as evidence?**
 
 ## Gemini file: what to ignore
 
-[`architecture_refactor_plan.md`](architecture_refactor_plan.md) is a
+The removed architecture-refactor plan was a
 rubber-stamp of ChatGPT with an execution sketch that would:
 
 - Put `outcome` inside LLM-emitted `evidence`
@@ -300,5 +299,5 @@ rubber-stamp of ChatGPT with an execution sketch that would:
 - Rename selection output files
 - Treat pair as “blind” while the live prompt still injects medoid cards
 
-Use **this critique + `implementation_plan.md`**, not Gemini’s phases, as the
-source of truth.
+Use **this critique and** [`../README.md`](../README.md) **§4.5**, not that
+removed plan, as the source of truth.

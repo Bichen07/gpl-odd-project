@@ -16,10 +16,8 @@ clusters are summarized) compares labels across the run and fixes duplicates;
 do not try to guess or avoid other clusters' names here.
 
 **You invent `label`.** Short **outcome archetype** (2–4 words), paper-heatmap
-style (`Smooth Pass`, `Yield`, `Cut-in Collision`, `Brake Rear-end`). Do
-**not** paste medoid motive codes into the name ("Assertive Gap…", "Late
-Reaction…", "Post-Pass Hard Brake…") and do not chain more than one mechanism.
-Motives and timing detail belong in `caption` only. Closed style set lives in
+style (`Smooth Pass`, `Yield`, `Cut-in Collision`, `Brake Rear-end`). One
+mechanism. The why belongs in `caption`. Closed style set lives in
 common_sense (`§Cluster label`) — prefer one of those before inventing a new
 archetype.
 
@@ -28,7 +26,7 @@ trajectory**. A cluster therefore groups trajectory shape and termination, not
 necessarily one interaction intent. At a collision/behavior boundary, one
 parameter-space edge may be a pass attempt that collides while another is a
 yield attempt that also collides, even when their trajectories look similar.
-Do not force those boundary cases into the medoid's single motive; use the
+Do not force those boundary cases into the medoid's resolution; use the
 pattern of pair verdicts to expose this mixture.
 
 Decide whether neighbors look mergeable, whether the medoid is unlike boundary
@@ -36,13 +34,13 @@ cases (finer split?), or whether the cluster is well separated.
 </Your Task>
 
 <Mandatory Workflow & Chain Of Thought>
-1. Medoid first: restate this cluster's primary_motive, outcome, and 1–2 timeline
-   concludes from `medoid_trial.yaml`. Draft a **2–4 word** `label` as an outcome
-   archetype (Pass / Yield / Collision / Stop / Rear-end family) — **not** a
-   concatenation of motive codes. Put assertive / late-reaction / post-clear
-   detail in the caption draft, not in `label`.
+1. Medoid first: restate this cluster's named-vehicle `resolution`, outcome, and
+   1–2 sentences of `motive_summary` from `medoid_trial.yaml`. Draft a **2–4 word**
+   `label` as an outcome archetype (Pass / Yield / Collision / Stop / Rear-end
+   family). `label` is the only place that may say `Late Yield`. Put the why
+   in `caption`.
 2. Neighbor-by-neighbor: for EACH Parameter-space pair block touching this cluster:
-   - Prefer the contrast YAML (separation_call, critical_divergence, motives).
+   - Prefer the contrast YAML (separation_call, critical_divergence, evidence).
    - MAP pair `separation_call` into this `verdict` faithfully. These are
      different YAML fields. `justified` / `over_fine` exist ONLY on the pair
      card — never write them here. Do **not** require this cluster's boundary
@@ -85,17 +83,17 @@ cases (finer split?), or whether the cluster is well separated.
    (true only if every verdict is `distinct`) — do not invent it.
    Never write pair words (`justified`, `over_fine`) or `inconclusive` on
    `neighborhood_separation`.
-6. **Label is yours.** Invent a 2–4 word outcome archetype `label` — no motive-code
-   paste, no mechanism chaining. Richer nuance belongs in `caption`.
+6. **Label is yours.** Invent a 2–4 word outcome archetype `label`. One
+   mechanism. Richer nuance belongs in `caption`.
 </Mandatory Workflow & Chain Of Thought>
 
 <Caption & verdict guide>
 `caption` (3–5 short paragraphs, blank line between):
-1. Medoid archetype (motive + outcome + key action vs the named conflict
-   vehicle). If `agent_interactions` names another agent Ego reacted to, one
+1. Medoid archetype (resolution, why, outcome, and the key action vs the named
+   conflict vehicle). If `agent_interactions` names another agent Ego reacted to, one
    short clause is enough — do not retitle the cluster after that agent.
    Name this cluster as `[cN]`. Open with your short outcome-style label; keep
-   motive codes in this paragraph, not in the `label` field.
+   the why in this paragraph.
 2. What parameter-space boundary pairs say about neighbors (cite folder names / separation_call / `[c*]`).
 3. Whether neighbors agree with each other (mixed distinct+similar → finer split;
    mostly distinct same family → keep; mostly similar → merge).
@@ -132,20 +130,22 @@ overwrite `label`.)
 
 ```yaml
 cluster_id: <int>
-label: "<2-4 word outcome archetype - no motive-code paste>"
+label: "<2-4 word outcome archetype>"
 confidence: "high" | "medium" | "low"
 caption: |
-  3-5 short paragraphs. Lead with short label; put medoid motives + parameter-space
-  boundary evidence here. Blank line between paragraphs.
+  3-5 short paragraphs. Lead with the short label; put the medoid why
+  (`motive_summary`) and parameter-space boundary evidence here.
+  Blank line between paragraphs.
 consistency_note: |
   Embedding spread vs outcome homogeneity in one short note.
 motive_consistency_note: |
-  Does this caption agree with the medoid's primary_motive? Empty if nothing to flag.
+  Does this caption agree with the medoid's resolution and motive_summary?
+  Empty if nothing to flag.
 neighbor_comparison:
   - neighbor_cluster: <int>
     parameter_space_pair_folder: "<e.g. c0-c4>"
     verdict: "distinct" | "similar" | "inconclusive" | "ambiguous"
-    reason: "<one line, cite contrast separation_call / motive / missing card>"
+    reason: "<one line, cite contrast separation_call / evidence / missing card>"
 neighborhood_separation: "well_separated" | "merge_candidates" | "needs_finer_split" | "ambiguous"
 ```
 </Output>

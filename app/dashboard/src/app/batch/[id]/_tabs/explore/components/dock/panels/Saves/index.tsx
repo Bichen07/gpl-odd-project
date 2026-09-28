@@ -430,25 +430,46 @@ export default function Saves(props: Props) {
                       new Uint8Array(fileBlob)[0] === 0x50 &&
                       new Uint8Array(fileBlob)[1] === 0x4b);
 
+                  let savedSelection: Record<string, any> | null = null;
                   if (isZip) {
                     const zip = await JSZip.loadAsync(fileBlob);
-                    const jsonFileName = Object.keys(zip.files).find((name) =>
-                      name.endsWith(".json"),
+                    const jsonNames = Object.keys(zip.files).filter(
+                      (name) =>
+                        name.endsWith(".json") && !zip.files[name].dir,
                     );
-                    if (jsonFileName == null) {
+                    const baseName = (name: string) =>
+                      name.split("/").pop() ?? name;
+                    const selectedName = jsonNames.find(
+                      (name) => baseName(name) === "selected.json",
+                    );
+                    const analysisName =
+                      jsonNames.find(
+                        (name) => baseName(name) === "trajectories.json",
+                      ) ??
+                      jsonNames.find((name) => name !== selectedName) ??
+                      jsonNames[0];
+                    if (analysisName == null) {
                       throw new Error("No JSON file found in ZIP");
                     }
                     const jsonText = await zip
-                      .file(jsonFileName)
+                      .file(analysisName)
                       ?.async("text");
                     jsonObject = JSON.parse(jsonText ?? "");
+                    if (selectedName != null) {
+                      const selectedText = await zip
+                        .file(selectedName)
+                        ?.async("text");
+                      savedSelection = JSON.parse(selectedText ?? "null");
+                    }
                   } else {
                     const jsonText = new TextDecoder().decode(fileBlob);
                     jsonObject = JSON.parse(jsonText);
                   }
 
                   for (const key of Object.keys(jsonObject)) {
-                    jsonObject[key]["id"] = loadItem.id;
+                    if (jsonObject[key] != null && typeof jsonObject[key] === "object") {
+                      jsonObject[key]["id"] = loadItem.id;
+                    }
                   }
                   // Old paper saves lack uniqueResultIndices; compute k≤8 only
                   // so Clustering Selection / Heatmap do not freeze or open
@@ -461,6 +482,14 @@ export default function Saves(props: Props) {
                   dispatch(
                     batchSlice.actions.setTrajectoryAnalysis(analysis),
                   );
+                  if (
+                    savedSelection != null &&
+                    typeof savedSelection === "object"
+                  ) {
+                    dispatch(
+                      batchSlice.actions.selectSavedClustering(savedSelection),
+                    );
+                  }
                   setActiveSaveId(loadSaveId);
                   setLoadingFilename(null);
 

@@ -59,6 +59,22 @@ import {
 import { sum } from "d3";
 import JSZip from "jszip";
 import axios from "axios";
+
+/** Payload file URLs go through the dashboard proxy. A direct browser fetch is blocked by CORS or a LAN-only host, so the analysis zip loads and the motion zip does not. */
+function payloadFileUrl(url: string): string {
+  if (!url || url.startsWith("/") || url.startsWith("blob:")) return url;
+  try {
+    const payloadHost = new URL(
+      process.env.NEXT_PUBLIC_PAYLOAD_API_ADDRESS ?? "",
+    ).host;
+    if (payloadHost && new URL(url).host === payloadHost) {
+      return `/api/payload-file?url=${encodeURIComponent(url)}`;
+    }
+  } catch {
+    /* keep the original url */
+  }
+  return url;
+}
 import { interactionSlice } from "../../../../redux/slices/interaction";
 import { ClusteringResult } from "@/app/_shared/graphql/queries/clustering";
 import EgoTimelineBox from "@/app/_shared/components/EgoTimelineBox";
@@ -658,8 +674,12 @@ const Replayer = () => {
       }
       const updated: typeof trajectories = {};
       for (const egoName of Object.keys(trajectoryAnalysis ?? {})) {
-        const url = trajectoryAnalysis[egoName].trajectoriesFileinfo.url;
-        const response = await axios.get(url ?? "", {
+        const rawUrl =
+          trajectoryAnalysis[egoName].trajectoriesFileinfo?.url;
+        if (!rawUrl) continue;
+        try {
+        const url = payloadFileUrl(rawUrl);
+        const response = await axios.get(url, {
           responseType: "arraybuffer",
         });
 
@@ -667,9 +687,12 @@ const Replayer = () => {
 
         const zip = await JSZip.loadAsync(zipBlob);
 
-        const jsonFileName = Object.keys(zip.files).find((name) =>
-          name.endsWith(".json"),
+        const jsonNames = Object.keys(zip.files).filter(
+          (name) => name.endsWith(".json") && !zip.files[name].dir,
         );
+        const jsonFileName =
+          jsonNames.find((name) => name.split("/").pop() === "rawTrajectories.json") ??
+          jsonNames[0];
         if (jsonFileName == null) throw new Error("No JSON file found in ZIP");
 
         const jsonText = await zip.file(jsonFileName)?.async("text");
@@ -699,12 +722,25 @@ const Replayer = () => {
           }
         }
         const ratio = allowed.size > 0 ? Object.keys(kept).length / allowed.size : 0;
+        const matched = Object.keys(kept).length;
         updated[egoName] = ratio >= 0.2 ? kept : {};
         if (ratio < 0.2) {
-          console.warn(
-            `[Replayer] ${egoName}: trajectories zip overlap ${Object.keys(kept).length}/${allowed.size} ` +
-              `(${(ratio * 100).toFixed(1)}%). Refusing to draw — ids do not match this clustering save.`,
+          const message =
+            `${egoName}: motion zip matches ${matched}/${allowed.size} analysis trials. ` +
+            "Not drawing — those ids are a different set.";
+          console.warn(`[Replayer] ${message}`);
+          toast.error(message);
+        } else if (matched < allowed.size) {
+          toast.warn(
+            `${egoName}: motion loaded for ${matched}/${allowed.size} trials. The rest have no path in this zip.`,
           );
+        }
+        } catch (error) {
+          console.error(`[Replayer] ${egoName} motion zip failed`, error);
+          toast.error(
+            `${egoName}: could not load the motion zip. Clustering is loaded; cars are not.`,
+          );
+          updated[egoName] = {};
         }
       }
       setTrajectories(updated);

@@ -10,7 +10,7 @@ it does not guarantee one clean interaction intent. Two matched boundary trials
 can have very similar trajectories while differing at the conflict decision:
 one may attempt to go through and collide, while the other may brake to yield
 but still collide. Treat that as a possible collision-boundary mixture to test,
-not as an annotation error and not as evidence that both sides share one motive.
+not as an annotation error and not as evidence that both sides share one resolution.
 
 PARAMETER-SPACE params are sampled OpenSCENARIO inputs (Oncoming start/target speed and start
 delay) — NOT measured speed at peak conflict.
@@ -48,7 +48,7 @@ in the glossary. Do not invent abbreviations like `rel=`, `roll1s=`, `az=`, or `
   block (resolution, minimum distance between vehicle boundaries, first persistent divergence)
   is authoritative
   for pass/yield and for whether motion is near-identical.
-- Derive each boundary side's mini-motive from **this pair's context first**.
+- Derive each boundary side's resolution from **this pair's context first**.
 - <Left/Right medoid trial extracts> come from each endpoint's `output/medoid_trial.yaml`
   (cluster archetypes, not these boundary sides). Optional last-paragraph comment
   only: same story as the medoids, or a different edge of that cluster. Never copy
@@ -71,10 +71,10 @@ Keep CoT terse — telegraphic bullets. The YAML fence MUST be reached.
 YAML field order matches this workflow: evidence first, **separation decision last**.
 Do not close the fence until `separation_call` + `separation_reason` are written.
 
-1. Geometry first: one line on left/right interaction resolution, minimum
+1. Geometry first: one line on left/right resolution, minimum
    distance between vehicle boundaries,
-   and whether the context marks near-identical motion. Medoid backdrop (primary_motive
-   + outcome) is a later check, not this step's evidence.
+   and whether the context marks near-identical motion. Medoid backdrop (resolution
+   + short why + outcome) is a later check, not this step's evidence.
 2. Phase pass: walk the shared timeline as 4–8 time ranges (approach → geometry /
    divergence → outcome). For each phase note how [cA] vs [cB] differ in
    longitudinal relationship, minimum distance between vehicle boundaries,
@@ -90,19 +90,17 @@ Do not close the fence until `separation_call` + `separation_reason` are written
    Use `trajectory_shape_difference` / `downstream_behavior_difference` for
    whole-trial cluster-split evidence — do not treat Layer 2 as synchronized geometry.
 3. BEV confirm: name the synced frame nearest that earliest t (filename token).
-4. Left mini-motive (this boundary side, not the medoid): interaction_resolution +
-   control_response + 1 closed motive code + evidence at/before its time. Causal
-   locality applies. `control_response` must agree with the motive code per
-   common_sense's control-response/motive table — fix `control_response` rather
-   than leave a contradiction.
-5. Right mini-motive: same.
+4. Left resolution (this boundary side, not the medoid): `pass_first` / `yield`
+   / `unresolved` plus one evidence sentence at/before its time. Causal
+   locality applies.
+5. Right resolution: same.
 6. Write contrast_explanation (story so far).
 7. **Final decision** — separation_call: justified | over_fine | inconclusive,
    grounded in contrast_timeline + critical_divergence, not outcome alone. If motion
    is near-identical and sides share pass/yield order and differ only by a small,
    late change in minimum distance between vehicle boundaries: `over_fine` when
    outcomes match; `justified` (rubric 2b) when outcomes differ and that clearance
-   delta is the contact/near-miss difference. Do not invent a different motive.
+   delta is the contact/near-miss difference.
    If whole-trajectory motion is similar but one side is yield-family and the
    other is pass-family, this is a real behavior-boundary difference even when
    both collide; use `justified` when the paired geometry supports it.
@@ -124,8 +122,8 @@ its cluster medoid.
 - no persistent geometry split beyond tiny late clearance.
 
 2) `justified` (keep split) — at least one is true:
-  a) different family across sides (yield-family vs pass-family) or different
-     motive family, regardless of whether outcomes match, OR
+  a) different family across sides (yield-family vs pass-family), regardless of
+     whether outcomes match, OR
   b) same family, outcomes differ, and a real persistent clearance / geometry
      delta is the contact vs near-miss difference (even if late / small), OR
   c) same family, same outcome, but a persistent stay-ahead vs overlap split
@@ -187,26 +185,19 @@ critical_divergence.at with a quantified metric_delta.
 
 <Output>
 After CoT, ONE YAML fence with **interpretation fields only**.
-Field order = CoT order: motives → timeline → divergence → explanation →
+Field order = CoT order: resolutions → timeline → divergence → explanation →
 **final** `separation_call` / `separation_reason` / `hypothesis` (required; do not omit).
-For each side, fill `interaction_resolution` then `control_response` then
-`primary_motive`, in that order (go-through vs give-way → speed manner on
-that side's named-vehicle arc → closed pattern code). Do not use
-`control_response: recovery` or motive `post_clear_recovery` (retired). See
-common_sense fill order and pairing table.
+For each side, fill `resolution` then one `evidence` sentence
+(go-through vs give-way, then why in prose).
 (Pipeline attaches clusters / outcomes / params / trial refs / conflict_metrics.)
 
 ```yaml
 left:
-  interaction_resolution: "pass_first" | "yield" | "unresolved"
-  control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "none"
-  primary_motive: "<one closed motive code>"
-  motive_evidence: "<cite [cA] metrics or pair-context row; must be at/before its own time>"
+  resolution: "pass_first" | "yield" | "unresolved"
+  evidence: "<cite [cA] metrics or pair-context row; must be at/before its own time>"
 right:
-  interaction_resolution: "pass_first" | "yield" | "unresolved"
-  control_response: "smooth" | "slowdown" | "proactive" | "late" | "stop" | "brake" | "maintain" | "none"
-  primary_motive: "<one closed motive code>"
-  motive_evidence: "<cite [cB] metrics or pair-context row; must be at/before its own time>"
+  resolution: "pass_first" | "yield" | "unresolved"
+  evidence: "<cite [cB] metrics or pair-context row; must be at/before its own time>"
 
 contrast_timeline:
   - t_start: <float>
@@ -223,11 +214,10 @@ critical_divergence:
   metric_delta: "<metric + [cA] vs [cB] quantities in one line, e.g. 'minimum distance between vehicle boundaries 1.0 vs 0.4 m; longitudinal relationship named_vehicle_ahead vs side_overlap'>"
   bev_frame: "<synced filename token near that t, or null>"
 
-motive_contrast: "same" | "different"   # same primary motive code vs different codes
 contrast_explanation: |
   Why matched parameter-spaces diverged (or look alike). Lean on contrast_timeline
   and critical_divergence. Cite [cA] / [cB] and medoid backdrop when relevant.
-  Blank lines between paragraphs. Use closed motive codes.
+  Blank lines between paragraphs.
 
 # --- final decision (required; write last, after the evidence above) ---
 separation_call: "justified" | "over_fine" | "inconclusive"

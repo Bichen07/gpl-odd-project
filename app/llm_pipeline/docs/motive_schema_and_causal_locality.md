@@ -351,14 +351,15 @@ read 58.8 % / 34.6 %. The FPC0/FPC1 ratio differs (1.563 vs 1.699), so the paper
 a different MFPCA fit, and HDBSCAN clusters those scores. Full derivation in
 [`results/batch8/6_cluster_s=0.5947/PAPER_CASESTUDY3_MAPPING.md`](../../../results/batch8/6_cluster_s%3D0.5947/PAPER_CASESTUDY3_MAPPING.md).
 
-### 4.3 The motive field now drives a selection verdict
+### 4.3 The motive field and the behavior score
 
-`primary_motive` being typed is what makes a programmatic cluster-selection check possible:
-repeated codes across clusters are a countable over-split signal. That check, its three
-companions, and the hybrid LLM verdict built on top of it are described in
-[`cluster_selection_evaluation.md`](cluster_selection_evaluation.md). Its headline result —
-that the deterministic score prefers the paper-structure k=6 candidate (76.67) over the
-higher-silhouette one (60.00) — is independent corroboration of §4.2.
+The 2026-08-08 selection score used typed `primary_motive`, plus three other
+components, and preferred the paper-structure k=6 candidate (76.67) over the
+higher-silhouette one (60.00). That comparison is historical. The live behavior
+score does not read a motive code. Title distinctness counts `cluster_summary.label`,
+and uses the medoid resolution only when a cluster has no label. Pair outcome
+flips are not weighted. See
+[`cluster_selection_evaluation.md`](cluster_selection_evaluation.md).
 
 ### 4.4 Downstream
 

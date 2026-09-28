@@ -104,6 +104,55 @@ export function generateColors(numColors: number) {
   return colors;
 }
 
+/**
+ * Color and count map for one clustering. Uniqueness only materializes this
+ * for the first twin of a duplicate partition, so the analyzed epsilon (batch
+ * 8 index 415, `3_cluster_s=0.8032`) can land on an empty slot. Callers must
+ * build from `result.data` in that case or the scatter falls back to the two
+ * pass/fail colors.
+ */
+export function buildClusterInfoFromResult(
+  result: Pick<ClusteringResult, "data"> | null | undefined,
+): ClusterInfo {
+  const built: ClusterInfo = {};
+  for (const item of Object.values(result?.data ?? {})) {
+    if (item == null) continue;
+    const label = String(item.label);
+    if (!(label in built)) {
+      built[label] = { color: noiseColor, count: 0 };
+    }
+    built[label].count += 1;
+  }
+  let hasNoise = false;
+  let uniqueClusterCount = Object.keys(built).length;
+  if ("-1" in built) {
+    uniqueClusterCount -= 1;
+    hasNoise = true;
+  }
+  const palette = generateColors(uniqueClusterCount);
+  const clusterLabels = Object.keys(built).sort();
+  for (const [colorIndex, clusterLabel] of clusterLabels.entries()) {
+    if (clusterLabel === "-1") {
+      built[clusterLabel].color = noiseColor;
+    } else {
+      built[clusterLabel].color =
+        palette[hasNoise ? colorIndex - 1 : colorIndex];
+    }
+  }
+  return built;
+}
+
+/** Keep a precomputed map; rebuild when uniqueness left the slot empty. */
+export function resolveClusterInfo(
+  existing: ClusterInfo | null | undefined,
+  result: ClusteringResult | null | undefined,
+): ClusterInfo | null {
+  if (existing != null && Object.keys(existing).length > 0) return existing;
+  if (result == null) return null;
+  const built = buildClusterInfoFromResult(result);
+  return Object.keys(built).length > 0 ? built : null;
+}
+
 export interface ClusterInterpretationSummary {
   cluster_label?: string;
   ego_perspective_summary?: unknown;
@@ -495,39 +544,7 @@ export const batchSlice = createSlice({
                 updated.push({});
                 continue;
               }
-              const clusters: ClusterInfo = {};
-
-              for (const item of Object.values(result.data)) {
-                if (item == null) {
-                  continue;
-                }
-                if (!(item.label in clusters)) {
-                  clusters[item.label] = {
-                    color: noiseColor,
-                    count: 0,
-                  };
-                }
-                clusters[item.label].count += 1;
-              }
-              let hasNoise = false;
-              let uniqueClusterCount = Object.keys(clusters).length;
-              if ("-1" in clusters) {
-                uniqueClusterCount -= 1;
-                hasNoise = true;
-              }
-
-              const palette = generateColors(uniqueClusterCount);
-
-              const clusterLabels = Object.keys(clusters).sort();
-              for (const [index, clusterLabel] of clusterLabels.entries()) {
-                if (clusterLabel === "-1") {
-                  clusters[clusterLabel].color = noiseColor;
-                } else {
-                  clusters[clusterLabel].color =
-                    palette[hasNoise ? index - 1 : index];
-                }
-              }
-              updated.push(clusters);
+              updated.push(buildClusterInfoFromResult(result));
             }
             newClusterInfos[egoName][durationMode] = updated as ClusterInfo[];
           }
@@ -847,11 +864,82 @@ export const batchSlice = createSlice({
     ) => {
       state.selectedClusteringResults = action.payload;
     },
+    /** Restore Create New → save `selected.json` after the analysis zip is in state. */
+    selectSavedClustering: (
+      state: BatchState,
+      action: PayloadAction<
+        Record<
+          string,
+          {
+            durationMode?: string;
+            clusteringIndex?: number | null;
+            task?: ClusteringResult["task"] | null;
+          }
+        >
+      >
+    ) => {
+      if (state.trajectoryAnalysis == null) return;
+      const selectedResults: NonNullable<typeof state.selectedClusteringResults> =
+        { ...(state.selectedClusteringResults ?? {}) };
+      const selectedInfos: NonNullable<typeof state.selectedClusterInfos> = {
+        ...(state.selectedClusterInfos ?? {}),
+      };
+      for (const [egoName, entry] of Object.entries(action.payload ?? {})) {
+        const mode = entry?.durationMode || state.durationMode;
+        const clustering: Array<ClusteringResult | null> =
+          state.trajectoryAnalysis[egoName]?.mfpca?.[mode]?.clustering ?? [];
+        let idx = entry?.clusteringIndex ?? -1;
+        if (idx < 0 || idx >= clustering.length || clustering[idx] == null) {
+          const taskKey =
+            entry?.task != null ? JSON.stringify(entry.task) : null;
+          idx = taskKey
+            ? clustering.findIndex(
+                (c) => c != null && JSON.stringify(c.task) === taskKey,
+              )
+            : -1;
+        }
+        if (idx < 0 || clustering[idx] == null) continue;
+        selectedResults[egoName] = clustering[idx];
+        const existingInfo = state.clusterInfos?.[egoName]?.[mode]?.[idx];
+        let info = resolveClusterInfo(existingInfo, clustering[idx]);
+        if (
+          info != null &&
+          (existingInfo == null || Object.keys(existingInfo).length === 0) &&
+          state.clusterInfos?.[egoName]?.[mode] != null
+        ) {
+          state.clusterInfos[egoName][mode][idx] = info;
+        }
+        selectedInfos[egoName] = info;
+        if (egoName === "ITRI") {
+          state.selectedClusteringResult = clustering[idx];
+          state.selectedClusterInfo = info;
+        }
+      }
+      state.selectedClusteringResults = selectedResults;
+      state.selectedClusterInfos = selectedInfos;
+    },
     setSelectedClusterInfos: (
       state: BatchState,
       action: PayloadAction<typeof initialState.selectedClusterInfos>
     ) => {
       state.selectedClusterInfos = action.payload;
+    },
+    /** Fill a uniqueness placeholder `{}` so list bars and later clicks keep colors. */
+    rememberClusterInfo: (
+      state: BatchState,
+      action: PayloadAction<{
+        egoName: string;
+        durationMode: string;
+        index: number;
+        info: ClusterInfo;
+      }>
+    ) => {
+      const { egoName, durationMode, index, info } = action.payload;
+      const row = state.clusterInfos?.[egoName]?.[durationMode];
+      if (row == null || index < 0 || index >= row.length) return;
+      const existing = row[index];
+      if (existing != null && Object.keys(existing).length > 0) return;
+      row[index] = info;
     },
     setClusterAnalysisByEgo: (
       state: BatchState,

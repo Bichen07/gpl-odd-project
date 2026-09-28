@@ -127,47 +127,30 @@
 - APPROACH_* / POST_*: conflict burst samples around peak (often labeled
   `Ns before/after` in context and BEV titles).
 
-**Motive codes (CLOSED set — single-trial ego behavior only)**
-Pick from this list; do not invent new codes or free-form motive names. Each code
-needs at least one cited metric (peak time / center-to-center distance /
-estimated time to collision / brake onset) or one context/BEV stamp (`t=…`,
-frame name).
+The only closed behavior field is `resolution`. The why is one prose clause.
 
 If the supplied context already states pass/yield (e.g. a pair pack's
 Deterministic interaction geometry block), trust that unless it contradicts
-the control arc below. Otherwise infer it from **longitudinal relationship
-AND brake/accelerate**. A late brake into overlap is a failed yield, not a
-pass. Braking is not yield only when Ego then continues through (named
-vehicle behind, or brake_release then continues).
+the geometry gate below. Otherwise infer `resolution` from **longitudinal
+relationship AND brake/accelerate**. A late brake into overlap is a failed
+yield, not a pass. Braking is not yield only when Ego then continues through
+(named vehicle behind, or the brake ends and Ego continues).
 
-| code | applies when |
-| ---- | ------------ |
-| `yield_to_vehicle` | Ego decelerates / stops to give way: named vehicle stays ahead through the outcome, **or** Ego is still braking when a collision/overlap cuts the tape (failed yield). Braking alone is NOT yield if Ego already passed (`named vehicle behind Ego`) or released the brake and continued. FRONT→LEFT overlap while still decelerating stays this family, not `pass_first`. |
-| `early_brake` | sustained deceleration begins while estimated time to collision > 3.5 s or the named vehicle is outside the immediate conflict zone; yield-family, including a failed yield that still collides in overlap |
-| `late_reaction` | first strong deceleration / EMERGENCY_BRAKE only near peak conflict (or estimated time to collision < 1.5 s); yield-family, including a failed yield that still collides in overlap while Ego is braking. Do not switch to `assertive_gap_acceptance` just because overlap or collision follows a late brake. |
-| `gap_acceptance_creep` | ego keeps a low non-zero speed into the conflict instead of stopping |
-| `assertive_gap_acceptance` | ego holds or increases speed into a closing gap before peak conflict, no brake |
-| `maintain_through` | \|Δego speed\| ≲ 2 m/s across the conflict window; no brake stamp (smooth pass when Ego also passes) |
-| `post_clear_hard_brake` | severe/abrupt decelerate (EMERGENCY_BRAKE or \|Δv\| ≳5 m/s) **toward this row's agent** (often after another agent was already passed). Put this on the agent the brake is toward (e.g. Parking ahead), never on the vehicle already behind. Creates rear-end risk for whoever is behind Ego. |
-| `vehicle_driven_swerve` | same-lane TURN_* inside the conflict window with moderate+ lateral effect **toward this row's agent** |
-| `brake_release` | Ego ENDS/eases an active decelerate (that itself was `yield_to_vehicle` / `late_reaction` / `early_brake`) **before** peak/outcome, while estimated time to collision ≲ 3 s or the named vehicle is still near/very-close — braking stops before the conflict is resolved |
-| `post_clear_adjustment` | light/moderate decelerate strictly **after** peak with **this row's agent**, while that agent is NOT re-closing — a following-distance correction vs that agent, not resume-driving and not a new conflict with someone else. If another agent is ahead, conclude toward that agent instead. |
-| `unclear` | metrics and BEV genuinely disagree (e.g. contradictory log text) or evidence is missing → say so in `open_questions`. Do NOT use this just because an action doesn't feel "assertive" — check `brake_release`, `post_clear_hard_brake`, and `post_clear_adjustment` first (see precedence below) |
+**Stamp reading**
+0. Read every secondary-agent metric clause on this stamp (name, speed,
+   clearance, position). Those numbers are evidence only — not a pre-assigned
+   cause. The medoid BEV crop can omit a nearby secondary; missing from the
+   image is not missing from the scene.
+1. Ego eases a decelerate while the named vehicle is still near, before the
+   peak → say that the brake ended early, in the why clause.
+2. After the peak, a hard decelerate with another agent still ahead → that
+   ahead agent gets the why, and its own `resolution` row if Ego is giving way
+   to it.
+3. After an agent is already behind, Ego accelerates or turns and nobody else
+   is ahead → omit the why. Do not hang it on the passed vehicle.
+4. Metrics and BEV disagree → `open_questions`.
 
-**Precedence for brake-release / post-peak actions (check BEFORE defaulting to `unclear`)**
-0. **Before any of the below**, read every secondary-agent metric clause on this
-   stamp (name, speed, clearance, position). Those numbers are evidence only —
-   not a pre-assigned cause. The medoid BEV crop is centered on the primary
-   vehicle and can omit a nearby secondary agent; missing from the image is not
-   missing from the scene. You decide whether a secondary agent belongs in the
-   `description` / `⇒` conclude.
-1. Ego ends/eases an active evasive decelerate, named vehicle still near/very-close or `ttc` still tight, stamp is before `peak_t`/outcome ⇒ `brake_release` (this is often the direct precursor to a collision — name it, don't bury it in `unclear`).
-2. Stamp is after `peak_t` vs the named/pack vehicle, action is a severe/abrupt decelerate (EMERGENCY_BRAKE or |Δv| ≳5 m/s) with another agent still ahead ⇒ `post_clear_hard_brake` **toward that ahead agent** (the direct precursor to a Brake Rear-end collision — name it, don't bury it in `unclear`).
-3. Stamp is after `peak_t`, action is a minor decelerate, **this** agent not re-closing, no other agent ahead ⇒ `post_clear_adjustment`.
-4. Stamp is after this agent is already behind, Ego accelerates or turns, and **no** other agent is in conflict ahead ⇒ motive `null` (resume driving; do **not** hang it on the passed vehicle). If another agent is ahead, conclude toward **that** agent.
-5. Only if none of the above apply AND the evidence itself is contradictory/insufficient ⇒ `unclear`.
-
-**Resolution vs control vs motive (factor together)**
+**Resolution (factor this, nothing else)**
 `resolution` is go-through vs give-way **vs that agent**. Decide it from geometry
 AND the conflict control arc (brake / accelerate / hold / brake_release). If
 context already prints a pass/yield verdict, use it unless it contradicts that
@@ -177,8 +160,8 @@ control arc.
 - `yield` — Ego decelerates/stops to give way and the named vehicle is **not**
   behind Ego. Includes completed stay-ahead yield **and** failed yield:
   FRONT→LEFT overlap or collision while Ego is still braking (too late / too
-  weak). That overlap does **not** become `pass_first`. Covers `proactive-yield`,
-  `late-yield`, `yield`, `yield-stop-collision`.
+  weak). That overlap does **not** become `pass_first`. Early or late, the
+  resolution is still `yield`.
 - `pass_first` — Ego proceeds through. ANY of these (azimuth BEHIND is **not**
   required):
   - longitudinal relationship becomes `named vehicle behind Ego (Ego has passed)`
@@ -186,97 +169,46 @@ control arc.
   - Ego holds or increases speed into the closing gap (no yield brake);
   - `brake_release` then Ego continues through;
   - azimuth FRONT→LEFT→BEHIND while Ego continues.
-  Includes `pass-first`, `smooth-pass`, `pass-slowdown`, post-pass
-  `braking-rear-end`, and a failed pass **after** Ego already went through.
+  Includes a failed pass **after** Ego already went through.
 - `unresolved` — conflict ends without a clear pass or yield (no behind, no
   give-way brake, no hold/accel through).
 
 `resolution=yield` remains `YIELD` whether Ego brakes early, brakes
 late, stops, or the brake is insufficient and the trial collides in overlap.
-Use `control_response` for timing/quality. Do not flip a still-braking overlap
-collision to `pass_first`. Do not infer yield from braking if Ego already passed.
+Do not flip a still-braking overlap collision to `pass_first`. Do not infer
+yield from braking if Ego already passed. A name such as `Late Yield` belongs
+on `cluster_summary.label`, not on this row.
 
-`control_response` (closed; speed manner **on this agent's conflict arc only**):
-- `smooth` / `maintain` — little or no brake while resolving **this** agent
-  (`smooth-pass` vs that agent)
-- `slowdown` — gradual decelerate **during** this agent's pass/yield
-  (`pass-slowdown` vs that agent)
-- `proactive` — brake while this agent is still far / early (`proactive-yield`)
-- `late` — brake only near peak **with this agent** (`late-yield`)
-- `stop` — decelerate to near-zero vs this agent (`yield-stop-collision` when colliding)
-- `brake` — severe/abrupt brake **vs this agent** (often a new conflict after
-  someone else was already passed — paper `braking-rear-end` belongs on the
-  agent ahead, not on the passed vehicle)
-- `none` — no distinctive speed control vs this agent
+**Arc window (required).** Each `agent_interactions` row's `resolution` uses
+only stamps whose conclude is **toward that agent**, from first engagement
+until that agent's pass/yield/unresolved is decided. Later stamps toward
+another agent do **not** change this row.
 
-**Arc window (required).** For each `agent_interactions` row, `control_response`
-and `motive` use only stamps whose conclude is **toward that agent**, from first
-engagement until that agent's pass/yield/unresolved is decided. Later stamps
-toward another agent do **not** change this row.
-
-Example: Ego holds speed through CuttingIn (`pass_first` + `smooth`/`maintain` +
-`assertive_gap_acceptance` / `maintain_through`), then decelerates with Parking
-ahead → CuttingIn stays `smooth`/`maintain`. The brake is Parking's
-`control_response` (`slowdown` / `late` / `brake`), not CuttingIn's. Do **not**
-set CuttingIn to `brake` because a later Parking brake exists.
+Example: Ego holds speed through CuttingIn (`resolution: pass_first`), then
+decelerates with Parking ahead → CuttingIn stays `pass_first`. The later
+brake is Parking's row, not a rewrite of CuttingIn.
 
 Resume driving (accelerate / heading change with the last conflict agent already
-behind and nobody ahead) is **not** a motive on any row — timeline `motive: null`.
+behind and nobody ahead) is **not** a resolution on any row — omit the why.
 
 **Filling `agent_interactions` (required)**
 One row per agent Ego actually responded to. Named / primary conflict vehicle
 first (the partner on every timeline line before any secondary clause — e.g.
 CuttingIn). Extra rows only for other agents Ego reacted to (not distant
-furniture). Fill each row in this order, each constrained by the one before it:
+furniture). Each row has two keys:
 
-1. `resolution` — go-through vs give-way **vs that row's agent** (`pass_first`
-   / `yield` / `unresolved`). From geometry AND control. Overlap + still
-   braking = failed `yield`. That agent behind, or hold/accel / brake_release
-   then continue = `pass_first`. Braking never decides this by itself if Ego
-   already passed that agent.
-2. `control_response` — speed manner **on that agent's conflict arc only**
-   (see arc window above). A later brake toward Parking does not rewrite
-   CuttingIn's `control_response`.
-3. `motive` — the single dominant **closed pattern code** for **that same
-   arc**, consistent with (1) and (2). Pick from the table
-   (`maintain_through`, `assertive_gap_acceptance`, `late_reaction`, …).
-   `assertive_gap_acceptance` / `maintain_through` are pass-style patterns
-   (held speed into a closing gap vs nearly constant speed); they pair with
-   `smooth`/`maintain`/`slowdown`.
+1. `agent` — the vehicle this row is about.
+2. `resolution` — go-through vs give-way **vs that row's agent** (`pass_first`
+   / `yield` / `unresolved`). Overlap + still braking = failed `yield`. That
+   agent behind, or hold/accel / brake_release then continue = `pass_first`.
+   Braking never decides this by itself if Ego already passed that agent.
 
 After the named vehicle is already behind, do **not** skip a later Ego
 decelerate / accelerate / turn stamp. Quote any secondary clause on that line
 (distance, clearance, speed, closing) and look at BEV for an agent ahead.
 If a secondary is ahead of Ego, gap closing, and Ego is still changing speed,
-add that agent as an `agent_interactions` row (your closed codes). Do not
-conclude `post_clear_hard_brake` / `post_clear_adjustment` toward the vehicle
-already behind when another agent is ahead on that stamp. Do not write a
-Python hint as the cause.
-
-**`control_response` must agree with the motive that produced it**
-Each `control_response` value only pairs with the motive codes below. If the
-timeline's dominant motive and `control_response` would disagree, trust the
-motive evidence and correct `control_response` — never leave a contradiction:
-
-| `control_response` | only pairs with |
-| ---- | ---- |
-| `proactive` | `early_brake` |
-| `late` | `late_reaction`, `brake_release` |
-| `stop` | `yield_to_vehicle`, or a collision-frame stamp |
-| `brake` | `post_clear_hard_brake` (severe/abrupt; on the agent the brake is toward) |
-| `smooth` / `maintain` | `maintain_through`, `assertive_gap_acceptance` |
-| `slowdown` | `assertive_gap_acceptance` (gradual, still passing), `gap_acceptance_creep`, `post_clear_adjustment` |
-| `none` | `unclear`, `vehicle_driven_swerve`, or no distinctive speed control vs this agent |
-
-This also settles the `yield_to_vehicle` vs `early_brake` vs `late_reaction`
-choice: since `proactive` pairs ONLY with `early_brake` and `late` pairs ONLY
-with `late_reaction`/`brake_release`, do not put `yield_to_vehicle` on the
-row when `control_response` is `proactive` or `late` — pick
-`early_brake`/`late_reaction` instead, they are more specific (they also name
-WHEN the yield committed). Reserve `yield_to_vehicle` as the row `motive` for
-`control_response=stop`. Use `gap_acceptance_creep` (pairs with `slowdown`)
-when Ego keeps a low non-zero speed instead of stopping. Other codes from
-the same trial belong on `decision_timeline` stamps, not on this row.
+add that agent as an `agent_interactions` row with its own `resolution`.
+Do not write the later brake as the cause of the vehicle already behind.
 
 **Evidence hierarchy (do not invert)**
 1. Ground-truth outcome and minimum distance between vehicle boundaries.
@@ -287,35 +219,23 @@ the same trial belong on `decision_timeline` stamps, not on this row.
 A single velocity sample or sub-second brake-onset difference is **not causal**
 without persistent geometric separation. Oscillatory Δv is noise.
 
-**Resolution class (derived, closed set — for caption / medoid reasoning only, NOT for the `label` field)**
-Prefer the row's `resolution` when present. Otherwise map
-motive codes — but never call YIELD merely because ego braked:
+**Resolution class (for reading — not the `label` field)**
+Use the row's `resolution`.
 
-| source | resolution class |
+| `resolution` | class |
 | ---- | ---- |
-| `resolution=pass_first` | PASS |
-| `resolution=yield` | YIELD |
-| `assertive_gap_acceptance` / `maintain_through` | PASS |
-| `yield_to_vehicle` (only if Ego remains behind) | YIELD |
-| `early_brake` + still behind | YIELD |
-| `gap_acceptance_creep` | YIELD (creeping) |
-| `late_reaction` | timing modifier only — combine with resolution |
-| `brake_release` | response event only — combine with resolution |
-| `post_clear_hard_brake` | PASS (risk modifier — pairs with the `Brake Rear-end` label) |
-| `vehicle_driven_swerve` | OTHER (lateral resolution) |
-| `unclear` / `unresolved` | OTHER |
+| `pass_first` | PASS |
+| `yield` | YIELD |
+| `unresolved` | OTHER |
 
 **Cluster label (cluster_summary `label` ONLY — LLM invents, one cluster at a time)**
 
 Invent a **short outcome archetype**, 2–4 words, paper-heatmap style — what an
-analyst would put on a legend, not a readout of the motive codes above.
+analyst would put on a legend. This is the only place a compound such as
+`Late Yield` is written. The medoid card does not contain that adjective.
 
 Do **not**:
-- paste closed motive codes into the name (`assertive_gap_acceptance` →
-  "Assertive Gap…", `late_reaction` → "Late Reaction…",
-  `post_clear_hard_brake` → "Post-Clear Hard Brake…")
-- chain more than one mechanism into one label ("Assertive Gap Late Yield
-  Collision")
+- chain more than one mechanism into one label
 - use a hardcoded actor→label table (CuttingIn / Parking / Oncoming → fixed
   name)
 
@@ -323,8 +243,8 @@ Do:
 - name the outcome family first: Pass / Yield / Collision / Stop / Slowdown /
   Rear-end
 - add at most **one** short timing/quality word when it is the distinguishing
-  fact (`Late Yield`, `Proactive Yield`) — not the whole motive vocabulary
-- keep motive codes, timing detail, and mechanism explanation in `caption` only
+  fact (`Late Yield`, `Proactive Yield`)
+- keep the why in `caption` only
 
 Closed style set (prefer these; invent a new 2–4 word archetype only if none fit):
 `Smooth Pass` · `Pass-Slowdown` · `Yield` · `Proactive Yield` · `Late Yield` ·
@@ -338,20 +258,18 @@ other clusters' names (a separate review pass compares labels across the run).
 - An ego action at time `t_a` may be explained only by evidence at `t ≤ t_a`, plus
   global ground truth (`peak_t`, `d`, `ttc`, outcome).
 -   Later events may appear in the timeline, but must NOT be given as the reason for an
-  earlier action. Post-peak light/moderate decelerate vs **this** agent (not
-  re-closing, nobody else ahead) ⇒ `post_clear_adjustment`; post-peak severe
-  decelerate toward an agent still ahead ⇒ `post_clear_hard_brake` on **that**
-  agent's row. Accelerate / heading change with nobody left in conflict ⇒
-  timeline `motive: null`, never a code on the passed vehicle. None of these is
-  ever the motive for a pre-peak brake.
-- Stamps where the named vehicle is still far (d ≳ 100 m) are scene setup, not conflict
-  motives, unless a metric ties them to the conflict.
+  earlier action. A post-peak decelerate toward an agent still ahead belongs
+  on **that** agent's resolution row, explained in prose. Accelerate / heading
+  change with nobody left in conflict has no why clause and is not a resolution
+  on the passed vehicle. None of these is the reason for a pre-peak brake.
+- Stamps where the named vehicle is still far (d ≳ 100 m) are scene setup, not the
+  conflict why, unless a metric ties them to the conflict.
 
 **Wording**
 - Longitudinal: "slow down" / "speed up" / "hard brake" / "maintain speed" +
   lightly|moderately|severely — never "speed adjustment".
 - Same-lane: "turn left/right (same lane)"; quote Δheading; not a lane change
-  unless LANE_CHANGE_* is present. Ignore junction enter/exit filler for motives.
+  unless LANE_CHANGE_* is present. Ignore junction enter/exit filler.
 
 **Honesty**
 - One medoid ≠ whole cluster. IC percentiles are descriptive, not safe/risky bounds.

@@ -114,7 +114,9 @@ control_response (smooth/slowdown/proactive/late/stop/brake/   Resolution class
 
 ## 3. Field-by-field reference
 
-### 3.1 `interaction_resolution` / row `resolution` — go-through vs give-way
+**Rank 1 (current LLM schema).** The model writes `agent_interactions[].resolution` only (`pass_first` / `yield` / `unresolved`), plus timeline `description` and `motive_summary`. Row `control_response` and row `motive` are **retired** — do not put them back in a prompt. §§3.2–3.3 and the pairing tables below are the historical codebook, not the fence. Paper compounds (`Late Yield`) are `cluster_summary.label` only.
+
+### 3.1 `resolution` — go-through vs give-way
 
 | Value | Meaning | Paper anchor |
 | --- | --- | --- |

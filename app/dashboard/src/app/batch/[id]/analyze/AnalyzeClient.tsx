@@ -275,7 +275,7 @@ export default function AnalyzeClient({
       if ((err as Error)?.name === "AbortError") {
         setEvalError("Cross-cluster eval stopped by user.");
       } else {
-        setEvalError(String(err));
+      setEvalError(String(err));
       }
     } finally {
       setEvalRunning(false);
@@ -758,8 +758,6 @@ export default function AnalyzeClient({
 
   // Find quality entry for current folder
   const currentQuality = evalConfigs.find((c) => c.folder === config.folder);
-  const currentBoundaryPairs = currentQuality?.trajectory_projection_pairs ?? [];
-  const currentCrossEval = currentQuality?.cross_cluster_eval;
 
   // "Cluster analysis" prerequisites: medoid + every touching Parameter-space pair contrast.
   const splitClustersForPrereq = splitAnalysis?.clusters ?? [];
@@ -844,7 +842,7 @@ export default function AnalyzeClient({
           productRuns={productRuns}
           run={run}
           stopAnalyze={stopAnalyze}
-          folder={config.folder}
+              folder={config.folder}
           batchId={batchId}
           apiKey={apiKey}
           dryRun={dryRun}
@@ -856,8 +854,8 @@ export default function AnalyzeClient({
           config={config}
           batchId={batchId}
           splitAnalysis={splitAnalysis}
-          prompts={prompts}
-          setPrompts={setPrompts}
+            prompts={prompts}
+            setPrompts={setPrompts}
           summaryRunClusters={summaryRunClusters}
           setSummaryRunClusters={setSummaryRunClusters}
           toggleSummaryRunCluster={toggleSummaryRunCluster}
@@ -882,7 +880,6 @@ export default function AnalyzeClient({
       {activeTab === TAB.CROSS_CLUSTER && (
         <CrossClusterAnalysis
           config={config}
-          batchId={batchId}
           splitAnalysis={splitAnalysis}
           evalRunning={evalRunning}
           evalError={evalError}
@@ -893,17 +890,14 @@ export default function AnalyzeClient({
           runCrossClusterEval={runCrossClusterEval}
           stopCrossClusterEval={stopCrossClusterEval}
           evalConfigs={evalConfigs}
-          currentCrossEval={currentCrossEval}
-          currentBoundaryPairs={currentBoundaryPairs}
-          currentQuality={currentQuality ?? null}
         />
       )}
 
       {activeTab === TAB.MEDOID && (
         <MedoidAnalysis
           config={config}
-          prompts={prompts}
-          setPrompts={setPrompts}
+            prompts={prompts}
+            setPrompts={setPrompts}
           selected={selected}
           setSelected={setSelected}
           runClusters={runClusters}
@@ -937,7 +931,7 @@ export default function AnalyzeClient({
 
       {activeTab === TAB.ODD_QA && config && (
         <OddQA
-          batchId={batchId}
+            batchId={batchId}
           folder={config.folder}
           apiKey={apiKey}
           model={model}

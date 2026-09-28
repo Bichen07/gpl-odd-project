@@ -39,22 +39,30 @@ export function clusterCountFromResult(
 }
 
 /**
- * Prefer a clustering with 2 ≤ k ≤ maxK (default 8) so Heatmap/Replayer do not
- * open ~20 cluster windows on load.
+ * Prefer the highest-silhouette clustering with 2 ≤ k ≤ maxK (default 8).
+ * Smallest-k used to open a 2-cluster candidate and hide the analyzed run
+ * (batch 8 `3_cluster_s=0.8032` is k=3, silhouette 0.8032). The k cap still
+ * keeps Heatmap/Replayer off ~20 panes.
  */
 export function pickPreferredClustering(
   clustering: Array<ClusteringResult | null | undefined>,
   maxK: number = DEFAULT_MAX_CLUSTER_COUNT,
 ): { result: ClusteringResult | null; index: number } {
-  let best: { result: ClusteringResult; index: number; k: number } | null =
-    null;
+  let best: {
+    result: ClusteringResult;
+    index: number;
+    k: number;
+    sil: number;
+  } | null = null;
   for (let i = 0; i < clustering.length; i++) {
     const r = clustering[i];
     if (r == null) continue;
     const k = clusterCountFromResult(r);
     if (k < 2 || k > maxK) continue;
-    if (best == null || k < best.k) {
-      best = { result: r, index: i, k };
+    const raw = r.scores?.silhouetteScore;
+    const sil = typeof raw === "number" && Number.isFinite(raw) ? raw : -Infinity;
+    if (best == null || sil > best.sil) {
+      best = { result: r, index: i, k, sil };
     }
   }
   if (best != null) return { result: best.result, index: best.index };

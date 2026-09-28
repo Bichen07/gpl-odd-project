@@ -62,7 +62,7 @@ export function stringifyValue(v: unknown): string {
   return String(v);
 }
 
-/** Named-vehicle row may be back-filled from legacy top-level resolution/control/motive. */
+/** Named-vehicle row may be back-filled from legacy top-level resolution only. */
 export function agentInteractionRows(
   parsed: Record<string, unknown> | null | undefined,
 ): Record<string, unknown>[] {
@@ -91,8 +91,6 @@ export function agentInteractionRows(
       {
         agent: partner,
         resolution: parsed.interaction_resolution,
-        control_response: parsed.control_response,
-        motive: parsed.primary_motive,
       },
       ...rows,
     ];

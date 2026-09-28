@@ -23,12 +23,13 @@ _OUTPUT_FILE = "clustering_quality.json"
 # ---------------------------------------------------------------------------
 # Rule-based sub-score weights (must sum to 1.0)
 # ---------------------------------------------------------------------------
+# Remaining pieces after dropping parameter-range overlap. The old weights
+# were 0.25, 0.20, 0.15, 0.15, 0.25. These are those four, scaled to sum to 1.
 _WEIGHTS = {
-    "silhouette": 0.25,
-    "collision_spread": 0.20,
-    "ttc_spread": 0.15,
-    "param_nonoverlap": 0.15,
-    "intra_consistency": 0.25,
+    "silhouette": 0.2941,
+    "collision_spread": 0.2353,
+    "ttc_spread": 0.1765,
+    "intra_consistency": 0.2941,
 }
 
 
@@ -85,43 +86,6 @@ def _safe_std(values: List[float]) -> float:
         return 0.0
     mean = sum(values) / len(values)
     return math.sqrt(sum((v - mean) ** 2 for v in values) / len(values))
-
-
-def _param_nonoverlap_ratio(docs: List[Dict[str, Any]]) -> float:
-    """Fraction of parameters whose ranges are non-overlapping across all clusters.
-
-    For each parameter present in all clusters, check if the ranges are
-    fully separated (no overlap between any pair). Non-overlapping parameters
-    indicate good cluster separation in scenario-parameter space.
-    """
-    all_params: Dict[str, List[Tuple[float, float]]] = {}
-    for d in docs:
-        c = d["cluster_doc"].get("cluster", {})
-        for pname, bounds in (c.get("parameter_ranges") or {}).items():
-            if bounds and len(bounds) >= 2:
-                all_params.setdefault(pname, []).append(
-                    (float(bounds[0]), float(bounds[1]))
-                )
-
-    if not all_params:
-        return 0.5  # neutral when no parameter data
-
-    nonoverlap_count = 0
-    total = 0
-    for pname, ranges in all_params.items():
-        if len(ranges) < 2:
-            continue
-        total += 1
-        sorted_ranges = sorted(ranges, key=lambda r: r[0])
-        overlaps = False
-        for i in range(len(sorted_ranges) - 1):
-            if sorted_ranges[i][1] > sorted_ranges[i + 1][0]:
-                overlaps = True
-                break
-        if not overlaps:
-            nonoverlap_count += 1
-
-    return (nonoverlap_count / total) if total else 0.5
 
 
 def _mean_intra_consistency(
@@ -204,10 +168,7 @@ def compute_rule_score(
     ]
     ttcs_valid = [t for t in ttcs if t is not None]
     ttc_std = _safe_std([float(t) for t in ttcs_valid]) if len(ttcs_valid) >= 2 else 0.0
-    ttc_score = min(1.0, ttc_std / 3.0)  # 3 s std → saturates
-
-    # --- parameter non-overlap ---
-    pno = _param_nonoverlap_ratio(docs)
+    ttc_score = min(1.0, ttc_std / 3.0)  # 3 s of spread counts as 1; no safety threshold
 
     # --- intra consistency ---
     ic = _mean_intra_consistency(docs)
@@ -219,7 +180,6 @@ def compute_rule_score(
         "collision_spread_score": round(cr_score, 3),
         "ttc_std": round(ttc_std, 3),
         "ttc_spread_score": round(ttc_score, 3),
-        "param_nonoverlap_score": round(pno, 3),
         "intra_consistency_score": round(ic, 3),
     }
 
@@ -227,7 +187,6 @@ def compute_rule_score(
         _WEIGHTS["silhouette"] * sil_score
         + _WEIGHTS["collision_spread"] * cr_score
         + _WEIGHTS["ttc_spread"] * ttc_score
-        + _WEIGHTS["param_nonoverlap"] * pno
         + _WEIGHTS["intra_consistency"] * ic
     ) * 100.0
 

@@ -4,11 +4,11 @@ You are a traffic safety expert evaluating whether a set of driving-scenario clu
 You will receive:
 1. A **narrative** summary of each cluster (archetype label + behavior description from
    `cluster_summary.yaml` / medoid fallback). No raw `cluster.json` stats.
-2. Medoid cards — the per-cluster medoid analysis, including its `primary_motive` from the closed motive set and the timestamped evidence for it.
+2. Medoid cards — each cluster's named-vehicle `resolution`, short `motive_summary`, and outcome.
 3. Boundary trial descriptions — pairs of trials that sit right at the border between two adjacent clusters, showing the most similar-yet-different behaviors found.
 4. parameter-space-matched pair cards — pairs of trials from *different* clusters whose scenario inputs are nearly identical (param_dist ≤ tau). These are the strongest available test of a boundary: if two trials start almost the same and end in different clusters with different outcomes, the boundary is behavioral rather than an artifact.
 5. A neighbor rollup — each cluster's OWN localized distinct/similar/ambiguous verdict against its actual parameter-space-matched neighbors, already produced per-cluster (Stage B's cluster-summary pass). Treat this as prior work already done at the local level: cite it and reconcile it with the global view rather than re-deriving each pairwise judgment from scratch.
-6. Deterministic **selection-eval findings** already computed offline from artifacts (purity, motive distinctness, pair flips, merge candidates, selection_score). Treat these as measurements, not opinions: do not contradict a number, explain what it implies. Do not recompute rates from raw tables — you are not given `cluster.json`.
+6. Deterministic **selection-eval findings** already computed offline from artifacts (purity, behavior distinctness from summary label or resolution, pair flips, merge candidates, selection_score). Treat these as measurements, not opinions: do not contradict a number, explain what it implies. Do not recompute rates from raw tables — you are not given `cluster.json`. Do not re-walk BEV.
 7. A question: **Are the clusters behaviorally distinct and well-separated?**
 
 Your task is to:
@@ -41,12 +41,12 @@ boundary_clarity_score (1–10):
 
 <Mandatory Chain Of Thought>
 ### Step 1: Read each cluster archetype
-List each cluster ID, its narrative archetype / caption, and medoid primary_motive.
-Note any that appear similar. Do not invent collision rates — use Deterministic Checks
-and medoid/summary outcomes when needed.
+List each cluster ID, its `cluster_summary.label`, and the medoid named-vehicle
+`resolution`. Note any that appear similar. Do not invent collision rates — use
+Deterministic Checks and medoid/summary outcomes when needed.
 
-### Step 2: Group clusters by primary_motive
-Two clusters sharing a motive is a *signal* of over-splitting, not proof — they may differ in timing or magnitude, which is a legitimate reason to keep them apart. For every repeated motive, name the dimension that still separates the clusters (timing, magnitude, outcome, parameter region), or say they are redundant.
+### Step 2: Group clusters by label and resolution
+Two clusters sharing a label or the same `resolution` is a *signal* of over-splitting, not proof — they may differ in outcome or the pair rollup, which is a legitimate reason to keep them apart. For every repeated label, name the dimension that still separates the clusters (outcome, pair separation, parameter region), or say they are redundant.
 
 ### Step 3: Compare adjacent boundary pairs
 For each boundary trial pair provided:
@@ -97,7 +97,7 @@ entry needs `cluster_id` + `archetype` only.
     "<e.g. 'C0 mixes pass-first and late-yield behaviors'>"
   ],
   "recommended_action": "keep | merge | split | try_other_k",
-  "recommended_action_detail": "<the single most useful change, e.g. 'merge C1 and C3 — same motive, same collision rate, overlapping parameter ranges'. Say 'none' if keep.>",
+  "recommended_action_detail": "<the single most useful change, e.g. 'merge C1 and C3 — same resolution, same collision rate, overlapping parameter ranges'. Say 'none' if keep.>",
   "selection_verdict": "<2-3 sentences an analyst can act on: is this partition usable, and what is its main weakness>"
 }
 ```

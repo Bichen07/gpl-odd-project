@@ -809,10 +809,11 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         ],
       });
     } else {
+      const clusterLabels = Object.keys(clusterInfo)
+        .filter((key) => key !== "-1")
+        .sort((a, b) => Number(a) - Number(b));
       let colors = [
-        ...Object.entries(clusterInfo)
-          .filter(([key, item]) => key !== "-1")
-          .map(([_key, item]) => chroma(item.color).rgba()),
+        ...clusterLabels.map((key) => chroma(clusterInfo[key].color).rgba()),
         chroma(theme.palette.error.light).rgba(),
         chroma(theme.palette.success.light).rgba(),
         chroma(theme.palette.error.light).rgba(),

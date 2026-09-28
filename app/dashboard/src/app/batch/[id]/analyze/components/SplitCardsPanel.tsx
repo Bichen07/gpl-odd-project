@@ -238,7 +238,7 @@ export default function SplitCardsPanel({
                     <Typography variant="caption" component="div">
                       <strong>distinct</strong> — keep apart: under matched scenario
                       parameters the two sides take different paths (stay-behind vs
-                      overlap / go-through, or a different motive family) and/or
+                      overlap / go-through, or a different resolution) and/or
                       different outcomes. Maps from pair{" "}
                       <code>separation_call: justified</code>. The boundary trial
                       need not match this cluster&apos;s medoid.
@@ -329,8 +329,13 @@ export default function SplitCardsPanel({
               </Typography>
               {medoidAgentInteractions.map((row: Record<string, unknown>, i: number) => (
                 <Typography key={`${String(row?.agent)}-${i}`} variant="body2">
-                  {String(row?.agent ?? "?")}: resolution={String(row?.resolution ?? "—")},
-                  control={String(row?.control_response ?? "—")}, motive={String(row?.motive ?? "—")}
+                  {String(row?.agent ?? "?")}: resolution={String(row?.resolution ?? "—")}
+                  {row?.control_response != null && String(row.control_response).trim() !== ""
+                    ? `, control=${String(row.control_response)}`
+                    : ""}
+                  {row?.motive != null && String(row.motive).trim() !== ""
+                    ? `, motive=${String(row.motive)}`
+                    : ""}
                 </Typography>
               ))}
             </Stack>

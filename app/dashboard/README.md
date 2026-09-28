@@ -118,7 +118,7 @@ Saves
 - `DEFAULT_MAX_CLUSTER_COUNT = 8`.
 - Count **k from `result.data`** (`clusterCountFromResult`) — do not wait on Redux `clusterInfos`.
 - Uniqueness / list skip `k > 8` unless **Show k > 8**.
-- On analysis load, `pickPreferredClustering` selects a result with **2 ≤ k ≤ 8** so Heatmap/Replayer do not open ~20 panes.
+- On analysis load, `pickPreferredClustering` selects the **highest silhouette** with **2 ≤ k ≤ 8**. A silhouette tie keeps the first index (batch 8: epsilon 0). Once `/api/cluster-analysis-status` loads, the list promotes the task-matched folder (`3_cluster_s=0.8032`, epsilon 10). That later index often has an empty color slot; `resolveClusterInfo` rebuilds it from `result.data` so Heatmap/Projection show three cluster colors, not the two pass/fail colors.
 
 #### 3. Showing AVs is the only ego filter
 
@@ -181,7 +181,7 @@ python3 app/analyzer/src/dataset_builder.py \
 | Analyzer hook | [`app/analyzer/src/controller.py`](../analyzer/src/controller.py) | Attach uniqueness on analysis |
 | Analyzer tests | [`app/analyzer/src/tests/test_clustering_uniqueness.py`](../analyzer/src/tests/test_clustering_uniqueness.py) | Collapse / distinct / rank / null / noise |
 | `Mfpca` types | [`_shared/graphql/queries/clustering.ts`](src/app/_shared/graphql/queries/clustering.ts) | Optional uniqueness fields |
-| Prefer k≤8 on load | [`explore/redux/slices/batch.ts`](src/app/batch/[id]/_tabs/explore/redux/slices/batch.ts) | `pickPreferredClustering` in `setTrajectoryAnalysis` |
+| Prefer highest silhouette, k≤8 on load | [`explore/redux/slices/batch.ts`](src/app/batch/[id]/_tabs/explore/redux/slices/batch.ts) | `pickPreferredClustering`; `resolveClusterInfo` fills an empty color slot when the analyzed twin replaces the first silhouette tie |
 | Clustering Selection UI | [`.../PerEgoSelection/index.tsx`](src/app/batch/[id]/_tabs/explore/components/dock/panels/ClusteringSelection/PerEgoSelection/index.tsx) | k≤8, uniqueness, badges, sort by label rank, Show k > 8 |
 | Clustering Selection egos | [`.../ClusteringSelection/index.tsx`](src/app/batch/[id]/_tabs/explore/components/dock/panels/ClusteringSelection/index.tsx) | Maps `state.batch.egos` only |
 | Showing AVs + select cascade | [`.../Controls/Filtering/index.tsx`](src/app/batch/[id]/_tabs/explore/components/dock/panels/Controls/Filtering/index.tsx) | `setEgos`; full `reset()` only on analysis load |

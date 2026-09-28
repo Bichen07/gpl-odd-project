@@ -24,6 +24,27 @@ from .paths import run_artifact_path, run_source_dir
 BRIEFING_FILENAME = "odd_chat_briefing.json"
 
 
+def _named_vehicle_resolution(medoid: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Resolution on the named-vehicle row. Legacy top-level key if the row is missing."""
+    if not isinstance(medoid, dict):
+        return None
+    cm = medoid.get("conflict_metrics") if isinstance(medoid.get("conflict_metrics"), dict) else {}
+    partner = str(cm.get("vehicle") or cm.get("partner") or "").strip()
+    for row in medoid.get("agent_interactions") or []:
+        if not isinstance(row, dict):
+            continue
+        if partner and str(row.get("agent") or "").strip() != partner:
+            continue
+        res = row.get("resolution") or row.get("interaction_resolution")
+        if isinstance(res, str) and res.strip():
+            return res.strip()
+        break
+    top = medoid.get("interaction_resolution")
+    if isinstance(top, str) and top.strip():
+        return top.strip()
+    return None
+
+
 def _read_json(p: Path) -> Optional[Dict[str, Any]]:
     if not p.is_file():
         return None
@@ -107,7 +128,7 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
                 "parameter_ranges": cluster_stats.get("parameter_ranges"),
                 "neighborhood_separation": (summary or {}).get("neighborhood_separation"),
                 "medoid_trial_id": (medoid or {}).get("trial_id"),
-                "medoid_motive": (medoid or {}).get("primary_motive"),
+                "medoid_resolution": _named_vehicle_resolution(medoid),
                 "medoid_outcome": (medoid or {}).get("outcome"),
                 "summary_caption_short": _truncate((summary or {}).get("caption")),
                 "consistency_note_short": _truncate((summary or {}).get("consistency_note")),

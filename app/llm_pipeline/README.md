@@ -19,7 +19,7 @@ Legacy folders `ic_pairs/` and `boundary_pairs/` still resolve as read fallbacks
 
 Dashboard **Analyze** tabs: Model setup → Medoid → Parameter-space pairs → Cluster analysis → Cross-cluster analysis → Report → ODD Q&A. Explore Replayer reads medoid / pair cards via `/api/cluster-analysis-status`. Visualization review (gaps, graph+text linking, paper notes): [`app/dashboard/VISUALIZATION_REVIEW.md`](../dashboard/VISUALIZATION_REVIEW.md).
 
-Design deep-dives: [`docs/cluster_selection_evaluation.md`](docs/cluster_selection_evaluation.md), [`docs/motive_schema_and_causal_locality.md`](docs/motive_schema_and_causal_locality.md), root [`README.md`](../../README.md), [`implementation_plan.md`](../../implementation_plan.md).
+Design deep-dives: [`docs/cluster_selection_evaluation.md`](docs/cluster_selection_evaluation.md), [`docs/motive_schema_and_causal_locality.md`](docs/motive_schema_and_causal_locality.md), root [`README.md`](../../README.md). The August implementation plan and the superseded architecture-refactor plan were removed; the current score formulas are in §4.5.
 
 ---
 
@@ -150,12 +150,13 @@ Also patches soft fields on `cluster.json`.
 | `{trial_context}` | `processed/context_medoid.md` |
 | BEV | `processed/snapshots/*.jpg` (all frames by default; dashboard **Select frames** can thin) |
 
-**Output:** `output/medoid_trial.yaml` — `agent_interactions` (per-agent
-resolution / control / motive on **that agent's conflict arc**; pipeline **strips** leftover top-level
-`interaction_resolution` / `control_response` / `primary_motive` /
-`secondary_motives` if the model still emits them; eval/dashboard may back-fill
-a missing named-vehicle row from those old keys when reading legacy files),
-`decision_timeline`, `collision_detail` (pipeline may inject GT), `motive_summary`, …
+**Output:** `output/medoid_trial.yaml`. Each `agent_interactions` row is
+`agent` + `resolution` (`pass_first` / `yield` / `unresolved`). The timeline
+is `timestamp` + `description`. `motive_summary` is 2–4 sentences of why.
+`ensure_named_vehicle_agent_interaction` strips leftover `control_response`,
+row `motive`, and top-level `interaction_resolution` / `primary_motive` /
+`secondary_motives` if a model still emits them. `conflict_metrics` stays
+(pipeline numbers). A name such as Late Yield is not written here.
 
 ```bash
 python -m llm_pipeline.cli cluster-interpret \
@@ -172,9 +173,13 @@ python -m llm_pipeline.cli cluster-interpret \
 | medoid extracts | both `cluster{A,B}/output/medoid_trial.yaml` |
 | BEV | `synced_bev/*.jpg` (≤8) |
 
-**Output:** `output/contrast.yaml` — `contrast_timeline`, `critical_divergence`,
-`motive_contrast`, `contrast_explanation`, `separation_call` ∈
-`{justified, over_fine, inconclusive}`, …
+**Output:** `output/contrast.yaml`. Each side is `resolution` + one
+`evidence` sentence. Also `contrast_timeline`, `critical_divergence`,
+`contrast_explanation`, and `separation_call` ∈
+`{justified, over_fine, inconclusive}`. The writer drops `motive_contrast`
+and the old side triple (`interaction_resolution` / `control_response` /
+`primary_motive`) on a new write. Older files on disk may still contain
+those keys until the pair is re-run.
 
 Whole-trajectory MFPCA+HDBSCAN can group similar shapes with different interaction
 intents; pair separation uses the shared conflict window. Dashboard rejects packs
@@ -195,11 +200,12 @@ python -m llm_pipeline.cli cluster-interpret \
 | cluster context | `processed/context_cluster.md` |
 | touching pairs | each touching `parameter_space_pairs/cA-cB/output/contrast.yaml` **and** the other side’s `clusterM/output/medoid_trial.yaml` extract |
 
-**Output:** `output/cluster_summary.yaml` — **`label` is LLM-authored**, target
-2–4 words / one outcome archetype (closed style set in `common_sense.txt`;
-motive codes and mechanism chaining must stay in `caption`, not `label`).
-Pipeline does **not** overwrite `label`. Still rule-sets `risk_level` from
-collision rate and `distinct_from_neighbors` from neighbor verdicts.
+**Output:** `output/cluster_summary.yaml`. **`label` is LLM-authored**,
+2–4 words, one outcome archetype (`Late Yield` lives only here). The why is
+`caption`. `motive_consistency_note` compares the caption to the medoid
+`resolution` and `motive_summary`. The pipeline does **not** overwrite
+`label`. It still sets `risk_level` from the collision rate and
+`distinct_from_neighbors` from the neighbor verdicts.
 
 Also: `caption`, `neighbor_comparison[]` (`verdict` mapped from pair
 `separation_call`: justified→distinct, over_fine→similar, …),
@@ -247,7 +253,8 @@ geometric; these layers are behavioral. Detail / dashboard field tutorial:
 
 **Scope:** cross-eval = inter-cluster verdict **inside one `$RUN`**. Ranking
 different `k_cluster_s=…` folders uses each folder’s `clustering_quality.json`
-(“All Clustering Configurations”).
+(“Other clusterings of this batch” on the cross-cluster tab). Silhouette is a
+geometry piece, not a separate ranking column.
 
 ```text
 cluster.json + medoid YAML + pair.json  ──rule──►  cluster_selection_eval.json
@@ -264,11 +271,14 @@ cluster.json + optional LLM scores  ──rule──►  clustering_quality.json
 | `cross_cluster/output/cross_cluster_eval.json` | LLM (stub if dry-run) | `--products cross-eval`; CLI `cross-cluster-eval`; dashboard button |
 | `analysis/quality/clustering_quality.json` | Rule (+ optional blend) | After dataset build; after cross-eval; CLI |
 
-**selection-eval components** (weights renormalize if missing):
-`outcome_purity` 0.30 · `motive_distinctness` 0.30 ·
-`parameter_space_pair_decisiveness` 0.25 · `no_merge_candidates` 0.15.
-Reads `cluster.json`, medoid `primary_motive`, `pair.json` flips — **never** sends
-raw `cluster.json` to the LLM (only `digest_for_prompt()`).
+**Behavior score** (`selection_score` in `cluster_selection_eval.json`; the dashboard
+says **behavior**). Weights renormalize if a component is missing:
+`outcome_purity` 0.50 · `motive_distinctness` 0.50.
+The JSON key is still `motive_distinctness`. It counts summary titles, and uses
+the medoid resolution only when a cluster has no title. Pair outcome flips and
+the merge-candidate list are written for inspection and are **not** in the score.
+The digest sent to the language model is `digest_for_prompt()` — never raw
+`cluster.json`.
 
 **cross-eval prompt slots:** `{cluster_summaries}`, `{medoid_cards}`,
 `{parameter_space_pair_cards}`, `{neighbor_rollup}`, `{boundary_trial_pairs}`,
@@ -276,10 +286,14 @@ raw `cluster.json` to the LLM (only `digest_for_prompt()`).
 `boundary_clarity_score` (1–10), `inter_notes`, merge/split lists,
 `recommended_action`, `selection_verdict`.
 
-**clustering_quality `rule_score` weights:** silhouette 0.25 · collision_spread 0.20 ·
-ttc_spread 0.15 · param_nonoverlap 0.15 · intra_consistency 0.25.
-`final_score = 0.6×rule + 0.4×llm` when non-stub cross-eval has both scores;
-else rule-only. `rank` filled by `GET /api/cluster-evaluate`.
+**clustering_quality `rule_score` weights:** silhouette 0.2941 · collision_spread 0.2353 ·
+ttc_spread 0.1765 · intra_consistency 0.2941.
+`final_score = 0.6×rule + 0.4×llm` when a non-stub cross-eval has both ratings;
+else the composite stays equal to the geometry score. The dashboard calls
+`rule_score` **geometry**, the blended language-model half **language model**,
+and `final_score` **composite**. The behavior score is not in the composite.
+If the model omits a rating, the parser stores 5 before this blend, so a missing
+rating is treated as a written 5. `rank` is filled by `GET /api/cluster-evaluate`.
 
 **`analysis/logs/split_analysis_summary.json`:** write-only receipt of the latest
 `cluster-interpret` call (paths written/skipped). Nothing reads it back.
@@ -298,9 +312,9 @@ Analyze → **Report** loads `GET /api/cluster-run-report` (no LLM) from files o
 
 | Panel | Source | Notes |
 |-------|--------|-------|
-| **F Clustering Trust** | `cross_cluster/input/cluster_selection_eval.json` | `merge_candidates`, `findings`; link jumps to Cross-cluster tab |
-| **G Recommended Next Tests** | client heuristics on report DTO | inconclusive `separation_call` packs; high-collision clusters missing contrast |
-| **E ODD boundary / rules** | S2/S3 JSON under `analysis/odd/output/` | CART rules table; min–max kNN ≠ pair z-score distance |
+| Header chips | selection-eval + `clustering_quality.json` | **behavior** is `selection_score`. **composite** is `final_score`. |
+| **Recommended Next Tests** | client heuristics on report DTO | Missing pair contrasts, inconclusive calls, and pairs called `over_fine`. An `over_fine` call is an open split, not a resolved one. |
+| **ODD boundary / rules** | S2/S3 JSON under `analysis/odd/output/` | CART rules table; min–max kNN ≠ pair z-score distance |
 
 Produce E’s files:
 
@@ -435,7 +449,7 @@ products so chat can say “unknown — run S3” instead of guessing.
 document index* (dense retriever + generator), then generate. This run’s
 knowledge is already **one structured JSON** (~6 clusters, ~9 pairs, ~8 rules,
 boundary counts). There is nothing to index at Wikipedia scale. Full RAG
-(chunk YAMLs / `context.md` / BEV, embeddings, GraphRAG as in VEHITS 2025)
+(chunk YAMLs / `context.md` / BEV, embeddings, a vector GraphRAG)
 would (a) retrieve prose the system prompt forbids as a number source, (b)
 make citations un-auditable, (c) burn tokens on timelines we deliberately
 exclude. Plan §2.4: briefing JSON = non-parametric memory for **this** `$RUN`;
@@ -529,7 +543,7 @@ python -m llm_pipeline.cli odd-chat --run-dir "$RUN" --question "…" [--dry-run
 | `split_analysis.py` | Products; gates; summary LLM invents `label` per cluster, independently; `split_analysis_summary.json` |
 | `cluster_aggregates.py` | Pass-1 aggregates → `cluster_aggregate.json` |
 | `cluster_label_reviewer.py` | Cross-cluster label QA — one LLM call, renames mechanism-chained / duplicate labels |
-| `cluster_selection_eval.py` | Rule selection score + digests |
+| `cluster_selection_eval.py` | Behavior score (purity + title distinctness) + digests |
 | `cross_cluster_evaluator.py` | Whole-partition LLM verdict |
 | `clustering_quality_scorer.py` | Rule (+ optional LLM blend) ranking score |
 | Analyzer `dataset_builder.py` / `parameter_space_pair_packs.py` | Packs, BEV, context rebuild |

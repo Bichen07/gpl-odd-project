@@ -44,8 +44,14 @@ export default function IcPairPanel({
   const contrastParsed = (pair?.contrastMeta as Record<string, any> | null)?.parsed as
     | Record<string, any>
     | undefined;
-  const leftMotive = contrastParsed?.left?.primary_motive;
-  const rightMotive = contrastParsed?.right?.primary_motive;
+  const leftRes =
+    contrastParsed?.left?.resolution ?? contrastParsed?.left?.interaction_resolution;
+  const rightRes =
+    contrastParsed?.right?.resolution ?? contrastParsed?.right?.interaction_resolution;
+  const leftLegacy =
+    leftRes == null ? contrastParsed?.left?.primary_motive : undefined;
+  const rightLegacy =
+    rightRes == null ? contrastParsed?.right?.primary_motive : undefined;
   const leftMedoid = splitClusters.find(
     (c) => String(c.cluster) === String(facts?.cluster_a),
   );
@@ -125,12 +131,21 @@ export default function IcPairPanel({
                   />
                 </TableCell>
               </TableRow>
-              {(leftMotive || rightMotive) && (
+              {(leftRes || rightRes) && (
                 <TableRow>
-                  <TableCell>primary_motive</TableCell>
+                  <TableCell>resolution</TableCell>
                   <TableCell>
-                    <Chip size="small" variant="outlined" label={`left: ${leftMotive ?? "?"}`} sx={{ mr: 1 }} />
-                    <Chip size="small" variant="outlined" label={`right: ${rightMotive ?? "?"}`} />
+                    <Chip size="small" variant="outlined" label={`left: ${leftRes ?? "?"}`} sx={{ mr: 1 }} />
+                    <Chip size="small" variant="outlined" label={`right: ${rightRes ?? "?"}`} />
+                  </TableCell>
+                </TableRow>
+              )}
+              {!leftRes && !rightRes && (leftLegacy || rightLegacy) && (
+                <TableRow>
+                  <TableCell>legacy motive</TableCell>
+                  <TableCell>
+                    <Chip size="small" variant="outlined" label={`left: ${leftLegacy ?? "?"}`} sx={{ mr: 1 }} />
+                    <Chip size="small" variant="outlined" label={`right: ${rightLegacy ?? "?"}`} />
                   </TableCell>
                 </TableRow>
               )}
@@ -265,17 +280,10 @@ export default function IcPairPanel({
         </Stack>
         <Collapse in={showContrastHelp}>
           <Alert severity="info" sx={{ mb: 2, py: 0.5 }}>
-            <Typography variant="caption" display="block" fontWeight={700}>
-              motive_contrast
-            </Typography>
             <Typography variant="caption" component="div">
-              <Chip size="small" label="same" /> means both boundary trials have
-              the same primary motive code.
-            </Typography>
-            <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-              <Chip size="small" label="different" /> means the boundary trials
-              have different primary motive codes or behavior families. This is
-              descriptive, not a risk level.
+              Each side is <code>resolution</code> (<code>pass_first</code>,{" "}
+              <code>yield</code>, or <code>unresolved</code>) plus one{" "}
+              <code>evidence</code> sentence from this pair&apos;s context.
             </Typography>
             <Typography variant="caption" display="block" fontWeight={700} sx={{ mt: 1 }}>
               separation_call

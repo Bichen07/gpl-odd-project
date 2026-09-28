@@ -1,9 +1,44 @@
 # Cluster-selection evaluation: is this clustering a good behavioral decomposition?
 
-**Status:** implemented (deterministic half + LLM prompt + UI). Applied 2026-08-08.
-**Scope:** new product `cross-eval`, new file `cluster_selection_eval.json`, Analyze page
-restructured into three tabs. No change to clustering, MFPCA, packs, or the medoid /
-summary / parameter-space-pairs prompts.
+**Status:** the score formulas below the banner are current as of 2026-09-29.
+Sections 3 and 4 describe the **retired** 2026-08-08 four-component behavior score.
+Do not use those weights.
+
+## Current formulas
+
+**Behavior** (`selection_score`, dashboard chip **behavior**). Equal weights,
+renormalized if one component is missing:
+
+| Component | Weight | What it counts |
+|-----------|--------|----------------|
+| `outcome_purity` | 0.50 | Share of clusters with collision rate ≤ 5% or ≥ 95% |
+| `motive_distinctness` | 0.50 | Unique `cluster_summary.label` values divided by clusters that have a title. The medoid resolution is used only when a cluster has no title. |
+
+`parameter_space_pair_decisiveness` and `no_merge_candidates` are still computed
+into the JSON and are **not** weighted. The composite does not use this score.
+
+**Geometry** (`rule_score` in `clustering_quality.json`, dashboard chip **geometry**):
+
+| Piece | Weight |
+|-------|--------|
+| silhouette, shifted from −1…1 onto 0–1 | 0.2941 |
+| collision-rate spread (std / 50 percentage points, cap 1) | 0.2353 |
+| time-to-collision spread (std / 3 seconds, cap 1; 3 s is a chosen full-mark) | 0.1765 |
+| tightness (`intra_consistency`; unitless distance to the cluster centroid) | 0.2941 |
+
+Parameter-range non-overlap was removed. The loosest cluster’s tightness piece is 0.
+
+**Composite** (`final_score`): `0.6 × geometry + 0.4 × language-model score` when
+both 1–10 ratings are present and the cross-eval is not a stub. The language-model
+score is the average of separation and boundary clarity, times 10. Without those
+ratings the composite equals geometry. The behavior score is not in the blend.
+The cross-eval parser stores a missing rating as 5, so an omitted rating is
+blended as a written 5.
+
+On `results/batch8/6_cluster_s=0.6113` after the 2026-09-28 re-run and the
+geometry-weight change: behavior 83.33, geometry 68.69, language model 50,
+composite 61.21. Cross-eval ratings are 5 and 5, with a merge suggestion for
+clusters 2, 3, and 5. That suggestion is not applied.
 
 ---
 
@@ -61,7 +96,10 @@ deterministic report lists a merge candidate, the disagreement is visible on the
 
 ---
 
-## 3. The four deterministic components
+## 3. Retired four-component behavior score (2026-08-08)
+
+These weights are **not** the live score. See “Current formulas” at the top.
+The live behavior score is outcome purity 0.50 and title distinctness 0.50.
 
 All in `python/llm_pipeline/cluster_selection_eval.py`. Each returns a value in `[0,1]`, or
 `None` when its inputs are missing; `selection_score` is the weighted mean over the

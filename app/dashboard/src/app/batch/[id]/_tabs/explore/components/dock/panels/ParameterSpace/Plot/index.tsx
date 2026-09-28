@@ -960,10 +960,13 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         // console.log(clusterInfo);
         // let alpha = showPoints ? 1 : 0;
         let alpha = 1;
+        const clusterLabels = Object.keys(clusterInfo)
+          .filter((key) => key !== "-1")
+          .sort((a, b) => Number(a) - Number(b));
         let colors = [
-          ...Object.entries(clusterInfo)
-            .filter(([key, item]) => key !== "-1")
-            .map(([_key, item]) => chroma(item.color).alpha(alpha).rgba()),
+          ...clusterLabels.map((key) =>
+            chroma(clusterInfo[key].color).alpha(alpha).rgba(),
+          ),
           chroma(theme.palette.error.light).alpha(alpha).rgba(),
           chroma(theme.palette.success.light).alpha(alpha).rgba(),
           chroma(theme.palette.error.light).alpha(alpha).rgba(),

@@ -18,7 +18,7 @@ Related product docs:
 GPL-ODD helps AV engineers **find → explain → aggregate → discuss** behavioral frontiers in scenario-parameter space (ODD-*related* evidence, not a full SAE certificate):
 
 1. Cluster whole trajectories (MFPCA / HDBSCAN).
-2. Interpret each cluster medoid with a closed behavior taxonomy (who passed/yielded, how Ego controlled speed, why via motive codes) plus BEV evidence.
+2. Interpret each cluster medoid with a closed resolution (`pass_first` / `yield` / `unresolved`) plus prose why (`motive_summary` and timeline descriptions) and BEV evidence. Cluster names such as Late Yield live on `cluster_summary.label`.
 3. Contrast **near-identical parameter-space pairs** across clusters (`contrast.yaml`, synced dual BEV).
 4. Summarize clusters and judge **neighborhood separation**.
 5. Score the partition (selection-eval / cross-eval / clustering-quality) and export ODD boundaries / rules / Q&A.

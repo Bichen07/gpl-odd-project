@@ -28,6 +28,33 @@ function findProjectRoot(start: string): string {
   return path.resolve(start, "..", "..");
 }
 
+function namedVehicleResolution(
+  medoid: Record<string, unknown> | null,
+): string | null {
+  if (!medoid) return null;
+  const cm = medoid.conflict_metrics;
+  const partner = String(
+    (cm && typeof cm === "object"
+      ? (cm as { vehicle?: unknown; partner?: unknown }).vehicle ??
+        (cm as { vehicle?: unknown; partner?: unknown }).partner
+      : "") ?? "",
+  ).trim();
+  const rows = Array.isArray(medoid.agent_interactions)
+    ? medoid.agent_interactions
+    : [];
+  for (const row of rows) {
+    if (row == null || typeof row !== "object") continue;
+    const rec = row as { agent?: unknown; resolution?: unknown; interaction_resolution?: unknown };
+    if (partner && String(rec.agent || "").trim() !== partner) continue;
+    const res = rec.resolution ?? rec.interaction_resolution;
+    if (typeof res === "string" && res.trim()) return res.trim();
+    break;
+  }
+  const top = medoid.interaction_resolution;
+  if (typeof top === "string" && top.trim()) return top.trim();
+  return null;
+}
+
 function readJsonSafe(p: string): Record<string, unknown> | null {
   if (!fs.existsSync(p)) return null;
   try {
@@ -192,9 +219,13 @@ export async function GET(req: NextRequest) {
         (summary?.neighbor_comparison as any[])?.[0]?.separation ??
         (summary?.neighborhood_separation as string) ??
         null,
-      medoidMotive: (medoid?.primary_motive as string) ?? null,
+      medoidMotive:
+        namedVehicleResolution(medoid) ??
+        (summary?.label as string) ??
+        (medoid?.primary_motive as string) ??
+        null,
       medoidOutcome: (medoid?.outcome as string) ?? null,
-      medoidResolution: (medoid?.interaction_resolution as string) ?? null,
+      medoidResolution: namedVehicleResolution(medoid),
       summaryCaption: (summary?.caption as string) ?? null,
       riskLevel: (summary?.risk_level as string) ?? null,
       consistencyNote: (summary?.consistency_note as string) ?? null,

@@ -2,12 +2,8 @@
 
 import { useEffect, useState } from "react";
 import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
   Alert,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Paper,
@@ -19,7 +15,6 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { ExpandMore } from "@mui/icons-material";
 import type { ReportData } from "../../types";
 import { TAB } from "../../constants";
 import { riskColor } from "../../utils";
@@ -66,7 +61,7 @@ export default function Report({
 
   const { header, clusters, pairs } = data;
 
-  // Motive histogram: count primary motives across high-collision clusters
+  // Histogram: resolution (else summary label) across high-collision clusters
   const motiveCount: Record<string, number> = {};
   for (const c of clusters) {
     if (c.medoidMotive && (c.collisionRate ?? 0) > 5) {
@@ -86,6 +81,7 @@ export default function Report({
   const inconclusivePairs = pairs.filter(
     (p) => p.separationCall === "inconclusive" || (p.hasContrast && !p.separationCall),
   );
+  const overFinePairs = pairs.filter((p) => p.separationCall === "over_fine");
 
   return (
     <Stack spacing={3}>
@@ -105,21 +101,22 @@ export default function Report({
         <Stack direction="row" spacing={1} flexWrap="wrap">
           {header.selectionScore != null && (
             <Chip
-              label={`selection score: ${header.selectionScore}`}
+              label={`behavior ${header.selectionScore}`}
               color="primary"
               size="small"
             />
           )}
           {header.qualityScore != null && (
             <Chip
-              label={`quality: ${header.qualityScore.toFixed(1)}`}
+              label={`composite ${header.qualityScore.toFixed(1)}`}
               size="small"
               variant="outlined"
             />
           )}
         </Stack>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-          Selection score measures behavioral usefulness of this partition, not geometric correctness alone.
+          Behavior is outcome purity and title distinctness. It is not in the composite.
+          Composite is 60% geometry and 40% language-model ratings.
         </Typography>
       </Paper>
 
@@ -138,7 +135,7 @@ export default function Report({
               <TableCell>Label</TableCell>
               <TableCell>n</TableCell>
               <TableCell>Collision Rate</TableCell>
-              <TableCell>Medoid Motive</TableCell>
+              <TableCell>Medoid resolution</TableCell>
               <TableCell>Outcome</TableCell>
               <TableCell>Risk</TableCell>
             </TableRow>
@@ -200,7 +197,7 @@ export default function Report({
           Behavioral Failure Modes
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Primary motives ranked by frequency across clusters with collision rate &gt; 5%.
+          Resolutions ranked by frequency across clusters with collision rate &gt; 5%.
         </Typography>
         {sortedMotives.length > 0 ? (
           <Stack spacing={1}>
@@ -493,56 +490,13 @@ export default function Report({
         )}
       </Paper>
 
-      {/* ── F. Merge / Split Advice ───────────────────────────────────── */}
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Typography variant="h6" gutterBottom>
-          Clustering Trust
-        </Typography>
-        {data.mergeCandidates.length > 0 ? (
-          <>
-            <Alert severity="warning" sx={{ mb: 1 }}>
-              <Typography variant="body2" fontWeight={600}>
-                Merge candidates detected
-              </Typography>
-              {data.mergeCandidates.map((mc, i) => (
-                <Typography key={i} variant="caption" display="block">
-                  cluster{mc.clusters[0]} + cluster{mc.clusters[1]} — shared motive{" "}
-                  <strong>{mc.sharedMotive}</strong>, param overlap {mc.paramOverlap.toFixed(2)}
-                </Typography>
-              ))}
-            </Alert>
-          </>
-        ) : (
-          <Alert severity="success" sx={{ mb: 1 }}>
-            No merge candidates — all clusters appear sufficiently distinct.
-          </Alert>
-        )}
-        {data.selectionFindings.length > 0 && (
-          <Stack spacing={0.5} sx={{ mt: 1 }}>
-            {data.selectionFindings.map((f, i) => (
-              <Typography key={i} variant="body2">
-                • {f}
-              </Typography>
-            ))}
-          </Stack>
-        )}
-        <Button
-          variant="text"
-          size="small"
-          sx={{ mt: 1 }}
-          onClick={() => onNavigateTab(TAB.CROSS_CLUSTER)}
-        >
-          View detailed cross-cluster analysis →
-        </Button>
-      </Paper>
-
-      {/* ── G. Recommended Next Tests ─────────────────────────────────── */}
+      {/* ── F. Recommended Next Tests ─────────────────────────────────── */}
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="h6" gutterBottom>
           Recommended Next Tests
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Deterministic priorities based on current analysis gaps.
+          Gaps in the pair analysis. A pair called over-fine is still an open split.
         </Typography>
         <Stack spacing={1}>
           {highFailNoContrast.length > 0 && (
@@ -567,50 +521,28 @@ export default function Report({
               </Typography>
             </Alert>
           )}
-          {highFailNoContrast.length === 0 && inconclusivePairs.length === 0 && (
+          {overFinePairs.length > 0 && (
+            <Alert severity="warning">
+              <Typography variant="body2">
+                <strong>Pairs called over-fine:</strong>{" "}
+                {overFinePairs.map((p) => p.folder).join(", ")}
+              </Typography>
+              <Typography variant="caption">
+                These matched-parameter pairs were judged too similar to stay separate.
+                That overlap is what the cross-cluster reading uses when it recommends a merge.
+              </Typography>
+            </Alert>
+          )}
+          {highFailNoContrast.length === 0 &&
+            inconclusivePairs.length === 0 &&
+            overFinePairs.length === 0 && (
             <Alert severity="success">
-              All high-collision clusters have pair contrasts and all separations are resolved.
+              Every high-collision cluster has a pair contrast, and no pair was left inconclusive or called over-fine.
             </Alert>
           )}
         </Stack>
       </Paper>
 
-      {/* ── Captions (per-cluster expandable) ─────────────────────────── */}
-      {clusters.some((c) => c.summaryCaption) && (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Cluster Summaries
-          </Typography>
-          {clusters.map((c) =>
-            c.summaryCaption ? (
-              <Accordion key={c.id} disableGutters elevation={0} variant="outlined" sx={{ mb: 0.5 }}>
-                <AccordionSummary expandIcon={<ExpandMore />}>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <Chip label={`C${c.id}`} size="small" />
-                    <Typography variant="subtitle2">{c.label ?? `Cluster ${c.id}`}</Typography>
-                    {c.riskLevel && (
-                      <Chip label={c.riskLevel} color={riskColor(c.riskLevel)} size="small" />
-                    )}
-                  </Stack>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Typography
-                    variant="body2"
-                    sx={{ whiteSpace: "pre-wrap", lineHeight: 1.7 }}
-                  >
-                    {c.summaryCaption}
-                  </Typography>
-                  {c.consistencyNote && (
-                    <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-                      Consistency: {c.consistencyNote}
-                    </Typography>
-                  )}
-                </AccordionDetails>
-              </Accordion>
-            ) : null,
-          )}
-        </Paper>
-      )}
     </Stack>
   );
 }

@@ -32,7 +32,7 @@ import {
   DEFAULT_MAX_CLUSTER_COUNT,
   pickPreferredClustering,
 } from "@/app/batch/[id]/_tabs/explore/utils/clusteringUniqueness";
-import { batchSlice, ClusterInfo, ClusterAnalysisContext } from "../../../../../redux/slices/batch";
+import { batchSlice, ClusterInfo, ClusterAnalysisContext, resolveClusterInfo } from "../../../../../redux/slices/batch";
 import _ from "lodash";
 import { getClusterInfos } from "@/app/_shared/utils";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
@@ -897,6 +897,10 @@ export default function PerEgoSelection({
     // Select immediately so Heatmap/Projection get a clustering before the
     // expensive unique-result filter finishes (488 candidates can take many
     // seconds). sortedResults then upgrades the selection when ready.
+    // Rank later replaces the first silhouette twin (epsilon 0) with the
+    // analyzed task (batch 8 index 415). That slot is often `{}` because
+    // uniqueness only colored the first twin — rebuild or the plots show
+    // two pass/fail colors instead of the three clusters.
     if (trajectoryAnalysis == null) return;
     if (sortedResults.length > 0) {
       dispatch(
@@ -905,8 +909,24 @@ export default function PerEgoSelection({
           [egoName]: sortedResults[0],
         })
       );
-      const index = results?.findIndex((v) => v === sortedResults[0]);
-      const info = infos != null && index != null && index < infos.length ? infos[index] : null;
+      const index = results?.findIndex((v) => v === sortedResults[0]) ?? -1;
+      const existing =
+        infos != null && index >= 0 && index < infos.length ? infos[index] : null;
+      const info = resolveClusterInfo(existing, sortedResults[0]);
+      if (
+        info != null &&
+        (existing == null || Object.keys(existing).length === 0) &&
+        index >= 0
+      ) {
+        dispatch(
+          batchSlice.actions.rememberClusterInfo({
+            egoName,
+            durationMode,
+            index,
+            info,
+          }),
+        );
+      }
       dispatch(
         batchSlice.actions.setSelectedClusterInfos({
           ...selectedClusterInfos,
@@ -931,8 +951,12 @@ export default function PerEgoSelection({
       return;
     }
 
+    // results is filled by a later effect. An empty list must not clear the
+    // clustering setTrajectoryAnalysis already chose.
+    if (results == null || results.length === 0) return;
+
     const { result: first, index } = pickPreferredClustering(
-      results ?? [],
+      results,
       MAX_CLUSTER_COUNT_DEFAULT,
     );
     if (first != null) {
@@ -942,8 +966,23 @@ export default function PerEgoSelection({
           [egoName]: first,
         }),
       );
-      const info =
+      const existing =
         infos != null && index >= 0 && index < infos.length ? infos[index] : null;
+      const info = resolveClusterInfo(existing, first);
+      if (
+        info != null &&
+        (existing == null || Object.keys(existing).length === 0) &&
+        index >= 0
+      ) {
+        dispatch(
+          batchSlice.actions.rememberClusterInfo({
+            egoName,
+            durationMode,
+            index,
+            info,
+          }),
+        );
+      }
       dispatch(
         batchSlice.actions.setSelectedClusterInfos({
           ...selectedClusterInfos,
@@ -971,7 +1010,7 @@ export default function PerEgoSelection({
         [egoName]: null,
       }),
     );
-  }, [sortedResults, results, infos]);
+  }, [sortedResults, results, infos, durationMode]);
 
   useEffect(() => {
     const newEditing: typeof editing = {};
@@ -1686,13 +1725,12 @@ export default function PerEgoSelection({
                       [egoName]: result ?? null,
                     })
                   );
+                  const existingInfo =
+                    infos != null && index < infos.length ? infos[index] : null;
                   dispatch(
                     batchSlice.actions.setSelectedClusterInfos({
                       ...selectedClusterInfos,
-                      [egoName]:
-                        infos != null && index < infos.length
-                          ? infos[index]
-                          : null,
+                      [egoName]: resolveClusterInfo(existingInfo, result),
                     })
                   );
                   dispatch(
@@ -1854,10 +1892,12 @@ export default function PerEgoSelection({
                       </Box>
                     ) : null}
                     {Object.entries(
-                      infos != null && index < infos.length ? infos[index] : {}
-                      // clusterInfos && durationMode in clusterInfos
-                      //   ? clusterInfos[durationMode][index] ?? {}
-                      //   : {}
+                      resolveClusterInfo(
+                        infos != null && index < infos.length
+                          ? infos[index]
+                          : null,
+                        result,
+                      ) ?? {},
                     ).map(([label, item]) => (
                       <Box
                         key={label}
@@ -1902,8 +1942,8 @@ export default function PerEgoSelection({
                   const cs = compositeScores[key];
                   if (!cs) return null;
                   const tooltip = cs.has_llm_eval
-                    ? `Rule: ${cs.rule_score?.toFixed(1)} | LLM: ${cs.llm_score?.toFixed(1)} | Final: ${cs.final_score?.toFixed(1)}`
-                    : `Rule-based score: ${cs.rule_score?.toFixed(1)} (LLM eval pending)`;
+                    ? `Geometry: ${cs.rule_score?.toFixed(1)} | Language model: ${cs.llm_score?.toFixed(1)} | Composite: ${cs.final_score?.toFixed(1)}`
+                    : `Geometry: ${cs.rule_score?.toFixed(1)} (language-model rating not run yet)`;
                   return (
                     <Tooltip title={tooltip}>
                       <Stack direction="row" alignItems="center" gap={0.5} sx={{ ml: 0.5 }}>

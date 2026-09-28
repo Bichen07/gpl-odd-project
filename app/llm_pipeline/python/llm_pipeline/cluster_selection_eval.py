@@ -1,21 +1,15 @@
-"""cluster_selection_eval.py — programmatic verdict on a clustering selection.
+"""cluster_selection_eval.py — behavior score for one clustering.
 
-Answers "is this candidate a good *behavioral* decomposition?" from artifacts
-already on disk, with no LLM call. It is the deterministic half of the hybrid
-cluster-selection evaluation; the LLM half lands in ``cross_cluster_eval.json``
-and is blended by ``clustering_quality_scorer``.
+Answers whether the clusters are outcome-pure and whether their summary titles
+differ. No language-model call. The language-model half is
+``cross_cluster_eval.json``. ``clustering_quality_scorer`` blends geometry with
+that half and does not use this score.
 
-Silhouette alone is a poor guide here: in Case Study 3 the highest-silhouette
-k=6 candidate merges two behaviorally distinct collision-free clusters, which
-these checks catch and silhouette does not.
-
-Inputs (all optional except cluster.json):
-  <run_dir>/cluster*/raw/cluster.json      sizes, collision rates, param ranges
-  <run_dir>/cluster*/output/medoid_trial.yaml   primary_motive per cluster
-  <run_dir>/parameter_space_pairs/*/pair.json           near-identical-Parameter-space pairs + outcomes
+The weighted components are outcome purity and title distinctness. Pair outcome
+flips and merge candidates are recorded and not scored.
 
 Output:
-  <run_dir>/cluster_selection_eval.json
+  <run_dir>/cross_cluster/input/cluster_selection_eval.json
 """
 
 from __future__ import annotations
@@ -32,10 +26,8 @@ _OUTPUT_FILE = "cluster_selection_eval.json"
 # Composite weights over the components that could be computed (renormalized
 # when a component is unavailable, e.g. no medoid cards yet).
 _WEIGHTS = {
-    "outcome_purity": 0.30,
-    "motive_distinctness": 0.30,
-    "parameter_space_pair_decisiveness": 0.25,
-    "no_merge_candidates": 0.15,
+    "outcome_purity": 0.50,
+    "motive_distinctness": 0.50,
 }
 
 # A cluster counts as outcome-pure when its collision rate sits at either end.
@@ -70,7 +62,41 @@ def _load_clusters(run_dir: Path) -> List[Dict[str, Any]]:
     return out
 
 
+def _named_resolution(doc: Dict[str, Any]) -> Optional[str]:
+    """Named-vehicle ``resolution``, else legacy top-level ``interaction_resolution``."""
+    cm = doc.get("conflict_metrics") if isinstance(doc.get("conflict_metrics"), dict) else {}
+    partner = str(cm.get("vehicle") or cm.get("partner") or "").strip()
+    for row in doc.get("agent_interactions") or []:
+        if not isinstance(row, dict):
+            continue
+        if partner and str(row.get("agent") or "").strip() != partner:
+            continue
+        res = row.get("resolution") or row.get("interaction_resolution")
+        if isinstance(res, str) and res.strip():
+            return res.strip()
+        break
+    val = doc.get("interaction_resolution")
+    if isinstance(val, str) and val.strip():
+        return val.strip()
+    return None
+
+
 def _primary_motive(cluster_dir: Path) -> Optional[str]:
+    """Behavior token for distinctness: summary label, else named resolution.
+
+    JSON still stores this under ``primary_motives``. Motive codes are not used.
+    """
+    summary_path = cluster_dir / "output" / "cluster_summary.yaml"
+    if summary_path.is_file():
+        try:
+            import yaml  # noqa: PLC0415 - optional dependency at import time
+
+            summary = yaml.safe_load(summary_path.read_text(encoding="utf-8")) or {}
+            label = summary.get("label") if isinstance(summary, dict) else None
+            if isinstance(label, str) and label.strip():
+                return label.strip()
+        except Exception:
+            pass
     path = cluster_dir / "output" / "medoid_trial.yaml"
     if not path.is_file():
         return None
@@ -80,20 +106,9 @@ def _primary_motive(cluster_dir: Path) -> Optional[str]:
         doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except Exception:
         return None
-    partner = str((doc.get("conflict_metrics") or {}).get("vehicle") or "").strip()
-    for row in doc.get("agent_interactions") or []:
-        if not isinstance(row, dict):
-            continue
-        if partner and str(row.get("agent") or "").strip() != partner:
-            continue
-        m = row.get("motive")
-        if isinstance(m, str) and m.strip() and m.strip() != "unclear":
-            return m.strip()
-        break
-    val = doc.get("primary_motive")
-    if isinstance(val, str) and val.strip() and val.strip() != "unclear":
-        return val.strip()
-    return None
+    if not isinstance(doc, dict):
+        return None
+    return _named_resolution(doc)
 
 
 def _load_parameter_space_pairs(run_dir: Path) -> List[Dict[str, Any]]:
@@ -182,7 +197,7 @@ def evaluate_run_dir(run_dir: Path) -> Optional[Dict[str, Any]]:
         dupes = {m: labs for m, labs in by_motive.items() if len(labs) > 1}
         if dupes:
             findings.append(
-                "Repeated primary motives: "
+                "Repeated behavior tokens (summary label or resolution): "
                 + "; ".join(
                     f"{m} in clusters {', '.join(sorted(labs))}" for m, labs in dupes.items()
                 )
@@ -190,58 +205,39 @@ def evaluate_run_dir(run_dir: Path) -> Optional[Dict[str, Any]]:
             )
         else:
             findings.append(
-                f"All {len(known)} captioned clusters carry a distinct primary motive."
+                f"All {len(known)} captioned clusters carry a distinct resolution or summary label."
             )
         if len(known) < k:
             findings.append(
-                f"{k - len(known)} of {k} clusters have no usable primary_motive yet "
-                "(medoid card missing or 'unclear')."
+                f"{k - len(known)} of {k} clusters have no usable resolution or summary label yet "
+                "(medoid card missing)."
             )
     else:
         components["motive_distinctness"] = None
         findings.append(
-            "No medoid cards found — motive distinctness not evaluated. "
+            "No medoid cards found — behavior distinctness not evaluated. "
             "Run the medoid product first."
         )
 
-    # --- 3. Parameter-space pair decisiveness --------------------------------------------
+    # --- 3. Near-identical pairs (recorded, not scored) ----------------------
+    # A collision flip is not a behavior score: two different collision
+    # behaviors do not flip. The list stays on the report for inspection.
     pairs = _load_parameter_space_pairs(run_dir)
     matched = [
         p for p in pairs
         if p.get("parameter_space_match", p.get("ic_match"))
     ]
     flips: List[Dict[str, Any]] = []
-    if matched:
-        decisive = 0
-        for p in matched:
-            a, b = p.get("collided_a"), p.get("collided_b")
-            differs = isinstance(a, bool) and isinstance(b, bool) and a != b
-            if differs:
-                decisive += 1
-            flips.append(
-                {
-                    "folder": p.get("folder"),
-                    "clusters": [p.get("cluster_a"), p.get("cluster_b")],
-                    "param_dist": p.get("param_dist"),
-                    "outcome_flip": bool(differs),
-                }
-            )
-        components["parameter_space_pair_decisiveness"] = decisive / len(matched)
-        verdict = (
-            "the boundary separates outcomes under near-identical initial conditions"
-            if decisive * 2 >= len(matched)
-            else "these boundaries rarely change the outcome, so they may be splitting "
-            "trials that behave alike"
-        )
-        findings.append(
-            f"{decisive} of {len(matched)} near-identical-Parameter-space pairs flip outcome across a "
-            f"cluster boundary — {verdict}."
-        )
-    else:
-        components["parameter_space_pair_decisiveness"] = None
-        findings.append(
-            "No Parameter-space pair packs with parameter_space_match found — boundary clarity not evaluated. "
-            "Rebuild with --param-boundaries all."
+    for p in matched:
+        a, b = p.get("collided_a"), p.get("collided_b")
+        differs = isinstance(a, bool) and isinstance(b, bool) and a != b
+        flips.append(
+            {
+                "folder": p.get("folder"),
+                "clusters": [p.get("cluster_a"), p.get("cluster_b")],
+                "param_dist": p.get("param_dist"),
+                "outcome_flip": bool(differs),
+            }
         )
 
     # --- 4. Merge candidates -------------------------------------------------
@@ -268,19 +264,9 @@ def evaluate_run_dir(run_dir: Path) -> Optional[Dict[str, Any]]:
                     "param_overlap": round(overlap, 3),
                 }
             )
-    if known:
-        components["no_merge_candidates"] = 0.0 if merge_candidates else 1.0
-        if merge_candidates:
-            findings.append(
-                "Merge candidates (same motive, similar collision rate, overlapping "
-                "parameter ranges): "
-                + "; ".join(
-                    f"cluster{c['clusters'][0]}+cluster{c['clusters'][1]}"
-                    for c in merge_candidates
-                )
-            )
-    else:
-        components["no_merge_candidates"] = None
+    # Same title, similar collision rate, and range overlap stay in
+    # ``merge_candidates``. They are not a score: a repeated title alone
+    # does not meet that triple, so the old 0/1 flag stayed 1 anyway.
 
     # --- Composite -----------------------------------------------------------
     usable = {k_: v for k_, v in components.items() if v is not None}
@@ -369,18 +355,25 @@ def medoid_card_block(cluster_dir: Path) -> Optional[str]:
     cm = doc.get("conflict_metrics") or {}
     interactions = doc.get("agent_interactions") or []
     ix_txt = "; ".join(
-        f"{row.get('agent')}: {row.get('resolution')}/{row.get('control_response')}/{row.get('motive')}"
+        f"{row.get('agent')}: {row.get('resolution') or row.get('interaction_resolution') or 'n/a'}"
         for row in interactions
         if isinstance(row, dict) and row.get("agent")
     )
-    # Motives live on decision_timeline entries (no separate motive_evidence list).
     tl = doc.get("decision_timeline") or []
     ev_txt = "; ".join(
-        f"{e.get('motive')}@{e.get('timestamp')}: {_trim(e.get('description'), 160)}"
+        f"t={e.get('timestamp')}: {_trim(e.get('description'), 160)}"
         for e in tl
-        if isinstance(e, dict) and e.get("motive") not in (None, "", "null")
+        if isinstance(e, dict) and str(e.get("description") or "").strip()
     )
-    # Backward compat for older medoid_trial.yaml that still had motive_evidence.
+    # Older cards stored a motive token on each stamp, or a motive_evidence list.
+    if not ev_txt:
+        ev_txt = "; ".join(
+            f"t={e.get('timestamp')}: {_trim(e.get('description'), 160)}"
+            for e in tl
+            if isinstance(e, dict)
+            and e.get("motive") not in (None, "", "null")
+            and not str(e.get("description") or "").strip()
+        )
     if not ev_txt:
         ev = doc.get("motive_evidence") or []
         ev_txt = "; ".join(
@@ -397,7 +390,7 @@ def medoid_card_block(cluster_dir: Path) -> Optional[str]:
         f"- peak_t={cm.get('peak_t')} brake_t={cm.get('brake_t')} "
         f"ttc={cm.get('ttc')} d={cm.get('d')}\n"
         f"- outcome: {_trim(doc.get('outcome'), 200)}\n"
-        f"- timeline_motives: {ev_txt or 'n/a'}\n"
+        f"- timeline: {ev_txt or 'n/a'}\n"
         f"- motive_summary: {_trim(doc.get('motive_summary'))}"
     )
 
@@ -453,21 +446,22 @@ def parameter_space_pair_digest(run_dir: Path) -> str:
                     contrast = loaded
                     break
         if contrast:
-            left_m = (contrast.get("left") or {}).get("primary_motive")
-            right_m = (contrast.get("right") or {}).get("primary_motive")
+            left_side = contrast.get("left") or {}
+            right_side = contrast.get("right") or {}
+            left_r = left_side.get("resolution") or left_side.get("interaction_resolution")
+            right_r = right_side.get("resolution") or right_side.get("interaction_resolution")
             cdiv = contrast.get("critical_divergence") or {}
             block += (
                 f"\n- separation_call: {contrast.get('separation_call')}"
                 f"\n- separation_reason: {_trim(contrast.get('separation_reason'), 300)}"
                 f"\n- contrast_explanation: {_trim(contrast.get('contrast_explanation'))}"
             )
-            if left_m or right_m:
-                motive_contrast = contrast.get("motive_contrast") or (
-                    "same" if left_m and left_m == right_m else "different"
-                )
+            if left_r or right_r:
+                block += f"\n- left.resolution={left_r}, right.resolution={right_r}"
+            elif left_side.get("primary_motive") or right_side.get("primary_motive"):
                 block += (
-                    f"\n- left.primary_motive={left_m}, right.primary_motive="
-                    f"{right_m} (motive_contrast={motive_contrast})"
+                    f"\n- legacy_motive left={left_side.get('primary_motive')}, "
+                    f"right={right_side.get('primary_motive')}"
                 )
             if cdiv:
                 block += (
@@ -532,17 +526,24 @@ def neighbor_cards_for_cluster(run_dir: Path, cluster_label: Any) -> str:
                 contrast = loaded
 
         if contrast:
-            left_m = (contrast.get("left") or {}).get("primary_motive")
-            right_m = (contrast.get("right") or {}).get("primary_motive")
+            left_side = contrast.get("left") or {}
+            right_side = contrast.get("right") or {}
+            left_r = left_side.get("resolution") or left_side.get("interaction_resolution")
+            right_r = right_side.get("resolution") or right_side.get("interaction_resolution")
             block += (
                 f"\n- separation_call: {contrast.get('separation_call')}"
                 f"\n- separation_reason: {_trim(contrast.get('separation_reason'), 300)}"
                 f"\n- contrast_explanation: {_trim(contrast.get('contrast_explanation'))}"
             )
-            if left_m or right_m:
+            if left_r or right_r:
                 block += (
-                    f"\n- left(cluster{a}).primary_motive={left_m}, "
-                    f"right(cluster{b}).primary_motive={right_m}"
+                    f"\n- left(cluster{a}).resolution={left_r}, "
+                    f"right(cluster{b}).resolution={right_r}"
+                )
+            elif left_side.get("primary_motive") or right_side.get("primary_motive"):
+                block += (
+                    f"\n- legacy_motive left(cluster{a})={left_side.get('primary_motive')}, "
+                    f"right(cluster{b})={right_side.get('primary_motive')}"
                 )
             left_outcome = (contrast.get("left") or {}).get("outcome")
             right_outcome = (contrast.get("right") or {}).get("outcome")
@@ -645,7 +646,7 @@ def digest_for_prompt(run_dir: Path) -> str:
     ]
     motives = report.get("primary_motives") or {}
     if motives:
-        lines.append("- primary_motives (from medoid_trial.yaml): " + ", ".join(
+        lines.append("- behavior_tokens (summary label or resolution): " + ", ".join(
             f"c{lab}={m or 'n/a'}" for lab, m in sorted(motives.items(), key=lambda x: str(x[0]))
         ))
     merges = report.get("merge_candidates") or []

@@ -55,13 +55,12 @@ def _cp():
 def ensure_named_vehicle_agent_interaction(
     parsed: Dict[str, Any], pack: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """Keep ``agent_interactions`` as the authoring list; copy named row to top-level.
+    """Keep ``agent_interactions`` as the authoring list (rank 1).
 
-    The LLM writes per-agent rows only. Named-vehicle resolution / control /
-    motive live on that
-    row, not as top-level ``interaction_resolution`` / ``control_response`` /
-    ``primary_motive``. Older YAML still using those keys is folded into the
-    named-vehicle row, then the keys are dropped.
+    Each row keeps ``agent`` + ``resolution`` only. Legacy top-level
+    ``interaction_resolution`` is folded into a missing named-vehicle row.
+    ``control_response`` and ``motive`` are stripped from every row and from
+    timeline stamps. They are not derived from each other.
     """
     if not isinstance(parsed, dict):
         return parsed
@@ -79,36 +78,18 @@ def ensure_named_vehicle_agent_interaction(
         None,
     )
     if partner and named is None:
-        named = {
-            "agent": partner,
-            "resolution": parsed.get("interaction_resolution"),
-            "control_response": parsed.get("control_response"),
-            "motive": parsed.get("primary_motive"),
-        }
+        res = parsed.get("resolution") or parsed.get("interaction_resolution") or "unresolved"
+        named = {"agent": partner, "resolution": res}
         cleaned = [named] + cleaned
-    parsed["agent_interactions"] = cleaned
-    if named:
-        if named.get("resolution") not in (None, ""):
-            parsed["interaction_resolution"] = named.get("resolution")
-        if named.get("control_response") not in (None, ""):
-            parsed["control_response"] = named.get("control_response")
-        if named.get("motive") not in (None, ""):
-            parsed["primary_motive"] = named.get("motive")
-    if parsed.get("secondary_motives") in (None, "", "parse_failed"):
-        named_motive = (named or {}).get("motive")
-        extras: List[str] = []
-        for entry in parsed.get("decision_timeline") or []:
-            if not isinstance(entry, dict):
-                continue
-            m = entry.get("motive")
-            if not isinstance(m, str) or not m.strip() or m.strip() in ("null", "unclear"):
-                continue
-            if m == named_motive or m in extras:
-                continue
-            extras.append(m)
-            if len(extras) >= 2:
-                break
-        parsed["secondary_motives"] = extras
+    slim: List[Dict[str, Any]] = []
+    for row in cleaned:
+        agent = str(row.get("agent") or "").strip()
+        res = row.get("resolution") or row.get("interaction_resolution") or "unresolved"
+        slim.append({"agent": agent, "resolution": res})
+    parsed["agent_interactions"] = slim
+    for entry in parsed.get("decision_timeline") or []:
+        if isinstance(entry, dict):
+            entry.pop("motive", None)
     for k in (
         "interaction_resolution",
         "control_response",
@@ -281,6 +262,39 @@ def _strip_yaml_fence(body: str) -> str:
     return body if body.endswith("\n") else body + "\n"
 
 
+_PAIR_SIDE_KEEP = (
+    "cluster",
+    "outcome",
+    "params",
+    "param_values",
+    "trial",
+    "trial_id",
+    "trial_index",
+    "trial_ref",
+    "conflict_metrics",
+    "resolution",
+    "evidence",
+)
+
+
+def _slim_pair_side(side: Dict[str, Any]) -> Dict[str, Any]:
+    """Rank 1 pair side: machine keys + resolution + evidence. No motive codes."""
+    out: Dict[str, Any] = {}
+    res = side.get("resolution") or side.get("interaction_resolution") or "unresolved"
+    ev = side.get("evidence")
+    if ev in (None, ""):
+        ev = side.get("motive_evidence")
+    for k in _PAIR_SIDE_KEEP:
+        if k in ("resolution", "evidence"):
+            continue
+        if k in side and side[k] not in (None, ""):
+            out[k] = side[k]
+    out["resolution"] = res
+    if ev not in (None, ""):
+        out["evidence"] = ev
+    return out
+
+
 def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta: Dict) -> Dict:
     """Write a single YAML artifact (no sibling *_meta.json).
 
@@ -300,10 +314,6 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
         # Narrative / LLM fields from salvaged raw win over parse_failed stubs
         for field in (
             "motive_summary",
-            "primary_motive",
-            "secondary_motives",
-            "interaction_resolution",
-            "control_response",
             "decision_timeline",
             "outcome",
             "caption",
@@ -314,7 +324,6 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
             "contrast_explanation",
             "contrast_timeline",
             "critical_divergence",
-            "motive_contrast",
             "separation_call",
             "separation_reason",
             "hypothesis",
@@ -371,6 +380,18 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
         final = ensure_named_vehicle_agent_interaction(
             final, final.get("conflict_metrics") if isinstance(final.get("conflict_metrics"), dict) else None
         )
+    elif path.name == "contrast.yaml":
+        for side in ("left", "right"):
+            if isinstance(final.get(side), dict):
+                final[side] = _slim_pair_side(final[side])
+        for k in (
+            "motive_contrast",
+            "primary_motive",
+            "control_response",
+            "interaction_resolution",
+            "secondary_motives",
+        ):
+            final.pop(k, None)
 
     body = yaml.safe_dump(final or {"empty": True}, sort_keys=False)
     path.write_text(body if body.endswith("\n") else body + "\n", encoding="utf-8")
@@ -736,10 +757,6 @@ def run_split_analysis(
                     "trial_id": medoid_tid,
                     "outcome": "collision" if mblk.get("collided") else "safe",
                     "conflict_metrics": pack,
-                    "interaction_resolution": "unresolved",
-                    "control_response": "none",
-                    "primary_motive": "unclear",
-                    "secondary_motives": [],
                     "agent_interactions": [],
                     "motive_summary": "stub (dry_run)",
                     "decision_timeline": [],
@@ -785,8 +802,8 @@ def run_split_analysis(
                     parsed["clip_start_esmini_s"] = round(float(clip_start), 3)
                     parsed["time_origin"] = "payload_observation_clip"
                 parsed = apply_collision_detail(parsed, pack)
-                # Motives live on decision_timeline[].motive — drop legacy list if
-                # the model still emits it so the on-disk schema stays single-timeline.
+                # Why is motive_summary + timeline description. Drop a leftover
+                # motive_evidence list if the model still emits one.
                 if isinstance(parsed, dict):
                     parsed.pop("motive_evidence", None)
                     parsed = ensure_named_vehicle_agent_interaction(parsed, pack)
@@ -1000,9 +1017,8 @@ def run_split_analysis(
                     "outcome": left_out,
                     "params": left_params,
                     "conflict_metrics": left_pack,
-                    "interaction_resolution": "unresolved",
-                    "control_response": "none",
-                    "primary_motive": "unclear",
+                    "resolution": "unresolved",
+                    "evidence": "",
                 },
                 "right": {
                     **right_ref,
@@ -1010,14 +1026,12 @@ def run_split_analysis(
                     "outcome": right_out,
                     "params": right_params,
                     "conflict_metrics": right_pack,
-                    "interaction_resolution": "unresolved",
-                    "control_response": "none",
-                    "primary_motive": "unclear",
+                    "resolution": "unresolved",
+                    "evidence": "",
                 },
                 "delta": {},
                 "contrast_timeline": [],
                 "critical_divergence": {},
-                "motive_contrast": "unclear",
             }
             if dry_run or interpreter is None:
                 stub = {
@@ -1045,7 +1059,7 @@ def run_split_analysis(
                     }
                 parsed.setdefault("left", {})
                 parsed.setdefault("right", {})
-                # Keep LLM motive fields; overwrite all ground-truth / machine keys.
+                # Keep LLM resolution + evidence; overwrite machine keys.
                 llm_left = dict(parsed.get("left") or {})
                 llm_right = dict(parsed.get("right") or {})
                 parsed["left"] = {
@@ -1054,12 +1068,12 @@ def run_split_analysis(
                     "outcome": left_out,
                     "params": left_params,
                     "conflict_metrics": left_pack,
-                    "interaction_resolution": llm_left.get(
-                        "interaction_resolution", "unresolved"
-                    ),
-                    "control_response": llm_left.get("control_response", "none"),
-                    "primary_motive": llm_left.get("primary_motive", "unclear"),
-                    "motive_evidence": llm_left.get("motive_evidence", ""),
+                    "resolution": llm_left.get("resolution")
+                    or llm_left.get("interaction_resolution")
+                    or "unresolved",
+                    "evidence": llm_left.get("evidence")
+                    or llm_left.get("motive_evidence")
+                    or "",
                 }
                 parsed["right"] = {
                     **right_ref,
@@ -1067,13 +1081,14 @@ def run_split_analysis(
                     "outcome": right_out,
                     "params": right_params,
                     "conflict_metrics": right_pack,
-                    "interaction_resolution": llm_right.get(
-                        "interaction_resolution", "unresolved"
-                    ),
-                    "control_response": llm_right.get("control_response", "none"),
-                    "primary_motive": llm_right.get("primary_motive", "unclear"),
-                    "motive_evidence": llm_right.get("motive_evidence", ""),
+                    "resolution": llm_right.get("resolution")
+                    or llm_right.get("interaction_resolution")
+                    or "unresolved",
+                    "evidence": llm_right.get("evidence")
+                    or llm_right.get("motive_evidence")
+                    or "",
                 }
+                parsed.pop("motive_contrast", None)
                 parsed["clusters"] = [int(ca), int(cb)]
                 parsed["param_dist"] = bp.get("param_dist")
                 parsed["card_role"] = card_role
