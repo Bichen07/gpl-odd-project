@@ -63,18 +63,26 @@ def _load_clusters(run_dir: Path) -> List[Dict[str, Any]]:
 
 
 def _named_resolution(doc: Dict[str, Any]) -> Optional[str]:
-    """Named-vehicle ``resolution``, else legacy top-level ``interaction_resolution``."""
+    """Resolution of the named conflict vehicle under its display name.
+
+    ``Opposite`` and ``Oncoming`` are one vehicle. A decided resolution wins
+    over ``unresolved`` on that name.
+    """
     cm = doc.get("conflict_metrics") if isinstance(doc.get("conflict_metrics"), dict) else {}
     partner = str(cm.get("vehicle") or cm.get("partner") or "").strip()
-    for row in doc.get("agent_interactions") or []:
-        if not isinstance(row, dict):
-            continue
-        if partner and str(row.get("agent") or "").strip() != partner:
-            continue
-        res = row.get("resolution") or row.get("interaction_resolution")
+    import sys
+    from pathlib import Path
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from agent_labels import collapse_agent_interactions  # type: ignore
+
+    rows = collapse_agent_interactions(doc.get("agent_interactions") or [], partner)
+    if rows:
+        res = rows[0].get("resolution")
         if isinstance(res, str) and res.strip():
             return res.strip()
-        break
     val = doc.get("interaction_resolution")
     if isinstance(val, str) and val.strip():
         return val.strip()
@@ -452,8 +460,8 @@ def parameter_space_pair_digest(run_dir: Path) -> str:
             right_r = right_side.get("resolution") or right_side.get("interaction_resolution")
             cdiv = contrast.get("critical_divergence") or {}
             block += (
-                f"\n- separation_call: {contrast.get('separation_call')}"
-                f"\n- separation_reason: {_trim(contrast.get('separation_reason'), 300)}"
+                f"\n- behavior_similarity: {contrast.get('behavior_similarity')}"
+                f"\n- behavior_similarity_reason: {_trim(contrast.get('behavior_similarity_reason'), 300)}"
                 f"\n- contrast_explanation: {_trim(contrast.get('contrast_explanation'))}"
             )
             if left_r or right_r:
@@ -531,8 +539,8 @@ def neighbor_cards_for_cluster(run_dir: Path, cluster_label: Any) -> str:
             left_r = left_side.get("resolution") or left_side.get("interaction_resolution")
             right_r = right_side.get("resolution") or right_side.get("interaction_resolution")
             block += (
-                f"\n- separation_call: {contrast.get('separation_call')}"
-                f"\n- separation_reason: {_trim(contrast.get('separation_reason'), 300)}"
+                f"\n- behavior_similarity: {contrast.get('behavior_similarity')}"
+                f"\n- behavior_similarity_reason: {_trim(contrast.get('behavior_similarity_reason'), 300)}"
                 f"\n- contrast_explanation: {_trim(contrast.get('contrast_explanation'))}"
             )
             if left_r or right_r:
@@ -574,12 +582,11 @@ def neighbor_cards_for_cluster(run_dir: Path, cluster_label: Any) -> str:
 
 
 def neighbor_rollup_digest(run_dir: Path) -> str:
-    """Roll up every cluster's own ``neighbor_comparison`` verdicts.
+    """Roll up every cluster's own ``neighbor_comparison`` behavior_similarity.
 
-    Reads each ``cluster<N>/output/cluster_summary.yaml`` (Stage B) and
-    compacts its localized distinct/similar/ambiguous-vs-IC-neighbor
-    judgments into one block, so the whole-partition cross-cluster verdict
-    can CITE these per-cluster checks instead of re-deriving them.
+    Reads each ``cluster<N>/output/cluster_summary.yaml`` and compacts its
+    distinct/similar/ambiguous neighbor calls into one block, so the
+    cross-cluster reading can cite these checks.
     """
     try:
         import yaml
@@ -617,12 +624,12 @@ def neighbor_rollup_digest(run_dir: Path) -> str:
                     continue
                 lines.append(
                     f"- vs cluster{nc.get('neighbor_cluster')} "
-                    f"({nc.get('parameter_space_pair_folder')}): {nc.get('verdict')} — "
+                    f"({nc.get('parameter_space_pair_folder')}): {nc.get('behavior_similarity')} — "
                     f"{_trim(nc.get('reason'), 200)}"
                 )
     if not any_found:
         return (
-            "(no per-cluster neighbor_comparison verdicts yet — run the "
+            "(no per-cluster neighbor_comparison yet — run the "
             "summary product first, per cluster, before this rollup is useful)"
         )
     return "\n".join(lines)

@@ -37,6 +37,8 @@ export default function IcPairPanel({
   const [idx, setIdx] = useState(0);
   const [frame, setFrame] = useState(0);
   const [showContrastHelp, setShowContrastHelp] = useState(false);
+  const [showDivergenceHelp, setShowDivergenceHelp] = useState(false);
+  const [showReasonHelp, setShowReasonHelp] = useState(false);
   const pair = pairs[Math.min(idx, Math.max(0, pairs.length - 1))] ?? null;
   const facts = (pair?.facts ?? null) as Record<string, any> | null;
   const frames = pair?.syncedBev ?? [];
@@ -286,22 +288,28 @@ export default function IcPairPanel({
               <code>evidence</code> sentence from this pair&apos;s context.
             </Typography>
             <Typography variant="caption" display="block" fontWeight={700} sx={{ mt: 1 }}>
-              separation_call
+              Behavioral similarity
             </Typography>
             <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-              <Chip size="small" color="primary" label="justified" /> means the
-              cluster split is supported by persistent behavior, geometry, or an
-              outcome-linked clearance difference; keep the clusters separate.
-              Blue is a clustering decision, not a safe outcome.
+              The behavior of the two boundary trials in this matched-parameter
+              pair. The report column Behavioral similarity is this same field.
+              It does not compare the whole-cluster trajectories and it does
+              not change the clustering. The file field is{" "}
+              <code>behavior_similarity</code>.
             </Typography>
             <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-              <Chip size="small" color="warning" label="over_fine" /> means the
-              two sides are effectively the same behavior family and may be merge
-              candidates.
+              <Chip size="small" color="success" label="distinct" /> the two
+              trials differ in resolution family, outcome, or a clearance
+              difference that stays different.
             </Typography>
             <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-              <Chip size="small" label="inconclusive" /> means the evidence
-              cannot decide whether to keep or merge the clusters.
+              <Chip size="small" label="similar" /> the two trials share a
+              resolution family and the same outcome. A trajectory detail can
+              still differ.
+            </Typography>
+            <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
+              <Chip size="small" label="inconclusive" /> the cards do not name
+              the difference.
             </Typography>
           </Alert>
         </Collapse>
@@ -313,17 +321,13 @@ export default function IcPairPanel({
               label={`motive_contrast: ${String(contrastParsed.motive_contrast)}`}
             />
           )}
-          {contrastParsed?.separation_call && (
+          {contrastParsed?.behavior_similarity && (
             <Chip
               size="small"
               color={
-                String(contrastParsed.separation_call) === "justified"
-                  ? "primary"
-                  : String(contrastParsed.separation_call) === "over_fine"
-                    ? "warning"
-                    : "default"
+                String(contrastParsed.behavior_similarity) === "distinct" ? "success" : "default"
               }
-              label={`separation_call: ${String(contrastParsed.separation_call)}`}
+              label={`Behavioral similarity: ${String(contrastParsed.behavior_similarity)}`}
             />
           )}
         </Stack>
@@ -356,15 +360,35 @@ export default function IcPairPanel({
         {contrastParsed?.critical_divergence &&
           typeof contrastParsed.critical_divergence === "object" && (
           <Box sx={{ mb: 2 }}>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-              gutterBottom
-              sx={CONTRAST_FIELD_LABEL_SX}
-            >
-              critical_divergence
-            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={CONTRAST_FIELD_LABEL_SX}>
+                critical_divergence
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label={
+                  showDivergenceHelp
+                    ? "Hide critical_divergence explanation"
+                    : "Explain critical_divergence"
+                }
+                onClick={() => setShowDivergenceHelp((open) => !open)}
+              >
+                {showDivergenceHelp ? <Close fontSize="inherit" /> : <HelpOutline fontSize="inherit" />}
+              </IconButton>
+            </Stack>
+            <Collapse in={showDivergenceHelp}>
+              <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
+                <Typography variant="caption" component="div">
+                  The earliest shared-clock time where a geometry difference
+                  lasts. Lasting means who is ahead, the minimum distance
+                  between vehicle boundaries, or the longitudinal relationship
+                  stays different on later stamps. A single speed sample, or a
+                  brake that starts slightly earlier, counts only when that
+                  clearance also splits and stays split. <code>at</code> is
+                  that time. The line under it is the measured difference.
+                </Typography>
+              </Alert>
+            </Collapse>
             <Typography variant="body2" color="text.secondary" sx={{ fontSize: 15, lineHeight: 2.5 }}>
               at time =
               {String(
@@ -401,19 +425,39 @@ export default function IcPairPanel({
             </Typography>
           </Box>
         )}
-        {contrastParsed?.separation_reason && (
+        {contrastParsed?.behavior_similarity_reason && (
           <Box sx={{ mb: 2 }}>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-              gutterBottom
-              sx={CONTRAST_FIELD_LABEL_SX}
-            >
-              separation_reason
-            </Typography>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={CONTRAST_FIELD_LABEL_SX}>
+                Separation reason
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label={
+                  showReasonHelp ? "Hide separation reason explanation" : "Explain separation reason"
+                }
+                onClick={() => setShowReasonHelp((open) => !open)}
+              >
+                {showReasonHelp ? <Close fontSize="inherit" /> : <HelpOutline fontSize="inherit" />}
+              </IconButton>
+            </Stack>
+            <Collapse in={showReasonHelp}>
+              <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
+                <Typography variant="caption" component="div">
+                  The one-line reason for Behavioral similarity on these two
+                  boundary trials. The trajectory clustering already placed
+                  them in different clusters. This line states how their
+                  behavior differs. <code>distinct</code> names a resolution
+                  family, an outcome, or a clearance that stays different.{" "}
+                  <code>similar</code> names a small late clearance or a
+                  whole-trajectory detail that remains. The report column
+                  Separation reason is this same field (
+                  <code>behavior_similarity_reason</code>).
+                </Typography>
+              </Alert>
+            </Collapse>
             <Typography variant="body2" sx={CONTRAST_FIELD_BODY_SX}>
-              {String(contrastParsed.separation_reason)}
+              {String(contrastParsed.behavior_similarity_reason)}
             </Typography>
           </Box>
         )}

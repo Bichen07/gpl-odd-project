@@ -167,8 +167,8 @@ export default function SplitCardsPanel({
                 <Alert severity="warning">{String(summaryParsed.motive_consistency_note)}</Alert>
               </Box>
             )}
-          {summaryParsed?.neighborhood_separation != null &&
-            String(summaryParsed.neighborhood_separation).trim() !== "" && (
+          {summaryParsed?.neighbor_behavior != null &&
+            String(summaryParsed.neighbor_behavior).trim() !== "" && (
               <Box sx={{ mb: 2 }}>
                 <Typography
                   variant="caption"
@@ -177,10 +177,10 @@ export default function SplitCardsPanel({
                   gutterBottom
                   sx={CONTRAST_FIELD_LABEL_SX}
                 >
-                  neighborhood_separation
+                  neighbor_behavior
                 </Typography>
                 <Typography variant="body2" sx={CONTRAST_FIELD_BODY_SX}>
-                  {String(summaryParsed.neighborhood_separation)}
+                  {String(summaryParsed.neighbor_behavior)}
                 </Typography>
               </Box>
             )}
@@ -232,30 +232,27 @@ export default function SplitCardsPanel({
                 <Collapse in={showNeighborHelp}>
                   <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
                     <Typography variant="caption" display="block" gutterBottom>
-                      Per-neighbor verdict for this cluster (from cluster_summary.yaml).
-                      These are not the pair card&apos;s separation_call words.
+                      <code>behavior_similarity</code> on each neighbor is the same field
+                      as the pair. It is the behavior of the two boundary trials,
+                      not the whole-cluster trajectories. ambiguous means that
+                      pair card is missing. <code>neighbor_behavior</code> rolls
+                      those values up: distinct, similar, mixed, or ambiguous.
                     </Typography>
                     <Typography variant="caption" component="div">
-                      <strong>distinct</strong> — keep apart: under matched scenario
-                      parameters the two sides take different paths (stay-behind vs
-                      overlap / go-through, or a different resolution) and/or
-                      different outcomes. Maps from pair{" "}
-                      <code>separation_call: justified</code>. The boundary trial
-                      need not match this cluster&apos;s medoid.
+                      <strong>distinct</strong> — the two boundary trials differ
+                      in resolution family, outcome, or a persistent stay-ahead
+                      versus overlap. The boundary trial need not match this
+                      cluster&apos;s medoid.
                     </Typography>
                     <Typography variant="caption" component="div">
-                      <strong>similar</strong> — merge evidence: same geometry family
-                      and outcome, only a weak/late geometric difference. Maps
-                      from pair <code>separation_call: over_fine</code>.
+                      <strong>similar</strong> — the two boundary trials share a
+                      resolution family and the same outcome. A trajectory detail
+                      can still differ.
                     </Typography>
                     <Typography variant="caption" component="div">
-                      <strong>inconclusive</strong> — this edge cannot decide keep vs
-                      merge because the pair card itself was{" "}
-                      <code>separation_call: inconclusive</code> (unusable /
-                      contradictory evidence). Not used merely because a boundary
-                      trial differs from the medoid. The Analyze report&apos;s
-                      &quot;Inconclusive pair separations&quot; list is the pair
-                      field, not this verdict.
+                      <strong>inconclusive</strong> — this edge cannot name the
+                      difference. The report list Inconclusive pairs is the same
+                      pair field.
                     </Typography>
                     <Typography variant="caption" component="div">
                       <strong>ambiguous</strong> — missing contrast.yaml / medoid card,
@@ -269,13 +266,13 @@ export default function SplitCardsPanel({
                       <Chip
                         size="small"
                         variant="outlined"
-                        label={`${nc.parameter_space_pair_folder ?? `cluster${nc.neighbor_cluster}`}: ${nc.verdict ?? "?"}`}
+                        label={`${nc.parameter_space_pair_folder ?? `cluster${nc.neighbor_cluster}`}: ${nc.behavior_similarity ?? "?"}`}
                         color={
-                          nc.verdict === "distinct"
+                          nc.behavior_similarity === "distinct"
                             ? "success"
-                            : nc.verdict === "similar"
+                            : nc.behavior_similarity === "similar"
                               ? "warning"
-                              : nc.verdict === "inconclusive"
+                              : nc.behavior_similarity === "inconclusive"
                                 ? "info"
                                 : "default"
                         }

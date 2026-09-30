@@ -29,6 +29,49 @@ def display_agent_name(name: Optional[object], fallback: str = "other vehicle") 
     return _LEGACY_NAME_ALIASES.get(raw.lower(), raw)
 
 
+_DECIDED_RESOLUTIONS = {"pass_first", "yield"}
+
+
+def collapse_agent_interactions(rows: Any, partner: Optional[object] = None) -> list:
+    """One row per display name. ``Opposite`` and ``Oncoming`` are one vehicle.
+
+    A decided resolution (``pass_first`` or ``yield``) replaces ``unresolved``
+    for that name. The named conflict vehicle, under its display name, is first.
+    """
+    grouped: dict = {}
+    order: list = []
+    raw_is_display: dict = {}
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        raw = str(row.get("agent") or "").strip()
+        if not raw:
+            continue
+        shown = display_agent_name(raw)
+        res = str(
+            row.get("resolution") or row.get("interaction_resolution") or "unresolved"
+        ).strip() or "unresolved"
+        if shown not in grouped:
+            grouped[shown] = res
+            order.append(shown)
+            raw_is_display[shown] = raw == shown
+            continue
+        prev = grouped[shown]
+        prev_decided = prev in _DECIDED_RESOLUTIONS
+        new_decided = res in _DECIDED_RESOLUTIONS
+        take_new = (new_decided and not prev_decided) or (
+            new_decided == prev_decided and raw == shown and not raw_is_display.get(shown)
+        )
+        if take_new:
+            grouped[shown] = res
+            raw_is_display[shown] = raw == shown
+    shown_partner = display_agent_name(partner) if str(partner or "").strip() else ""
+    names = list(order)
+    if shown_partner and shown_partner in grouped:
+        names = [shown_partner] + [name for name in names if name != shown_partner]
+    return [{"agent": name, "resolution": grouped[name]} for name in names]
+
+
 _OLD_ACTOR_TOKEN = "part" + "ner"
 
 

@@ -538,7 +538,7 @@ Checked against the current functions. No writer change came out of this pass.
 | `cluster_selection_eval._primary_motive` | Distinctness token is `cluster_summary.label`, else the named-vehicle `resolution`. The JSON key stays `primary_motives`. It does not read a motive code. | No. Keep the key so old reports still load. |
 | `cluster_selection_eval.evaluate_run_dir` | Deterministic 0–100 score. Outcome purity: share of clusters with collision rate ≤ 5% or ≥ 95% (weight 0.50). Title distinctness: unique summary labels / captioned clusters (0.50); resolution is used only when a cluster has no label. Collision-flip share and the 0/1 merge flag are not in the score. Missing components are reweighted. | No |
 | `cluster_selection_eval.medoid_card_block` | Prints `agent: resolution`, `t` + description, and `motive_summary`. If an old card has no description, it still prints a stamp motive token so that card remains readable. New writes do not create that token. | No |
-| `clustering_quality_scorer.compute_final_score` | Composite is not the behavior score. Geometry is silhouette 0.2941, collision-rate spread 0.2353, time-to-collision spread 0.1765, and tightness 0.2941. Parameter-range non-overlap is not in the score. Final is 0.6 × geometry + 0.4 × the mean of the two 1–10 ratings times 10, or geometry alone when those ratings are absent. | No |
+| `clustering_quality_scorer.compute_final_score` | Geometry is four equal pieces at 0.25: silhouette, collision-rate spread, time-to-collision spread, and tightness. The ranking number equals that geometry score. Language-model ratings are stored beside it and do not move it. | No |
 | `odd_briefing` | Writes `medoid_resolution` from the named-vehicle row. Does not invent `medoid_motive`. | No |
 | `cluster_reviewer_prompt.txt` | Rewrites a label that chains two mechanisms, or that duplicates another cluster’s name. It does not see the timeline or BEV. | No |
 
@@ -572,7 +572,7 @@ What the new cards say:
 - Separation calls: justified on c0-c4, c0-c5, c1-c2, c1-c3, c1-c5, c4-c5. Over-fine on c2-c3, c2-c5, c3-c5.
 - Label-review renamed nothing. It kept both “Rear-end Collision” and both “Late Yield Collision”, with the reason that the captions describe the same behavior family.
 - Selection-eval score is outcome purity and title distinctness only, equal weight. On this run that is (1.0 + 4/6) / 2 = 83.33. Collision-flip share and the merge flag are recorded and not scored.
-- Cross-eval: separation 5, boundary clarity 5, recommended action `merge` (C2, C3, and C5). After dropping parameter-range non-overlap from geometry, composite is 61.21 (geometry 68.69, language model 50.0). That suggestion is not applied.
+- Cross-eval on disk: separation 5, boundary clarity 5, and a merge suggestion for C2, C3, and C5 from the 2026-09-28 run. The prompt no longer asks for a merge, a split, or a different k. Geometry is 68.0 and is the ranking number. The language-model reading of 50 is stored beside it.
 - Briefing `generated_at` 2026-09-28T14:58:51Z copies the new labels and `medoid_resolution`. `missing` is empty.
 
 ### 9.5 Checklist

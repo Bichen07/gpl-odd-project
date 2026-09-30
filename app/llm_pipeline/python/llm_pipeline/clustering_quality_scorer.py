@@ -23,13 +23,12 @@ _OUTPUT_FILE = "clustering_quality.json"
 # ---------------------------------------------------------------------------
 # Rule-based sub-score weights (must sum to 1.0)
 # ---------------------------------------------------------------------------
-# Remaining pieces after dropping parameter-range overlap. The old weights
-# were 0.25, 0.20, 0.15, 0.15, 0.25. These are those four, scaled to sum to 1.
+# Four equal pieces. They must sum to 1.0.
 _WEIGHTS = {
-    "silhouette": 0.2941,
-    "collision_spread": 0.2353,
-    "ttc_spread": 0.1765,
-    "intra_consistency": 0.2941,
+    "silhouette": 0.25,
+    "collision_spread": 0.25,
+    "ttc_spread": 0.25,
+    "intra_consistency": 0.25,
 }
 
 
@@ -197,9 +196,10 @@ def compute_final_score(
     rule_score: float,
     cross_eval: Optional[Dict[str, Any]],
 ) -> Tuple[float, bool]:
-    """Blend rule score with LLM evaluation when available.
+    """Return the geometry score as the ranking number.
 
-    Returns (final_score, has_llm_eval).
+    Language-model ratings are stored beside it. They explain differences.
+    They do not change this number and they do not change the clustering.
     """
     if cross_eval is None or cross_eval.get("stub"):
         return rule_score, False
@@ -209,9 +209,7 @@ def compute_final_score(
     if sep is None or cla is None:
         return rule_score, False
 
-    llm_score = ((float(sep) + float(cla)) / 2.0) * 10.0  # → 0-100 scale
-    final = 0.6 * rule_score + 0.4 * llm_score
-    return round(final, 2), True
+    return rule_score, True
 
 
 def score_run_dir(run_dir: Path) -> Optional[Path]:

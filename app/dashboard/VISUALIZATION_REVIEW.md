@@ -80,7 +80,7 @@ Explore (outside Analyze) already owns parameter-space / projection scatters, he
 
 | Keep as text / chips | Add / strengthen as graph |
 |----------------------|---------------------------|
-| Motive codes, separation_call, captions | Parameter-space / projection scatter with cluster color + brush → open card |
+| Motive codes, Behavioral similarity, captions | Parameter-space / projection scatter with cluster color + brush → open card |
 | Contrast explanation (short) | Coverage / instance-space style 2D of trial features (safe vs collision) |
 | Decision timeline entries | Time-aligned BEV + metric sparklines (clearance, TTC, Ego speed) |
 
@@ -99,7 +99,7 @@ Narrative remains necessary for *why* (closed codes + cited stamps). Graphs answ
 1. **Sync scrubbers** — selecting a `decision_timeline` / `contrast_timeline` stamp sets BEV frame (and vice versa when a nearest stamp exists).
 2. **Deep links** — Report row → Medoid tab with cluster selected; pair row → Pairs tab with that `cA-cB` focused.
 3. **Compare canvas** — one screen: two medoid cards *or* one pair dual-BEV + chips-first contrast summary.
-4. **Chips before prose** — `motive_contrast`, `separation_call`, resolution, outcome always above long explanation.
+4. **Chips before prose** — Behavioral similarity, resolution, outcome always above long explanation.
 5. **Collapse raw YAML** — default to parsed fields; accordion for raw dump.
 6. **Single score legend** — one glossary for selection_score vs clustering_quality vs silhouette.
 

@@ -72,16 +72,16 @@ export default function Report({
 
   // Outcome-flip pairs
   const flipPairs = pairs.filter((p) => p.outcomeFlip);
-  const justifiedPairs = pairs.filter((p) => p.separationCall === "justified");
+  const distinctPairs = pairs.filter((p) => p.behaviorSimilarity === "distinct");
 
   // Next tests recommendations (deterministic)
   const highFailNoContrast = clusters.filter(
     (c) => (c.collisionRate ?? 0) > 10 && !pairs.some((p) => p.clusters.includes(c.id) && p.hasContrast),
   );
   const inconclusivePairs = pairs.filter(
-    (p) => p.separationCall === "inconclusive" || (p.hasContrast && !p.separationCall),
+    (p) => p.behaviorSimilarity === "inconclusive" || (p.hasContrast && !p.behaviorSimilarity),
   );
-  const overFinePairs = pairs.filter((p) => p.separationCall === "over_fine");
+  const similarPairs = pairs.filter((p) => p.behaviorSimilarity === "similar");
 
   return (
     <Stack spacing={3}>
@@ -99,24 +99,17 @@ export default function Report({
           )}
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap">
-          {header.selectionScore != null && (
-            <Chip
-              label={`behavior ${header.selectionScore}`}
-              color="primary"
-              size="small"
-            />
-          )}
           {header.qualityScore != null && (
             <Chip
-              label={`composite ${header.qualityScore.toFixed(1)}`}
+              label={`geometry ${header.qualityScore.toFixed(1)}`}
               size="small"
               variant="outlined"
             />
           )}
         </Stack>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-          Behavior is outcome purity and title distinctness. It is not in the composite.
-          Composite is 60% geometry and 40% language-model ratings.
+          This number is the geometry score. The language-model reading explains
+          differences and does not change it.
         </Typography>
       </Paper>
 
@@ -168,7 +161,7 @@ export default function Report({
                 </TableCell>
                 <TableCell>
                   <Chip
-                    label={c.medoidMotive ?? "—"}
+                    label={c.medoidResolution ?? c.medoidMotive ?? "—"}
                     size="small"
                     variant="outlined"
                   />
@@ -241,16 +234,17 @@ export default function Report({
             size="small"
           />
           <Chip
-            label={`${justifiedPairs.length} justified separation${justifiedPairs.length !== 1 ? "s" : ""}`}
-            color={justifiedPairs.length > 0 ? "success" : "default"}
+            label={`${distinctPairs.length} distinct`}
+            color={distinctPairs.length > 0 ? "success" : "default"}
             size="small"
           />
           <Chip label={`${pairs.length} total pair${pairs.length !== 1 ? "s" : ""}`} size="small" variant="outlined" />
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           Near-identical scenario parameters with different outcomes → candidate ODD edge.
-          Click a row to expand full Explanation / Separation reason; click again or another
-          row to collapse.
+          Behavioral similarity is the behavior of the two boundary trials in that
+          pack. The pair panel uses the same field. Click a row to expand
+          contrast_explanation and the separation reason.
         </Typography>
         {pairs.length > 0 ? (
           <Table size="small">
@@ -259,8 +253,8 @@ export default function Report({
                 <TableCell>Pack</TableCell>
                 <TableCell>Param Distance</TableCell>
                 <TableCell>Outcome Flip</TableCell>
-                <TableCell>Separation</TableCell>
-                <TableCell>Explanation</TableCell>
+                <TableCell>Behavioral similarity</TableCell>
+                <TableCell>contrast_explanation</TableCell>
                 <TableCell>Separation reason</TableCell>
               </TableRow>
             </TableHead>
@@ -320,16 +314,10 @@ export default function Report({
                     />
                   </TableCell>
                   <TableCell>
-                    {p.separationCall ? (
+                    {p.behaviorSimilarity ? (
                       <Chip
-                        label={p.separationCall}
-                        color={
-                          p.separationCall === "justified"
-                            ? "success"
-                            : p.separationCall === "over_fine"
-                              ? "warning"
-                              : "default"
-                        }
+                        label={p.behaviorSimilarity}
+                        color={p.behaviorSimilarity === "distinct" ? "success" : "default"}
                         size="small"
                       />
                     ) : (
@@ -343,7 +331,7 @@ export default function Report({
                   </TableCell>
                   <TableCell sx={{ maxWidth: 440 }}>
                     <Typography variant="caption" sx={{ ...clampSx(3), whiteSpace: "pre-wrap" }}>
-                      {p.separationReason ?? "—"}
+                      {p.behaviorSimilarityReason ?? "—"}
                     </Typography>
                   </TableCell>
                 </TableRow>
@@ -496,7 +484,8 @@ export default function Report({
           Recommended Next Tests
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-          Gaps in the pair analysis. A pair called over-fine is still an open split.
+          Gaps in the pair analysis. A similar pair shares a behavior family and
+          still has a trajectory difference. It is not a request to merge.
         </Typography>
         <Stack spacing={1}>
           {highFailNoContrast.length > 0 && (
@@ -513,31 +502,29 @@ export default function Report({
           {inconclusivePairs.length > 0 && (
             <Alert severity="info">
               <Typography variant="body2">
-                <strong>Inconclusive pair separations:</strong>{" "}
+                <strong>Inconclusive pairs:</strong>{" "}
                 {inconclusivePairs.map((p) => p.folder).join(", ")}
               </Typography>
               <Typography variant="caption">
-                Re-examine these pairs — the current analysis could not determine if the separation is justified.
+                Re-examine these pairs — the current analysis could not name the remaining difference.
               </Typography>
             </Alert>
           )}
-          {overFinePairs.length > 0 && (
-            <Alert severity="warning">
+          {similarPairs.length > 0 && (
+            <Alert severity="info">
               <Typography variant="body2">
-                <strong>Pairs called over-fine:</strong>{" "}
-                {overFinePairs.map((p) => p.folder).join(", ")}
+                <strong>Pairs that share a behavior:</strong>{" "}
+                {similarPairs.map((p) => p.folder).join(", ")}
               </Typography>
               <Typography variant="caption">
-                These matched-parameter pairs were judged too similar to stay separate.
-                That overlap is what the cross-cluster reading uses when it recommends a merge.
+                These matched-parameter pairs share a behavior family. The contrast
+                names the trajectory or clearance difference that still separates them.
               </Typography>
             </Alert>
           )}
-          {highFailNoContrast.length === 0 &&
-            inconclusivePairs.length === 0 &&
-            overFinePairs.length === 0 && (
+          {highFailNoContrast.length === 0 && inconclusivePairs.length === 0 && (
             <Alert severity="success">
-              Every high-collision cluster has a pair contrast, and no pair was left inconclusive or called over-fine.
+              Every high-collision cluster has a pair contrast, and no pair was left inconclusive.
             </Alert>
           )}
         </Stack>

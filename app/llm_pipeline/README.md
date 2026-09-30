@@ -19,7 +19,7 @@ Legacy folders `ic_pairs/` and `boundary_pairs/` still resolve as read fallbacks
 
 Dashboard **Analyze** tabs: Model setup → Medoid → Parameter-space pairs → Cluster analysis → Cross-cluster analysis → Report → ODD Q&A. Explore Replayer reads medoid / pair cards via `/api/cluster-analysis-status`. Visualization review (gaps, graph+text linking, paper notes): [`app/dashboard/VISUALIZATION_REVIEW.md`](../dashboard/VISUALIZATION_REVIEW.md).
 
-Design deep-dives: [`docs/cluster_selection_evaluation.md`](docs/cluster_selection_evaluation.md), [`docs/motive_schema_and_causal_locality.md`](docs/motive_schema_and_causal_locality.md), root [`README.md`](../../README.md). The August implementation plan and the superseded architecture-refactor plan were removed; the current score formulas are in §4.5.
+Design deep-dives: [`docs/analysis_nouns.md`](docs/analysis_nouns.md) (the noun list to check after a wording change), [`docs/cluster_selection_evaluation.md`](docs/cluster_selection_evaluation.md), [`docs/motive_schema_and_causal_locality.md`](docs/motive_schema_and_causal_locality.md), root [`README.md`](../../README.md). The August implementation plan and the superseded architecture-refactor plan were removed; the current score formulas are in §4.5.
 
 ---
 
@@ -175,14 +175,15 @@ python -m llm_pipeline.cli cluster-interpret \
 
 **Output:** `output/contrast.yaml`. Each side is `resolution` + one
 `evidence` sentence. Also `contrast_timeline`, `critical_divergence`,
-`contrast_explanation`, and `separation_call` ∈
-`{justified, over_fine, inconclusive}`. The writer drops `motive_contrast`
-and the old side triple (`interaction_resolution` / `control_response` /
-`primary_motive`) on a new write. Older files on disk may still contain
-those keys until the pair is re-run.
+`contrast_explanation`, and `behavior_similarity` ∈
+`{distinct, similar, inconclusive}`. Behavioral similarity is the behavior of
+the two boundary trials in that pack. The report column uses the same words.
+`behavior_similarity_reason` is the one-line reason. The writer drops
+`motive_contrast` and the old side triple (`interaction_resolution` /
+`control_response` / `primary_motive`) on a new write.
 
 Whole-trajectory MFPCA+HDBSCAN can group similar shapes with different interaction
-intents; pair separation uses the shared conflict window. Dashboard rejects packs
+intents; `behavior_similarity` uses the shared conflict window. Dashboard rejects packs
 that are not `readyForLlm` (see §9).
 
 ```bash
@@ -207,10 +208,10 @@ python -m llm_pipeline.cli cluster-interpret \
 `label`. It still sets `risk_level` from the collision rate and
 `distinct_from_neighbors` from the neighbor verdicts.
 
-Also: `caption`, `neighbor_comparison[]` (`verdict` mapped from pair
-`separation_call`: justified→distinct, over_fine→similar, …),
-`neighborhood_separation` ∈
-`{well_separated, merge_candidates, needs_finer_split, ambiguous}`.
+Also: `caption`, `neighbor_comparison[]` (`behavior_similarity` copied from
+the pair: `distinct`, `similar`, `inconclusive`, or `ambiguous` when the pair
+card is missing), `neighbor_behavior` ∈
+`{distinct, similar, mixed, ambiguous}`.
 
 ```bash
 python -m llm_pipeline.cli cluster-interpret \
@@ -262,7 +263,7 @@ cluster.json + medoid YAML + pair.json  ──rule──►  cluster_selection_e
 medoid / summary / contrast / boundary text  ──LLM──► cross_cluster_eval.json
                                                       │
 cluster.json + optional LLM scores  ──rule──►  clustering_quality.json
-                                              (0.6×rule + 0.4×llm when both LLM scores exist)
+                                              (final_score is the geometry score; LLM ratings are stored beside it)
 ```
 
 | Artifact | Kind | When |
@@ -271,29 +272,30 @@ cluster.json + optional LLM scores  ──rule──►  clustering_quality.json
 | `cross_cluster/output/cross_cluster_eval.json` | LLM (stub if dry-run) | `--products cross-eval`; CLI `cross-cluster-eval`; dashboard button |
 | `analysis/quality/clustering_quality.json` | Rule (+ optional blend) | After dataset build; after cross-eval; CLI |
 
-**Behavior score** (`selection_score` in `cluster_selection_eval.json`; the dashboard
-says **behavior**). Weights renormalize if a component is missing:
-`outcome_purity` 0.50 · `motive_distinctness` 0.50.
-The JSON key is still `motive_distinctness`. It counts summary titles, and uses
-the medoid resolution only when a cluster has no title. Pair outcome flips and
-the merge-candidate list are written for inspection and are **not** in the score.
-The digest sent to the language model is `digest_for_prompt()` — never raw
-`cluster.json`.
+**Selection checks** (`cluster_selection_eval.json`). Outcome purity and title
+distinctness are still computed, with equal weight, into `selection_score`.
+That number is a digest for the language-model prompt. The dashboard does not
+show it. The JSON key is still `motive_distinctness`. It counts summary titles,
+and uses the medoid resolution only when a cluster has no title. Pair outcome
+flips and the merge-candidate list are written for inspection. The digest sent
+to the language model is `digest_for_prompt()` — never raw `cluster.json`.
 
 **cross-eval prompt slots:** `{cluster_summaries}`, `{medoid_cards}`,
 `{parameter_space_pair_cards}`, `{neighbor_rollup}`, `{boundary_trial_pairs}`,
 `{deterministic_checks}`. Outputs `behavioral_separation_score`,
-`boundary_clarity_score` (1–10), `inter_notes`, merge/split lists,
-`recommended_action`, `selection_verdict`.
+`boundary_clarity_score` (1–10), `inter_notes`, `cluster_differences`, and
+`selection_verdict`. The reading names what clusters share and what trajectory,
+collision, or timing difference still separates them. It does not recommend a
+merge, a split, or a different number of clusters.
 
-**clustering_quality `rule_score` weights:** silhouette 0.2941 · collision_spread 0.2353 ·
-ttc_spread 0.1765 · intra_consistency 0.2941.
-`final_score = 0.6×rule + 0.4×llm` when a non-stub cross-eval has both ratings;
-else the composite stays equal to the geometry score. The dashboard calls
-`rule_score` **geometry**, the blended language-model half **language model**,
-and `final_score` **composite**. The behavior score is not in the composite.
-If the model omits a rating, the parser stores 5 before this blend, so a missing
-rating is treated as a written 5. `rank` is filled by `GET /api/cluster-evaluate`.
+**clustering_quality `rule_score` weights:** silhouette 0.25 · collision_spread 0.25 ·
+ttc_spread 0.25 · intra_consistency 0.25.
+`final_score` equals `rule_score`. The dashboard calls that number **geometry**.
+The language-model rating is the average of separation and boundary clarity,
+times 10, and is stored as `llm_score`. It does not move `final_score`.
+`rank` is filled by `GET /api/cluster-evaluate` from `final_score`, so the rank
+follows geometry. If the model omits a rating, the parser stores 5; that 5 is
+shown on the reading and does not change the geometry score.
 
 **`analysis/logs/split_analysis_summary.json`:** write-only receipt of the latest
 `cluster-interpret` call (paths written/skipped). Nothing reads it back.
@@ -312,8 +314,8 @@ Analyze → **Report** loads `GET /api/cluster-run-report` (no LLM) from files o
 
 | Panel | Source | Notes |
 |-------|--------|-------|
-| Header chips | selection-eval + `clustering_quality.json` | **behavior** is `selection_score`. **composite** is `final_score`. |
-| **Recommended Next Tests** | client heuristics on report DTO | Missing pair contrasts, inconclusive calls, and pairs called `over_fine`. An `over_fine` call is an open split, not a resolved one. |
+| Header chips | `clustering_quality.json` | **geometry** is `final_score`, which equals the geometry score. |
+| **Recommended Next Tests** | client heuristics on report DTO | Missing pair contrasts and inconclusive calls. A `similar` pair shares a behavior family and the same outcome; the contrast names the remaining trajectory difference. |
 | **ODD boundary / rules** | S2/S3 JSON under `analysis/odd/output/` | CART rules table; min–max kNN ≠ pair z-score distance |
 
 Produce E’s files:
@@ -543,7 +545,7 @@ python -m llm_pipeline.cli odd-chat --run-dir "$RUN" --question "…" [--dry-run
 | `split_analysis.py` | Products; gates; summary LLM invents `label` per cluster, independently; `split_analysis_summary.json` |
 | `cluster_aggregates.py` | Pass-1 aggregates → `cluster_aggregate.json` |
 | `cluster_label_reviewer.py` | Cross-cluster label QA — one LLM call, renames mechanism-chained / duplicate labels |
-| `cluster_selection_eval.py` | Behavior score (purity + title distinctness) + digests |
+| `cluster_selection_eval.py` | Purity and title-distinctness checks + digests |
 | `cross_cluster_evaluator.py` | Whole-partition LLM verdict |
 | `clustering_quality_scorer.py` | Rule (+ optional LLM blend) ranking score |
 | Analyzer `dataset_builder.py` / `parameter_space_pair_packs.py` | Packs, BEV, context rebuild |

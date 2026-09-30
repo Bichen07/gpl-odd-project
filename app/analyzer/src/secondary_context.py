@@ -658,7 +658,7 @@ def format_trajectory_shape_section(summary: Dict[str, Any], left_lab: str, righ
         "## Trajectory shape difference (deterministic)",
         "",
         "MFPCA+HDBSCAN clustered on whole-trajectory shape. This block summarizes",
-        "full-trial facts — independent of synchronized `separation_call`.",
+        "full-trial facts — independent of synchronized `behavior_similarity`.",
         "",
         f"- **layer1_end_t**: {summary.get('layer1_end_t')} s",
         f"- **downstream_behavior_difference**: {summary.get('downstream_behavior_difference')}",

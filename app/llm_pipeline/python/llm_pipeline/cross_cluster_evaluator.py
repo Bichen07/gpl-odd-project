@@ -51,6 +51,7 @@ class CrossClusterEval:
     boundary_clarity_score: int
     inter_notes: str
     cluster_summaries: List[Dict[str, Any]] = field(default_factory=list)
+    cluster_differences: List[Dict[str, Any]] = field(default_factory=list)
     merge_candidates: List[str] = field(default_factory=list)
     split_candidates: List[str] = field(default_factory=list)
     recommended_action: str = ""
@@ -413,6 +414,10 @@ class CrossClusterEvaluator:
             boundary_clarity_score=int(parsed.get("boundary_clarity_score", 5)),
             inter_notes=str(parsed.get("inter_notes", "")),
             cluster_summaries=enriched,
+            cluster_differences=[
+                row for row in list(parsed.get("cluster_differences") or [])
+                if isinstance(row, dict)
+            ],
             merge_candidates=list(parsed.get("merge_candidates") or []),
             split_candidates=list(parsed.get("split_candidates") or []),
             recommended_action=str(parsed.get("recommended_action") or ""),
@@ -459,6 +464,7 @@ def run_cross_cluster_eval(
             "boundary_clarity_score": None,
             "inter_notes": f"Cross-cluster evaluation skipped ({reason})",
             "cluster_summaries": [],
+            "cluster_differences": [],
             "merge_candidates": [],
             "split_candidates": [],
             "recommended_action": "",
@@ -483,6 +489,7 @@ def run_cross_cluster_eval(
         "boundary_clarity_score": result.boundary_clarity_score,
         "inter_notes": result.inter_notes,
         "cluster_summaries": result.cluster_summaries,
+        "cluster_differences": result.cluster_differences,
         "merge_candidates": result.merge_candidates,
         "split_candidates": result.split_candidates,
         "recommended_action": result.recommended_action,

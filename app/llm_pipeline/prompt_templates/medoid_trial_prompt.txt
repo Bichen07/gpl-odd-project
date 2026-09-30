@@ -55,13 +55,16 @@ metrics on those stamps (Parking distance/clearance/speed). Tag each
 the named vehicle is still d ≳ 100 m (setup features stay out of the why).
 
 Then walk the medoid chronologically. **Before any why**, state pass/yield
-**vs the named vehicle** (common_sense gate; closed 3-set only). For each
+**vs the named vehicle** (common_sense gate; closed 3-set only). Use the
+agent name from the context prose (`Oncoming`, `CuttingIn`, `Parking`).
+A filename token such as `Opposite` is the same vehicle as `Oncoming`;
+write one row for that vehicle, not two. For each
 salient stamp that becomes a `decision_timeline` entry, one CoT bullet:
-1. \(Q_a\) Action — Labeller/lexicon verb + intensity + quoted speed / Δheading.
+1. Action — lexicon verb + intensity + quoted speed / Δheading.
    Do not invent a maneuver name.
 2. Situation — quote the relevant agent(s) from **this stamp's** context clause;
    confirm on BEV (secondary may be off-crop).
-3. \(Q_j\) Why — **one short clause** toward the agent this action is for
+3. Why — **one short clause** toward the agent this action is for
    (e.g. "CuttingIn already beside Ego, brake starts only now"). Causal
    locality: evidence only at t ≤ this stamp. Resume-driving with nobody
    ahead → omit the why clause.
@@ -106,7 +109,7 @@ Situation clause (REQUIRED on every non-trivial entry — quote from context_med
   agent ahead, the conclude for that decelerate/slowdown is toward the ahead
   agent. Do not treat any context flag as a pre-assigned cause.
 
-Conclude clause = \(Q_j\) (end of every Ego-action description; omit on
+Conclude clause (end of every Ego-action description; omit on
 named-vehicle-only / outcome-only stamps):
 - **One short why** toward a named agent, in plain English.
   GOOD: "⇒ CuttingIn already on the left; Ego only brakes now."
@@ -119,9 +122,9 @@ Collision phrasing (LAST entry only when outcome: collision):
   "<named vehicle> side-swipes/T-bones Ego's <left/right>" — always name the struck
   side and quote both speeds when context provides them.
 
-ONE timeline only — each entry is \(Q_a\) then \(Q_j\):
-  \(Q_a\): [lexicon verb + intensity] [quoted speed/Δheading] [quoted situation]
-  \(Q_j\): [one why clause toward one agent]
+ONE timeline only — each entry is the action, then one why clause:
+  Action: [lexicon verb + intensity] [quoted speed/Δheading] [quoted situation]
+  Why: [one why clause toward one agent]
   Target ≤30 words. Dense — not a paragraph, not a slogan.
   BAD (too thin):  "Ego begins moderately speeding up."
   BAD (unfocused): junction / road-ID travelogue.
@@ -149,7 +152,7 @@ agent_interactions:
   # more rows only for agents Ego actually responded to (e.g. Parking)
 decision_timeline:
   - timestamp: <float>        # same clock as context_medoid.md / Replayer
-    description: "<Q_a: verb + quoted numbers + situation. Q_j: one why clause.>"
+    description: "<verb + quoted numbers + situation. One why clause.>"
   # 6-15 entries spanning approach → conflict → outcome.
   # LAST entry = final outcome. If collision, LAST uses collision phrasing.
 collision_detail:            # omit entirely (or null) when outcome != collision
@@ -164,10 +167,10 @@ open_questions:
 </Output>
 
 <Motive summary guide>
-This field is DriveGPT4 \(Q_j\) at **trial** scale: “Why does Ego behave this way?”
-It is not a recap of `decision_timeline`.
+Write why Ego behaves this way across the trial. It is not a recap of
+`decision_timeline`.
 
-Write **2–4 short sentences** (one block; blank lines optional). Hard cap ~80 words.
+Write **2–4 short sentences** in one paragraph. Hard cap ~80 words.
 If CuttingIn then Parking both matter, two sentences for CuttingIn, one for Parking.
 
 Each sentence answers why, with at most **one** quoted anchor (time or distance or
@@ -178,7 +181,7 @@ Rules:
   cluster_summary, not here.
 - State pass vs yield vs the **named vehicle** once, in words (“Ego goes first”
   / “Ego gives way”).
-- Do not re-walk every stamp. The timeline already has \(Q_a\).
+- Do not re-walk every stamp. The timeline already lists the actions.
 - Do not invent actions absent from context/BEV.
 - Collision / near-miss: one sentence with the peak numbers that matter
   (who, side, min distance or speeds) — not a second timeline.
@@ -187,7 +190,7 @@ BAD (too long, stamp recap):
   Ego initially holds speed, then at 8.1 s the gap is 20 m, then at 9.4 s it
   brakes, then at 10.8 s the gap is 5 m, then at 12 s it accelerates again …
 
-GOOD (Q_j, cluster1-shaped):
+GOOD:
   Ego goes first: it keeps speeding up while CuttingIn is still ahead and the
   gap shrinks to ~9 m, then brakes only when CuttingIn is already on the left
   (~5 m) — late, but it still misses (min boundary 1.4 m) and passes. After

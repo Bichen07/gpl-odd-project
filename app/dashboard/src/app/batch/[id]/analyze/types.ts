@@ -123,7 +123,7 @@ export type ReportData = {
     collisionRate: number | null;
     collisionCount: number | null;
     parameterRanges: Record<string, [number, number]> | null;
-    neighborhoodSeparation: string | null;
+    neighborBehavior: string | null;
     medoidMotive: string | null;
     medoidOutcome: string | null;
     medoidResolution: string | null;
@@ -138,8 +138,8 @@ export type ReportData = {
     clusters: [number, number];
     paramDist: number | null;
     outcomeFlip: boolean;
-    separationCall: string | null;
-    separationReason: string | null;
+    behaviorSimilarity: string | null;
+    behaviorSimilarityReason: string | null;
     contrastExplanation: string | null;
     hasContrast: boolean;
   }>;

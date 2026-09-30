@@ -6,8 +6,9 @@ Do not use those weights.
 
 ## Current formulas
 
-**Behavior** (`selection_score`, dashboard chip **behavior**). Equal weights,
-renormalized if one component is missing:
+**Selection checks** (`selection_score` in `cluster_selection_eval.json`). The
+dashboard does not show this number. Equal weights, renormalized if one
+component is missing:
 
 | Component | Weight | What it counts |
 |-----------|--------|----------------|
@@ -21,24 +22,24 @@ into the JSON and are **not** weighted. The composite does not use this score.
 
 | Piece | Weight |
 |-------|--------|
-| silhouette, shifted from −1…1 onto 0–1 | 0.2941 |
-| collision-rate spread (std / 50 percentage points, cap 1) | 0.2353 |
-| time-to-collision spread (std / 3 seconds, cap 1; 3 s is a chosen full-mark) | 0.1765 |
-| tightness (`intra_consistency`; unitless distance to the cluster centroid) | 0.2941 |
+| silhouette, shifted from −1…1 onto 0–1 | 0.25 |
+| collision-rate spread (std / 50 percentage points, cap 1) | 0.25 |
+| time-to-collision spread (std / 3 seconds, cap 1; 3 s is a chosen full-mark) | 0.25 |
+| tightness (`intra_consistency`; unitless distance to the cluster centroid) | 0.25 |
 
 Parameter-range non-overlap was removed. The loosest cluster’s tightness piece is 0.
 
-**Composite** (`final_score`): `0.6 × geometry + 0.4 × language-model score` when
-both 1–10 ratings are present and the cross-eval is not a stub. The language-model
-score is the average of separation and boundary clarity, times 10. Without those
-ratings the composite equals geometry. The behavior score is not in the blend.
-The cross-eval parser stores a missing rating as 5, so an omitted rating is
-blended as a written 5.
+**Ranking number** (`final_score`): equals geometry. The language-model score is
+the average of separation and boundary clarity, times 10, and is stored beside
+the ranking number. It does not move it. The reading explains differences. It
+does not recommend a merge, a split, or a different number of clusters.
+The cross-eval parser stores a missing rating as 5. That stored 5 is shown on
+the reading and does not change geometry.
 
-On `results/batch8/6_cluster_s=0.6113` after the 2026-09-28 re-run and the
-geometry-weight change: behavior 83.33, geometry 68.69, language model 50,
-composite 61.21. Cross-eval ratings are 5 and 5, with a merge suggestion for
-clusters 2, 3, and 5. That suggestion is not applied.
+On `results/batch8/6_cluster_s=0.6113` the geometry score is 68.0. The
+2026-09-28 cross-eval file still contains ratings of 5 and 5 and a merge
+suggestion for clusters 2, 3, and 5. That suggestion is not applied. A new
+cross-eval run uses the difference-reading prompt.
 
 ---
 
@@ -98,8 +99,9 @@ deterministic report lists a merge candidate, the disagreement is visible on the
 
 ## 3. Retired four-component behavior score (2026-08-08)
 
-These weights are **not** the live score. See “Current formulas” at the top.
-The live behavior score is outcome purity 0.50 and title distinctness 0.50.
+These weights are **not** the live file. See “Current formulas” at the top.
+The selection file records outcome purity 0.50 and title distinctness 0.50.
+The dashboard does not show that total.
 
 All in `python/llm_pipeline/cluster_selection_eval.py`. Each returns a value in `[0,1]`, or
 `None` when its inputs are missing; `selection_score` is the weighted mean over the

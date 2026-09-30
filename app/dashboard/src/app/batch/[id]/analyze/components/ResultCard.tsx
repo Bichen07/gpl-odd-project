@@ -19,6 +19,7 @@ import {
 import { Close, ExpandMore, HelpOutline } from "@mui/icons-material";
 import type { ResultEntry } from "../types";
 import { agentInteractionRows, normalizeEgoSummary } from "../utils";
+import { displayAgentName } from "@/app/api/_lib/agentNames";
 
 /**
  * Medoid analysis result card. Shows medoid_trial.yaml fields only —
@@ -71,9 +72,9 @@ export default function ResultCard({
     (parsed.conflict_metrics as Record<string, unknown> | undefined) ??
     (meta.conflict_metrics as Record<string, unknown> | undefined) ??
     null;
-  const conflictPartner = String(
-    conflictMetrics?.vehicle ?? conflictMetrics?.partner ?? "",
-  ).trim();
+  const conflictPartner = displayAgentName(
+    String(conflictMetrics?.vehicle ?? conflictMetrics?.partner ?? "").trim(),
+  );
   const agentInteractions = agentInteractionRows(parsed);
 
   return (
@@ -127,10 +128,12 @@ export default function ResultCard({
             <Alert severity="info" sx={{ mb: 1.5, py: 0.5 }}>
               <Typography variant="caption" component="div">
                 Each row is Ego vs <strong>that agent</strong>:{" "}
-                <code>agent</code> and <code>resolution</code>. The first row
-                is the pack partner
-                {conflictPartner ? ` (${conflictPartner})` : ""}. Extra rows
-                are other agents Ego actually responded to.
+                <code>agent</code> and <code>resolution</code>. The conflict
+                vehicle is shown by its prose name
+                {conflictPartner ? ` (${conflictPartner})` : ""}. A raw
+                scenario token such as Opposite is the same vehicle as
+                Oncoming, so it is not a second row. Extra rows are other
+                agents Ego actually responded to.
               </Typography>
               <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
                 <strong>Resolution</strong> (go-through vs give-way vs that
@@ -144,8 +147,9 @@ export default function ResultCard({
                 this row.
               </Typography>
               <Typography variant="caption" component="div" sx={{ mt: 0.5 }}>
-                The why is <code>motive_summary</code> (2–4 sentences) and the
-                last clause of each timeline <code>description</code>.
+                The why is <code>motive_summary</code>: 2–4 sentences in one
+                paragraph. Each timeline <code>description</code> ends with
+                one why clause.
               </Typography>
             </Alert>
           </Collapse>

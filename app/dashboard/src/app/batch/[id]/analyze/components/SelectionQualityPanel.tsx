@@ -21,19 +21,6 @@ import { useState, type ReactNode } from "react";
 import type { ClusteringQuality } from "../types";
 import { fmtNum } from "../utils";
 
-const BEHAVIOR_ROWS: Array<{ key: string; label: string; help: string }> = [
-  {
-    key: "outcome_purity",
-    label: "Outcome purity",
-    help: "Share of clusters that are almost all safe or almost all collisions.",
-  },
-  {
-    key: "motive_distinctness",
-    label: "Title distinctness",
-    help: "Unique summary titles divided by clusters that have a title.",
-  },
-];
-
 const GEOMETRY_ROWS: Array<{
   key: string;
   label: string;
@@ -43,25 +30,25 @@ const GEOMETRY_ROWS: Array<{
   {
     key: "silhouette_score",
     label: "Silhouette",
-    weight: 0.2941,
+    weight: 0.25,
     help: "How separated the trajectories are. The file stores this on −1 to 1; the row is that value shifted onto 0–1.",
   },
   {
     key: "collision_spread_score",
     label: "Collision-rate spread",
-    weight: 0.2353,
+    weight: 0.25,
     help: "How uneven the clusters' collision rates are.",
   },
   {
     key: "ttc_spread_score",
     label: "Time-to-collision spread",
-    weight: 0.1765,
+    weight: 0.25,
     help: "How uneven each cluster's mean time-to-collision is.",
   },
   {
     key: "intra_consistency_score",
     label: "Tightness",
-    weight: 0.2941,
+    weight: 0.25,
     help: "How close each cluster's trials sit to its center in the projection.",
   },
 ];
@@ -123,9 +110,8 @@ export default function SelectionQualityPanel({
   const cross = (crossEval ?? null) as Record<string, any> | null;
   const qual = (quality ?? null) as Record<string, any> | null;
   const sub = (qual?.sub_scores ?? {}) as Record<string, number | null>;
-  const components = (sel?.components ?? {}) as Record<string, number | null>;
-  const weights = (sel?.weights ?? {}) as Record<string, number>;
   const findings = (sel?.findings ?? []) as string[];
+  const mergeCandidates = (sel?.merge_candidates ?? []) as Array<Record<string, any>>;
   const crossIsStub = cross?.stub === true;
   const [showHelp, setShowHelp] = useState(false);
   const rawSilhouette = sub.silhouette_raw;
@@ -150,12 +136,13 @@ export default function SelectionQualityPanel({
           {scoreText(qual?.final_score)}
         </Typography>
         <Typography variant="subtitle1" color="text.secondary">
-          composite
+          geometry
         </Typography>
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
-        60% geometry and 40% language-model ratings. Behavior is reported beside
-        them and is not in this number. The tab label shows this composite.
+        This number is the geometry score from the clustering. The language-model
+        reading explains what still differs between clusters and does not change
+        this number. The tab label shows this score.
       </Typography>
 
       <Collapse in={showHelp}>
@@ -179,13 +166,9 @@ export default function SelectionQualityPanel({
             time-to-collision spread, and tightness.
           </Typography>
           <Typography variant="body2" sx={{ mt: 1 }}>
-            The language-model half is the average of separation and boundary
-            clarity, each 1–10, multiplied by 10. Ratings of 5 and 5 become 50.
-            Without those ratings, the composite stays equal to geometry.
-          </Typography>
-          <Typography variant="body2" sx={{ mt: 1 }}>
-            Behavior is the average of outcome purity and title distinctness.
-            It does not call the language model, and the composite leaves it out.
+            The language-model ratings describe how clearly the behavior
+            differences can be stated. They sit beside this score. They do not
+            move it, and they do not change the number of clusters.
           </Typography>
         </Alert>
       </Collapse>
@@ -194,7 +177,7 @@ export default function SelectionQualityPanel({
         <ScoreCard
           title="Geometry"
           value={scoreText(qual?.rule_score)}
-          caption="60% of the composite"
+          caption="Clustering score"
         >
           {GEOMETRY_ROWS.map((row) => (
             <Box key={row.key} sx={{ mb: 1 }}>
@@ -223,52 +206,22 @@ export default function SelectionQualityPanel({
         <ScoreCard
           title="Language model"
           value={scoreText(qual?.llm_score)}
-          caption="40% of the composite"
+          caption="Supplementary reading"
         >
           <Typography variant="body2">
-            Separation {cross?.behavioral_separation_score ?? "n/a"}/10
+            Behavior difference {cross?.behavioral_separation_score ?? "n/a"}/10
           </Typography>
           <Typography variant="body2" sx={{ mb: 1 }}>
             Boundary clarity {cross?.boundary_clarity_score ?? "n/a"}/10
           </Typography>
           <Typography variant="caption" color="text.secondary">
-            Separation asks whether the clusters describe different driving
-            strategies. Clarity asks whether the written cards and
-            matched-parameter pairs keep those boundaries readable.
+            Behavior difference rates how clearly the cluster stories differ.
+            Boundary clarity rates how clearly the cards state that difference.
+            Neither number is Behavioral similarity, and neither changes the
+            clustering.
           </Typography>
         </ScoreCard>
 
-        <ScoreCard
-          title="Behavior"
-          value={scoreText(sel?.selection_score)}
-          caption="Not in the composite"
-        >
-          {!sel && (
-            <Typography variant="caption" color="text.secondary">
-              Filled when this clustering is evaluated. These checks do not use
-              the language model.
-            </Typography>
-          )}
-          {BEHAVIOR_ROWS.map((row) => (
-            <Box key={row.key} sx={{ mb: 1 }}>
-              <Stack direction="row" justifyContent="space-between" spacing={1}>
-                <Typography variant="body2">{row.label}</Typography>
-                <Typography variant="body2">
-                  {components[row.key] == null ? "n/a" : fmtNum(components[row.key], 3)}
-                  {weights[row.key] != null && (
-                    <Typography component="span" variant="caption" color="text.secondary">
-                      {" "}
-                      × {fmtNum(weights[row.key], 2)}
-                    </Typography>
-                  )}
-                </Typography>
-              </Stack>
-              <Typography variant="caption" color="text.secondary">
-                {row.help}
-              </Typography>
-            </Box>
-          ))}
-        </ScoreCard>
       </Stack>
 
       {findings.length > 0 && (
@@ -281,12 +234,12 @@ export default function SelectionQualityPanel({
         </Stack>
       )}
 
-      {(sel?.merge_candidates ?? []).length > 0 && (
+      {mergeCandidates.length > 0 && (
         <Alert severity="warning" sx={{ mt: 2 }}>
           <Typography variant="body2" fontWeight="bold">
-            Behavior merge candidates
+            Same-title clusters
           </Typography>
-          {(sel.merge_candidates as Array<Record<string, any>>).map((m, i) => (
+          {mergeCandidates.map((m, i) => (
             <Typography key={i} variant="caption" display="block">
               cluster{m.clusters?.[0]} + cluster{m.clusters?.[1]} — shared label{" "}
               {m.shared_motive}, param overlap {m.param_overlap}
@@ -318,36 +271,25 @@ export default function SelectionQualityPanel({
               {String(cross.selection_verdict)}
             </Typography>
           )}
-          {cross.recommended_action && (
-            <Typography variant="body2">
-              <strong>Recommended action:</strong> {String(cross.recommended_action)}
-              {cross.recommended_action_detail
-                ? ` — ${String(cross.recommended_action_detail)}`
-                : ""}
-            </Typography>
-          )}
-          {Array.isArray(cross.merge_candidates) && cross.merge_candidates.length > 0 && (
-            <Alert severity="warning">
-              <Typography variant="body2" fontWeight="bold">
-                Merge candidates
-              </Typography>
-              {cross.merge_candidates.map((item: unknown, i: number) => (
-                <Typography key={i} variant="caption" display="block">
-                  {String(item)}
-                </Typography>
-              ))}
-            </Alert>
-          )}
-          {Array.isArray(cross.split_candidates) && cross.split_candidates.length > 0 && (
+          {Array.isArray(cross.cluster_differences) && cross.cluster_differences.length > 0 && (
             <Alert severity="info">
               <Typography variant="body2" fontWeight="bold">
-                Split candidates
+                What still differs
               </Typography>
-              {cross.split_candidates.map((item: unknown, i: number) => (
-                <Typography key={i} variant="caption" display="block">
-                  {String(item)}
-                </Typography>
-              ))}
+              {cross.cluster_differences.map((item: unknown, i: number) => {
+                const row = (item ?? {}) as Record<string, unknown>;
+                const clusters = Array.isArray(row.clusters) ? row.clusters.join(" and ") : "";
+                const shared = row.shared ? ` Shared: ${String(row.shared)}` : "";
+                const difference = row.difference ? ` Difference: ${String(row.difference)}` : "";
+                return (
+                  <Typography key={i} variant="caption" display="block">
+                    {clusters ? `${clusters}.` : ""}
+                    {shared}
+                    {difference}
+                    {!clusters && !shared && !difference ? String(item) : ""}
+                  </Typography>
+                );
+              })}
             </Alert>
           )}
         </Stack>
@@ -369,7 +311,6 @@ export default function SelectionQualityPanel({
                 <TableCell align="right">k</TableCell>
                 <TableCell align="right">Geometry</TableCell>
                 <TableCell align="right">Language model</TableCell>
-                <TableCell align="right">Composite</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -390,9 +331,6 @@ export default function SelectionQualityPanel({
                   <TableCell align="right">{row.rule_score?.toFixed(1)}</TableCell>
                   <TableCell align="right">
                     {row.llm_score != null ? row.llm_score.toFixed(1) : "—"}
-                  </TableCell>
-                  <TableCell align="right">
-                    <strong>{row.final_score?.toFixed(1)}</strong>
                   </TableCell>
                 </TableRow>
               ))}

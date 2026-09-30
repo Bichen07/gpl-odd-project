@@ -1,13 +1,12 @@
 """S5 (part 1/2) — deterministic ``odd_chat_briefing.json`` builder.
 
-No LLM call in this module. Assembles the fixed "knowledge base" that S5's
-chat (``odd_chat.py``) is only ever allowed to cite from, per
-implementation_plan.md §7.5. Mirrors the field extraction already used by
-``cluster-run-report/route.ts`` so the Report tab and the chat briefing
-never disagree about what a given YAML/JSON means.
+No LLM call in this module. Assembles the fixed knowledge base that S5's
+chat (``odd_chat.py``) is only ever allowed to cite from. Mirrors the field
+extraction already used by ``cluster-run-report/route.ts`` so the Report tab
+and the chat briefing never disagree about what a given YAML/JSON means.
 
 Truncates long free-text fields (caption / consistency_note / contrast
-explanation) to keep the briefing near the ~8-15k token budget in §7.5.
+explanation) so the briefing stays small enough for one chat call.
 """
 
 from __future__ import annotations
@@ -25,20 +24,23 @@ BRIEFING_FILENAME = "odd_chat_briefing.json"
 
 
 def _named_vehicle_resolution(medoid: Optional[Dict[str, Any]]) -> Optional[str]:
-    """Resolution on the named-vehicle row. Legacy top-level key if the row is missing."""
+    """Resolution of the named conflict vehicle under its display name."""
     if not isinstance(medoid, dict):
         return None
     cm = medoid.get("conflict_metrics") if isinstance(medoid.get("conflict_metrics"), dict) else {}
     partner = str(cm.get("vehicle") or cm.get("partner") or "").strip()
-    for row in medoid.get("agent_interactions") or []:
-        if not isinstance(row, dict):
-            continue
-        if partner and str(row.get("agent") or "").strip() != partner:
-            continue
-        res = row.get("resolution") or row.get("interaction_resolution")
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from agent_labels import collapse_agent_interactions  # type: ignore
+
+    rows = collapse_agent_interactions(medoid.get("agent_interactions") or [], partner)
+    if rows:
+        res = rows[0].get("resolution")
         if isinstance(res, str) and res.strip():
             return res.strip()
-        break
     top = medoid.get("interaction_resolution")
     if isinstance(top, str) and top.strip():
         return top.strip()
@@ -126,7 +128,7 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
                 "n": cluster_stats.get("n_trials") or cluster_stats.get("size"),
                 "collision_rate": cluster_stats.get("collision_rate"),
                 "parameter_ranges": cluster_stats.get("parameter_ranges"),
-                "neighborhood_separation": (summary or {}).get("neighborhood_separation"),
+                "neighbor_behavior": (summary or {}).get("neighbor_behavior"),
                 "medoid_trial_id": (medoid or {}).get("trial_id"),
                 "medoid_resolution": _named_vehicle_resolution(medoid),
                 "medoid_outcome": (medoid or {}).get("outcome"),
@@ -153,10 +155,10 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
                     "clusters": [pair.get("cluster_a"), pair.get("cluster_b")],
                     "param_dist": pair.get("param_dist"),
                     "outcome_flip": outcome_a != outcome_b if outcome_a and outcome_b else None,
-                    "separation_call": divergence.get("separation_call") or (contrast or {}).get("separation_call"),
+                    "behavior_similarity": divergence.get("behavior_similarity") or (contrast or {}).get("behavior_similarity"),
                     "explanation_short": _truncate(
                         divergence.get("contrast_explanation")
-                        or divergence.get("separation_reason")
+                        or divergence.get("behavior_similarity_reason")
                         or (contrast or {}).get("contrast_explanation")
                     ),
                 }

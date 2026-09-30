@@ -86,7 +86,17 @@ def ensure_named_vehicle_agent_interaction(
         agent = str(row.get("agent") or "").strip()
         res = row.get("resolution") or row.get("interaction_resolution") or "unresolved"
         slim.append({"agent": agent, "resolution": res})
-    parsed["agent_interactions"] = slim
+    import sys
+
+    analyzer_src = Path(__file__).resolve().parents[3] / "analyzer" / "src"
+    if str(analyzer_src) not in sys.path:
+        sys.path.insert(0, str(analyzer_src))
+    from agent_labels import collapse_agent_interactions, display_agent_name  # type: ignore
+
+    shown_partner = display_agent_name(partner) if partner else ""
+    parsed["agent_interactions"] = collapse_agent_interactions(slim, shown_partner or partner)
+    if isinstance(parsed.get("conflict_metrics"), dict) and shown_partner:
+        parsed["conflict_metrics"]["vehicle"] = shown_partner
     for entry in parsed.get("decision_timeline") or []:
         if isinstance(entry, dict):
             entry.pop("motive", None)
@@ -324,8 +334,8 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
             "contrast_explanation",
             "contrast_timeline",
             "critical_divergence",
-            "separation_call",
-            "separation_reason",
+            "behavior_similarity",
+            "behavior_similarity_reason",
             "hypothesis",
             "delta",
             "open_questions",
@@ -1037,8 +1047,8 @@ def run_split_analysis(
                 stub = {
                     **base_doc,
                     "contrast_explanation": "stub (dry_run)",
-                    "separation_call": "inconclusive",
-                    "separation_reason": "stub",
+                    "behavior_similarity": "inconclusive",
+                    "behavior_similarity_reason": "stub",
                     "hypothesis": "",
                     "stub": True,
                 }
@@ -1054,8 +1064,8 @@ def run_split_analysis(
                     parsed = {
                         **base_doc,
                         "contrast_explanation": "parse_failed",
-                        "separation_call": "inconclusive",
-                        "separation_reason": "parse_failed",
+                        "behavior_similarity": "inconclusive",
+                        "behavior_similarity_reason": "parse_failed",
                     }
                 parsed.setdefault("left", {})
                 parsed.setdefault("right", {})
@@ -1117,15 +1127,15 @@ def run_split_analysis(
                         k: v for k, v in cleaned.items() if v is not None
                     }
 
-                if not parsed.get("separation_call"):
+                if not parsed.get("behavior_similarity"):
                     print(
-                        f"  ⚠️  {folder}: LLM omitted separation_call "
+                        f"  ⚠️  {folder}: LLM omitted behavior_similarity "
                         "(contrast saved without decision fields)"
                     )
                 for key in (
                     "contrast_explanation",
                     "hypothesis",
-                    "separation_reason",
+                    "behavior_similarity_reason",
                 ):
                     if isinstance(parsed.get(key), str):
                         parsed[key] = _format_caption_paragraphs(parsed[key])
@@ -1195,7 +1205,7 @@ def run_split_analysis(
                     "motive_consistency_note": "",
                     "neighbor_comparison": [],
                     "distinct_from_neighbors": None,
-                    "neighborhood_separation": "ambiguous",
+                    "neighbor_behavior": "ambiguous",
                     "stub": True,
                 }
                 _write_yaml_doc(out_path, None, stub, {"stub": True})
@@ -1212,7 +1222,7 @@ def run_split_analysis(
                         "cluster_id": cid,
                         "label": f"Cluster {cid}",
                         "caption": "parse_failed",
-                        "neighborhood_separation": "ambiguous",
+                        "neighbor_behavior": "ambiguous",
                         "neighbor_comparison": [],
                     }
                 parsed["cluster_id"] = cid
@@ -1230,11 +1240,11 @@ def run_split_analysis(
                     parsed["risk_level"] = "medium"
                 else:
                     parsed["risk_level"] = "low"
-                # distinct_from_neighbors from neighbor_comparison verdicts.
+                # distinct_from_neighbors from neighbor_comparison behavior_similarity.
                 comps = parsed.get("neighbor_comparison") or []
                 if isinstance(comps, list) and comps:
                     parsed["distinct_from_neighbors"] = all(
-                        isinstance(c, dict) and c.get("verdict") == "distinct"
+                        isinstance(c, dict) and c.get("behavior_similarity") == "distinct"
                         for c in comps
                     )
                 else:
@@ -1284,7 +1294,7 @@ def run_split_analysis(
     except Exception as exc:
         print(f"  ⚠️  selection eval failed: {exc}")
 
-    # --- Cross-cluster evaluation (LLM verdict over medoid + Parameter-space pair cards) ---
+    # --- Cross-cluster evaluation (reading of medoid + parameter-space pair cards) ---
     if "cross-eval" in prods:
         print("\n[split-analysis] cross-eval")
         try:

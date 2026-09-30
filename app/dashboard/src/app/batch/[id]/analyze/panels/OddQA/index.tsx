@@ -7,7 +7,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Divider,
   FormControl,
   InputLabel,
   MenuItem,
@@ -17,6 +16,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import { Send } from "@mui/icons-material";
 import type { ChatTurn } from "../../types";
 
 type ConversationSummary = {
@@ -59,6 +59,9 @@ export default function OddChatPanel({
   const [question, setQuestion] = useState("");
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
+  const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
+  const [nameDraft, setNameDraft] = useState("New conversation");
+  const [renaming, setRenaming] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   const loadHistory = useCallback((selectedConversationId?: string | null) => {
@@ -87,12 +90,64 @@ export default function OddChatPanel({
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [history]);
+  }, [history, asking]);
+
+  useEffect(() => {
+    const current = conversations.find((conversation) => conversation.id === conversationId);
+    setNameDraft(current?.title ?? "New conversation");
+  }, [conversationId, conversations]);
+
+  const saveName = async () => {
+    const title = nameDraft.replace(/\s+/g, " ").trim();
+    const activeConversationId = conversationId ?? "default";
+    if (!title || renaming) return;
+    const current = conversations.find((conversation) => conversation.id === activeConversationId);
+    if (current?.title === title) return;
+    setRenaming(true);
+    setAskError(null);
+    try {
+      const res = await fetch("/api/odd-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchId: Number(batchId),
+          folder,
+          conversationId: activeConversationId,
+          title,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      setConversations((prev) => {
+        const exists = prev.some((conversation) => conversation.id === activeConversationId);
+        if (!exists) {
+          return [
+            {
+              id: activeConversationId,
+              title,
+              updatedAt: new Date().toISOString(),
+              turnCount: history.length,
+            },
+            ...prev,
+          ];
+        }
+        return prev.map((conversation) =>
+          conversation.id === activeConversationId ? { ...conversation, title } : conversation,
+        );
+      });
+      setNameDraft(title);
+    } catch (e) {
+      setAskError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRenaming(false);
+    }
+  };
 
   const ask = async () => {
     const q = question.trim();
     if (!q || asking) return;
     const activeConversationId = conversationId ?? "default";
+    await saveName();
     if (!String(apiKey).trim()) {
       setAskError("Enter the API key in Model setup first.");
       onOpenSetup();
@@ -100,6 +155,8 @@ export default function OddChatPanel({
     }
     setAsking(true);
     setAskError(null);
+    setPendingQuestion(q);
+    setQuestion("");
     try {
       const res = await fetch("/api/odd-chat", {
         method: "POST",
@@ -121,6 +178,7 @@ export default function OddChatPanel({
       setAskError(e instanceof Error ? e.message : String(e));
     } finally {
       setAsking(false);
+      setPendingQuestion(null);
     }
   };
 
@@ -131,6 +189,7 @@ export default function OddChatPanel({
         : `conversation-${Date.now()}`;
     setConversationId(id);
     setHistory([]);
+    setNameDraft("New conversation");
     setAskError(null);
   };
 
@@ -168,7 +227,7 @@ export default function OddChatPanel({
         <Button size="small" variant="outlined" onClick={startNewConversation}>
           New conversation
         </Button>
-        <FormControl size="small" sx={{ minWidth: 280 }}>
+        <FormControl size="small" sx={{ minWidth: 220 }}>
           <InputLabel id="odd-conversation-label">Conversation</InputLabel>
           <Select
             labelId="odd-conversation-label"
@@ -178,7 +237,7 @@ export default function OddChatPanel({
           >
             {conversationId &&
               !conversations.some((conversation) => conversation.id === conversationId) && (
-                <MenuItem value={conversationId}>New conversation (unsaved)</MenuItem>
+                <MenuItem value={conversationId}>{nameDraft || "New conversation"}</MenuItem>
               )}
             {conversations.map((conversation) => (
               <MenuItem key={conversation.id} value={conversation.id}>
@@ -187,6 +246,23 @@ export default function OddChatPanel({
             ))}
           </Select>
         </FormControl>
+        <TextField
+          size="small"
+          label="Conversation name"
+          value={nameDraft}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onBlur={() => {
+            void saveName();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              void saveName();
+            }
+          }}
+          disabled={renaming}
+          sx={{ minWidth: 240, flexGrow: 1 }}
+        />
       </Stack>
 
       {loadingHistory ? (
@@ -217,38 +293,103 @@ export default function OddChatPanel({
           <Box
             ref={logRef}
             sx={{
-              maxHeight: 380,
+              minHeight: 360,
+              maxHeight: 520,
               overflowY: "auto",
-              mb: 2,
-              border: "1px solid",
-              borderColor: "divider",
-              borderRadius: 1,
-              p: 1.5,
+              mb: 1.5,
+              bgcolor: "grey.50",
+              borderRadius: 2,
+              px: 2,
+              py: 2,
+              display: "flex",
+              flexDirection: "column",
+              gap: 1.5,
             }}
           >
-            {history.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                No questions asked yet for this run.
+            {history.length === 0 && !pendingQuestion ? (
+              <Typography variant="body2" color="text.secondary" sx={{ m: "auto", textAlign: "center" }}>
+                Ask a question about this run.
               </Typography>
             ) : (
               history.map((t, i) => (
-                <Box key={i} sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2">You: {t.question}</Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", mt: 0.5 }}>
-                    {t.answer}
-                  </Typography>
-                  <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
-                    {(t.citations ?? []).map((c, j) => (
-                      <Chip key={j} label={c} size="small" variant="outlined" />
-                    ))}
-                    {t.dry_run && (
-                      <Chip label="dry-run (no API key)" size="small" color="warning" />
-                    )}
-                    <Chip label={t.model} size="small" variant="outlined" />
-                  </Stack>
-                  {i < history.length - 1 && <Divider sx={{ mt: 1.5 }} />}
-                </Box>
+                <Stack key={`${t.timestamp ?? "turn"}-${i}`} spacing={1.5}>
+                  <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                    <Box
+                      sx={{
+                        maxWidth: "75%",
+                        px: 1.75,
+                        py: 1.25,
+                        borderRadius: "18px 18px 6px 18px",
+                        bgcolor: "primary.main",
+                        color: "primary.contrastText",
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                        {t.question}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+                    <Box
+                      sx={{
+                        maxWidth: "75%",
+                        px: 1.75,
+                        py: 1.25,
+                        borderRadius: "18px 18px 18px 6px",
+                        bgcolor: "background.paper",
+                        border: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                        {t.answer}
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
+                        {(t.citations ?? []).map((c, j) => (
+                          <Chip key={j} label={c} size="small" variant="outlined" />
+                        ))}
+                        {t.dry_run && (
+                          <Chip label="dry-run" size="small" color="warning" />
+                        )}
+                      </Stack>
+                    </Box>
+                  </Box>
+                </Stack>
               ))
+            )}
+            {pendingQuestion && (
+              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                <Box
+                  sx={{
+                    maxWidth: "75%",
+                    px: 1.75,
+                    py: 1.25,
+                    borderRadius: "18px 18px 6px 18px",
+                    bgcolor: "primary.main",
+                    color: "primary.contrastText",
+                  }}
+                >
+                  <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                    {pendingQuestion}
+                  </Typography>
+                </Box>
+              </Box>
+            )}
+            {asking && (
+              <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
+                <Box
+                  sx={{
+                    px: 1.75,
+                    py: 1.25,
+                    borderRadius: "18px 18px 18px 6px",
+                    bgcolor: "background.paper",
+                    border: "1px solid",
+                    borderColor: "divider",
+                  }}
+                >
+                  <CircularProgress size={16} />
+                </Box>
+              </Box>
             )}
           </Box>
 
@@ -258,26 +399,34 @@ export default function OddChatPanel({
             </Alert>
           )}
 
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} alignItems="flex-end">
             <TextField
-              size="small"
               fullWidth
-              placeholder='e.g. "Which scenario should we test next?"'
+              multiline
+              maxRows={6}
+              placeholder="Message this run"
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  ask();
+                  void ask();
                 }
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": { borderRadius: 3, bgcolor: "background.paper" },
               }}
             />
             <Button
               variant="contained"
-              onClick={ask}
+              onClick={() => {
+                void ask();
+              }}
               disabled={asking || !question.trim() || !apiKey}
+              aria-label="Send"
+              sx={{ minWidth: 48, height: 48, borderRadius: 3 }}
             >
-              {asking ? <CircularProgress size={18} /> : "Ask"}
+              {asking ? <CircularProgress size={18} color="inherit" /> : <Send fontSize="small" />}
             </Button>
           </Stack>
           <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>

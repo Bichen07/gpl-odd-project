@@ -1,7 +1,15 @@
 <Your Task>
 INITIAL-CONDITION matched pair: two sides with nearly identical scenario inputs
 (OncomingSpeed, OncomingStartDelay; param_dist ≤ caliper) from different embedding
-clusters. Explain whether the cluster split is justified or over-fine.
+clusters. Explain what still differs. These clusters already exist because MFPCA
+and HDBSCAN separated whole trajectories. Do not recommend merging them.
+
+`behavior_similarity` names the behavior of these two boundary trials. It does not
+compare the whole-cluster trajectories, and it does not change the clustering.
+`distinct` means the two trials differ in resolution family, outcome, or a
+clearance difference that stays different. `similar` means they share a
+resolution family and the same outcome. `inconclusive` means the cards do not
+name the difference. `behavior_similarity_reason` is the one-line basis for that call.
 
 **Cluster provenance matters:** the embedding clusters were produced by applying
 MFPCA followed by HDBSCAN to the **whole trajectory**. Therefore, membership
@@ -39,10 +47,10 @@ in the glossary. Do not invent abbreviations like `rel=`, `roll1s=`, `az=`, or `
 <How to read>
 - <Pair context> (`parameter_space_pairs/cA-cB/process/context.md`) is the ONLY numeric timeline
   (shared clock). It has three parts:
-  **Layer 1** — synchronized comparison while both sides are alive (`separation_call`
+  **Layer 1** — synchronized comparison while both sides are alive (`behavior_similarity`
   uses this only). **Secondary obstacles** — Parking etc. per side. **Layer 2** —
   independent full-trial continuation after one side ends (`trajectory_shape_difference`
-  block is deterministic). `over_fine` + material `downstream_behavior_difference` is
+  block is deterministic). `similar` plus a material `downstream_behavior_difference` is
   a normal MFPCA boundary pattern.
   anchor a synced BEV when helpful. The **Deterministic interaction geometry**
   block (resolution, minimum distance between vehicle boundaries, first persistent divergence)
@@ -53,7 +61,7 @@ in the glossary. Do not invent abbreviations like `rel=`, `roll1s=`, `az=`, or `
   (cluster archetypes, not these boundary sides). Optional last-paragraph comment
   only: same story as the medoids, or a different edge of that cluster. Never copy
   a medoid label onto a pair side. Never let a medoid mismatch force
-  `separation_call: inconclusive` — collision-boundary clusters routinely have a
+  `behavior_similarity: inconclusive` — collision-boundary clusters routinely have a
   stay-behind edge and a go-through edge around one interior medoid.
 - Because clustering used whole trajectories, use the conflict-window control arc
   to classify each boundary side: yield-family means Ego decelerates/stops to
@@ -69,7 +77,7 @@ in the glossary. Do not invent abbreviations like `rel=`, `roll1s=`, `az=`, or `
 <Mandatory Workflow & Chain Of Thought>
 Keep CoT terse — telegraphic bullets. The YAML fence MUST be reached.
 YAML field order matches this workflow: evidence first, **separation decision last**.
-Do not close the fence until `separation_call` + `separation_reason` are written.
+Do not close the fence until `behavior_similarity` + `behavior_similarity_reason` are written.
 
 1. Geometry first: one line on left/right resolution, minimum
    distance between vehicle boundaries,
@@ -95,19 +103,22 @@ Do not close the fence until `separation_call` + `separation_reason` are written
    locality applies.
 5. Right resolution: same.
 6. Write contrast_explanation (story so far).
-7. **Final decision** — separation_call: justified | over_fine | inconclusive,
-   grounded in contrast_timeline + critical_divergence, not outcome alone. If motion
-   is near-identical and sides share pass/yield order and differ only by a small,
-   late change in minimum distance between vehicle boundaries: `over_fine` when
-   outcomes match; `justified` (rubric 2b) when outcomes differ and that clearance
-   delta is the contact/near-miss difference.
+7. **Name the behavior difference** — behavior_similarity: distinct | similar | inconclusive,
+   grounded in contrast_timeline + critical_divergence, not outcome alone.
+   Name the remaining trajectory difference either way. Do not recommend a merge.
+   If motion is near-identical and sides share pass/yield order and differ only by a
+   small, late change in minimum distance between vehicle boundaries: `similar`
+   when outcomes match; `distinct` (rubric 2b) when outcomes differ and that
+   clearance delta is the contact/near-miss difference.
    If whole-trajectory motion is similar but one side is yield-family and the
-   other is pass-family, this is a real behavior-boundary difference even when
-   both collide; use `justified` when the paired geometry supports it.
-   Then separation_reason (rubric one-liner) and optional hypothesis.
+   other is pass-family, name that behavior difference; use `distinct` when the
+   paired geometry supports it.
+   Then behavior_similarity_reason (rubric one-liner) and optional hypothesis.
+   The hypothesis may name a measurement to check. It must not say to merge,
+   split, or change the number of clusters.
 </Mandatory Workflow & Chain Of Thought>
 
-<Separation decision rubric (use exactly one label)>
+<Behavior call (use exactly one label)>
 Judge the TWO BOUNDARY SIDES against each other. Cluster medoids are a later
 comment, not a veto. Family = **yield-family** (decelerate/stop to give way;
 named vehicle not behind, including failed overlap while still braking) vs
@@ -116,12 +127,14 @@ brake_release then continue). Do not put overlap-while-braking in the pass
 family. Do not call `inconclusive` because a boundary YAML string differs from
 its cluster medoid.
 
-1) `over_fine` (merge signal):
+1) `similar` (same behavior family and same outcome; the trajectory split remains):
 - both boundary sides are the same family, AND
 - outcomes match (both collision or both safe/near-miss), AND
-- no persistent geometry split beyond tiny late clearance.
+- the remaining difference is a small late clearance or a whole-trajectory
+  detail rather than a different resolution.
+  Say what that remaining difference is. This is not a request to merge.
 
-2) `justified` (keep split) — at least one is true:
+2) `distinct` (the boundary sides differ in behavior or outcome) — at least one is true:
   a) different family across sides (yield-family vs pass-family), regardless of
      whether outcomes match, OR
   b) same family, outcomes differ, and a real persistent clearance / geometry
@@ -129,18 +142,18 @@ its cluster medoid.
   c) same family, same outcome, but a persistent stay-ahead vs overlap split
      (not just tiny late clearance).
 
-3) `inconclusive` (cannot call justified or over_fine):
+3) `inconclusive` (cannot call distinct or similar):
 - evidence is contradictory or missing.
 Do NOT use `inconclusive` for medoid mismatch. Do NOT use it for a tiny late
-clearance split when both sides share geometry family — that is `over_fine`
-(same outcome) or `justified` 2b (outcome differs). `inconclusive` here is the
-pair card's call; cluster_summary maps it to neighbor `verdict: inconclusive`
-(different field, same word on purpose).
+clearance split when both sides share geometry family — that is `similar`
+(same outcome) or `distinct` 2b (outcome differs). `inconclusive` here is the
+pair card's call; the cluster summary copies it onto that neighbor's
+`behavior_similarity`.
 
-Do not invent new labels. If you suspect finer sub-structure, keep
-`separation_call` within the 3 labels and state the split/subdivide concern in
-`separation_reason` and `hypothesis`.
-</Separation decision rubric>
+Do not invent new labels. If the sides also differ inside
+one cluster, keep `behavior_similarity` within the 3 labels and describe that mix in
+`behavior_similarity_reason` and `hypothesis`. Do not recommend a new clustering.
+</Behavior call>
 
 <Divergence hunt (required)>
 Across phases you MUST quantify at least one of (glossary nouns), in this order:
@@ -157,7 +170,7 @@ Across phases you MUST quantify at least one of (glossary nouns), in this order:
   critical_divergence unless geometry also split and stayed split
 If sides look identical through the whole window, or they share pass_first and
 differ only by a small, late change in minimum distance between vehicle boundaries,
-say so explicitly: `over_fine` if outcomes match, `justified` if outcomes differ
+say so explicitly: `similar` if outcomes match, `distinct` if outcomes differ
 and the clearance delta is tied to contact vs near-miss. Do not invent a
 divergence, and do not use `inconclusive` for that geometry.
 
@@ -186,7 +199,7 @@ critical_divergence.at with a quantified metric_delta.
 <Output>
 After CoT, ONE YAML fence with **interpretation fields only**.
 Field order = CoT order: resolutions → timeline → divergence → explanation →
-**final** `separation_call` / `separation_reason` / `hypothesis` (required; do not omit).
+**final** `behavior_similarity` / `behavior_similarity_reason` / `hypothesis` (required; do not omit).
 For each side, fill `resolution` then one `evidence` sentence
 (go-through vs give-way, then why in prose).
 (Pipeline attaches clusters / outcomes / params / trial refs / conflict_metrics.)
@@ -219,9 +232,9 @@ contrast_explanation: |
   and critical_divergence. Cite [cA] / [cB] and medoid backdrop when relevant.
   Blank lines between paragraphs.
 
-# --- final decision (required; write last, after the evidence above) ---
-separation_call: "justified" | "over_fine" | "inconclusive"
-separation_reason: |
+# --- behavior_similarity (required; write last, after the evidence above) ---
+behavior_similarity: "distinct" | "similar" | "inconclusive"
+behavior_similarity_reason: |
   One short note using the rubric above (geometry family + boundary divergence),
   grounded in critical_divergence / contrast_timeline, not outcome alone.
 hypothesis: |

@@ -47,22 +47,22 @@ export default function CrossClusterAnalysis({
         help={
           <>
             <Typography variant="body2">
-              This judges the clustering you have open: do the clusters describe
-              different driving behaviors, and do the boundaries hold when two
-              trials start from nearly the same scenario inputs? It does not
-              re-cluster the data.
+              This explains the clustering you have open. The clusters come from
+              MFPCA and HDBSCAN on the whole trajectory, so they already differ
+              in trajectory shape. The reading names what behavior they share
+              and what collision, clearance, or timing difference still separates
+              them. It does not re-cluster the data.
             </Typography>
             <Typography variant="body2" sx={{ mt: 1 }}>
-              The number on this tab is the composite: 60% geometry and 40%
-              language-model ratings. Silhouette is one piece of geometry.
-              Behavior is shown beside the composite and is not inside it.
+              The number on this tab is the geometry score. Silhouette is one
+              piece of that score. The language-model reading sits beside it.
             </Typography>
           </>
         }
       />
       <Typography variant="body2" color="text.secondary">
-        Whole-partition verdict for the clustering you have open. It uses the
-        medoid cards, the matched-parameter pairs, and the behavior checks.
+        Whole-partition reading for the clustering you have open. It uses the
+        medoid cards and the matched-parameter pairs to name differences.
       </Typography>
 
       <Paper variant="outlined" sx={{ p: 2 }}>
@@ -83,8 +83,8 @@ export default function CrossClusterAnalysis({
             </Button>
           )}
           <Typography variant="caption" color="text.secondary">
-            Requires a valid API key (Model setup). Updates the composite score with the LLM
-            behavioral layer.
+            Requires a valid API key (Model setup). Rewrites the difference reading.
+            It does not change the geometry score.
           </Typography>
         </Stack>
         <AnalyzeRunConsole

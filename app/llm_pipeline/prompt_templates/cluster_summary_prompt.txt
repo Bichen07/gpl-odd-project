@@ -1,6 +1,6 @@
 <Your Task>
 Write a CLUSTER behavior summary for the WHOLE cluster (not one medoid journey)
-AND judge whether it separates well from its parameter-space-matched neighbors.
+AND describe how its trajectory differs from its parameter-space-matched neighbors.
 
 Primary inputs (required upstream):
 1. This cluster's `output/medoid_trial.yaml` — archetype behavior.
@@ -15,8 +15,8 @@ cluster's summary before writing another's. A separate review pass (after all
 clusters are summarized) compares labels across the run and fixes duplicates;
 do not try to guess or avoid other clusters' names here.
 
-**You invent `label`.** Short **outcome archetype** (2–4 words), paper-heatmap
-style (`Smooth Pass`, `Yield`, `Cut-in Collision`, `Brake Rear-end`). One
+**You invent `label`.** Short **outcome archetype** (2–4 words), the kind of
+name that fits a legend (`Smooth Pass`, `Yield`, `Cut-in Collision`, `Brake Rear-end`). One
 mechanism. The why belongs in `caption`. Closed style set lives in
 common_sense (`§Cluster label`) — prefer one of those before inventing a new
 archetype.
@@ -27,10 +27,11 @@ necessarily one interaction intent. At a collision/behavior boundary, one
 parameter-space edge may be a pass attempt that collides while another is a
 yield attempt that also collides, even when their trajectories look similar.
 Do not force those boundary cases into the medoid's resolution; use the
-pattern of pair verdicts to expose this mixture.
+pattern of pair readings to describe the mix.
 
-Decide whether neighbors look mergeable, whether the medoid is unlike boundary
-cases (finer split?), or whether the cluster is well separated.
+The clustering already groups whole trajectories. Describe what this cluster
+shares with a neighbor and what still differs. Do not recommend a merge, a
+split, or a different number of clusters.
 </Your Task>
 
 <Mandatory Workflow & Chain Of Thought>
@@ -40,75 +41,69 @@ cases (finer split?), or whether the cluster is well separated.
    family). `label` is the only place that may say `Late Yield`. Put the why
    in `caption`.
 2. Neighbor-by-neighbor: for EACH Parameter-space pair block touching this cluster:
-   - Prefer the contrast YAML (separation_call, critical_divergence, evidence).
-   - MAP pair `separation_call` into this `verdict` faithfully. These are
-     different YAML fields. `justified` / `over_fine` exist ONLY on the pair
-     card — never write them here. Do **not** require this cluster's boundary
-     side to match the medoid YAML. The medoid is one interior point; a
-     collision-boundary cluster can have a stay-behind edge and a go-through
-     edge. That mix is rolled up in step 4 — never override a pair call to
-     `inconclusive` just because the edge ≠ the medoid.
-     | pair `separation_call` | this `verdict` |
+   - Prefer the contrast YAML (`behavior_similarity`, critical_divergence, evidence).
+   - Copy pair `behavior_similarity` onto this neighbor. It is the behavior of
+     the two boundary trials, not the whole-cluster trajectories. Do **not**
+     require this cluster's boundary side to match the medoid YAML. The medoid
+     is one interior point; a collision-boundary cluster can have a stay-behind
+     edge and a go-through edge. That mix is rolled up in step 4 — never override
+     a pair call to `inconclusive` just because the edge ≠ the medoid.
+     | pair `behavior_similarity` | this neighbor `behavior_similarity` |
      | ---- | ---- |
      | missing contrast file | `ambiguous` |
-     | `justified` | `distinct` |
-     | `over_fine` | `similar` |
+     | `distinct` | `distinct` |
+     | `similar` | `similar` |
      | `inconclusive` | `inconclusive` |
-   - `distinct` = keep-apart evidence (maps from pair `justified`).
-   - `similar` = merge evidence (maps from pair `over_fine`).
-   - `inconclusive` = this edge cannot decide keep vs merge — same meaning as
-     pair `separation_call: inconclusive` (unusable / contradictory evidence).
-     Not a missing file (`ambiguous`) and not a neighborhood_separation value.
-   - `ambiguous` = missing card, not a behavior judgment.
-3. Read the PATTERN of neighbor verdicts (not “does one edge match the medoid”).
+   - `distinct` = the two boundary trials differ in resolution family, outcome, or a
+     persistent stay-ahead versus overlap.
+   - `similar` = the two boundary trials share a resolution family and the same outcome.
+     Name the trajectory detail that still differs.
+   - `inconclusive` = this pair does not name the difference.
+     Not a missing file (`ambiguous`) and not a `neighbor_behavior` value.
+   - `ambiguous` = missing card.
+3. Read the pattern of neighbor `behavior_similarity` values (not “does one edge match the medoid”).
    A collision-boundary cluster often shows mixed calls: some `distinct`
-   (stay-behind vs overlap / go-through) and some `similar` (same pass family,
-   outcome / late clearance only). That pattern is the intended product.
-   This is the expected signature when whole-trajectory MFPCA+HDBSCAN has
-   grouped similar trajectories across a behavior boundary: do not relabel the
-   boundary cases merely to make them agree with the medoid.
-4. Roll up `neighborhood_separation`:
-   - `well_separated` — neighbors mostly `distinct`, and those distinct edges
-     tell the SAME geometry family as each other (all stay-behind, or all
-     go-through).
-   - `merge_candidates` — neighbors mostly `similar` (same family + outcome).
-   - `needs_finer_split` — this cluster’s own boundary sides mix families
-     (yield-family on one neighbor, pass-family on another), OR neighbors
-     DISAGREE with each other: at least one `distinct` AND at least one
-     `similar`. Whole-trajectory clustering glued two behaviors into one
-     collision-boundary cluster. Do NOT use this merely because one boundary
-     trial ≠ the medoid string.
-   - `ambiguous` — missing medoid_trial.yaml / contrast.yaml or conflicting evidence.
+   (stay-behind vs overlap / go-through) and some `similar` (same family and
+   same outcome). That pattern is the intended product.
+   Whole-trajectory MFPCA+HDBSCAN can group those trials together: do not relabel
+   the boundary cases merely to make them agree with the medoid.
+4. Roll up `neighbor_behavior` from those values. This is not a clustering change:
+   - `distinct` — neighbors are mostly `distinct`, and those edges tell the SAME
+     geometry family as each other (all stay-behind, or all go-through).
+   - `similar` — neighbors are mostly `similar`.
+   - `mixed` — this cluster’s boundary sides mix families, OR the neighbor list
+     has at least one `distinct` AND at least one `similar`. Describe the mix.
+     Do NOT use this merely because one boundary trial ≠ the medoid string.
+   - `ambiguous` — missing medoid_trial.yaml / contrast.yaml.
 5. `distinct_from_neighbors` is computed by the pipeline from neighbor_comparison
-   (true only if every verdict is `distinct`) — do not invent it.
-   Never write pair words (`justified`, `over_fine`) or `inconclusive` on
-   `neighborhood_separation`.
+   (true only if every `behavior_similarity` is `distinct`) — do not invent it.
 6. **Label is yours.** Invent a 2–4 word outcome archetype `label`. One
    mechanism. Richer nuance belongs in `caption`.
 </Mandatory Workflow & Chain Of Thought>
 
-<Caption & verdict guide>
+<Caption guide>
 `caption` (3–5 short paragraphs, blank line between):
 1. Medoid archetype (resolution, why, outcome, and the key action vs the named
    conflict vehicle). If `agent_interactions` names another agent Ego reacted to, one
    short clause is enough — do not retitle the cluster after that agent.
    Name this cluster as `[cN]`. Open with your short outcome-style label; keep
    the why in this paragraph.
-2. What parameter-space boundary pairs say about neighbors (cite folder names / separation_call / `[c*]`).
-3. Whether neighbors agree with each other (mixed distinct+similar → finer split;
-   mostly distinct same family → keep; mostly similar → merge).
+2. What parameter-space boundary pairs say about neighbors (cite folder names / behavior_similarity / `[c*]`).
+3. Whether neighbors agree with each other (both distinct and similar means
+   `neighbor_behavior: mixed`; mostly distinct means the behavior differs;
+   mostly similar means the behavior is shared and a trajectory detail still
+   differs). Do not write keep, merge, or split as an action.
 
-`neighborhood_separation` must be one of the four closed codes above.
+`neighbor_behavior` must be one of `distinct`, `similar`, `mixed`, `ambiguous`.
 
 EXAMPLE (illustrative; match density, not facts):
 
 Medoid [c5] is a late-brake collision archetype. Pair c0-c5 is
-separation_call=justified (stay-behind vs overlap) → verdict distinct. Pair
-c1-c5 is over_fine / justified 2b (same go-through family, late clearance /
-outcome only) → verdict similar. Neighbors disagree with each other, so
-neighborhood_separation=needs_finer_split — not well_separated, and not
-inconclusive merely because an edge differs from the medoid.
-</Caption & verdict guide>
+behavior_similarity=distinct (stay-behind vs overlap). Pair
+c1-c5 is similar (same go-through family, same outcome, late clearance only).
+Neighbors disagree with each other, so neighbor_behavior=mixed. Describe that
+mix. Do not call it inconclusive merely because an edge differs from the medoid.
+</Caption guide>
 
 <This cluster's medoid trial (`output/medoid_trial.yaml` extract)>
 {medoid_trial}
@@ -144,8 +139,8 @@ motive_consistency_note: |
 neighbor_comparison:
   - neighbor_cluster: <int>
     parameter_space_pair_folder: "<e.g. c0-c4>"
-    verdict: "distinct" | "similar" | "inconclusive" | "ambiguous"
-    reason: "<one line, cite contrast separation_call / evidence / missing card>"
-neighborhood_separation: "well_separated" | "merge_candidates" | "needs_finer_split" | "ambiguous"
+    behavior_similarity: "distinct" | "similar" | "inconclusive" | "ambiguous"
+    reason: "<one line, cite contrast behavior_similarity / evidence / missing card>"
+neighbor_behavior: "distinct" | "similar" | "mixed" | "ambiguous"
 ```
 </Output>

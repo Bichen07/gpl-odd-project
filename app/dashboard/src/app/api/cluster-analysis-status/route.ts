@@ -97,8 +97,8 @@ type FolderStatus = {
     {
       contrast_timeline?: unknown;
       contrast_explanation?: string;
-      separation_call?: string;
-      separation_reason?: string;
+      behavior_similarity?: string;
+      behavior_similarity_reason?: string;
     }
   >;
 };
@@ -402,13 +402,13 @@ export async function GET(req: NextRequest) {
             typeof parsed.contrast_explanation === "string"
               ? parsed.contrast_explanation
               : undefined,
-          separation_call:
-            typeof parsed.separation_call === "string"
-              ? parsed.separation_call
+          behavior_similarity:
+            typeof parsed.behavior_similarity === "string"
+              ? parsed.behavior_similarity
               : undefined,
-          separation_reason:
-            typeof parsed.separation_reason === "string"
-              ? parsed.separation_reason
+          behavior_similarity_reason:
+            typeof parsed.behavior_similarity_reason === "string"
+              ? parsed.behavior_similarity_reason
               : undefined,
         };
       }

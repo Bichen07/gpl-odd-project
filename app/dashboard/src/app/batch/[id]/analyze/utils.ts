@@ -1,4 +1,5 @@
 import { snapshotTimestamp } from "@/app/_shared/utils/snapshotSelection";
+import { collapseAgentInteractions, displayAgentName } from "@/app/api/_lib/agentNames";
 import type { AnalyzeProduct } from "./constants";
 import type { EgoEvent } from "./types";
 
@@ -62,40 +63,29 @@ export function stringifyValue(v: unknown): string {
   return String(v);
 }
 
-/** Named-vehicle row may be back-filled from legacy top-level resolution only. */
+/** Named-vehicle row uses the prose name. Opposite and Oncoming are one vehicle. */
 export function agentInteractionRows(
   parsed: Record<string, unknown> | null | undefined,
 ): Record<string, unknown>[] {
   if (parsed == null) return [];
   const cm = parsed.conflict_metrics;
-  const partner = String(
-    (cm && typeof cm === "object"
+  const partner =
+    cm && typeof cm === "object"
       ? (cm as { vehicle?: unknown; partner?: unknown }).vehicle ??
         (cm as { vehicle?: unknown; partner?: unknown }).partner
-      : "") ?? "",
-  ).trim();
-  const raw = Array.isArray(parsed.agent_interactions)
-    ? parsed.agent_interactions.filter(
-        (row: unknown) =>
-          row != null &&
-          typeof row === "object" &&
-          String((row as { agent?: unknown }).agent || "").trim() !== "",
-      )
-    : [];
-  const rows = raw as Record<string, unknown>[];
-  if (
-    partner &&
-    !rows.some((row) => String(row.agent || "").trim() === partner)
-  ) {
+      : "";
+  const collapsed = collapseAgentInteractions(parsed.agent_interactions, partner);
+  if (collapsed.length > 0) return collapsed;
+  const shown = displayAgentName(partner);
+  if (shown) {
     return [
       {
-        agent: partner,
+        agent: shown,
         resolution: parsed.interaction_resolution,
       },
-      ...rows,
     ];
   }
-  return rows;
+  return [];
 }
 
 export function fmtNum(v: unknown, digits = 3): string {

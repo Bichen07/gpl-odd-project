@@ -236,7 +236,7 @@ def write_pair_process_context_md(
         "Compare geometry only while both sides are alive. "
         "Primary conflict-vehicle metrics appear on every line; secondary agents "
         "(e.g. Parking) appear on the same line only when within 40 m at that "
-        "timestamp. `separation_call` must use this section only."
+        "timestamp. `behavior_similarity` must use this section only."
     )
     header.append("")
 

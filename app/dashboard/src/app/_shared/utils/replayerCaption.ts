@@ -284,9 +284,9 @@ function captionFromCandidate(
       typeof ic?.contrast_explanation === "string" &&
       ic.contrast_explanation.trim()
         ? ic.contrast_explanation
-        : typeof ic?.separation_reason === "string" &&
-            ic.separation_reason.trim()
-          ? ic.separation_reason
+        : typeof ic?.behavior_similarity_reason === "string" &&
+            ic.behavior_similarity_reason.trim()
+          ? ic.behavior_similarity_reason
           : null;
     return {
       label: clusterLabel,

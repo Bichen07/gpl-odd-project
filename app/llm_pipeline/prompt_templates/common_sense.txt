@@ -230,7 +230,7 @@ Use the row's `resolution`.
 
 **Cluster label (cluster_summary `label` ONLY — LLM invents, one cluster at a time)**
 
-Invent a **short outcome archetype**, 2–4 words, paper-heatmap style — what an
+Invent a **short outcome archetype**, 2–4 words — what an
 analyst would put on a legend. This is the only place a compound such as
 `Late Yield` is written. The medoid card does not contain that adjective.
 

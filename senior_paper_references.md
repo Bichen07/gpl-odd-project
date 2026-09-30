@@ -368,7 +368,7 @@ These papers try to *choose which simulations to run*. Our batches are already a
 
 **How.** Needs a distance in the same space you clustered. We compute it on the FPC scores.
 
-**Here.** Silhouette is one piece of the geometry score. It is high when clusters are tight and separated in FPC space. It does not know pass versus yield. The behavior score is a different number: outcome purity and distinct summary titles. Pair outcome flips are not in that score. A high silhouette can merge two safe behaviors that a reader would keep apart. Read the definition once. Do not use it as the only reason to keep a clustering.
+**Here.** Silhouette is one piece of the geometry score. It is high when clusters are tight and separated in FPC space. It does not know pass versus yield. Outcome purity and repeated summary titles are checks the language-model prompt reads. They are not a third number in the composite. A high silhouette can merge two safe behaviors that a reader would keep apart. Read the definition once. Do not use it as the only reason to keep a clustering.
 
 ### [33] Murtagh and Legendre, 2014, Ward’s method — medium
 

@@ -163,8 +163,8 @@ export interface ClusterInterpretationSummary {
 export interface IcPairInterpretation {
   contrast_timeline?: unknown;
   contrast_explanation?: string;
-  separation_call?: string;
-  separation_reason?: string;
+  behavior_similarity?: string;
+  behavior_similarity_reason?: string;
 }
 
 export type ClusterHighlightRole =

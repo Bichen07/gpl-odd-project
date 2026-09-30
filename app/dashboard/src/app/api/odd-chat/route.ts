@@ -94,7 +94,38 @@ function conversationTitle(question: string): string {
   return normalized.length > 56 ? `${normalized.slice(0, 56)}…` : normalized || "New conversation";
 }
 
-function summarizeConversations(entries: ChatLogEntry[]): ConversationSummary[] {
+function titlesPath(runDir: string): string {
+  return path.join(path.dirname(runArtifactPath(runDir, "oddChatLog")), "odd_chat_titles.json");
+}
+
+function readTitles(runDir: string): Record<string, string> {
+  const p = titlesPath(runDir);
+  if (!fs.existsSync(p)) return {};
+  try {
+    const parsed = JSON.parse(fs.readFileSync(p, "utf-8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    const out: Record<string, string> = {};
+    for (const [id, title] of Object.entries(parsed)) {
+      if (typeof title === "string" && title.trim()) out[id] = title.trim();
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writeTitle(runDir: string, conversationId: string, title: string): void {
+  const p = titlesPath(runDir);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  const titles = readTitles(runDir);
+  titles[conversationId] = title;
+  fs.writeFileSync(p, JSON.stringify(titles, null, 2), "utf-8");
+}
+
+function summarizeConversations(
+  entries: ChatLogEntry[],
+  titles: Record<string, string>,
+): ConversationSummary[] {
   const summaries = new Map<string, ConversationSummary>();
   for (const entry of entries) {
     const id = entryConversationId(entry);
@@ -105,7 +136,7 @@ function summarizeConversations(entries: ChatLogEntry[]): ConversationSummary[] 
     } else {
       summaries.set(id, {
         id,
-        title: conversationTitle(entry.question),
+        title: titles[id] || conversationTitle(entry.question),
         updatedAt: entry.timestamp,
         turnCount: 1,
       });
@@ -140,7 +171,7 @@ export async function GET(req: NextRequest) {
   }
 
   const allHistory = readChatLog(runDir);
-  const conversations = summarizeConversations(allHistory);
+  const conversations = summarizeConversations(allHistory, readTitles(runDir));
   const requestedConversationId = url.searchParams.get("conversationId")?.trim();
   const selectedConversationId =
     requestedConversationId || conversations[0]?.id || DEFAULT_CONVERSATION_ID;
@@ -154,6 +185,36 @@ export async function GET(req: NextRequest) {
     conversationId: selectedConversationId,
     history,
   });
+}
+
+// PATCH — rename one conversation. The chat log stays append-only.
+export async function PATCH(req: NextRequest) {
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+  const batchId = String(body.batchId ?? "");
+  const folder = String(body.folder ?? "");
+  const requestedConversationId =
+    typeof body.conversationId === "string" ? body.conversationId.trim() : "";
+  const title = typeof body.title === "string" ? body.title.replace(/\s+/g, " ").trim() : "";
+  if (!/^\d+$/.test(batchId) || !folder) {
+    return NextResponse.json({ error: "batchId (int) and folder required" }, { status: 400 });
+  }
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestedConversationId)) {
+    return NextResponse.json({ error: "conversationId is invalid" }, { status: 400 });
+  }
+  if (!title || title.length > 80) {
+    return NextResponse.json({ error: "title must be 1–80 characters" }, { status: 400 });
+  }
+  const runDir = resolveRunDir(batchId, folder);
+  if (!runDir) {
+    return NextResponse.json({ error: `Run directory not found: ${folder}` }, { status: 404 });
+  }
+  writeTitle(runDir, requestedConversationId, title);
+  return NextResponse.json({ conversationId: requestedConversationId, title });
 }
 
 // POST — ask one grounded question; the CLI appends it to the persisted log itself.

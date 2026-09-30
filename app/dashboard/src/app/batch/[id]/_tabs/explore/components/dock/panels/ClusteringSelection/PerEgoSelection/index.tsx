@@ -98,8 +98,8 @@ interface AnalysisStatusEntry {
     {
       contrast_timeline?: unknown;
       contrast_explanation?: string;
-      separation_call?: string;
-      separation_reason?: string;
+      behavior_similarity?: string;
+      behavior_similarity_reason?: string;
     }
   >;
 }
@@ -1942,8 +1942,8 @@ export default function PerEgoSelection({
                   const cs = compositeScores[key];
                   if (!cs) return null;
                   const tooltip = cs.has_llm_eval
-                    ? `Geometry: ${cs.rule_score?.toFixed(1)} | Language model: ${cs.llm_score?.toFixed(1)} | Composite: ${cs.final_score?.toFixed(1)}`
-                    : `Geometry: ${cs.rule_score?.toFixed(1)} (language-model rating not run yet)`;
+                    ? `Geometry ${cs.rule_score?.toFixed(1)}. Language-model reading ${cs.llm_score?.toFixed(1)} sits beside it and does not change this score.`
+                    : `Geometry ${cs.rule_score?.toFixed(1)}. Language-model reading not run yet.`;
                   return (
                     <Tooltip title={tooltip}>
                       <Stack direction="row" alignItems="center" gap={0.5} sx={{ ml: 0.5 }}>

@@ -7,7 +7,7 @@ only two problems:
 
 1. **Mechanism-chained label** — the label strings more than one mechanism
    into the name instead of one outcome archetype
-   (e.g. "Late Yield Collision", "Failed Yield Rear-end"). Target: 2–4 words, paper-heatmap style (`Smooth Pass`,
+   (e.g. "Late Yield Collision", "Failed Yield Rear-end"). Target: 2–4 words, a short legend name (`Smooth Pass`,
    `Yield`, `Cut-in Collision`, `Brake Rear-end`, `Yield-Stop Collision`,
    `Pass-Slowdown`).
 2. **Duplicate / near-duplicate label** — two or more clusters use the same

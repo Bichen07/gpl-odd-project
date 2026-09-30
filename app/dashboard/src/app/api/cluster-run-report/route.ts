@@ -4,6 +4,10 @@ import path from "path";
 import { resolveClusterArtifact } from "@/app/api/_lib/clusterPaths";
 import { readYamlDoc } from "@/app/api/_lib/readYaml";
 import {
+  collapseAgentInteractions,
+  displayAgentName,
+} from "@/app/api/_lib/agentNames";
+import {
   runArtifactPath,
   runSourceDir,
 } from "@/app/api/_lib/runArtifactPaths";
@@ -28,9 +32,9 @@ function findProjectRoot(start: string): string {
   return path.resolve(start, "..", "..");
 }
 
-function namedVehicleResolution(
+function namedConflict(
   medoid: Record<string, unknown> | null,
-): string | null {
+): { agent: string; resolution: string } | null {
   if (!medoid) return null;
   const cm = medoid.conflict_metrics;
   const partner = String(
@@ -39,19 +43,12 @@ function namedVehicleResolution(
         (cm as { vehicle?: unknown; partner?: unknown }).partner
       : "") ?? "",
   ).trim();
-  const rows = Array.isArray(medoid.agent_interactions)
-    ? medoid.agent_interactions
-    : [];
-  for (const row of rows) {
-    if (row == null || typeof row !== "object") continue;
-    const rec = row as { agent?: unknown; resolution?: unknown; interaction_resolution?: unknown };
-    if (partner && String(rec.agent || "").trim() !== partner) continue;
-    const res = rec.resolution ?? rec.interaction_resolution;
-    if (typeof res === "string" && res.trim()) return res.trim();
-    break;
-  }
+  const rows = collapseAgentInteractions(medoid.agent_interactions, partner);
+  if (rows.length > 0 && rows[0].resolution) return rows[0];
   const top = medoid.interaction_resolution;
-  if (typeof top === "string" && top.trim()) return top.trim();
+  if (typeof top === "string" && top.trim()) {
+    return { agent: displayAgentName(partner), resolution: top.trim() };
+  }
   return null;
 }
 
@@ -73,7 +70,7 @@ type ReportCluster = {
   collisionRate: number | null;
   collisionCount: number | null;
   parameterRanges: Record<string, [number, number]> | null;
-  neighborhoodSeparation: string | null;
+  neighborBehavior: string | null;
   medoidMotive: string | null;
   medoidOutcome: string | null;
   medoidResolution: string | null;
@@ -89,8 +86,8 @@ type ReportPair = {
   clusters: [number, number];
   paramDist: number | null;
   outcomeFlip: boolean;
-  separationCall: string | null;
-  separationReason: string | null;
+  behaviorSimilarity: string | null;
+  behaviorSimilarityReason: string | null;
   contrastExplanation: string | null;
   hasContrast: boolean;
 };
@@ -207,6 +204,7 @@ export async function GET(req: NextRequest) {
     // cluster_summary.yaml
     const summaryPath = resolveClusterArtifact(clusterDir, "cluster_summary.yaml");
     const summary = readYamlDoc(summaryPath);
+    const conflict = namedConflict(medoid);
 
     clusters.push({
       id: cid,
@@ -215,17 +213,10 @@ export async function GET(req: NextRequest) {
       collisionRate: clusterStats?.collision_rate ?? null,
       collisionCount: clusterStats?.collision_count ?? null,
       parameterRanges: clusterStats?.parameter_ranges ?? null,
-      neighborhoodSeparation:
-        (summary?.neighbor_comparison as any[])?.[0]?.separation ??
-        (summary?.neighborhood_separation as string) ??
-        null,
-      medoidMotive:
-        namedVehicleResolution(medoid) ??
-        (summary?.label as string) ??
-        (medoid?.primary_motive as string) ??
-        null,
+      neighborBehavior: (summary?.neighbor_behavior as string) ?? null,
+      medoidMotive: conflict?.resolution ?? (summary?.label as string) ?? null,
       medoidOutcome: (medoid?.outcome as string) ?? null,
-      medoidResolution: namedVehicleResolution(medoid),
+      medoidResolution: conflict ? `${conflict.agent}: ${conflict.resolution}` : null,
       summaryCaption: (summary?.caption as string) ?? null,
       riskLevel: (summary?.risk_level as string) ?? null,
       consistencyNote: (summary?.consistency_note as string) ?? null,
@@ -278,8 +269,8 @@ export async function GET(req: NextRequest) {
         clusters: [ca, cb],
         paramDist: pairJson?.param_dist ?? null,
         outcomeFlip,
-        separationCall: (contrast?.separation_call as string) ?? null,
-        separationReason: (contrast?.separation_reason as string) ?? null,
+        behaviorSimilarity: (contrast?.behavior_similarity as string) ?? null,
+        behaviorSimilarityReason: (contrast?.behavior_similarity_reason as string) ?? null,
         contrastExplanation: (contrast?.contrast_explanation as string) ?? null,
         hasContrast: contrast != null,
       });
