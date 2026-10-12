@@ -204,7 +204,7 @@ export default function OddChatPanel({
         &ldquo;Why keep these clusters separate?&rdquo;). Answers are grounded only in this
         run&rsquo;s deterministic stats + LLM-authored cluster/pair products (
         <code>odd_chat_briefing.json</code>) — never invented. History below is stored in{" "}
-        <code>odd_chat_log.jsonl</code> in the run folder, so it is still here next time this
+        <code>conversation_log/odd_chat_log.jsonl</code>, so it is still here next time this
         dashboard is opened (by anyone), and is shared with the same command run from a terminal.
       </Typography>
 

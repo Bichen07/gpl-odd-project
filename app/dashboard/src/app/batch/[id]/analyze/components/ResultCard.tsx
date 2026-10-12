@@ -76,6 +76,28 @@ export default function ResultCard({
     String(conflictMetrics?.vehicle ?? conflictMetrics?.partner ?? "").trim(),
   );
   const agentInteractions = agentInteractionRows(parsed);
+  const collisionDetail =
+    parsed.collision_detail != null && typeof parsed.collision_detail === "object"
+      ? (parsed.collision_detail as Record<string, unknown>)
+      : null;
+  const collisionFields = collisionDetail
+    ? (
+        [
+          ["impact_type", collisionDetail.impact_type],
+          ["striking_vehicle", collisionDetail.striking_vehicle],
+          ["struck_vehicle", collisionDetail.struck_vehicle],
+          ["bearing_sector", collisionDetail.bearing_sector],
+        ] as const
+      ).filter(([, value]) => {
+        if (value == null) return false;
+        const text = String(value).trim();
+        return text !== "" && text !== "null" && text !== "None";
+      })
+    : [];
+  const collisionNarrative =
+    collisionDetail && typeof collisionDetail.narrative === "string"
+      ? collisionDetail.narrative.trim()
+      : "";
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -200,6 +222,26 @@ export default function ResultCard({
           <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
             {motiveSummary}
           </Typography>
+        </Box>
+      )}
+
+      {(collisionFields.length > 0 || collisionNarrative) && (
+        <Box sx={{ mb: 1.5 }}>
+          <Typography variant="subtitle2" gutterBottom>
+            collision_detail
+          </Typography>
+          {collisionFields.length > 0 && (
+            <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 0.75 }}>
+              {collisionFields.map(([key, value]) => (
+                <Chip key={key} size="small" variant="outlined" label={`${key}: ${String(value)}`} />
+              ))}
+            </Stack>
+          )}
+          {collisionNarrative && (
+            <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+              {collisionNarrative}
+            </Typography>
+          )}
         </Box>
       )}
 

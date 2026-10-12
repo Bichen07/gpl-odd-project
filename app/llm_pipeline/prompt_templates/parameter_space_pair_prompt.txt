@@ -1,73 +1,38 @@
 <Your Task>
-INITIAL-CONDITION matched pair: two sides with nearly identical scenario inputs
-(OncomingSpeed, OncomingStartDelay; param_dist ≤ caliper) from different embedding
-clusters. Explain what still differs. These clusters already exist because MFPCA
-and HDBSCAN separated whole trajectories. Do not recommend merging them.
+Two trials with similar scenario parameter inputs (OncomingSpeed, OncomingStartDelay; param_dist ≤ caliper). They sit in different clusters because MFPCA + HDBSCAN grouped the whole trajectory. Similar input, different trajectory over time. Find that difference. 
 
-`behavior_similarity` names the behavior of these two boundary trials. It does not
-compare the whole-cluster trajectories, and it does not change the clustering.
-`distinct` means the two trials differ in resolution family, outcome, or a
-clearance difference that stays different. `similar` means they share a
-resolution family and the same outcome. `inconclusive` means the cards do not
-name the difference. `behavior_similarity_reason` is the one-line basis for that call.
+`behavior_similarity` is the behavior of these two boundary trials, not of the whole clusters. The call and its one-line reason are defined in <Behavior call>. Write them last.
 
-**Cluster provenance matters:** the embedding clusters were produced by applying
-MFPCA followed by HDBSCAN to the **whole trajectory**. Therefore, membership
-primarily reflects whole-trajectory shape, duration, and collision termination;
-it does not guarantee one clean interaction intent. Two matched boundary trials
-can have very similar trajectories while differing at the conflict decision:
-one may attempt to go through and collide, while the other may brake to yield
-but still collide. Treat that as a possible collision-boundary mixture to test,
-not as an annotation error and not as evidence that both sides share one resolution.
+Whole-trajectory membership does not guarantee one interaction. Two matched trials can look alike and still differ at the conflict: one goes through and collides, the other brakes to yield and also collides. That mix is a boundary to describe, not an annotation error, and not evidence that both sides share one resolution.
 
-PARAMETER-SPACE params are sampled OpenSCENARIO inputs (Oncoming start/target speed and start
-delay) — NOT measured speed at peak conflict.
+The scenario parameters are sampled inputs (oncoming speed and start delay), not the measured speed at the conflict.
 
-Matched parameter-space sides often MOVE VERY SIMILARLY. Your job is to find what still differs —
-**persistent geometry, longitudinal relationship, minimum distance between vehicle
-boundaries, and named vehicle position in Ego coordinates** —
-across shared-clock phases, using the pair context + synced BEV frames. Cluster
-medoid `output/medoid_trial.yaml` extracts are a **final consistency check only**, never evidence for these
-boundary sides.
-Do not stop at "both collide" or "both decelerate." Do not treat a 0.3 s brake-onset
-gap or an oscillatory speed-difference sample as the critical divergence unless
-minimum distance between vehicle boundaries or longitudinal relationship also
-splits and stays split.
+Find the earliest time the two trajectories start to differ, and what differs then. It can be a behavior (for example one brakes 0.3 s earlier), the body gap, who is ahead, the position in Ego coordinates, or the speed. Keep it only if the two trajectories stay apart after that time. A single sample that returns to the same path is noise. Each side's medoid card is a last comment, never the evidence for that side. Do not stop at "both collide" or "both decelerate."
 
-Metric nouns in context are plain and precise: Ego speed, named vehicle speed,
-center-to-center distance, named vehicle azimuth relative to Ego heading,
-center-distance closing/opening rate, estimated time to collision, named vehicle position
-in Ego coordinates, minimum distance between vehicle boundaries, longitudinal
-relationship, and Ego average speed during the previous 1 second. Definitions are
-in the glossary. Do not invent abbreviations like `rel=`, `roll1s=`, `az=`, or `d=`.
+The pair file also prints Ego's average speed during the previous 1 second. Use that phrase as printed. Nouns are defined in the glossary.
 
-**Naming:** Refer to sides as `[cA]` / `[cB]` (e.g. `[c0]`, `[c4]`).
+Name sides `[cA]` / `[cB]` (for example `[c0]`, `[c4]`).
 </Your Task>
 
 <How to read>
 - <Pair context> (`parameter_space_pairs/cA-cB/process/context.md`) is the ONLY numeric timeline
   (shared clock). It has three parts:
-  **Layer 1** — synchronized comparison while both sides are alive (`behavior_similarity`
-  uses this only). **Secondary obstacles** — Parking etc. per side. **Layer 2** —
-  independent full-trial continuation after one side ends (`trajectory_shape_difference`
-  block is deterministic). `similar` plus a material `downstream_behavior_difference` is
-  a normal MFPCA boundary pattern.
-  anchor a synced BEV when helpful. The **Deterministic interaction geometry**
+  **Layer 1** — shared clock while both sides are still in the clip.
+  **Layer 2** — each side after one has ended. Read this too.
+  MFPCA grouped the whole trajectory, so the difference may be here: the two move
+  almost the same, and a small gap leaves one in collision (the clip ends) while the
+  other stays alive, or one stays alive longer. `trajectory_shape_difference` is
+  deterministic. `similar` plus a material `downstream_behavior_difference` is a
+  normal MFPCA boundary pattern. Anchor a synced BEV when helpful. The **Deterministic interaction geometry**
   block (resolution, minimum distance between vehicle boundaries, first persistent divergence)
   is authoritative
   for pass/yield and for whether motion is near-identical.
 - Derive each boundary side's resolution from **this pair's context first**.
-- <Left/Right medoid trial extracts> come from each endpoint's `output/medoid_trial.yaml`
-  (cluster archetypes, not these boundary sides). Optional last-paragraph comment
-  only: same story as the medoids, or a different edge of that cluster. Never copy
-  a medoid label onto a pair side. Never let a medoid mismatch force
-  `behavior_similarity: inconclusive` — collision-boundary clusters routinely have a
-  stay-behind edge and a go-through edge around one interior medoid.
-- Because clustering used whole trajectories, use the conflict-window control arc
-  to classify each boundary side: yield-family means Ego decelerates/stops to
-  give way; pass-family means Ego holds/increases speed, releases the brake and
-  continues, or gets behind the named vehicle. Similar whole-trajectory shape
-  does not override this side-specific classification.
+- The two medoid cards are the middle trial of each cluster, not these boundary trials. 
+Mention them only in the last paragraph: this side matches its medoid, or it does not. 
+Do not copy the medoid's pass first or yield onto this side. 
+If this boundary trial different with its medoid, do not call `behavior_similarity: inconclusive`.
+- Classify each side with the glossary resolution gate, from this pair's context. Similar whole-trajectory shape does not override that side.
 - Synced BEVs: dual panel at the same shared clock t under `synced_bev/`
   (common_sense BEV guide). Shared adaptive scale. Title tokens match filenames.
 - Clusters, outcomes, scenario params, and trial refs are already known to the
@@ -88,34 +53,24 @@ Do not close the fence until `behavior_similarity` + `behavior_similarity_reason
    longitudinal relationship, minimum distance between vehicle boundaries,
   named vehicle position
    in Ego coordinates, then center-to-center distance / Ego average speed during
-   the previous 1 second — not merely the
-   earliest differing action token. Mark the EARLIEST t where **persistent**
-   geometry / minimum distance between vehicle boundaries / longitudinal
-   relationship diverges
+   the previous 1 second. Mark the EARLIEST t where the two trajectories start
+   to differ and stay apart afterwards: a behavior (brake, accelerate, turn), the
+   body gap, who is ahead, the position, or the speed
    (critical_divergence.at + metric_delta).
-   When one side’s line is `ended (out of frame / clip)`, stop Layer 1 pairing.
-   Read **Layer 2 — Full-trial continuation** for each side independently.
-   Use `trajectory_shape_difference` / `downstream_behavior_difference` for
-   whole-trial cluster-split evidence — do not treat Layer 2 as synchronized geometry.
+   When one side’s line is `ended (out of frame / clip)`, the shared clock stops.
+   Read **Layer 2 — Full-trial continuation** for the side that continues.
+   A small gap can end one trial in a collision and leave the other alive, or
+   leave one alive longer. That tail is part of the trajectory difference.
+   It is not a second shared clock.
 3. BEV confirm: name the synced frame nearest that earliest t (filename token).
 4. Left resolution (this boundary side, not the medoid): `pass_first` / `yield`
    / `unresolved` plus one evidence sentence at/before its time. Causal
    locality applies.
 5. Right resolution: same.
 6. Write contrast_explanation (story so far).
-7. **Name the behavior difference** — behavior_similarity: distinct | similar | inconclusive,
-   grounded in contrast_timeline + critical_divergence, not outcome alone.
-   Name the remaining trajectory difference either way. Do not recommend a merge.
-   If motion is near-identical and sides share pass/yield order and differ only by a
-   small, late change in minimum distance between vehicle boundaries: `similar`
-   when outcomes match; `distinct` (rubric 2b) when outcomes differ and that
-   clearance delta is the contact/near-miss difference.
-   If whole-trajectory motion is similar but one side is yield-family and the
-   other is pass-family, name that behavior difference; use `distinct` when the
-   paired geometry supports it.
-   Then behavior_similarity_reason (rubric one-liner) and optional hypothesis.
-   The hypothesis may name a measurement to check. It must not say to merge,
-   split, or change the number of clusters.
+7. Apply <Behavior call>. Write `behavior_similarity` and `behavior_similarity_reason` last.
+   Do not copy a medoid motive onto a boundary side.
+   The hypothesis may name a measurement to check.
 </Mandatory Workflow & Chain Of Thought>
 
 <Behavior call (use exactly one label)>
@@ -137,8 +92,10 @@ its cluster medoid.
 2) `distinct` (the boundary sides differ in behavior or outcome) — at least one is true:
   a) different family across sides (yield-family vs pass-family), regardless of
      whether outcomes match, OR
-  b) same family, outcomes differ, and a real persistent clearance / geometry
-     delta is the contact vs near-miss difference (even if late / small), OR
+  b) same family and outcomes differ (safe versus collision, or contact versus
+     a near-miss). Cite the lasting clearance when the context has one. When
+     the context names no lasting split, the reason says so and the call stays
+     `distinct`, OR
   c) same family, same outcome, but a persistent stay-ahead vs overlap split
      (not just tiny late clearance).
 
@@ -150,9 +107,7 @@ clearance split when both sides share geometry family — that is `similar`
 pair card's call; the cluster summary copies it onto that neighbor's
 `behavior_similarity`.
 
-Do not invent new labels. If the sides also differ inside
-one cluster, keep `behavior_similarity` within the 3 labels and describe that mix in
-`behavior_similarity_reason` and `hypothesis`. Do not recommend a new clustering.
+Do not invent a fourth label. If the two sides also differ inside one cluster, keep the three labels and describe that mix in `behavior_similarity_reason` and `hypothesis`.
 </Behavior call>
 
 <Divergence hunt (required)>
@@ -166,22 +121,16 @@ Across phases you MUST quantify at least one of (glossary nouns), in this order:
   (not a single Ego-speed sample)
 - change in named vehicle azimuth relative to Ego heading (°) or sector
   (FRONT→LEFT, etc.)
-- brake / decelerate onset Δt only as a **secondary correlation**, never as the
-  critical_divergence unless geometry also split and stayed split
+- brake / decelerate onset Δt. It can be the critical_divergence when the
+  trajectories stay apart after it. Give the later gap or speed difference it led to.
 If sides look identical through the whole window, or they share pass_first and
 differ only by a small, late change in minimum distance between vehicle boundaries,
-say so explicitly: `similar` if outcomes match, `distinct` if outcomes differ
-and the clearance delta is tied to contact vs near-miss. Do not invent a
-divergence, and do not use `inconclusive` for that geometry.
+say so explicitly: `similar` if outcomes match, `distinct` if outcomes differ.
+Do not invent a divergence. When no lasting split exists, the reason says so.
 
-EXAMPLE phase density (illustrative; match THIS interpretive style, not these facts):
+EXAMPLE (style only; do not copy these facts):
 
-t=9.8–11.0: both egos behind CuttingIn (FRONT LEFT→FRONT). [c0] near-miss then
-opens the gap with stronger decel (Ego speed drops hard; center-to-center distance
-grows; CuttingIn swings more FRONT). [c4] stays faster and keeps closing into
-near-miss/cut-in. Synced BEV `t_09.80_…` shows the near-miss asymmetry. Earliest
-clear split may be earlier at brake onset (e.g. t≈8.8) — put that stamp in
-critical_divergence.at with a quantified metric_delta.
+t=9.8–11.0: [c0] opens the gap after a near-miss; [c4] keeps closing. Name the earliest stamp where the trajectories start to differ and stay apart (a brake, the body gap, or who is ahead), with both numbers.
 </Divergence hunt>
 
 <Pair context (shared clock — authoritative)>
@@ -220,7 +169,8 @@ contrast_timeline:
       Interpretive contrast for this shared-clock range. Name sides as [cA] / [cB].
       Cite a few decisive metrics; do not dump every number.
   # 6–15 phases spanning approach → brake/divergence → outcome.
-  # Do not add phases after one side is `ended (out of frame / clip)`.
+  # Shared-clock phases stop when one side is `ended (out of frame / clip)`.
+  # Name the continuation (who collided, who stayed alive, who ran longer) in contrast_explanation.
 
 critical_divergence:
   at: <float>              # earliest decisive shared-clock t
@@ -235,8 +185,10 @@ contrast_explanation: |
 # --- behavior_similarity (required; write last, after the evidence above) ---
 behavior_similarity: "distinct" | "similar" | "inconclusive"
 behavior_similarity_reason: |
-  One short note using the rubric above (geometry family + boundary divergence),
-  grounded in critical_divergence / contrast_timeline, not outcome alone.
+  One short note using the rubric above.
+  Cite critical_divergence when a lasting split exists.
+  When it does not, cite the outcome difference and say the context names no lasting split.
+  Do not cite a medoid card as this boundary side's resolution.
 hypothesis: |
   Testable follow-up, or empty.
 ```

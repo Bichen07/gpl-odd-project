@@ -35,7 +35,6 @@ from .llm_factory import (
 from .paths import (
     PROMPT_TEMPLATES_DIR,
     REPO_ROOT,
-    run_artifact_path,
     run_source_path,
 )
 
@@ -162,6 +161,73 @@ def missing_parameter_space_contrasts_for_cluster(results_dir: Path, cluster_id:
     return missing
 
 
+_PAIR_SIMILARITY = ("distinct", "similar", "inconclusive")
+
+
+def neighbor_comparison_from_contrasts(results_dir: Path, cluster_id: Any) -> List[Dict[str, Any]]:
+    """One row per pair touching this cluster, copied from its ``contrast.yaml``.
+
+    ``behavior_similarity`` and ``reason`` are the pair card's own values.
+    A missing, stub, or unreadable card gives ``ambiguous``.
+    """
+    import re
+
+    import yaml
+
+    cid = int(cluster_id)
+    rows: List[Dict[str, Any]] = []
+    for pack in touching_parameter_space_pair_folders(results_dir, cid):
+        m = re.match(r"^c(\d+)-c(\d+)$", pack.name)
+        if not m:
+            continue
+        a, b = int(m.group(1)), int(m.group(2))
+        other = b if a == cid else a
+        call, reason = "ambiguous", "No contrast card for this pair."
+        path = resolve_parameter_space_contrast_path(pack)
+        if path is not None:
+            try:
+                doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            except Exception:
+                doc = {}
+            sim = str(doc.get("behavior_similarity") or "").strip().lower()
+            if isinstance(doc, dict) and not doc.get("stub") and sim in _PAIR_SIMILARITY:
+                call = sim
+                reason = str(doc.get("behavior_similarity_reason") or "").strip()
+        rows.append(
+            {
+                "neighbor_cluster": other,
+                "parameter_space_pair_folder": pack.name,
+                "behavior_similarity": call,
+                "reason": reason,
+            }
+        )
+    return rows
+
+
+def neighbor_behavior_from_comparison(rows: List[Dict[str, Any]]) -> str:
+    """Count the copied pair calls. Not a grade of the clustering.
+
+    All ``distinct`` → distinct. All ``similar`` → similar. At least one of
+    each → mixed. A missing card, or no pairs, → ambiguous.
+    """
+    calls = [
+        str(row.get("behavior_similarity") or "")
+        for row in rows
+        if isinstance(row, dict)
+    ]
+    if not calls or any(c not in ("distinct", "similar", "inconclusive") for c in calls):
+        return "ambiguous"
+    has_distinct = "distinct" in calls
+    has_similar = "similar" in calls
+    if has_distinct and has_similar:
+        return "mixed"
+    if has_distinct and all(c == "distinct" for c in calls):
+        return "distinct"
+    if has_similar and all(c == "similar" for c in calls):
+        return "similar"
+    return "mixed"
+
+
 def medoid_trial_path(results_dir: Path, cluster_id: Any) -> Optional[Path]:
     """Path to ``clusterN/output/medoid_trial.yaml`` if it exists."""
     cdir = Path(results_dir) / f"cluster{int(cluster_id)}"
@@ -193,9 +259,6 @@ PRODUCT_ALIASES = {
     # Legacy aliases (pre-rename: ic_pairs / IC closest pairs)
     "ic-pairs": "parameter-space-pairs",
     "ic_pairs": "parameter-space-pairs",
-    "cross-eval": "cross-eval",
-    "cross_eval": "cross-eval",
-    "selection": "cross-eval",
     "label-review": "label-review",
     "label_review": "label-review",
     "review": "label-review",
@@ -203,7 +266,7 @@ PRODUCT_ALIASES = {
     "all": "all",
 }
 
-_ALL_PRODUCTS = {"medoid", "summary", "parameter-space-pairs", "cross-eval", "label-review"}
+_ALL_PRODUCTS = {"medoid", "summary", "parameter-space-pairs", "label-review"}
 
 # Default: medoid trial narrative only. Summary / Parameter-space pairs are opt-in.
 DEFAULT_PRODUCTS = frozenset({"medoid"})
@@ -330,7 +393,6 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
             "consistency_note",
             "label",
             "risk_level",
-            "confidence",
             "contrast_explanation",
             "contrast_timeline",
             "critical_divergence",
@@ -362,7 +424,8 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
             "trial_id",
             "cluster_id",
             "param_dist",
-            "numeric_digest_ref",
+            "neighbor_comparison",
+            "neighbor_behavior",
         ):
             if k in parsed and parsed[k] is not None:
                 final[k] = parsed[k]
@@ -371,10 +434,11 @@ def _write_yaml_doc(path: Path, raw: Optional[str], parsed: Optional[Dict], meta
                 base = dict(final.get(side) or {})
                 base.update(parsed[side])
                 final[side] = base
-        # collision_detail is deterministic (cluster_aggregates.apply_collision_detail
-        # already ran before this call). If the caller omitted it (non-collision
-        # trial), drop any hallucinated value salvaged from the raw LLM YAML instead
-        # of letting it leak through the "fill missing keys from loaded" pass above.
+        # collision_detail was built by cluster_aggregates.apply_collision_detail
+        # before this call (model judgement plus the recorded bearing_sector). If the
+        # caller omitted it (non-collision trial), drop any value salvaged from the
+        # raw LLM YAML instead of letting it leak through the "fill missing keys
+        # from loaded" pass above.
         if "collision_detail" not in parsed:
             final.pop("collision_detail", None)
 
@@ -656,7 +720,7 @@ def run_split_analysis(
     pair_tpl = _load_template("parameter_space_pair_prompt.txt")
 
     # --- Pass 1 (no LLM): build every cluster's aggregate first -------------
-    # Aggregates stay on disk for dashboard / selection-eval; they are NOT fed
+    # Aggregates stay on disk for the dashboard; they are NOT fed
     # into the cluster-summary LLM prompt (summary uses medoid + IC contrasts only).
     per_cluster: Dict[int, Dict[str, Any]] = {}
     for cluster_dir in cluster_dirs:
@@ -828,7 +892,7 @@ def run_split_analysis(
     # --- Parameter-space pairs (gated matched packs under parameter_space_pairs/cA-cB/) ---
     if "parameter-space-pairs" in prods:
         print("\n[split-analysis] Parameter-space matched pairs…")
-        from .cluster_selection_eval import medoid_card_block
+        from .cluster_cards import medoid_card_block
 
         manifest = {}
         mp = run_source_path(results_dir, "manifest.json")
@@ -1146,7 +1210,7 @@ def run_split_analysis(
 
     # --- Cluster summaries (AFTER parameter-space-pairs so same-invocation contrasts exist) ---
     if "summary" in prods:
-        from .cluster_selection_eval import (
+        from .cluster_cards import (
             medoid_card_block,
             neighbor_cards_for_cluster,
         )
@@ -1194,18 +1258,16 @@ def run_split_analysis(
             )
             out_path = _cp().write_path(cluster_dir, "cluster_summary.yaml")
             if dry_run or interpreter is None:
+                comps = neighbor_comparison_from_contrasts(results_dir, cid)
                 stub = {
                     "cluster_id": cid,
                     "label": f"Cluster {cid}",
                     "risk_level": "high" if (aggregate.get("collision_rate") or 0) > 50 else "low",
-                    "confidence": "medium",
-                    "numeric_digest_ref": True,
                     "caption": "stub (dry_run)",
                     "consistency_note": "",
                     "motive_consistency_note": "",
-                    "neighbor_comparison": [],
-                    "distinct_from_neighbors": None,
-                    "neighbor_behavior": "ambiguous",
+                    "neighbor_comparison": comps,
+                    "neighbor_behavior": neighbor_behavior_from_comparison(comps),
                     "stub": True,
                 }
                 _write_yaml_doc(out_path, None, stub, {"stub": True})
@@ -1222,16 +1284,12 @@ def run_split_analysis(
                         "cluster_id": cid,
                         "label": f"Cluster {cid}",
                         "caption": "parse_failed",
-                        "neighbor_behavior": "ambiguous",
                         "neighbor_comparison": [],
                     }
                 parsed["cluster_id"] = cid
                 # LLM owns label — keep parsed value; only fill if missing.
                 if not str(parsed.get("label") or "").strip():
                     parsed["label"] = f"Cluster {cid}"
-                if not str(parsed.get("confidence") or "").strip():
-                    parsed["confidence"] = "medium"
-                parsed["numeric_digest_ref"] = True
                 # risk_level from cluster collision rate (rule-based GT).
                 rate = float(aggregate.get("collision_rate") or 0.0)
                 if rate > 50:
@@ -1240,15 +1298,13 @@ def run_split_analysis(
                     parsed["risk_level"] = "medium"
                 else:
                     parsed["risk_level"] = "low"
-                # distinct_from_neighbors from neighbor_comparison behavior_similarity.
-                comps = parsed.get("neighbor_comparison") or []
-                if isinstance(comps, list) and comps:
-                    parsed["distinct_from_neighbors"] = all(
-                        isinstance(c, dict) and c.get("behavior_similarity") == "distinct"
-                        for c in comps
-                    )
-                else:
-                    parsed["distinct_from_neighbors"] = False
+                # Pair verdicts are copied from contrast.yaml, never from the summary model.
+                parsed["neighbor_comparison"] = neighbor_comparison_from_contrasts(
+                    results_dir, cid
+                )
+                parsed["neighbor_behavior"] = neighbor_behavior_from_comparison(
+                    parsed["neighbor_comparison"]
+                )
                 if isinstance(parsed.get("caption"), str):
                     parsed["caption"] = _format_caption_paragraphs(parsed["caption"])
                 if isinstance(parsed.get("consistency_note"), str):
@@ -1284,39 +1340,5 @@ def run_split_analysis(
         except Exception as exc:
             print(f"  ⚠️  label review failed: {exc}")
 
-    # --- Deterministic selection quality (always; no LLM, no network) ---------
-    try:
-        from .cluster_selection_eval import write_eval
-
-        sel_path = write_eval(results_dir)
-        if sel_path is not None:
-            outputs["selection_eval"] = str(sel_path)
-    except Exception as exc:
-        print(f"  ⚠️  selection eval failed: {exc}")
-
-    # --- Cross-cluster evaluation (reading of medoid + parameter-space pair cards) ---
-    if "cross-eval" in prods:
-        print("\n[split-analysis] cross-eval")
-        try:
-            from .cross_cluster_evaluator import run_cross_cluster_eval
-
-            cross_path = run_cross_cluster_eval(
-                run_dir=results_dir,
-                model=model,
-                temperature=temperature,
-                api_key=api_key,
-                dry_run=dry_run,
-            )
-            if cross_path is not None:
-                outputs["cross_eval"] = str(cross_path)
-                # Re-score so clustering_quality.json picks up the LLM layer.
-                from .clustering_quality_scorer import score_run_dir
-
-                score_run_dir(results_dir)
-        except Exception as exc:
-            print(f"  ⚠️  cross-eval failed: {exc}")
-
-    summary_path = run_artifact_path(results_dir, "split_summary", write=True)
-    summary_path.write_text(json.dumps(outputs, indent=2), encoding="utf-8")
-    print(f"\n[split-analysis] done → {summary_path}")
+    print("\n[split-analysis] done")
     return outputs

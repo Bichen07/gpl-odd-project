@@ -37,7 +37,6 @@ Creates e.g. `results/batch9/4_cluster_s=0.7482/` with:
 
 - `clustering/selectedClusteringResult.json` (paper labels)
 - `manifest.json` + `cluster*/cluster.json` skeletons
-- `PAPER_SOURCE.json`
 
 Case 1 System B lands under `results/batch7_ITRILatest/…`.
 

@@ -4,11 +4,6 @@ export const PROMPT_LABELS: Array<{ key: string; label: string; help: string }> 
   { key: "medoid", label: "Medoid trial prompt", help: "Motive / decision timeline for one medoid trial." },
   { key: "summary", label: "Cluster summary prompt", help: "Caption over enriched TTC/IC digests." },
   { key: "parameter_space_pair", label: "Parameter-space closest-pair prompt", help: "Contrast two near-identical parameter-space trials across clusters." },
-  {
-    key: "cross_eval",
-    label: "Cross-cluster eval prompt",
-    help: "Grades the whole partition from the medoid + Parameter-space pair cards and the deterministic checks.",
-  },
 ];
 
 // Prompt groups keyed by product (tabs no longer share indices with products).
@@ -23,16 +18,14 @@ export const TAB = {
   MEDOID: 1,
   PAIRS: 2,
   CLUSTER: 3,
-  CROSS_CLUSTER: 4,
-  REPORT: 5,
-  ODD_QA: 6,
+  REPORT: 4,
+  ODD_QA: 5,
 } as const;
 
 export type AnalyzeProduct = "medoid" | "parameter-space-pairs" | "summary";
 
 export type ProductRunState = {
   logs: string;
-  logFile: string;
   error: string | null;
   total: number;
   completed: number;
@@ -40,7 +33,6 @@ export type ProductRunState = {
 
 export const EMPTY_PRODUCT_RUN: ProductRunState = {
   logs: "",
-  logFile: "",
   error: null,
   total: 0,
   completed: 0,

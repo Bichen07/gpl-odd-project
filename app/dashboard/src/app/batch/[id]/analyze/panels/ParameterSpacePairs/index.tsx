@@ -168,7 +168,6 @@ export default function ParameterSpacePairs({
         title="Parameter-space pair analysis"
         running={runningProduct === "parameter-space-pairs"}
         logs={productRuns["parameter-space-pairs"].logs}
-        logFile={productRuns["parameter-space-pairs"].logFile}
         error={productRuns["parameter-space-pairs"].error}
         completed={productRuns["parameter-space-pairs"].completed}
         total={productRuns["parameter-space-pairs"].total}

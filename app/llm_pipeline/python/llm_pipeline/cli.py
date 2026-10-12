@@ -30,11 +30,11 @@ def main() -> None:
     ci.add_argument(
         "--products",
         default="medoid",
-        help="Comma list: medoid[,summary][,parameter-space-pairs][,label-review][,cross-eval]. "
+        help="Comma list: medoid[,summary][,parameter-space-pairs][,label-review]. "
              "Default is medoid only (one YAML: output/medoid_trial.yaml). label-review runs "
              "once per invocation after all cluster_summary.yaml exist and renames "
-             "mechanism-chained / duplicate labels. cross-eval grades the whole partition "
-             "from the medoid + Parameter-space pair cards. Use 'all' for all products.",
+             "same or near-same labels whose cards show different behavior. "
+             "Use 'all' for all products.",
     )
     ci.add_argument("--api-key", default=None, help="API key (overrides env; ephemeral)")
     ci.add_argument("--clusters", default=None,
@@ -58,23 +58,8 @@ def main() -> None:
         help="Write stub YAML without calling the LLM",
     )
 
-    # cross-cluster-eval: run Phase 6b + rescore for one run directory
-    cce = sub.add_parser("cross-cluster-eval")
-    cce.add_argument("--run-dir", required=True,
-                     help="results/batch<id>/<k>_cluster_s=.../ directory to evaluate")
-    cce.add_argument("--model", default="gemini-2.5-flash",
-                     help="LLM model (default gemini-2.5-flash)")
-    cce.add_argument("--api-key", default=None)
-    cce.add_argument("--temperature", type=float, default=0.1)
-    cce.add_argument("--dry-run", action="store_true")
-
-    # selection-eval: deterministic selection quality only — no LLM, no network
-    se = sub.add_parser("selection-eval")
-    se.add_argument("--run-dir", required=True,
-                    help="results/batch<id>/<k>_cluster_s=.../ directory to evaluate")
-
     # label-review: one LLM call reviewing ALL cluster_summary.yaml labels in a
-    # run (mechanism-chained / duplicate names) — renames in place where justified.
+    # run (same or near-same names) — renames in place where justified.
     lr = sub.add_parser("label-review", help="Review + rename cluster_summary.yaml labels across one run")
     lr.add_argument("--run-dir", required=True,
                     help="results/batch<id>/<k>_cluster_s=.../ directory to review")
@@ -121,16 +106,7 @@ def main() -> None:
 
     args = parser.parse_args()
     source = _source_path()
-    if args.cmd == "selection-eval":
-        from .cluster_selection_eval import write_eval
-
-        path = write_eval(Path(args.run_dir))
-        out = (
-            f"cluster_selection_eval written to {path}"
-            if path
-            else "selection-eval failed (no cluster dirs)"
-        )
-    elif args.cmd == "label-review":
+    if args.cmd == "label-review":
         from .cluster_label_reviewer import review_run_dir
 
         result_path = review_run_dir(
@@ -145,22 +121,6 @@ def main() -> None:
             if result_path
             else "label-review skipped (fewer than 2 labeled clusters)"
         )
-    elif args.cmd == "cross-cluster-eval":
-        from .cross_cluster_evaluator import run_cross_cluster_eval
-        from .clustering_quality_scorer import score_run_dir
-
-        result_path = run_cross_cluster_eval(
-            run_dir=Path(args.run_dir),
-            model=getattr(args, "model", "gemini-2.5-flash"),
-            temperature=getattr(args, "temperature", 0.1),
-            api_key=getattr(args, "api_key", None),
-            dry_run=getattr(args, "dry_run", False),
-        )
-        if result_path:
-            score_run_dir(Path(args.run_dir))
-            out = f"cross_cluster_eval written to {result_path}"
-        else:
-            out = "cross-cluster-eval failed"
     elif args.cmd == "odd-export":
         from .odd_export import export_run_dir
 

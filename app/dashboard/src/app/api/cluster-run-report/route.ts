@@ -99,18 +99,9 @@ type ReportDTO = {
     k: number | null;
     silhouette: number | null;
     qualityScore: number | null;
-    qualityRuleScore: number | null;
-    selectionScore: number | null;
   };
   clusters: ReportCluster[];
   pairs: ReportPair[];
-  selectionFindings: string[];
-  mergeCandidates: Array<{
-    clusters: [number, number];
-    sharedMotive: string;
-    collisionRate: [number, number];
-    paramOverlap: number;
-  }>;
   // S2 — present once the Filtering panel "Export ODD boundary" button (or
   // the `odd-export` CLI command) has been used on this folder.
   boundaryExport: {
@@ -172,13 +163,10 @@ export async function GET(req: NextRequest) {
   const k = folderMatch ? parseInt(folderMatch[1], 10) : null;
   const silhouette = folderMatch ? parseFloat(folderMatch[2]) : null;
 
-  // ── Quality / selection JSON ──────────────────────────────────────────
+  // ── Quality JSON ──────────────────────────────────────────
 
   const qualityJson = readJsonSafe(
     runArtifactPath(runDir, "quality"),
-  ) as Record<string, any> | null;
-  const selectionJson = readJsonSafe(
-    runArtifactPath(runDir, "selectionEval"),
   ) as Record<string, any> | null;
 
   // ── Clusters ──────────────────────────────────────────────────────────
@@ -332,21 +320,10 @@ export async function GET(req: NextRequest) {
       folder,
       k,
       silhouette,
-      qualityScore: qualityJson?.final_score ?? null,
-      qualityRuleScore: qualityJson?.rule_score ?? null,
-      selectionScore: selectionJson?.selection_score ?? null,
+      qualityScore: qualityJson?.score ?? null,
     },
     clusters,
     pairs,
-    selectionFindings: (selectionJson?.findings as string[]) ?? [],
-    mergeCandidates: ((selectionJson?.merge_candidates as any[]) ?? []).map(
-      (mc: any) => ({
-        clusters: mc.clusters as [number, number],
-        sharedMotive: mc.shared_motive ?? "",
-        collisionRate: mc.collision_rate as [number, number],
-        paramOverlap: mc.param_overlap ?? 0,
-      }),
-    ),
     boundaryExport,
     parameterRules,
   };

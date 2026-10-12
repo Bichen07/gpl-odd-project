@@ -3,20 +3,19 @@
 
 Each cluster's ``label`` is invented independently by the summary LLM (one
 call per cluster, no view of siblings — see ``cluster_summary_prompt.txt``).
-This module runs a SECOND, single LLM call over the whole run that only ever
-reads what is already on disk (label + caption excerpt + risk_level) and:
-
-  1. catches mechanism-chained labels ("Assertive Gap Late Yield Collision")
-     and rewrites them to a short 2-4 word outcome archetype;
-  2. catches duplicate / near-duplicate labels across clusters whose captions
-     actually describe different behavior, and renames the offending one.
-
-It never re-derives behavior from medoid_trial.yaml / contrast.yaml — that
-evidence already produced the label the first time; this pass only cleans up
-naming across the run. Renames are applied in place to ``cluster_summary.yaml``
+This module runs a SECOND, single LLM call over the whole run. For every
+cluster it sends the full summary card (caption, notes, neighbor verdicts,
+risk_level) and the medoid card (brake_t, peak_t, outcome, collision line,
+timeline). The reviewer renames only when two or more clusters share a name,
+or a near-same name, and their cards show different behavior. It adds one
+adjective drawn from that difference (for example Proactive vs Late from the
+brake lead time). Every other label is left alone. Renames are applied in
+place to ``cluster_summary.yaml``
 (``label`` is overwritten; the previous value + reason are kept in a
 ``label_review`` audit block), and the full row set is written to
-``analysis/quality/cluster_label_review.json``.
+``cluster_analysis/cluster_label_review.json``. The exact card text the model
+receives is written to ``cluster_analysis/context_label_review.md`` before the
+call.
 """
 
 from __future__ import annotations
@@ -50,8 +49,8 @@ except ImportError:  # pragma: no cover
 _REVIEWER_PROMPT_FILE = "cluster_reviewer_prompt.txt"
 
 _SYSTEM_TEXT = (
-    "You are an expert AV safety analyst auditing cluster archetype names for "
-    "precision and distinctiveness across one run. Follow the task exactly. "
+    "You are an expert AV safety analyst auditing cluster names for "
+    "distinctiveness across one run. Follow the task exactly. "
     "Output one ```json fenced array only, one row per cluster listed."
 )
 
@@ -97,19 +96,47 @@ def _load_cluster_rows(run_dir: Path) -> List[Dict[str, Any]]:
                 "yaml_path": path,
                 "label": label,
                 "risk_level": doc.get("risk_level"),
-                "caption_excerpt": str(doc.get("caption") or "").strip()[:400],
+                "summary": doc,
+                "cluster_dir": cdir,
             }
         )
     return rows
 
 
+def _indent(text: str, pad: str = "  ") -> str:
+    return "\n".join(pad + ln if ln.strip() else ln for ln in text.strip().splitlines())
+
+
 def _format_cluster_cards(rows: List[Dict[str, Any]]) -> str:
-    lines: List[str] = []
+    """Per cluster: the full summary card, then the medoid card."""
+    from .cluster_cards import medoid_card_block
+
+    blocks: List[str] = []
     for r in rows:
-        lines.append(f"c{r['cluster_id']}: label=\"{r['label']}\" risk_level={r.get('risk_level')}")
-        if r["caption_excerpt"]:
-            lines.append(f"  caption: {r['caption_excerpt']}")
-    return "\n".join(lines) if lines else "(no cluster_summary.yaml labels on disk)"
+        doc = r["summary"]
+        lines = [
+            f"## c{r['cluster_id']}: label=\"{r['label']}\" risk_level={r.get('risk_level')}",
+            "summary card:",
+        ]
+        for key in ("caption", "consistency_note", "motive_consistency_note"):
+            val = str(doc.get(key) or "").strip()
+            if val:
+                lines.append(f"  {key}:")
+                lines.append(_indent(val, "    "))
+        if doc.get("neighbor_behavior"):
+            lines.append(f"  neighbor_behavior: {doc.get('neighbor_behavior')}")
+        for c in doc.get("neighbor_comparison") or []:
+            if isinstance(c, dict):
+                lines.append(
+                    f"  neighbor c{c.get('neighbor_cluster')} "
+                    f"({c.get('parameter_space_pair_folder')}): "
+                    f"{c.get('behavior_similarity')} — {str(c.get('reason') or '').strip()}"
+                )
+        medoid = medoid_card_block(r["cluster_dir"])
+        lines.append("medoid card:")
+        lines.append(_indent(medoid, "  ") if medoid else "  (no medoid card)")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks) if blocks else "(no cluster_summary.yaml labels on disk)"
 
 
 def _extract_json_block(text: str) -> str:
@@ -193,7 +220,7 @@ def review_run_dir(
     dry_run: bool = False,
 ) -> Optional[Path]:
     """Review every cluster_summary.yaml ``label`` in one run; rename in place
-    where justified. Writes ``analysis/quality/cluster_label_review.json``.
+    where justified. Writes ``cluster_analysis/cluster_label_review.json``.
 
     Returns the output path, or ``None`` if there are fewer than 2 labeled
     clusters to compare (nothing to review).
@@ -205,6 +232,10 @@ def review_run_dir(
     if len(rows) < 2:
         print(f"[ClusterLabelReviewer] Need >=2 labeled clusters; found {len(rows)} — skipped")
         return None
+
+    cluster_cards = _format_cluster_cards(rows)
+    context_path = run_artifact_path(run_dir, "label_review_context", write=True)
+    context_path.write_text(cluster_cards + "\n", encoding="utf-8")
 
     model = normalize_model_name(model)
     if dry_run or not has_llm_credentials(model, api_key):
@@ -230,7 +261,7 @@ def review_run_dir(
     prompt_tmpl = _load_prompt()
     if not prompt_tmpl:
         return None
-    full_prompt = prompt_tmpl.replace("{cluster_cards}", _format_cluster_cards(rows))
+    full_prompt = prompt_tmpl.replace("{cluster_cards}", cluster_cards)
 
     llm = create_interpretation_llm(
         model, api_key=llm_api_key_for_model(model, api_key), temperature=temperature

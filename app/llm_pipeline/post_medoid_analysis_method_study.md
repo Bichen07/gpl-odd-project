@@ -2,14 +2,14 @@
 
 Parameter-space pairs → cluster summary → label-review → cross-cluster (plus how this sits next to ODD). Companion to `[medoid_analysis_method_study.md](medoid_analysis_method_study.md)`.
 
+> **Status:** written while the cross-cluster stage existed. That stage, its prompt, and the selection score were removed. The label review reads every cluster summary card and medoid card in one call. Sections that discuss the cross-cluster verdict, ratings, or merge candidates describe the earlier design.
+
 Internal sources:
 
 - `[README.md](README.md)` §§1, 4.2–4.5, 6
 - `[prompt_templates/parameter_space_pair_prompt.txt](prompt_templates/parameter_space_pair_prompt.txt)`
 - `[prompt_templates/cluster_summary_prompt.txt](prompt_templates/cluster_summary_prompt.txt)`
 - `[prompt_templates/cluster_reviewer_prompt.txt](prompt_templates/cluster_reviewer_prompt.txt)`
-- `[prompt_templates/cross_cluster_prompt.txt](prompt_templates/cross_cluster_prompt.txt)`
-- `[docs/cluster_selection_evaluation.md](docs/cluster_selection_evaluation.md)`
 - Examples: `[results/batch8/6_cluster_s=0.6113/parameter_space_pairs/c0-c4/output/contrast.yaml](../../results/batch8/6_cluster_s=0.6113/parameter_space_pairs/c0-c4/output/contrast.yaml)`, `[results/batch8/6_cluster_s=0.6113/cluster1/output/cluster_summary.yaml](../../results/batch8/6_cluster_s=0.6113/cluster1/output/cluster_summary.yaml)`
 
 ---
@@ -68,7 +68,7 @@ The rank-1 writer and the pair / summary / cross prompts were edited in the same
 | Cross-eval (LLM)      | Is the **whole partition** usable?                                                          | All of the above, no raw `cluster.json` |
 
 
-This is the right scientific stack: **point → matched contrast → local name → global verdict**. Silhouette stays geometric; behavior is judged later. That split is documented in `cluster_selection_evaluation.md` and matches why k=6 vs a lower-silhouette k can disagree with the paper.
+This is the right scientific stack: **point → matched contrast → local name → global verdict**. Silhouette stays geometric; behavior is judged later. That split matches why k=6 vs a lower-silhouette k can disagree with the paper.
 
 **What is *not* in this LLM chain (gap):** `trajectory_projection_pairs/` (MFPCA-near, different params) has packs but **no LLM product**. IC pairs test “same input, different cluster.” Embedding pairs would test “same shape, maybe different input.” PEGASUS-style work uses **both** (see §4).
 
@@ -422,7 +422,7 @@ Post-medoid flow is **logically correct** and closer to published AV practice th
 
 This section is **not** a new LLM stage in the pair→summary→cross DAG. S2, S3, and S5 sit **after** that stack (`README.md` §6). File layout, example numbers (batch8 k=6), and engineer-facing meaning of each JSON: that README. Here: whether the *products* earn their keep.
 
-On-disk example (`results/batch8/6_cluster_s=0.6113/analysis/odd/`):
+On-disk example (`results/batch8/6_cluster_s=0.6113/odd/`):
 
 
 | Product     | File                               | Size / facts (this run)                                         |
@@ -431,7 +431,7 @@ On-disk example (`results/batch8/6_cluster_s=0.6113/analysis/odd/`):
 | S2 frontier | `output/odd_boundary_export.json`  | 650 collision-boundary / 741 cluster-boundary; kNN=10 (~718 KB) |
 | S3 CART     | `output/odd_parameter_rules.json`  | 8 leaves, train acc 0.857, cv 0.842 (~3 KB)                     |
 | S5a KB      | `output/odd_chat_briefing.json`    | ~15 KB, `missing: []`                                           |
-| S5b log     | `analysis/logs/odd_chat_log.jsonl` | per-turn Q/A + citations                                        |
+| S5b log     | `conversation_log/odd_chat_log.jsonl` | per-turn Q/A + citations                                     |
 
 
 

@@ -12,20 +12,9 @@ export type ClusteringQuality = {
   folder: string;
   k: number | null;
   silhouette: number | null;
-  rule_score: number;
-  llm_score: number | null;
-  final_score: number;
+  score: number;
   rank: number | null;
-  has_llm_eval: boolean;
   sub_scores: Record<string, unknown>;
-  cross_cluster_eval?: {
-    behavioral_separation_score: number | null;
-    boundary_clarity_score: number | null;
-    inter_notes: string;
-    cluster_summaries: Array<{cluster_id: number; archetype: string; intra_score?: number}>;
-    merge_candidates?: string[];
-    split_candidates?: string[];
-  } | null;
   trajectory_projection_pairs?: Array<{
     cluster_a: number; trial_a: string; collided_a: boolean;
     cluster_b: number; trial_b: string; collided_b: boolean;
@@ -74,8 +63,6 @@ export type IcPairEntry = {
 export type SplitAnalysis = {
   clusters: SplitClusterCard[];
   icPairs: IcPairEntry[];
-  crossEval?: Record<string, unknown> | null;
-  selectionEval?: Record<string, unknown> | null;
   quality?: Record<string, unknown> | null;
 };
 
@@ -97,15 +84,6 @@ export type BoundaryPair = {
   embedding_dist: number;
 };
 
-export type CrossEvalData = {
-  behavioral_separation_score: number | null;
-  boundary_clarity_score: number | null;
-  inter_notes: string;
-  cluster_summaries: Array<{cluster_id: number; archetype: string; intra_score?: number}>;
-  merge_candidates?: string[];
-  split_candidates?: string[];
-} | null | undefined;
-
 export type ReportData = {
   header: {
     batchId: string;
@@ -113,8 +91,6 @@ export type ReportData = {
     k: number | null;
     silhouette: number | null;
     qualityScore: number | null;
-    qualityRuleScore: number | null;
-    selectionScore: number | null;
   };
   clusters: Array<{
     id: number;
@@ -142,13 +118,6 @@ export type ReportData = {
     behaviorSimilarityReason: string | null;
     contrastExplanation: string | null;
     hasContrast: boolean;
-  }>;
-  selectionFindings: string[];
-  mergeCandidates: Array<{
-    clusters: [number, number];
-    sharedMotive: string;
-    collisionRate: [number, number];
-    paramOverlap: number;
   }>;
   boundaryExport: {
     generatedAt: string | null;

@@ -1,33 +1,19 @@
 <Your Task>
 Analyze ONE cluster medoid (representative archetype of its cluster, not the whole
-cluster). Refer to it as `[cN]` / "this medoid" / Ego.
+cluster). Refer to it as `[cN]` / "this medoid".
 Inputs: medoid context timeline (`processed/context_medoid.md`) and **single-panel** BEV
 frames (Ego-centered, half-extent = Ego–named vehicle distance + 2 m, fixed initial-yaw
 up; titles include burst timing e.g. `0p5s_before_APPROACH_Oncoming` — see
 common_sense BEV guide).
-First fill **agent_interactions** (common_sense): one row per agent Ego
-responded to. Named / primary conflict vehicle first. On that row,
-`resolution` is pass_first / yield / unresolved: `yield` if Ego
-decelerates/stops to give way and that named vehicle is not behind — including
-overlap collision while still braking. `pass_first` if that named vehicle is
-behind Ego, OR Ego holds / increases speed into the gap, OR brake_release then
-continues, OR azimuth FRONT→BEHIND while continuing. Each row is only
-`agent` + `resolution` for that agent's conflict arc (stamps concluded toward
-that agent until its pass/yield/unresolved). Extra rows (e.g. Parking) do not
-change the named-vehicle row's `resolution`.
-Then walk Ego vs **each** agent that appears with metrics: why it slowed /
-sped up / braked / yielded / turned. Ignore junction enter/exit filler.
-Braking during a committed pass of the named vehicle is not a reason to call
-that completed pass a yield. A brake after that vehicle is already behind,
-with another agent ahead, is that ahead agent's `resolution` — not a rewrite
-of the passed vehicle. Resume-driving with nobody ahead is a timeline
-description with no why, not a resolution on the passed vehicle.
+Fill **agent_interactions** from the glossary gate: one row per agent Ego
+responded to, named vehicle first, each row only `agent` + `resolution`.
+Then walk Ego vs **each** agent that appears with metrics: why it slowed,
+sped up, braked, yielded, or turned. Ignore junction enter/exit filler.
 
-If context shows a collision outcome, describe the collision anatomy in the LAST
-`decision_timeline` entry and in `collision_detail.narrative` (who struck whom,
-side, speeds). Structured `collision_detail` fields (`impact_type` /
-`striking_vehicle` / `struck_vehicle`) and `outcome` are filled by the
-pipeline — do not invent them.
+If context shows a collision outcome, describe the collision in the LAST
+`decision_timeline` entry and in `collision_detail` (impact type, who struck
+whom, which sides touched, speeds), judged with the glossary Impact rule.
+`outcome` and `bearing_sector` are filled by the pipeline.
 </Your Task>
 
 <Collision anatomy (required when outcome: collision)>
@@ -35,10 +21,14 @@ Read the collision / near-miss lines in the medoid context and the final BEV fra
 Use the full, precise metric descriptions written in context, including the named vehicle's
 azimuth relative to Ego heading, both vehicle speeds, center-to-center distance,
 and its closing/opening rate.
-Write one clear narrative sentence (striking/struck or side-swipe). Pipeline
-attaches impact_type / striking_vehicle / struck_vehicle from metrics.
-If context lacks geometry for a collision, say so in `open_questions`
-instead of guessing.
+Decide `impact_type`, `striking_vehicle`, and `struck_vehicle` with the glossary
+Impact rule. The context has speeds, not the other vehicle's heading. On the
+collision image, compare the two heading arrows. Nearly the same direction with
+the gap closing is a rear-end even when the boxes meet at a corner. Nearly the
+same direction with the gap opening, or with the vehicle behind nearly stopped,
+is a corner contact. Then write one narrative sentence that agrees with that type.
+If context lacks geometry for a collision, write null for the vehicles and say
+so in `open_questions`.
 </Collision anatomy>
 
 <Mandatory Workflow & Chain Of Thought>
@@ -65,21 +55,11 @@ salient stamp that becomes a `decision_timeline` entry, one CoT bullet:
 2. Situation — quote the relevant agent(s) from **this stamp's** context clause;
    confirm on BEV (secondary may be off-crop).
 3. Why — **one short clause** toward the agent this action is for
-   (e.g. "CuttingIn already beside Ego, brake starts only now"). Causal
-   locality: evidence only at t ≤ this stamp. Resume-driving with nobody
-   ahead → omit the why clause.
-   Never assign `resolution: yield` if the named vehicle is behind Ego (the
-   behind bin, not the overlap band) or Ego released the brake and continued.
-   Overlap while still braking is failed yield, not a bar on `yield`.
-
-After the walk, **always** fill `agent_interactions` (never omit the key).
-Named-vehicle row first (`agent` + `resolution` only). Extra rows
-only for other agents Ego actually responded to.
-A second decelerate after the named vehicle is behind is its own stamp.
-If that stamp (context clause or BEV) shows another agent **ahead** of Ego
-(e.g. Parking FRONT, clearance shrinking), conclude **toward that agent**,
-not toward the vehicle already behind. That ahead agent **must** have an
-`agent_interactions` row. Do not park it in `open_questions` as furniture.
+   (e.g. "CuttingIn already beside Ego, brake starts only now").
+   Evidence only at t ≤ this stamp (glossary). Resume with nobody ahead → omit the why.
+   A second decelerate after the named vehicle is behind, with another agent
+   ahead, is that ahead agent's row (glossary arc window). Do not leave it in
+   `open_questions`.
 
 If outcome is collision: the LAST CoT bullet states impact geometry from
 context/BEV and feeds the final timeline entry + `collision_detail.narrative`.
@@ -92,14 +72,14 @@ Longitudinal verbs (always pair with intensity + a quoted speed):
   (|Δv|≲2 / 2–5 / ≳5 m/s, or EMERGENCY_BRAKE ⇒ severely)
 
 Lateral / heading (only when context or BEV shows it):
-- turn left/right (same lane) — quote Δheading and lateral_speed effect (low/moderate/strong)
+- turn left/right (same lane) — quote Δheading and lateral_speed
 - named vehicle lane-change left/right — name the vehicle and direction; this is
   named-vehicle motion, not an Ego action unless Ego reacts to it
 
 Situation clause (REQUIRED on every non-trivial entry — quote from context_medoid.md):
-- named vehicle name + distance band + sector, e.g. "CuttingIn near FRONT
+- named vehicle name + the context phrase, e.g. "CuttingIn ahead of Ego
   (center-to-center distance=11.7 m)"
-- when near/very-close (<15 m) or at COLLISION: also quote the named vehicle speed and gap
+- when the stamp gives them, or at COLLISION: also quote the named vehicle speed and gap
   closing/opening rate so "who is catching up" is explicit
 - optional TTC when the stamp provides it
 - Also quote any secondary-agent metrics on the same line (e.g. `Parking
@@ -118,9 +98,12 @@ named-vehicle-only / outcome-only stamps):
 - If the why is uncertain, say so in `open_questions`.
 
 Collision phrasing (LAST entry only when outcome: collision):
-  "<named vehicle> rear-ends Ego" | "Ego rear-ends <named vehicle>" |
-  "<named vehicle> side-swipes/T-bones Ego's <left/right>" — always name the struck
-  side and quote both speeds when context provides them.
+  When the heading arrows are nearly parallel and the gap is closing, use
+  "<named vehicle> rear-ends Ego" | "Ego rear-ends <named vehicle>".
+  When one front meets a side, use
+  "<striking vehicle> side-swipes <struck vehicle>'s <left/right>".
+  For corner contact, use "<other vehicle>'s <rear|front|side> meets Ego's <front|rear>-<left|right>",
+  with Ego's corner taken from the position line. Quote both speeds.
 
 ONE timeline only — each entry is the action, then one why clause:
   Action: [lexicon verb + intensity] [quoted speed/Δheading] [quoted situation]
@@ -128,7 +111,7 @@ ONE timeline only — each entry is the action, then one why clause:
   Target ≤30 words. Dense — not a paragraph, not a slogan.
   BAD (too thin):  "Ego begins moderately speeding up."
   BAD (unfocused): junction / road-ID travelogue.
-  GOOD: "Ego ends accelerating at 6.78 m/s; CuttingIn near FRONT 11.7 m,
+  GOOD: "Ego ends accelerating at 6.78 m/s; CuttingIn ahead of Ego, 11.7 m,
          gap closing 2.93 m/s. ⇒ Holds speed into a still-ahead vehicle."
 No road IDs; no junction enter/exit filler.
 </Lexicon>
@@ -136,9 +119,8 @@ No road IDs; no junction enter/exit filler.
 <Output>
 After CoT, ONE YAML fence with **interpretation fields only**.
 The why is the description's last clause and `motive_summary`.
-(Pipeline attaches `trial_id`, `outcome`, `conflict_metrics`, and overwrites
-structured `collision_detail` fields from ground truth. Author only
-`collision_detail.narrative`.)
+(Pipeline attaches `trial_id`, `outcome`, `conflict_metrics`, and
+`collision_detail.bearing_sector`.)
 
 Author **only** `agent_interactions` (see common_sense: resolution =
 go-through vs give-way). Named-vehicle row first, then extra agents Ego
@@ -156,8 +138,10 @@ decision_timeline:
   # 6-15 entries spanning approach → conflict → outcome.
   # LAST entry = final outcome. If collision, LAST uses collision phrasing.
 collision_detail:            # omit entirely (or null) when outcome != collision
-  # impact_type / striking_vehicle / struck_vehicle: pipeline overwrites these
-  narrative: "<1 sentence: who hit whom, from which side / az label, at what speed>"
+  impact_type: "rear-end" | "side-swipe" | "corner contact" | "head-on" | "unclear"
+  striking_vehicle: "<Ego or the named vehicle, or null>"
+  struck_vehicle: "<Ego or the named vehicle, or null>"
+  narrative: "<1 sentence: who hit whom, which corners or sides touched, at what speeds>"
 motive_summary: |
   See <Motive summary guide> below. Follow the structure and density of the EXAMPLE.
 open_questions:

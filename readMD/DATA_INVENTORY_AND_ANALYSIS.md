@@ -910,12 +910,10 @@ The dashboard is the primary entry point (the old `LlmAnalysis` dock panel has b
    time to save API quota) in addition to **Run all selected**. Clusters are always sent to
    the LLM **one at a time, sequentially** — each cluster is an independent request (Pass 1
    + optional Pass 2), never one giant multi-cluster payload.
-6. **Live progress + logs:** `POST /api/cluster-analyze/run` streams NDJSON
+6. **Live progress:** `POST /api/cluster-analyze/run` streams NDJSON
    (`{type:"log"|"done"}`) with `PYTHONUNBUFFERED=1`, so the page shows a progress bar
-   (completed/total clusters) and the child's stdout/stderr live. The full run log is saved
-   to `results/batch<id>/<folder>/logs/analysis_<timestamp>_<clusters>.log` (API key is never
-   logged) for later inspection. **Timestamps are in Taiwan time (UTC+8)** — both the log
-   filename (`analysis_2026-06-30_13-36-03_c0.log`) and the `# time:` header (`... (UTC+8)`).
+   (completed/total clusters) and the child's stdout/stderr while the run is going.
+   The API key is never written to disk or echoed in that stream.
 7. **Models:** only currently-served models are offered. `gemini-2.0-flash` was retired by
    Google (`404 ... no longer available`) and has been removed — use `gemini-2.5-flash` /
    `gemini-2.5-pro` / `gemini-2.5-flash-lite` or the OpenAI `gpt-4o*` models.

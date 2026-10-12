@@ -55,7 +55,6 @@ class ClusterInterpretation:
     """Result of LLM cluster analysis."""
     cluster_id: int
     cluster_label: str
-    confidence: str  # "high", "medium", "low"
     behavior_description: str
     safety_assessment: Dict
     parameter_conditions: Dict
@@ -375,7 +374,7 @@ Intersection geometry:
             "```yaml ... ``` code block — no additional prose, no Chain of Thought. "
             "Use exactly the schema specified in the Final Output Instructions, "
             "including all required top-level keys "
-            "(cluster_id, cluster_label, confidence, behavior_description, "
+            "(cluster_id, cluster_label, behavior_description, "
             "safety_assessment, parameter_conditions, ego_perspective_summary). "
             "The ego_perspective_summary MUST have 10-15 timestamped events "
             "spanning the FULL scenario timeline."

@@ -1613,69 +1613,20 @@ def write_cluster_context_md(
     cluster_dir: Path,
     cluster_doc: Optional[Dict[str, Any]],
 ) -> str:
-    """Cluster-level facts for summary later — not fed to the medoid LLM."""
+    """Collision count for the summary prompt. Not fed to the medoid LLM."""
     cd = cluster_doc or {}
     c = cd.get("cluster", {}) or {}
-    m = cd.get("medoid", {}) or {}
-    s = cd.get("scene", {}) or {}
     label = c.get("label", cluster_dir.name.replace("cluster", ""))
     clab = f"c{label}"
-    sil = c.get("silhouette")
-    sil_str = f"{sil:.4f}" if isinstance(sil, (int, float)) else "n/a"
-    lines: List[str] = [
-        f"# Cluster [{clab}] (cluster-level)",
+    n = c.get("n_trials", c.get("size", "?"))
+    count = c.get("collision_count", "?")
+    rate = c.get("collision_rate", "?")
+    lines = [
+        f"# Cluster [{clab}]",
         "",
-        "This file is cluster-wide evidence for `--products summary`. "
-        "The medoid LLM reads `context_medoid.md` (this cluster's medoid timeline), "
-        "not this file.",
+        f"- **Collisions**: {count}/{n} trials ({rate}%)",
         "",
-        f"- **Size**: {c.get('size', c.get('n_trials', '?'))} trials "
-        f"(k={c.get('n_clusters', '?')}, silhouette={sil_str})",
     ]
-    if c.get("collision_rate") is not None:
-        lines.append(
-            f"- **Collisions**: {c.get('collision_count')}/{c.get('n_trials')} trials "
-            f"({c.get('collision_rate')}%)"
-        )
-    if c.get("mean_ttc") is not None:
-        lines.append(
-            f"- **TTC**: mean={c.get('mean_ttc')} s, min={c.get('min_ttc')} s"
-        )
-    if c.get("mean_spret") is not None:
-        lines.append(f"- **SPRET mean**: {c.get('mean_spret')} s")
-    pr = c.get("parameter_ranges") or {}
-    if pr:
-        bits = []
-        for name, rng in pr.items():
-            if isinstance(rng, (list, tuple)) and len(rng) >= 2:
-                bits.append(f"{name} [{rng[0]}, {rng[1]}]")
-            else:
-                bits.append(f"{name}={rng}")
-        lines.append(f"- **Scenario parameter ranges**: {'; '.join(bits)}")
-    iv = c.get("intra_variance") or {}
-    if iv.get("mean_dist_to_medoid") is not None:
-        lines.append(
-            f"- **Intra-cluster distance to medoid**: mean={iv.get('mean_dist_to_medoid')}, "
-            f"std={iv.get('std_dist_to_medoid')}, max={iv.get('max_dist_to_medoid')}"
-        )
-    # Cluster tag only — never expose trial / payload / esmini IDs to the summary LLM.
-    nearest = "" if m.get("is_exact_medoid", True) else " (nearest available medoid)"
-    outcome_bit = ""
-    if "collided" in m:
-        outcome_bit = (
-            f", outcome={'collision' if m.get('collided') else 'safe'}"
-        )
-    lines.append(f"- **Medoid**: [{clab}] archetype{nearest}{outcome_bit}")
-    loc = s.get("location")
-    if loc:
-        lines.append(
-            f"- **Map**: {loc}, duration {s.get('duration_seconds', '?')}s, "
-            f"{s.get('frame_count', '?')} frames"
-        )
-    lines.append(
-        "- **Timeline**: see `context_medoid.md` (medoid archetype; not cluster-wide)."
-    )
-    lines.append("")
     return "\n".join(lines)
 
 
@@ -1687,6 +1638,7 @@ def write_context_md(
     snap_filenames: Optional[List[str]] = None,
     traj_df: Any = None,
     map_tracks_csv: Optional[str] = None,
+    write_cluster: bool = True,
 ) -> None:
     """Write ``context_medoid.md`` + ``context_cluster.md``.
 
@@ -1756,12 +1708,13 @@ def write_context_md(
     write_path(cluster_dir, "context_medoid.md").write_text(
         medoid_text, encoding="utf-8"
     )
-    write_path(cluster_dir, "context_cluster.md").write_text(
-        write_cluster_context_md(cluster_dir, cluster_doc), encoding="utf-8"
-    )
+    if write_cluster:
+        write_path(cluster_dir, "context_cluster.md").write_text(
+            write_cluster_context_md(cluster_dir, cluster_doc), encoding="utf-8"
+        )
 
 
-def rebuild_processed_context_texts(run_dir: Path) -> None:
+def rebuild_processed_context_texts(run_dir: Path, *, medoid_only: bool = False) -> None:
     """Rewrite medoid/cluster/pair context markdown from existing snapshots.
 
     Does not re-render BEVs and does not call the LLM. Requires
@@ -1821,9 +1774,15 @@ def rebuild_processed_context_texts(run_dir: Path) -> None:
             snap_filenames=filenames,
             traj_df=traj_df,
             map_tracks_csv=map_tracks_csv,
+            write_cluster=not medoid_only,
         )
-        print(f"  ✓ {cluster_dir.name}: context_medoid.md + context_cluster.md")
+        written = "context_medoid.md" if medoid_only else "context_medoid.md + context_cluster.md"
+        print(f"  ✓ {cluster_dir.name}: {written}")
         n_cluster += 1
+
+    if medoid_only:
+        print(f"Rebuilt medoid context for {n_cluster} clusters (cluster and pair files left as they were).")
+        return
 
     n_pair = 0
     pair_root = run_source_dir(run_dir, for_write=True) / "parameter_space_pairs"

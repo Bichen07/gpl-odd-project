@@ -9,8 +9,8 @@ import { resolveResultsBatchDir } from "../_lib/resultsBatchDir";
 /**
  * GET /api/cluster-evaluate?batchId=2
  *
- * Scans results/batch<id>/<k>_cluster_s=<sil>/clustering_quality.json for all
- * available clustering configurations, assigns ranks (by final_score desc), and
+ * Scans results/batch<id>/<k>_cluster_s=<sil>/cluster_analysis/clustering_quality.json for all
+ * available clustering configurations, assigns ranks (by score desc), and
  * returns the sorted array along with per-config cluster intra-variance data.
  *
  * Also returns trajectory_projection_pairs from each config's manifest.json.
@@ -72,13 +72,11 @@ export async function GET(req: NextRequest) {
   for (const entry of entries) {
     const runDir = path.join(batchDir, entry.name);
     const qualityPath = runArtifactPath(runDir, "quality");
-    const crossPath = runArtifactPath(runDir, "crossEval");
     const manifestPath = runSourcePath(runDir, ["manifest.json"]);
 
     const quality = readJsonSafe(qualityPath);
     if (!quality) continue;
 
-    const crossEval = readJsonSafe(crossPath);
     const manifest = readJsonSafe(manifestPath);
 
     // Collect per-cluster intra_variance from each cluster dir
@@ -127,16 +125,15 @@ export async function GET(req: NextRequest) {
     configs.push({
       ...quality,
       folder: entry.name,
-      cross_cluster_eval: crossEval,
       trajectory_projection_pairs: (manifest as Record<string, unknown> | null)?.trajectory_projection_pairs ?? [],
       cluster_intra: clusterIntra,
     });
   }
 
-  // Assign ranks by final_score descending
+  // Assign ranks by score descending
   configs.sort(
     (a, b) =>
-      ((b.final_score as number) ?? 0) - ((a.final_score as number) ?? 0)
+      ((b.score as number) ?? 0) - ((a.score as number) ?? 0)
   );
   configs.forEach((c, i) => {
     c.rank = i + 1;

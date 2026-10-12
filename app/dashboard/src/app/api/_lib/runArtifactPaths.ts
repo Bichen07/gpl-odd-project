@@ -8,60 +8,40 @@ import fs from "fs";
 import path from "path";
 
 const ARTIFACTS: Record<string, { directory: string; name: string }> = {
-  selectionEval: {
-    directory: path.join("cross_cluster", "input"),
-    name: "cluster_selection_eval.json",
-  },
-  crossEval: {
-    directory: path.join("cross_cluster", "output"),
-    name: "cross_cluster_eval.json",
-  },
-  quality: { directory: path.join("analysis", "quality"), name: "clustering_quality.json" },
-  splitSummary: { directory: path.join("analysis", "logs"), name: "split_analysis_summary.json" },
+  quality: { directory: "cluster_analysis", name: "clustering_quality.json" },
   oddAllTrials: {
-    directory: path.join("analysis", "odd", "input"),
+    directory: path.join("odd", "input"),
     name: "odd_all_trials.json",
   },
   oddBoundaryExport: {
-    directory: path.join("analysis", "odd", "output"),
+    directory: path.join("odd", "output"),
     name: "odd_boundary_export.json",
   },
   oddRules: {
-    directory: path.join("analysis", "odd", "output"),
+    directory: path.join("odd", "output"),
     name: "odd_parameter_rules.json",
   },
   oddBriefing: {
-    directory: path.join("analysis", "odd", "output"),
+    directory: path.join("odd", "output"),
     name: "odd_chat_briefing.json",
   },
-  paperSource: {
-    directory: path.join("analysis", "metadata"),
-    name: "PAPER_SOURCE.json",
-  },
-  oddChatLog: { directory: path.join("analysis", "logs"), name: "odd_chat_log.jsonl" },
+  oddChatLog: { directory: "conversation_log", name: "odd_chat_log.jsonl" },
 };
 
 const PREVIOUS_DIRECTORIES: Partial<Record<RunArtifact, string>> = {
   quality: "quality",
-  splitSummary: "logs",
-  oddAllTrials: path.join("odd", "input"),
-  oddBoundaryExport: path.join("odd", "output"),
-  oddRules: path.join("odd", "output"),
-  oddBriefing: path.join("odd", "output"),
-  oddChatLog: "logs",
-  paperSource: "metadata",
+  oddAllTrials: path.join("analysis", "odd", "input"),
+  oddBoundaryExport: path.join("analysis", "odd", "output"),
+  oddRules: path.join("analysis", "odd", "output"),
+  oddBriefing: path.join("analysis", "odd", "output"),
 };
 
 export type RunArtifact =
-  | "selectionEval"
-  | "crossEval"
   | "quality"
-  | "splitSummary"
   | "oddAllTrials"
   | "oddBoundaryExport"
   | "oddRules"
   | "oddBriefing"
-  | "paperSource"
   | "oddChatLog";
 
 export function runSourceDir(runDir: string, options: { forWrite?: boolean } = {}): string {
@@ -111,12 +91,12 @@ export function runOddSnapshotPath(
   options: { forWrite?: boolean } = {},
 ): string {
   const name = `odd_boundary_export.kNN${knn}.json`;
-  const organized = path.join(runDir, "analysis", "odd", "snapshots", name);
+  const organized = path.join(runDir, "odd", "snapshots", name);
   if (options.forWrite) return organized;
   if (fs.existsSync(organized)) return organized;
   const legacy = path.join(runDir, name);
   if (fs.existsSync(legacy)) return legacy;
-  const previous = path.join(runDir, "odd", "snapshots", name);
+  const previous = path.join(runDir, "analysis", "odd", "snapshots", name);
   if (fs.existsSync(previous)) return previous;
   return organized;
 }

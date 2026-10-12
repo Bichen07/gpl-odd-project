@@ -95,9 +95,6 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
     missing: List[str] = []
 
     quality = _read_json(run_artifact_path(run_dir, "quality"))
-    selection = _read_json(run_artifact_path(run_dir, "selection_eval"))
-    if selection is None:
-        missing.append("no cluster_selection_eval.json — selection-eval not run")
 
     # ── Clusters ──────────────────────────────────────────────────────────
     clusters: List[Dict[str, Any]] = []
@@ -194,9 +191,6 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
             for r in (rules_doc.get("rules") or [])
         ]
 
-    findings = (selection or {}).get("findings") or []
-    merge_candidates = (selection or {}).get("merge_candidates") or []
-
     doc = {
         "generated_at": _now_iso(),
         "run": {
@@ -204,16 +198,12 @@ def build_briefing(run_dir: Path) -> Dict[str, Any]:
             "folder": folder,
             "k": k,
             "silhouette": silhouette,
-            "quality_score": (quality or {}).get("final_score"),
-            "quality_rule_score": (quality or {}).get("rule_score"),
-            "selection_score": (selection or {}).get("selection_score"),
+            "quality_score": (quality or {}).get("score"),
         },
         "clusters": clusters,
         "pairs": pairs,
         "rules": rules,
         "boundary": boundary,
-        "findings": findings,
-        "merge_candidates": merge_candidates,
         "open_questions": _harvest_open_questions(run_dir),
         "missing": missing,
     }

@@ -1,49 +1,28 @@
 <Your Task>
-You are reviewing the LABELS already invented for every cluster in ONE run —
-you are not writing new labels from raw evidence. Each cluster's `label` and
-`caption` were written independently (one LLM call per cluster, with no view
-of any other cluster). Your job is to look at all of them together and fix
-only two problems:
+Every cluster in ONE run has a name. Each name was written alone, with no view of the other clusters, and without an adjective. Read all the names together.
 
-1. **Mechanism-chained label** — the label strings more than one mechanism
-   into the name instead of one outcome archetype
-   (e.g. "Late Yield Collision", "Failed Yield Rear-end"). Target: 2–4 words, a short legend name (`Smooth Pass`,
-   `Yield`, `Cut-in Collision`, `Brake Rear-end`, `Yield-Stop Collision`,
-   `Pass-Slowdown`).
-2. **Duplicate / near-duplicate label** — two or more clusters use the same
-   or a confusingly similar name, but their captions describe different
-   behavior (different collision rate, different stop / rear-end / timing
-   mechanism). Keep the SAME name only when the captions genuinely describe
-   the same behavior family.
+Rename only when two or more clusters have the same name, or names so close that a reader cannot tell them apart, AND their cards show different behavior. Add one word to each of those names so the names differ. Leave every other name as it is. Most runs need few or no changes.
 
-Do not touch a label that is already a short, distinct 2–4 word archetype —
-most labels need no change. Do not invent new evidence beyond what is already
-in the caption / collision_rate / risk_level shown to you.
+If the cards show the same behavior, keep the same name. Do not invent evidence. Use only the cards below.
 </Your Task>
 
 <Workflow>
-1. Read every cluster's label + caption excerpt + collision_rate + risk_level.
-2. Flag mechanism-chained labels (rule 1). Rewrite each to the closest 2–4
-   word outcome archetype from the caption's own outcome family (Pass / Yield
-   / Collision / Stop / Slowdown / Rear-end), optionally + one timing word
-   (Late / Proactive).
-3. Flag duplicate/near-duplicate labels (rule 2). Compare their captions:
-   - If genuinely the same behavior family and similar collision_rate, leave
-     both as-is (do not force an artificial difference).
-   - If different, rename the more mechanism-chained one, or — if both are
-     already short — the one whose caption reads as the less typical /
-     smaller-count case, to a distinct 2–4 word name that still matches its
-     own caption.
-4. Output one row per cluster, changed or not, with a one-line reason that
-   cites which rule applied (or "no change needed").
+1. List the names. Mark any that are the same or near-same.
+2. For each marked group, compare the cards of those clusters: outcome, brake_t and peak_t, collision line, timeline, caption, risk_level.
+3. If the behavior is the same, change nothing. If it differs, pick one added word that names the difference you can point to. Examples:
+   - Brake lead time = peak_t − brake_t on the medoid card. The longer lead is `Proactive`. The shorter is `Late`.
+   - One stops and the other only slows: `Stop` and `Slowdown`.
+   - Any other difference you can quote from the cards.
+4. Keep each new name to 5 words or fewer. Put the added word first, for example `Late Yield`.
+5. Output one row per cluster, changed or not. The reason quotes the numbers or lines you used, or says "no change needed".
 </Workflow>
 
-<Clusters in this run (label + risk_level + caption excerpt, from cluster_summary.yaml)>
+<Clusters in this run (summary card + medoid card for each cluster)>
 {cluster_cards}
 </Clusters in this run>
 
 <Output>
-After a short scan (1-2 sentences) noting which rows need a change and why,
+After a short scan (1-2 sentences) noting which names are shared and whether the behavior differs,
 ONE fenced ```json block: an array with exactly one row per cluster listed
 above, in the same order.
 
@@ -52,9 +31,9 @@ above, in the same order.
   {
     "cluster_id": 0,
     "original_label": "<label exactly as shown above>",
-    "new_label": "<same as original_label if unchanged, else your 2-4 word replacement>",
+    "new_label": "<same as original_label if unchanged, else the new name>",
     "changed": false,
-    "reason": "<one line: 'no change needed' or which rule (1 or 2) fired and why>"
+    "reason": "<one line: 'no change needed', or the shared name and the numbers that differ>"
   }
 ]
 ```

@@ -108,8 +108,8 @@ export default function Report({
           )}
         </Stack>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: "block" }}>
-          This number is the geometry score. The language-model reading explains
-          differences and does not change it.
+          This number is the geometry score. The model explanation of cluster
+          differences does not change it.
         </Typography>
       </Paper>
 

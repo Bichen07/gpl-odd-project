@@ -34,30 +34,24 @@ def prompt_templates_dir(start: Path) -> Path:
 
 
 _RUN_ARTIFACTS = {
-    "selection_eval": ("cross_cluster/input", "cluster_selection_eval.json"),
-    "cross_eval": ("cross_cluster/output", "cross_cluster_eval.json"),
-    "quality": ("analysis/quality", "clustering_quality.json"),
-    "label_review": ("analysis/quality", "cluster_label_review.json"),
-    "split_summary": ("analysis/logs", "split_analysis_summary.json"),
-    "odd_all_trials": ("analysis/odd/input", "odd_all_trials.json"),
-    "odd_boundary_export": ("analysis/odd/output", "odd_boundary_export.json"),
-    "odd_boundary_snapshot": ("analysis/odd/snapshots", None),
-    "odd_rules": ("analysis/odd/output", "odd_parameter_rules.json"),
-    "odd_briefing": ("analysis/odd/output", "odd_chat_briefing.json"),
-    "odd_chat_log": ("analysis/logs", "odd_chat_log.jsonl"),
-    "paper_source": ("analysis/metadata", "PAPER_SOURCE.json"),
+    "quality": ("cluster_analysis", "clustering_quality.json"),
+    "label_review": ("cluster_analysis", "cluster_label_review.json"),
+    "label_review_context": ("cluster_analysis", "context_label_review.md"),
+    "odd_all_trials": ("odd/input", "odd_all_trials.json"),
+    "odd_boundary_export": ("odd/output", "odd_boundary_export.json"),
+    "odd_boundary_snapshot": ("odd/snapshots", None),
+    "odd_rules": ("odd/output", "odd_parameter_rules.json"),
+    "odd_briefing": ("odd/output", "odd_chat_briefing.json"),
+    "odd_chat_log": ("conversation_log", "odd_chat_log.jsonl"),
 }
 
 _PREVIOUS_RUN_ARTIFACT_DIRS = {
     "quality": "quality",
-    "split_summary": "logs",
-    "odd_all_trials": "odd/input",
-    "odd_boundary_export": "odd/output",
-    "odd_boundary_snapshot": "odd/snapshots",
-    "odd_rules": "odd/output",
-    "odd_briefing": "odd/output",
-    "odd_chat_log": "logs",
-    "paper_source": "metadata",
+    "odd_all_trials": "analysis/odd/input",
+    "odd_boundary_export": "analysis/odd/output",
+    "odd_boundary_snapshot": "analysis/odd/snapshots",
+    "odd_rules": "analysis/odd/output",
+    "odd_briefing": "analysis/odd/output",
 }
 
 

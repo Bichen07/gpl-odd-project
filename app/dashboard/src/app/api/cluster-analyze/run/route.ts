@@ -14,7 +14,7 @@ import { metaFromYamlPath } from "../../_lib/readYaml";
  * STREAMS progress back as NDJSON (one JSON object per line):
  *   { "type": "start", "jobId": "..." }
  *   { "type": "log",  "data": "<chunk of stdout/stderr>" }
- *   { "type": "done", "ok": bool, "exitCode": n, "stopped"?: bool, "results": [...], "logFile": "..." }
+ *   { "type": "done", "ok": bool, "exitCode": n, "stopped"?: bool, "results": [...] }
  *
  * Stop a live run:
  *   { action: "stop", jobId }
@@ -60,24 +60,6 @@ function killAnalyzeJob(job: AnalyzeJob) {
       }
     }
   }, 2000);
-}
-
-// Taiwan (UTC+8) timestamp for log filenames + headers.
-function taipeiNow(): { stamp: string; human: string } {
-  const parts = new Intl.DateTimeFormat("sv-SE", {
-    timeZone: "Asia/Taipei",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).format(new Date()); // e.g. "2026-06-30 13:36:03"
-  return {
-    human: `${parts} (UTC+8)`,
-    stamp: parts.replace(" ", "_").replace(/:/g, "-"), // 2026-06-30_13-36-03
-  };
 }
 
 function findProjectRoot(start: string): string {
@@ -363,32 +345,12 @@ export async function POST(req: NextRequest) {
 
         const results = collectResults(resultsDir, clusters);
 
-        // Persist the run log for later analysis (no API key is ever logged).
-        let logFile = "";
-        try {
-          const logsDir = path.join(resultsDir, "logs");
-          fs.mkdirSync(logsDir, { recursive: true });
-          const { stamp, human } = taipeiNow();
-          const tag = clusters && clusters.length ? `c${clusters.join("-")}` : "all";
-          logFile = path.join(logsDir, `analysis_${stamp}_${tag}.log`);
-          const header =
-            `# LLM cluster analysis run\n` +
-            `# time: ${human}\n` +
-            `# model: ${model} | temperature: ${temperature} | dryRun: ${dryRun}\n` +
-            `# clusters: ${clusters && clusters.length ? clusters.join(", ") : "all"}\n` +
-            `# exitCode: ${wasKilled ? -2 : exitCode}\n\n`;
-          fs.writeFileSync(logFile, header + allLogs.join(""), "utf-8");
-        } catch {
-          logFile = "";
-        }
-
         send({
           type: "done",
           ok: !wasKilled && exitCode === 0,
           exitCode: wasKilled ? -2 : exitCode,
           stopped: wasKilled,
           results,
-          logFile: logFile ? path.relative(projectRoot, logFile) : "",
         });
         controller.close();
       };

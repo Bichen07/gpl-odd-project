@@ -331,6 +331,43 @@ export default function IcPairPanel({
             />
           )}
         </Stack>
+        {contrastParsed?.behavior_similarity_reason && (
+          <Box sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={CONTRAST_FIELD_LABEL_SX}>
+                behavior_similarity_reason
+              </Typography>
+              <IconButton
+                size="small"
+                aria-label={
+                  showReasonHelp
+                    ? "Hide behavior_similarity_reason explanation"
+                    : "Explain behavior_similarity_reason"
+                }
+                onClick={() => setShowReasonHelp((open) => !open)}
+              >
+                {showReasonHelp ? <Close fontSize="inherit" /> : <HelpOutline fontSize="inherit" />}
+              </IconButton>
+            </Stack>
+            <Collapse in={showReasonHelp}>
+              <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
+                <Typography variant="caption" component="div">
+                  The one-line reason for Behavioral similarity on these two
+                  boundary trials. The trajectory clustering already placed
+                  them in different clusters. This line states how their
+                  behavior differs. <code>distinct</code> names a resolution
+                  family, an outcome, or a difference that stays.{" "}
+                  <code>similar</code> names a small late clearance or a
+                  whole-trajectory detail that remains. The report column
+                  Separation reason is this same field.
+                </Typography>
+              </Alert>
+            </Collapse>
+            <Typography variant="body2" sx={CONTRAST_FIELD_BODY_SX}>
+              {String(contrastParsed.behavior_similarity_reason)}
+            </Typography>
+          </Box>
+        )}
         {Array.isArray(contrastParsed?.contrast_timeline) &&
           (contrastParsed.contrast_timeline as unknown[]).length > 0 && (
             <Box sx={{ mb: 2 }}>
@@ -379,13 +416,13 @@ export default function IcPairPanel({
             <Collapse in={showDivergenceHelp}>
               <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
                 <Typography variant="caption" component="div">
-                  The earliest shared-clock time where a geometry difference
-                  lasts. Lasting means who is ahead, the minimum distance
-                  between vehicle boundaries, or the longitudinal relationship
-                  stays different on later stamps. A single speed sample, or a
-                  brake that starts slightly earlier, counts only when that
-                  clearance also splits and stays split. <code>at</code> is
-                  that time. The line under it is the measured difference.
+                  The earliest shared-clock time where the two trajectories
+                  start to differ and stay apart afterwards. The difference can
+                  be a behavior (one brakes earlier), the minimum distance
+                  between vehicle boundaries, who is ahead, the position, or
+                  the speed. A single sample that returns to the same path does
+                  not count. <code>at</code> is that time. The line under it is
+                  the measured difference.
                 </Typography>
               </Alert>
             </Collapse>
@@ -422,42 +459,6 @@ export default function IcPairPanel({
             </Typography>
             <Typography variant="body2" sx={CONTRAST_FIELD_BODY_SX}>
               {String(contrastParsed.contrast_explanation)}
-            </Typography>
-          </Box>
-        )}
-        {contrastParsed?.behavior_similarity_reason && (
-          <Box sx={{ mb: 2 }}>
-            <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
-              <Typography variant="caption" color="text.secondary" sx={CONTRAST_FIELD_LABEL_SX}>
-                Separation reason
-              </Typography>
-              <IconButton
-                size="small"
-                aria-label={
-                  showReasonHelp ? "Hide separation reason explanation" : "Explain separation reason"
-                }
-                onClick={() => setShowReasonHelp((open) => !open)}
-              >
-                {showReasonHelp ? <Close fontSize="inherit" /> : <HelpOutline fontSize="inherit" />}
-              </IconButton>
-            </Stack>
-            <Collapse in={showReasonHelp}>
-              <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
-                <Typography variant="caption" component="div">
-                  The one-line reason for Behavioral similarity on these two
-                  boundary trials. The trajectory clustering already placed
-                  them in different clusters. This line states how their
-                  behavior differs. <code>distinct</code> names a resolution
-                  family, an outcome, or a clearance that stays different.{" "}
-                  <code>similar</code> names a small late clearance or a
-                  whole-trajectory detail that remains. The report column
-                  Separation reason is this same field (
-                  <code>behavior_similarity_reason</code>).
-                </Typography>
-              </Alert>
-            </Collapse>
-            <Typography variant="body2" sx={CONTRAST_FIELD_BODY_SX}>
-              {String(contrastParsed.behavior_similarity_reason)}
             </Typography>
           </Box>
         )}

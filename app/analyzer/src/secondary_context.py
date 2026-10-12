@@ -335,7 +335,13 @@ def _secondary_stamp_times(
     return stamps
 
 
-def _secondary_metric_bits(m: Dict[str, Any], agent_name: str) -> List[str]:
+def _secondary_metric_bits(
+    m: Dict[str, Any],
+    agent_name: str,
+    *,
+    include_v_ego: bool = True,
+    include_rolling_speed: bool = True,
+) -> List[str]:
     """Metric tokens for secondary agents — position in ego coords, no pass-state bin.
 
     Longitudinal relationship (ahead/overlap/behind) is kept for the primary
@@ -353,6 +359,8 @@ def _secondary_metric_bits(m: Dict[str, Any], agent_name: str) -> List[str]:
         clearance_m=m.get("clearance_m"),
         rolling_speed_1s_mps=m.get("rolling_speed_1s_mps"),
         conflict_name=agent_name,
+        include_v_ego=include_v_ego,
+        include_rolling_speed=include_rolling_speed,
     )
 
 
@@ -364,6 +372,8 @@ def secondary_inline_clauses(
     primary_tid: Optional[int],
     primary_name: str,
     secondary_agents: Sequence[SecondaryAgent],
+    include_v_ego: bool = True,
+    include_rolling_speed: bool = True,
 ) -> List[str]:
     """Metric clauses for secondary agents at ``t``, only when within the 40 m gate.
 
@@ -385,7 +395,12 @@ def secondary_inline_clauses(
             continue
         series = _pair_series(df, agent.track_id)
         m = _metrics_at(series, float(t), agent.name, agent.track_id, source_df=df)
-        bits = _secondary_metric_bits(m, agent.name)
+        bits = _secondary_metric_bits(
+            m,
+            agent.name,
+            include_v_ego=include_v_ego,
+            include_rolling_speed=include_rolling_speed,
+        )
         if not bits:
             continue
         state = "stationary" if agent.stationary else "moving"

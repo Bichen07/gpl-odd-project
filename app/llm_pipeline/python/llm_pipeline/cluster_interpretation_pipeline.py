@@ -459,7 +459,6 @@ def interpretation_to_dict(interp: Any) -> Dict[str, Any]:
     d: Dict[str, Any] = {
         "cluster_id": interp.cluster_id,
         "cluster_label": interp.cluster_label,
-        "confidence": interp.confidence,
         "behavior_description": interp.behavior_description,
         "safety_assessment": interp.safety_assessment,
         "parameter_conditions": interp.parameter_conditions,
@@ -510,7 +509,6 @@ def write_stub_interpretation(
     payload = {
         "cluster_id": cluster_id,
         "cluster_label": f"Cluster {cluster_id} (offline stub)",
-        "confidence": "low",
         "behavior_description": (
             f"LLM interpretation skipped ({reason}). "
             f"Cluster has {cluster_stats.get('n_trials', 0)} trials; "

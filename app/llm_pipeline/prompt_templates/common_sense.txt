@@ -1,154 +1,52 @@
 <Domain Rules & Glossary>
 
-**Conflict metrics (authoritative when provided — do not recompute)**
-- **Center-to-center distance** (legacy JSON key: `d`): straight-line distance
-  between the geometric centers of Ego and the named conflict vehicle (m).
-  In pack-level conflict_metrics, this is the closest-approach value for the trial;
-  in timeline rows it is the value at that stamp.
-- **Ego speed / named vehicle speed** (legacy JSON: `v_ego` / `v_vehicle`): absolute
-  ground speeds (m/s), not relative speed.
-- **Estimated time to collision** (legacy JSON: `ttc`): center-to-center distance
-  divided by its current closing rate while the vehicles are approaching. It is
-  a constant-rate estimate, not a prediction that collision will occur.
-  Pack-level = trial minimum; timeline = value at that stamp.
-- `peak_t`: closest approach or collision time.
-- `relevance_t`: the named conflict vehicle enters the conflict window.
-- `brake_t`: onset of ego hard brake / sustained decelerate from the action log.
-- **Center-to-center distance closing rate** (legacy JSON: `closing`):
-  **−d(center-to-center distance)/dt** (m/s).
-  Sign: `>0` ⇒ gap shrinking (approaching); `<0` ⇒ gap opening; ≈0 ⇒ steady.
-  Context phrases this as `gap closing at X m/s` / `gap opening at X m/s`.
-  This is **not** `ego speed − named vehicle speed`. To judge who is catching whom,
-  compare both absolute speeds together with this distance trend.
-- `impact` (present only when outcome = collision): rule-based collision geometry at
-  the COLLISION frame — named vehicle azimuth relative to Ego heading, both vehicle
-  speeds, and center-to-center distance closing rate,
-  `impact_type` (`rear-end` or `side/lateral impact`), and for a rear-end,
-  `striking_vehicle` (closed the gap, hit) / `struck_vehicle` (rear absorbed it) —
-  both null for a side/lateral impact. Ground truth — quote it directly
-  (e.g. "CuttingIn strikes Ego's rear"); do not re-derive or contradict from
-  center-to-center distance / azimuth.
-- **Named vehicle position in Ego coordinates** (legacy JSON: `rel_long_m` /
-  `rel_lat_m`): named vehicle **center** relative to Ego **center**, after rotating
-  world axes so Ego's heading is +forward and Ego's left is +left. Context writes
-  directions explicitly, e.g. `(9.3 m behind ego, 1.5 m left of ego)`. This is
-  center-to-center geometry, not bumper/nose tip.
-- **Minimum distance between vehicle boundaries** (legacy JSON:
-  `clearance_m`): shortest Euclidean distance between the boundaries of the two
-  oriented vehicle rectangles (m). This is a vehicle-geometry term, unrelated
-  to PCB or electrical clearance. It is zero when the rectangles touch or overlap.
-  This distance quantifies geometric proximity; it does **not** decide whether
-  the trial is a collision. Collision / safe outcome comes from ground truth
-  (`collided`, Payload `collisionWith*`, or a COLLISION stamp in context).
-- **Longitudinal relationship** (legacy JSON: `pass_state`): discrete bin of the
-  longitudinal center offset (named vehicle center ahead/behind Ego center along Ego
-  heading), with a ±2.5 m band (~half vehicle length). Context phrases:
-  - `named vehicle ahead of Ego` — named vehicle center > 2.5 m ahead of Ego center
-  - `vehicle lengths overlap longitudinally` — |ahead/behind offset| ≤ 2.5 m
-    (centers roughly abreast; lateral gap may still be large)
-  - `named vehicle behind Ego (Ego has passed)` — named vehicle center > 2.5 m behind Ego
-  A transition from ahead → behind establishes that Ego passed the named vehicle.
-  Do not confuse this with minimum distance between vehicle boundaries.
-- **Ego average speed during the previous 1 second** (legacy JSON:
-  `rolling_speed_1s_mps`) and **Ego distance traveled during the previous
-  1 second** (legacy JSON: `rolling_disp_1s_m`): sustained Ego motion.
-  Prefer these over one instantaneous Ego-speed sample.
-  Do **not** invent short tokens like `rel=`, `roll1s=`, `pass=`, `az=`, or `d=`.
-- Conflict pack window (BEV / context stamps): default **15 s before** peak through
-  **8 s after** peak (asymmetric; captures pre-conflict setup). Legacy ±W if set.
+Do not recompute a number the context already states. Do not invent abbreviations.
 
-**BEV reading guide (how frames are drawn)**
-- Layout:
-  - Medoid: **single panel**, Ego-centered. Half-extent = Ego–named vehicle center
-    distance + 2 m (clamped ~8–40 m, expanded to fit vehicle footprints).
-    **This half-extent is keyed only to the primary/named vehicle's distance —
-    a secondary agent (e.g. `Parking`) can be closer than the crop edge in
-    reality but still fall outside the drawn frame if it sits off to the side
-    at a moment when the primary vehicle is very close.** A secondary agent
-    missing from the image is NOT evidence it is far away or irrelevant —
-    always cross-check its inline text clause (distance, clearance, speed)
-    before assuming it is absent.
-    Fixed Replayer orientation: rotate once from the trial's **initial** ego yaw
-    so that heading points up, then only recenter — do not re-rotate per frame.
-  - Parameter-space synced pair: dual panel — left = cluster A, right = cluster B
-    at the **same shared clock** `t` (StartValidCondition clip per trial).
-    Both panels share one scale: the larger center-to-center distance + 2 m.
-    Each panel uses
-    that trial's own fixed initial-yaw rotation.
-- Title / filename event token (same rule everywhere): includes burst timing when
-  present, e.g. `0p5s_before_APPROACH_Oncoming`, `0p5s_after_POST_Oncoming`,
-  `COLLISION_Oncoming`. Context lines use the same timing in words
-  (“0.5s before approach phase…”). Panel captions show `t` and the event token.
-- Agents: Ego = orange box; other vehicles = blue. On-car ID circle = legend ID.
-- Velocity arrows (from vehicle nose): **length ∝ speed**; Ego = dark green;
-  others = cyan/blue. No arrow ≈ stationary / near-zero speed.
-- Past path (trail up to this frame): Ego = orange line; others = blue line.
-- Overlays: top-left legend (ID → role + speed); bottom-left scale bar (m);
-  bottom-right center-to-center distance / estimated time-to-collision chip on
-  conflict/pair panels when available;
-  red road-ID / black lane-ID boxes on highlighted corridor roads.
-- Prefer metrics + context timeline if a BEV overlay is ambiguous.
+**Center-to-center distance.** Straight-line distance between the two vehicle centers (m). On a timeline line it is the value at that stamp. In pack-level conflict metrics it is the closest approach of the trial.
 
-**Geometry (canonical nouns — defined once)**
-- **Named vehicle azimuth relative to Ego heading**: bearing to the named vehicle, in degrees.
-  Computed as direction-to-named-vehicle minus Ego nose heading, wrapped to (−180, 180].
-  - 0° = straight ahead
-  - + = named vehicle on Ego's left
-  - − = named vehicle on Ego's right
-  - ±180° = directly behind
-  Context writes `CuttingIn azimuth relative to Ego heading=BEHIND LEFT (129°)` —
-  read both; do not invent a
-  separate “sector” metric. Do not use short tokens like `az=`.
-  Label bins (same angle, for reading only): FRONT |azimuth|≤30°; FRONT LEFT 30–60°;
-  LEFT 60–120°; BEHIND LEFT 120–150°; mirrored on the right; else BEHIND.
-- **`Δazimuth`**: change in azimuth over time (e.g. FRONT→LEFT, or +20°). Same coordinate.
-- Distance bands (from center-to-center distance): far ≥40 m, moderate 15–40, near 5–15,
-  very close <5.
-- Named vehicle speed and center-distance trend appear in timelines once distance is
-  near/very-close (<15 m) or at COLLISION — compare against Ego speed to determine
-  who is catching whom.
-- **Δheading**: change in nose yaw (°); + ≈ left (CCW), − ≈ right (CW).
-- **heading vs road direction** (`heading_vs_road`, JSON `vs_road`): nose heading
-  minus local lane/road tangent; 0° = nose parallel to road. `+heading_vs_road` =
-  nose to road-left; `-heading_vs_road` = nose to road-right. Not the same as
-  azimuth to another agent.
-  Do NOT infer severity from angle alone — use angle and speed:
-  - lateral speed ≈ Ego speed × sin(|heading relative to road|) (m/s)
-  - low lateral effect: `lateral_speed < 0.3 m/s`
-  - moderate: `0.3–0.8 m/s`
-  - strong: `> 0.8 m/s`
+**Minimum distance between vehicle boundaries.** Shortest distance between the two vehicle rectangles (m). Zero when they touch or overlap. This length is not the center distance, and it does not decide collision. Collision or safe comes from the recorded outcome or a COLLISION stamp.
 
-**Rule-based actions (trust the log; do not invent)**
-- Speed: ACCELERATE / DECELERATE / EMERGENCY_BRAKE / STOPPED.
-- Lane: LANE_CHANGE_LEFT / RIGHT (lane_id change).
-- Same-lane TURN_LEFT / RIGHT: heading change without lane_id change (≥15°, ≥1.5 s).
-- Junction ENTER/EXIT: separate; turn intent there uses a larger junction threshold.
-- COLLISION / NEAR_MISS: the named vehicle appears in the log (`with_name`).
-- APPROACH_* / POST_*: conflict burst samples around peak (often labeled
-  `Ns before/after` in context and BEV titles).
+**Ego speed.** Ego's ground speed at that stamp (m/s). Named-vehicle speed is that vehicle's ground speed, not a relative speed.
 
-The only closed behavior field is `resolution`. The why is one prose clause.
+**Closing rate.** How fast the center distance is shrinking (m/s). Positive means the gap is shrinking; negative means it is opening. Context writes `closing at` or `opening at`. This is not Ego speed minus the other vehicle's speed. To see who is catching whom, read both speeds together with this rate.
 
-If the supplied context already states pass/yield (e.g. a pair pack's
-Deterministic interaction geometry block), trust that unless it contradicts
-the geometry gate below. Otherwise infer `resolution` from **longitudinal
-relationship AND brake/accelerate**. A late brake into overlap is a failed
-yield, not a pass. Braking is not yield only when Ego then continues through
-(named vehicle behind, or the brake ends and Ego continues).
+**Estimated time to collision.** Center distance divided by the closing rate while the vehicles approach. A constant-rate estimate, not a prediction that a collision will occur. On a timeline line it is the value at that stamp; in pack-level metrics it is the trial minimum.
 
-**Stamp reading**
-0. Read every secondary-agent metric clause on this stamp (name, speed,
-   clearance, position). Those numbers are evidence only — not a pre-assigned
-   cause. The medoid BEV crop can omit a nearby secondary; missing from the
-   image is not missing from the scene.
-1. Ego eases a decelerate while the named vehicle is still near, before the
-   peak → say that the brake ended early, in the why clause.
-2. After the peak, a hard decelerate with another agent still ahead → that
-   ahead agent gets the why, and its own `resolution` row if Ego is giving way
-   to it.
-3. After an agent is already behind, Ego accelerates or turns and nobody else
-   is ahead → omit the why. Do not hang it on the passed vehicle.
-4. Metrics and BEV disagree → `open_questions`.
+**Position in Ego coordinates.** The named vehicle's center relative to Ego's center, with Ego's heading as forward and Ego's left as left. Example: `(9.3 m behind ego, 1.5 m left of ego)`. Centers, not bumpers.
+
+**Longitudinal relationship.** A bin of that forward offset, cut at ±2.5 m:
+- ahead of Ego — center more than 2.5 m forward
+- vehicle lengths overlap longitudinally — the forward offset is within 2.5 m (the lateral gap may still be large)
+- behind Ego (Ego has passed) — center more than 2.5 m back
+Ahead then behind means Ego passed. Do not confuse this bin with the body gap.
+
+**Azimuth relative to Ego heading.** Bearing to the named vehicle, degrees, wrapped to (−180, 180]. 0° is straight ahead, positive is Ego's left, negative is Ego's right, ±180° is behind. Context writes the sector and the degrees together (`BEHIND LEFT (129°)`). Bins, for reading the same angle: FRONT within 30°; FRONT LEFT 30–60°; LEFT 60–120°; BEHIND LEFT 120–150°; mirrored on the right; else BEHIND.
+
+**Heading vs road.** Nose heading minus the local road tangent. 0° means the nose is parallel to the road. Positive is nose to road-left. This is not the azimuth to another vehicle. Do not read severity from the angle alone; the line also gives `lateral_speed`.
+
+**Δheading.** Change in nose yaw. Positive is left, negative is right.
+
+**Times in the pack.** `peak_t` is closest approach or collision. `relevance_t` is when the named vehicle enters the conflict window. `brake_t` is the onset of the hard brake or the sustained decelerate in the action log. Stamps run from 15 s before the peak through 8 s after it.
+
+**Impact** (only when the outcome is collision). Judge it at the COLLISION stamp from the position line, both speeds, the closing rate, and the image. Quote azimuth and both speeds.
+- `striking_vehicle` is the vehicle whose body moves into the other; `struck_vehicle` is the one that is hit. A vehicle under about 0.3 m/s while the other moves is struck. When both move and the gap is closing, the vehicle behind is striking. When the gap is opening, the vehicle ahead is moving away, and the contact comes from a turn or a swinging corner: name that vehicle by its motion.
+- When the evidence leaves it open, write null for both vehicles and give the reason in `open_questions`.
+- Name Ego's touching corner from the position line alone: other vehicle ahead and left of Ego is Ego's front-left; ahead and right is front-right; behind and left is rear-left; behind and right is rear-right. `left of ego` is Ego's left.
+- Name only the part of the other vehicle that faces Ego: its rear when it is ahead of Ego, its front when it is behind Ego, its side when it is beside Ego. Leave out its left and right. Example: CuttingIn ahead and left of Ego gives "CuttingIn's rear meets Ego's front-left."
+- `impact_type` follows the two heading arrows on the collision image. The context line has no heading for the other vehicle, so read the arrows. A touch at a box corner does not decide the type: two boxes almost always meet at a corner unless they overlap on one line.
+  - `rear-end`: the arrows point nearly the same way, the gap is closing, and the vehicle behind drives into the one ahead. A corner of the box touching is still a rear-end.
+  - `head-on`: the arrows point nearly opposite ways, and the two fronts meet.
+  - `side-swipe`: the arrows differ by a large angle, so one front meets the other's side, or the vehicles run side by side and touch along a side. A corner of the box touching is still a side-swipe.
+  - `corner contact`: one vehicle swings a corner into the other. Use it when the arrows point nearly the same way but the gap is opening or the vehicle behind is nearly stopped, because the vehicle ahead turned or changed lane into it. Use it also when the arrows are neither nearly parallel nor a clear side meeting.
+  - `unclear`: the arrows, the speeds, and the position line do not settle it.
+- `bearing_sector` is the azimuth bin, filled by the pipeline.
+
+**BEV.** A medoid frame is one panel, Ego-centered, cropped to the named vehicle's center distance plus 2 m, heading up from the trial's initial yaw. That crop follows the named vehicle. A pair frame is two panels at the same clock, one scale (the larger center distance plus 2 m). If the image and the text disagree, use the text and say so in `open_questions`.
+
+**Stamp reading.**
+- A secondary-agent clause (name, speed, clearance, position) is a fact, not a pre-assigned cause.
+- Ego eases a decelerate while the named vehicle is still close, before the peak: the why says the brake ended early.
+- After an agent is already behind and nobody else is ahead, an accelerate or a turn has no why.
 
 **Resolution (factor this, nothing else)**
 `resolution` is go-through vs give-way **vs that agent**. Decide it from geometry
@@ -179,100 +77,19 @@ Do not flip a still-braking overlap collision to `pass_first`. Do not infer
 yield from braking if Ego already passed. A name such as `Late Yield` belongs
 on `cluster_summary.label`, not on this row.
 
-**Arc window (required).** Each `agent_interactions` row's `resolution` uses
-only stamps whose conclude is **toward that agent**, from first engagement
-until that agent's pass/yield/unresolved is decided. Later stamps toward
-another agent do **not** change this row.
+**Arc window.** Each `agent_interactions` row uses only the stamps concluded toward that agent, from first engagement until that agent's pass, yield, or unresolved is decided. One row per agent Ego responded to. Named vehicle first. Each row is `agent` + `resolution` only. Later stamps toward another agent do not change this row.
 
-Example: Ego holds speed through CuttingIn (`resolution: pass_first`), then
-decelerates with Parking ahead → CuttingIn stays `pass_first`. The later
-brake is Parking's row, not a rewrite of CuttingIn.
+Example: Ego holds speed through CuttingIn (`pass_first`), then decelerates with Parking ahead. CuttingIn stays `pass_first`. The later brake is Parking's row.
 
-Resume driving (accelerate / heading change with the last conflict agent already
-behind and nobody ahead) is **not** a resolution on any row — omit the why.
+Resume driving, with the last conflict agent already behind and nobody ahead, is not a resolution. Omit the why.
 
-**Filling `agent_interactions` (required)**
-One row per agent Ego actually responded to. Named / primary conflict vehicle
-first (the partner on every timeline line before any secondary clause — e.g.
-CuttingIn). Extra rows only for other agents Ego reacted to (not distant
-furniture). Each row has two keys:
+**Evidence order.** Do not invert this:
+1. Recorded outcome and minimum distance between vehicle boundaries.
+2. Longitudinal relationship, position in Ego coordinates, and FRONT→BEHIND.
+3. Ego speed at that stamp.
+4. Action stamps.
+One speed sample, or a sub-second brake-onset gap, is not a cause unless the geometry stays split. An action at time t may be explained only with evidence at or before t, plus the recorded outcome. Later events may appear in the timeline and must not be given as the reason for an earlier action. A stamp while the named vehicle is still beyond about 100 m is setup, not the conflict why, unless a metric ties it to the conflict.
 
-1. `agent` — the vehicle this row is about.
-2. `resolution` — go-through vs give-way **vs that row's agent** (`pass_first`
-   / `yield` / `unresolved`). Overlap + still braking = failed `yield`. That
-   agent behind, or hold/accel / brake_release then continue = `pass_first`.
-   Braking never decides this by itself if Ego already passed that agent.
-
-After the named vehicle is already behind, do **not** skip a later Ego
-decelerate / accelerate / turn stamp. Quote any secondary clause on that line
-(distance, clearance, speed, closing) and look at BEV for an agent ahead.
-If a secondary is ahead of Ego, gap closing, and Ego is still changing speed,
-add that agent as an `agent_interactions` row with its own `resolution`.
-Do not write the later brake as the cause of the vehicle already behind.
-
-**Evidence hierarchy (do not invert)**
-1. Ground-truth outcome and minimum distance between vehicle boundaries.
-2. Longitudinal relationship / named vehicle position in Ego coordinates /
-   relative-angle FRONT→BEHIND.
-3. Ego distance traveled and average speed during the previous 1 second.
-4. Instantaneous Ego speed / action stamps.
-A single velocity sample or sub-second brake-onset difference is **not causal**
-without persistent geometric separation. Oscillatory Δv is noise.
-
-**Resolution class (for reading — not the `label` field)**
-Use the row's `resolution`.
-
-| `resolution` | class |
-| ---- | ---- |
-| `pass_first` | PASS |
-| `yield` | YIELD |
-| `unresolved` | OTHER |
-
-**Cluster label (cluster_summary `label` ONLY — LLM invents, one cluster at a time)**
-
-Invent a **short outcome archetype**, 2–4 words — what an
-analyst would put on a legend. This is the only place a compound such as
-`Late Yield` is written. The medoid card does not contain that adjective.
-
-Do **not**:
-- chain more than one mechanism into one label
-- use a hardcoded actor→label table (CuttingIn / Parking / Oncoming → fixed
-  name)
-
-Do:
-- name the outcome family first: Pass / Yield / Collision / Stop / Slowdown /
-  Rear-end
-- add at most **one** short timing/quality word when it is the distinguishing
-  fact (`Late Yield`, `Proactive Yield`)
-- keep the why in `caption` only
-
-Closed style set (prefer these; invent a new 2–4 word archetype only if none fit):
-`Smooth Pass` · `Pass-Slowdown` · `Yield` · `Proactive Yield` · `Late Yield` ·
-`Cut-in Collision` · `Yield-Stop Collision` · `Brake Rear-end` · `Side Collision` ·
-`Stationary Collision`
-
-This prompt only sees ONE cluster — do not try to differentiate this label from
-other clusters' names (a separate review pass compares labels across the run).
-
-**Causal locality (no future evidence)**
-- An ego action at time `t_a` may be explained only by evidence at `t ≤ t_a`, plus
-  global ground truth (`peak_t`, `d`, `ttc`, outcome).
--   Later events may appear in the timeline, but must NOT be given as the reason for an
-  earlier action. A post-peak decelerate toward an agent still ahead belongs
-  on **that** agent's resolution row, explained in prose. Accelerate / heading
-  change with nobody left in conflict has no why clause and is not a resolution
-  on the passed vehicle. None of these is the reason for a pre-peak brake.
-- Stamps where the named vehicle is still far (d ≳ 100 m) are scene setup, not the
-  conflict why, unless a metric ties them to the conflict.
-
-**Wording**
-- Longitudinal: "slow down" / "speed up" / "hard brake" / "maintain speed" +
-  lightly|moderately|severely — never "speed adjustment".
-- Same-lane: "turn left/right (same lane)"; quote Δheading; not a lane change
-  unless LANE_CHANGE_* is present. Ignore junction enter/exit filler.
-
-**Honesty**
-- One medoid ≠ whole cluster. IC percentiles are descriptive, not safe/risky bounds.
-- If BEV and metrics disagree, prefer metrics and note uncertainty.
+**Honesty.** One medoid is not the whole cluster. If the image and the metrics disagree, prefer the metrics and note the uncertainty.
 
 </Domain Rules & Glossary>

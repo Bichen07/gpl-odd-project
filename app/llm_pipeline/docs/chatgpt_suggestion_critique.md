@@ -1,5 +1,7 @@
 # Critique: ChatGPT architecture notes vs this repo
 
+> **Status:** written before the cross-cluster stage and the selection score were removed. Mentions of `cross-eval`, `selection-eval`, `cluster_selection_eval.*`, `cross_cluster_prompt.txt`, `final_score`, `rule_score`, and `llm_score` describe the earlier design.
+
 ChatGPT never saw `gpl-odd-project`. A superseded architecture-refactor plan
 mostly agreed with ChatGPT and did **not** check the live pipeline. That plan
 and the August implementation plan were removed. This file is the

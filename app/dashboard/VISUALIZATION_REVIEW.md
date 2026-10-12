@@ -21,7 +21,7 @@ GPL-ODD helps AV engineers **find → explain → aggregate → discuss** behavi
 2. Interpret each cluster medoid with a closed resolution (`pass_first` / `yield` / `unresolved`) plus prose why (`motive_summary` and timeline descriptions) and BEV evidence. Cluster names such as Late Yield live on `cluster_summary.label`.
 3. Contrast **near-identical parameter-space pairs** across clusters (`contrast.yaml`, synced dual BEV).
 4. Summarize clusters and judge **neighborhood separation**.
-5. Score the partition (selection-eval / cross-eval / clustering-quality) and export ODD boundaries / rules / Q&A.
+5. Score the clustering (geometry score) and export ODD boundaries / rules / Q&A.
 
 Visualization must keep **evidence cards**, **geometry**, and **parameter context** linked — not replace them with a single dump or with free-form prose alone.
 
@@ -38,7 +38,7 @@ Orchestrator: `AnalyzeClient.tsx` → seven tabs.
 | Medoid analysis | `MedoidAnalysis` + `MedoidPanel` + `ResultCard` | Cluster chips; BEV scrubber / grid; decision-timeline scrub; YAML / prose cards | `context_medoid.md`, snapshots, `medoid_trial.yaml` |
 | Parameter-space pairs | `ParameterSpacePairs` + `IcPairPanel` | Pair chips; facts table; synced dual BEV scrub; contrast chips + narrative; phase boxes | `process/context.md`, `synced_bev/`, `contrast.yaml` |
 | Cluster analysis | `ClusterAnalysis` + `SplitCardsPanel` | Summary cards; neighbor verdict chips; caption prose | `cluster_summary.yaml`, `context_cluster.md` |
-| Cross-cluster analysis | `CrossClusterAnalysis` | Ranked config table; selection-quality panel; boundary text compare | `cross_cluster_eval.json`, `cluster_selection_eval.json`, `clustering_quality.json` |
+| Cluster analysis | `ClusterAnalysis` | Per-cluster summary, plus the geometry score and ranked config table | `cluster_summary.yaml`, `cluster_analysis/clustering_quality.json` |
 | Report | `Report` | Risk table; motive histogram **CSS bars**; pair evidence table; ODD panels | `GET /api/cluster-run-report` (disk only) |
 | ODD Q&A | `OddQA` | Chat + citations | `odd_chat_briefing.json` |
 
@@ -54,7 +54,7 @@ Explore (outside Analyze) already owns parameter-space / projection scatters, he
 1. **Evidence-backed cards** — closed motive / resolution / separation fields sit next to BEV and context timelines (matches TAXONOMY causal locality).
 2. **Synced dual BEV for pairs** — shared-clock left|right panels are the right visual for “matched IC, different cluster.”
 3. **Staged artifacts** — medoid → pairs → summary gates prevent orphan judgments.
-4. **Partition scores surfaced** — selection-eval and clustering-quality give a non-silhouette behavioral layer.
+4. **Clustering score surfaced** — the geometry score gives a non-silhouette ranking.
 5. **Report + ODD Q&A** — read-only aggregation path for thesis / operator handoff without re-calling LLMs.
 
 ---
@@ -66,7 +66,7 @@ Explore (outside Analyze) already owns parameter-space / projection scatters, he
 3. **BEV scrub ≠ decision timeline scrub** — two independent time controls; easy to look at the wrong frame for a motive stamp.
 4. **No Analyze-side parameter / embedding scatter** — coverage and “where is this failure in ODD space?” lives in Explore; Analyze does not brush into cards.
 5. **Sequential gates feel like stalls** — blocked summary/pair chips need clearer “what to run next” and deep links.
-6. **Duplicate score surfaces** — quality / selection / cross-eval appear in Cross-cluster, SelectionQualityPanel, and Report with overlapping meaning.
+6. **Score surfaces** — the geometry score appears on Cluster analysis, the Explore tab chip, and Report.
 7. **One-at-a-time browsing** — chip-indexed viewers; no persistent dual-cluster or cluster-vs-boundary compare layout.
 8. **ODD exports often offline** — Report boundary/rules empty until CLI odd-export → rules → join → briefing.
 
@@ -122,7 +122,7 @@ DecisionTimeline          --open--------->  ExploreReplayer
 | ID | Change | Target |
 |----|--------|--------|
 | P0.1 | Link BEV frame index to timeline stamp (shared `t`) | `MedoidPanel`, `ResultCard`, `IcPairPanel` |
-| P0.2 | Deep-link Report / Cross-cluster → focused cluster or pair | `Report`, `AnalyzeClient` tab state |
+| P0.2 | Deep-link Report / Cluster analysis → focused cluster or pair | `Report`, `AnalyzeClient` tab state |
 | P0.3 | Contrast card order: chips → `critical_divergence` → explanation → reason → timeline | `IcPairPanel` (partially done) |
 
 ### P1 (engineer compare workflow)
@@ -131,7 +131,7 @@ DecisionTimeline          --open--------->  ExploreReplayer
 |----|--------|--------|
 | P1.1 | Dual-pane compare: two clusters or one pair always visible | new compare layout or `SplitCardsPanel` |
 | P1.2 | Embed mini param-space / projection thumbnail with current selection brushed | Explore docks ↔ Analyze selection |
-| P1.3 | Unify score explanation tooltip (selection vs quality vs silhouette) | `SelectionQualityPanel`, `CrossClusterAnalysis`, `Report` |
+| P1.3 | Unify score explanation tooltip (geometry vs silhouette) | `ClusteringScore`, `Report` |
 
 ### P2 (coverage / ODD visual analytics)
 

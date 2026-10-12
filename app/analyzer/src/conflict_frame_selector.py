@@ -77,7 +77,7 @@ AZIMUTH_GLOSSARY = (
     "minimum distance between vehicle boundaries: shortest Euclidean distance "
     "between the two oriented vehicle rectangles (m). longitudinal relationship: "
     "named vehicle ahead, vehicle lengths overlapping longitudinally, or named vehicle behind. "
-    "ego average speed during previous 1 second: prefer this over one sample."
+    "ego speed: Ego's speed at this stamp (m/s)."
 )
 
 
@@ -1327,10 +1327,12 @@ def format_side_metric_bits(
     pass_state: Optional[str] = None,
     rolling_speed_1s_mps: Optional[float] = None,
     conflict_name: Optional[str] = None,
+    include_v_ego: bool = True,
+    include_rolling_speed: bool = True,
 ) -> List[str]:
     """Full-noun metric tokens for pair/medoid context lines."""
     bits: List[str] = []
-    if v_ego is not None:
+    if include_v_ego and v_ego is not None:
         bits.append(f"ego speed={float(v_ego):.1f} m/s")
     name = display_agent_name(conflict_name)
     if v_vehicle is not None:
@@ -1354,9 +1356,10 @@ def format_side_metric_bits(
     clear_tok = format_minimum_vehicle_boundary_distance_token(clearance_m)
     if clear_tok:
         bits.append(clear_tok)
-    roll_tok = format_rolling_speed_token(rolling_speed_1s_mps)
-    if roll_tok:
-        bits.append(roll_tok)
+    if include_rolling_speed:
+        roll_tok = format_rolling_speed_token(rolling_speed_1s_mps)
+        if roll_tok:
+            bits.append(roll_tok)
     return bits
 
 
@@ -1505,21 +1508,16 @@ def _event_gloss(
 
 
 def _named_vehicle_relation_phrase(
-    vehicle_name: str, sector: str, band: str, d: float, az: float
+    vehicle_name: str, sector: str, d: float, az: float
 ) -> str:
+    """Center distance and azimuth. No distance-band or ahead/left words.
+
+    Those words repeat the meters, the azimuth sector, and the longitudinal
+    relationship already written on the same line.
+    """
     name = display_agent_name(vehicle_name)
-    sector_phrase = {
-        "FRONT": f"{name} is {band} ahead of Ego",
-        "FRONT LEFT": f"{name} is {band} front-left of Ego",
-        "LEFT": f"{name} is {band} on Ego's left",
-        "BEHIND LEFT": f"{name} is {band} behind-left of Ego",
-        "FRONT RIGHT": f"{name} is {band} front-right of Ego",
-        "RIGHT": f"{name} is {band} on Ego's right",
-        "BEHIND RIGHT": f"{name} is {band} behind-right of Ego",
-        "BEHIND": f"{name} is {band} behind Ego",
-    }.get(sector, f"{name} is {band} relative to Ego ({sector})")
     return (
-        f"{sector_phrase} (center-to-center distance={d:.1f} m), "
+        f"center-to-center distance={d:.1f} m, "
         f"{name} azimuth relative to Ego heading="
         f"{sector} ({az:.1f}°)"
     )
@@ -1615,11 +1613,10 @@ def format_conflict_timeline_sentences(
             parts.append(turn_extra)
         if fr.d is not None and fr.az is not None:
             sector = _bearing_sector(fr.az)
-            band = _distance_band(float(fr.d))
             pname = display_agent_name(fr.vehicle_name, vehicle_fallback)
             parts.append(
                 _named_vehicle_relation_phrase(
-                    pname, sector, band, float(fr.d), float(fr.az)
+                    pname, sector, float(fr.d), float(fr.az)
                 )
             )
         pname = display_agent_name(fr.vehicle_name, vehicle_fallback)
@@ -1634,12 +1631,8 @@ def format_conflict_timeline_sentences(
         clear_tok = format_minimum_vehicle_boundary_distance_token(fr.clearance_m)
         if clear_tok:
             parts.append(clear_tok)
-        if fr.rolling_speed_1s_mps is not None and fr.rolling_disp_1s_m is not None:
-            parts.append(
-                f"ego distance traveled during previous 1 second="
-                f"{float(fr.rolling_disp_1s_m):.2f} m; "
-                f"{format_rolling_speed_token(fr.rolling_speed_1s_mps)}"
-            )
+        if fr.v_ego is not None:
+            parts.append(f"ego speed={float(fr.v_ego):.1f} m/s")
         if traj_df is not None:
             try:
                 from kinematics_context import sample_kinematics_at_time
@@ -1651,26 +1644,17 @@ def format_conflict_timeline_sentences(
                     vehicle_tid=fr.vehicle_track_id,
                     map_tracks_csv=map_tracks_csv,
                 )
-                if k and k.get("v_lat") is not None and k.get("vs_road") is not None:
-                    vlat = float(k["v_lat"])
-                    side = "left" if vlat > 1e-6 else ("right" if vlat < -1e-6 else "neutral")
-                    mag = abs(vlat)
-                    if mag < 0.3:
-                        eff = "low"
-                    elif mag <= 0.8:
-                        eff = "moderate"
-                    else:
-                        eff = "strong"
-                    parts.append(
-                        f"lateral_speed={vlat:+.2f} m/s ({eff} lateral {side}, "
-                        f"heading_vs_road={float(k['vs_road']):+.1f}°)"
-                    )
+                if k and k.get("v_lat") is not None:
+                    lat_bits = [f"lateral_speed={float(k['v_lat']):+.2f} m/s"]
+                    if k.get("vs_road") is not None:
+                        lat_bits.append(
+                            f"heading_vs_road={float(k['vs_road']):+.1f}°"
+                        )
+                    parts.append(", ".join(lat_bits))
             except Exception:
                 pass
         if fr.ttc is not None and float(fr.ttc) < 5.0:
             parts.append(f"estimated time to collision≈{float(fr.ttc):.2f} s")
-        if fr.v_ego is not None:
-            parts.append(f"ego speed={float(fr.v_ego):.2f} m/s")
         # Vehicle speed / closing rate only matter once the gap is tight —
         # this is exactly the evidence needed to tell "who is catching up to
         # whom" at approach/collision, so surface it for near + very-close
@@ -1695,6 +1679,8 @@ def format_conflict_timeline_sentences(
                     primary_tid=selection.vehicle_track_id,
                     primary_name=selection.vehicle_name or "",
                     secondary_agents=secondary_agents,
+                    include_v_ego=False,
+                    include_rolling_speed=False,
                 ):
                     parts.append(clause)
             except Exception:

@@ -6,20 +6,17 @@ Primary inputs (required upstream):
 1. This cluster's `output/medoid_trial.yaml` — archetype behavior.
 2. Parameter-space pair contrast files that touch this cluster (`parameter_space_pairs/c*-c*/output/contrast.yaml`)
    — boundary evidence under matched initial conditions.
-3. Optional `processed/context_cluster.md` — cluster size, collision rate, parameter ranges
-   (not a single-trial timeline).
+3. `processed/context_cluster.md` — the collision count only: collisions/trials (rate%).
 
-This prompt runs **per cluster, independently** — you do not see any other
-cluster's label, caption, or evidence, and the pipeline does not read one
-cluster's summary before writing another's. A separate review pass (after all
-clusters are summarized) compares labels across the run and fixes duplicates;
-do not try to guess or avoid other clusters' names here.
+**You invent `label`.** 2–4 words that say what this cluster did. One mechanism. The why belongs in `caption`.
 
-**You invent `label`.** Short **outcome archetype** (2–4 words), the kind of
-name that fits a legend (`Smooth Pass`, `Yield`, `Cut-in Collision`, `Brake Rear-end`). One
-mechanism. The why belongs in `caption`. Closed style set lives in
-common_sense (`§Cluster label`) — prefer one of those before inventing a new
-archetype.
+Use plain nouns and no adjective (not late, proactive, smooth, hard). You do not see the other clusters, so a degree word has nothing to compare against. A later review pass adds those words when two clusters share a name.
+
+No collision: name the outcome, for example `Pass`, `Yield`, `Stop`, `Slowdown`.
+
+Collision: read the `collision` line of the medoid card (impact_type, striking_vehicle, struck_vehicle). Name the impact type and the two vehicles, striking first, for example `CuttingIn Rear-end Ego`. If the card has no `collision` line, name the impact from the timeline and say so in `caption`.
+
+Do not chain two mechanisms into one name.
 
 **Cluster provenance:** MFPCA followed by HDBSCAN was run on the **whole
 trajectory**. A cluster therefore groups trajectory shape and termination, not
@@ -29,89 +26,51 @@ yield attempt that also collides, even when their trajectories look similar.
 Do not force those boundary cases into the medoid's resolution; use the
 pattern of pair readings to describe the mix.
 
-The clustering already groups whole trajectories. Describe what this cluster
-shares with a neighbor and what still differs. Do not recommend a merge, a
-split, or a different number of clusters.
+Describe what this cluster shares with a neighbor and what still differs. Do not recommend a merge, a split, or a different number of clusters.
 </Your Task>
 
 <Mandatory Workflow & Chain Of Thought>
 1. Medoid first: restate this cluster's named-vehicle `resolution`, outcome, and
-   1–2 sentences of `motive_summary` from `medoid_trial.yaml`. Draft a **2–4 word**
-   `label` as an outcome archetype (Pass / Yield / Collision / Stop / Rear-end
-   family). `label` is the only place that may say `Late Yield`. Put the why
-   in `caption`.
+   1–2 sentences of `motive_summary`. Draft the `label` from the rules above.
+   Put the why in `caption`.
 2. Neighbor-by-neighbor: for EACH Parameter-space pair block touching this cluster:
-   - Prefer the contrast YAML (`behavior_similarity`, critical_divergence, evidence).
-   - Copy pair `behavior_similarity` onto this neighbor. It is the behavior of
-     the two boundary trials, not the whole-cluster trajectories. Do **not**
-     require this cluster's boundary side to match the medoid YAML. The medoid
-     is one interior point; a collision-boundary cluster can have a stay-behind
-     edge and a go-through edge. That mix is rolled up in step 4 — never override
-     a pair call to `inconclusive` just because the edge ≠ the medoid.
-     | pair `behavior_similarity` | this neighbor `behavior_similarity` |
-     | ---- | ---- |
-     | missing contrast file | `ambiguous` |
-     | `distinct` | `distinct` |
-     | `similar` | `similar` |
-     | `inconclusive` | `inconclusive` |
-   - `distinct` = the two boundary trials differ in resolution family, outcome, or a
-     persistent stay-ahead versus overlap.
-   - `similar` = the two boundary trials share a resolution family and the same outcome.
-     Name the trajectory detail that still differs.
-   - `inconclusive` = this pair does not name the difference.
-     Not a missing file (`ambiguous`) and not a `neighbor_behavior` value.
-   - `ambiguous` = missing card.
-3. Read the pattern of neighbor `behavior_similarity` values (not “does one edge match the medoid”).
-   A collision-boundary cluster often shows mixed calls: some `distinct`
-   (stay-behind vs overlap / go-through) and some `similar` (same family and
-   same outcome). That pattern is the intended product.
-   Whole-trajectory MFPCA+HDBSCAN can group those trials together: do not relabel
-   the boundary cases merely to make them agree with the medoid.
-4. Roll up `neighbor_behavior` from those values. This is not a clustering change:
-   - `distinct` — neighbors are mostly `distinct`, and those edges tell the SAME
-     geometry family as each other (all stay-behind, or all go-through).
-   - `similar` — neighbors are mostly `similar`.
-   - `mixed` — this cluster’s boundary sides mix families, OR the neighbor list
-     has at least one `distinct` AND at least one `similar`. Describe the mix.
-     Do NOT use this merely because one boundary trial ≠ the medoid string.
-   - `ambiguous` — missing medoid_trial.yaml / contrast.yaml.
-5. `distinct_from_neighbors` is computed by the pipeline from neighbor_comparison
-   (true only if every `behavior_similarity` is `distinct`) — do not invent it.
-6. **Label is yours.** Invent a 2–4 word outcome archetype `label`. One
-   mechanism. Richer nuance belongs in `caption`.
+   - Read the pair card (`behavior_similarity`, critical_divergence, evidence).
+   - The pipeline copies each pair's `behavior_similarity` and reason into
+     `neighbor_comparison`. Do not write that block. Do not re-judge a pair.
+     A pair call is about the two boundary trials, not the medoid. If a
+     boundary trial differs from this cluster's medoid, keep the pair call.
+3. For each neighbor, say what behavior is shared and what differs. The two trials
+   have similar inputs and different trajectories. The behavior may be the same
+   (both yield, one finishes safe and one collides) or different (one brakes and
+   the other accelerates). Do not say whether the clustering is good. Do not
+   relabel a boundary trial to match the medoid.
 </Mandatory Workflow & Chain Of Thought>
 
 <Caption guide>
-`caption` (3–5 short paragraphs, blank line between):
+`caption` (1–3 short paragraphs, blank line between):
 1. Medoid archetype (resolution, why, outcome, and the key action vs the named
    conflict vehicle). If `agent_interactions` names another agent Ego reacted to, one
    short clause is enough — do not retitle the cluster after that agent.
    Name this cluster as `[cN]`. Open with your short outcome-style label; keep
    the why in this paragraph.
-2. What parameter-space boundary pairs say about neighbors (cite folder names / behavior_similarity / `[c*]`).
-3. Whether neighbors agree with each other (both distinct and similar means
-   `neighbor_behavior: mixed`; mostly distinct means the behavior differs;
-   mostly similar means the behavior is shared and a trajectory detail still
-   differs). Do not write keep, merge, or split as an action.
-
-`neighbor_behavior` must be one of `distinct`, `similar`, `mixed`, `ambiguous`.
+2. For each neighbor, what behavior is shared and what differs. Same behavior
+   with a different result, or a different behavior. Cite the pair folder,
+   `behavior_similarity`, and `[c*]`. Do not judge the clustering.
 
 EXAMPLE (illustrative; match density, not facts):
 
-Medoid [c5] is a late-brake collision archetype. Pair c0-c5 is
-behavior_similarity=distinct (stay-behind vs overlap). Pair
-c1-c5 is similar (same go-through family, same outcome, late clearance only).
-Neighbors disagree with each other, so neighbor_behavior=mixed. Describe that
-mix. Do not call it inconclusive merely because an edge differs from the medoid.
+Medoid [c4] yields and collides. Pair c0-c4 is distinct: both yield, [c0] stays
+safe and [c4] collides. Pair c4-c5 is distinct: [c4] yields and [c5] does not
+resolve, and both collide. Say what each pair shares and what differs.
 </Caption guide>
 
 <This cluster's medoid trial (`output/medoid_trial.yaml` extract)>
 {medoid_trial}
 </This cluster's medoid trial>
 
-<This cluster's cluster-level context (`processed/context_cluster.md`)>
+<This cluster's collision count (`processed/context_cluster.md`)>
 {cluster_context}
-</This cluster's cluster-level context>
+</This cluster's collision count>
 
 <Neighbor parameter-space packs (pair.json + contrast.yaml + neighbor medoid_trial.yaml extracts)>
 {neighbor_cards}
@@ -119,28 +78,22 @@ mix. Do not call it inconclusive merely because an edge differs from the medoid.
 
 <Output>
 After CoT, ONE YAML fence with **interpretation fields only**.
-(Pipeline attaches `cluster_id`, `risk_level` from collision rate, and
-`distinct_from_neighbors` from neighbor_comparison. Pipeline does **not**
+(Pipeline attaches `cluster_id`, `risk_level` from collision rate,
+`neighbor_comparison` copied from each pair's contrast.yaml, and
+`neighbor_behavior` counted from those calls. Pipeline does **not**
 overwrite `label`.)
 
 ```yaml
 cluster_id: <int>
 label: "<2-4 word outcome archetype>"
-confidence: "high" | "medium" | "low"
 caption: |
-  3-5 short paragraphs. Lead with the short label; put the medoid why
+  1-3 short paragraphs. Lead with the short label; put the medoid why
   (`motive_summary`) and parameter-space boundary evidence here.
   Blank line between paragraphs.
 consistency_note: |
-  Embedding spread vs outcome homogeneity in one short note.
+  Does this collision count match the medoid outcome? One short note.
 motive_consistency_note: |
   Does this caption agree with the medoid's resolution and motive_summary?
   Empty if nothing to flag.
-neighbor_comparison:
-  - neighbor_cluster: <int>
-    parameter_space_pair_folder: "<e.g. c0-c4>"
-    behavior_similarity: "distinct" | "similar" | "inconclusive" | "ambiguous"
-    reason: "<one line, cite contrast behavior_similarity / evidence / missing card>"
-neighbor_behavior: "distinct" | "similar" | "mixed" | "ambiguous"
 ```
 </Output>

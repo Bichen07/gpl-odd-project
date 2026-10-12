@@ -101,8 +101,8 @@ analyze() {
     --model "$MODEL" \
     --products summary
 
-  run_stage "$label: whole-partition cross-cluster LLM analysis" \
-    "${ANALYZER[@]}" -m llm_pipeline.cli cross-cluster-eval \
+  run_stage "$label: cluster label review" \
+    "${ANALYZER[@]}" -m llm_pipeline.cli label-review \
     --run-dir "$run_dir" \
     --model "$MODEL"
 }

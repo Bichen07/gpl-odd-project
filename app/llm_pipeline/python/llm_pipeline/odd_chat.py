@@ -128,16 +128,14 @@ def route(question: str, briefing: Dict[str, Any]) -> RoutedContext:
     elif intent == "what_next":
         ctx["boundary"] = briefing.get("boundary")
         ctx["rules"] = briefing.get("rules")
-        ctx["merge_candidates"] = briefing.get("merge_candidates")
         citations = ["boundary export", "parameter rules"]
     elif intent == "why_clustering":
         ctx["clusters"] = [
             {k: c.get(k) for k in ("id", "label", "neighbor_behavior")} for c in clusters
         ]
         ctx["pairs"] = [{k: p.get(k) for k in ("folder", "clusters", "behavior_similarity")} for p in pairs]
-        ctx["merge_candidates"] = briefing.get("merge_candidates")
-        ctx["quality"] = {"selection_score": (briefing.get("run") or {}).get("selection_score")}
-        citations = [f"pair {p['folder']}" for p in pairs] + ["selection-eval"]
+        ctx["quality"] = {"score": (briefing.get("run") or {}).get("quality_score")}
+        citations = [f"pair {p['folder']}" for p in pairs] + ["clustering score"]
     else:
         ctx["clusters"] = [{k: c.get(k) for k in ("id", "label", "collision_rate")} for c in clusters]
         citations = ["run header"]

@@ -14,7 +14,6 @@ export default function AnalyzeRunConsole({
   title,
   running,
   logs,
-  logFile,
   error,
   completed,
   total,
@@ -23,7 +22,6 @@ export default function AnalyzeRunConsole({
   title: string;
   running: boolean;
   logs: string;
-  logFile: string;
   error: string | null;
   completed: number;
   total: number;
@@ -81,11 +79,6 @@ export default function AnalyzeRunConsole({
       >
         {logs || "(waiting for output…)"}
       </Box>
-      {logFile && (
-        <Typography variant="caption" color="text.secondary">
-          Log saved to <code>{logFile}</code>
-        </Typography>
-      )}
       {error && (
         <Alert severity="error" sx={{ mt: 1 }}>
           {error}

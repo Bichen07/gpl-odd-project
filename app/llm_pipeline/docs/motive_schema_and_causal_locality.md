@@ -355,11 +355,9 @@ a different MFPCA fit, and HDBSCAN clusters those scores. Full derivation in
 
 The 2026-08-08 selection score used typed `primary_motive`, plus three other
 components, and preferred the paper-structure k=6 candidate (76.67) over the
-higher-silhouette one (60.00). That comparison is historical. The live behavior
-score does not read a motive code. Title distinctness counts `cluster_summary.label`,
-and uses the medoid resolution only when a cluster has no label. Pair outcome
-flips are not weighted. See
-[`cluster_selection_evaluation.md`](cluster_selection_evaluation.md).
+higher-silhouette one (60.00). That comparison is historical. The selection
+score was removed; the only ranking number is the geometry score
+(`clustering_quality.json`).
 
 ### 4.4 Downstream
 

@@ -173,7 +173,6 @@ export default function MedoidAnalysis({
             title="Medoid analysis"
             running={runningProduct === "medoid"}
             logs={productRuns.medoid.logs}
-            logFile={productRuns.medoid.logFile}
             error={productRuns.medoid.error}
             completed={productRuns.medoid.completed}
             total={productRuns.medoid.total}

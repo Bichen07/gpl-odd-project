@@ -216,18 +216,6 @@ export default function SplitCardsPanel({
                       <HelpOutline fontSize="inherit" />
                     )}
                   </IconButton>
-                  {summaryParsed?.distinct_from_neighbors != null && (
-                    <Chip
-                      size="small"
-                      sx={{ verticalAlign: "middle" }}
-                      color={summaryParsed.distinct_from_neighbors ? "success" : "warning"}
-                      label={
-                        summaryParsed.distinct_from_neighbors
-                          ? "distinct from all neighbors"
-                          : "not distinct from every neighbor"
-                      }
-                    />
-                  )}
                 </Stack>
                 <Collapse in={showNeighborHelp}>
                   <Alert severity="info" sx={{ mb: 1, py: 0.5 }}>
@@ -404,6 +392,16 @@ export default function SplitCardsPanel({
                     {cd.impact_type != null && (
                       <Typography variant="body2">
                         impact_type: {String(cd.impact_type)}
+                      </Typography>
+                    )}
+                    {cd.striking_vehicle != null && String(cd.striking_vehicle).trim() !== "" && (
+                      <Typography variant="body2">
+                        striking_vehicle: {String(cd.striking_vehicle)}
+                      </Typography>
+                    )}
+                    {cd.struck_vehicle != null && String(cd.struck_vehicle).trim() !== "" && (
+                      <Typography variant="body2">
+                        struck_vehicle: {String(cd.struck_vehicle)}
                       </Typography>
                     )}
                     {cd.bearing_sector != null && (

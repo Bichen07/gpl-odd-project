@@ -17,9 +17,9 @@ RUN=results/batch8/3_cluster_s=0.8032   # example used throughout
 
 Legacy folders `ic_pairs/` and `boundary_pairs/` still resolve as read fallbacks.
 
-Dashboard **Analyze** tabs: Model setup → Medoid → Parameter-space pairs → Cluster analysis → Cross-cluster analysis → Report → ODD Q&A. Explore Replayer reads medoid / pair cards via `/api/cluster-analysis-status`. Visualization review (gaps, graph+text linking, paper notes): [`app/dashboard/VISUALIZATION_REVIEW.md`](../dashboard/VISUALIZATION_REVIEW.md).
+Dashboard **Analyze** tabs: Model setup → Medoid → Parameter-space pairs → Cluster analysis → Report → ODD Q&A. The geometry score is on the Cluster analysis page. Explore Replayer reads medoid / pair cards via `/api/cluster-analysis-status`. Visualization review (gaps, graph+text linking, paper notes): [`app/dashboard/VISUALIZATION_REVIEW.md`](../dashboard/VISUALIZATION_REVIEW.md).
 
-Design deep-dives: [`docs/analysis_nouns.md`](docs/analysis_nouns.md) (the noun list to check after a wording change), [`docs/cluster_selection_evaluation.md`](docs/cluster_selection_evaluation.md), [`docs/motive_schema_and_causal_locality.md`](docs/motive_schema_and_causal_locality.md), root [`README.md`](../../README.md). The August implementation plan and the superseded architecture-refactor plan were removed; the current score formulas are in §4.5.
+Design deep-dives: [`docs/analysis_nouns.md`](docs/analysis_nouns.md) (the noun list to check after a wording change), [`docs/motive_schema_and_causal_locality.md`](docs/motive_schema_and_causal_locality.md), root [`README.md`](../../README.md). The August implementation plan and the superseded architecture-refactor plan were removed; the score formula is in §4.5.
 
 ---
 
@@ -42,9 +42,7 @@ llm_pipeline.cli cluster-interpret
         ├─ medoid → medoid_trial.yaml
         ├─ parameter-space-pairs → contrast.yaml
         ├─ summary → cluster_summary.yaml            (each cluster independent)
-        ├─ label-review (optional LLM, once) → renames + cluster_label_review.json
-        ├─ selection-eval (always, rule) → cluster_selection_eval.json
-        └─ cross-eval (optional LLM) → cross_cluster_eval.json + rescore quality
+        └─ label-review (optional LLM, once) → cluster_analysis/context_label_review.md, renames, cluster_label_review.json
         │
         ▼
 odd-export → odd-rules → odd-briefing → odd-chat   (S2, S3, S5)
@@ -58,10 +56,8 @@ odd-export → odd-rules → odd-briefing → odd-chat   (S2, S3, S5)
 | `medoid` | `$RUN/clusterN/processed/` | `clusterN/output/medoid_trial.yaml` |
 | `parameter-space-pairs` | both medoids + pack `process/context.md` + `synced_bev/` | `parameter_space_pairs/cA-cB/output/contrast.yaml` |
 | `summary` | medoid + every touching `contrast.yaml`; **each cluster run independently** (no cross-cluster read) | `clusterN/output/cluster_summary.yaml` (`label` = LLM) |
-| `label-review` | every requested cluster's `cluster_summary.yaml` on disk; API key unless `--dry-run` | may rename `label` in place + `analysis/quality/cluster_label_review.json` |
-| `selection-eval` *(not a product flag)* | `clusterN/raw/cluster.json` min.; richer with medoids + `pair.json` | `cross_cluster/input/cluster_selection_eval.json` (also auto at end of every `cluster-interpret`) |
-| `cross-eval` | medoids (+ summaries preferred) + pair packs; API key unless `--dry-run` | `cross_cluster/output/cross_cluster_eval.json` + rescored `analysis/quality/clustering_quality.json` |
-| `all` | — | all five products above |
+| `label-review` | every requested cluster's `cluster_summary.yaml` + `medoid_trial.yaml` on disk; API key unless `--dry-run` | `cluster_analysis/context_label_review.md` (the text the model reads), may rename `label` in place, `cluster_analysis/cluster_label_review.json` |
+| `all` | — | all four products above |
 
 `$RUN/clusterN/raw/cluster.json` comes from clustering / `dataset_builder`, not the LLM pipeline. **Rule-only** — never pasted into an LLM prompt. Holds size, `collision_rate`, TTC/SPRET, `parameter_ranges`, medoid id, `intra_variance`.
 
@@ -81,6 +77,9 @@ $RUN/
 │   └── output/
 │       ├── medoid_trial.yaml
 │       └── cluster_summary.yaml
+├── clustering/selectedClusteringResult.json
+├── conversation_log/odd_chat_log.jsonl
+├── cluster_analysis/{clustering_quality.json, cluster_label_review.json, context_label_review.md}
 ├── trajectory_projection_pairs/cA-cB/   # MFPCA-near; no LLM product yet
 ├── parameter_space_pairs/cA-cB/
 │   ├── pair.json            # rule/UI metadata — not fed to pair LLM
@@ -88,17 +87,10 @@ $RUN/
 │   ├── synced_bev/
 │   ├── output/contrast.yaml
 │   └── c*_trial_*/…         # thin sides
-├── cross_cluster/
-│   ├── input/cluster_selection_eval.json
-│   └── output/cross_cluster_eval.json
-└── analysis/
-    ├── quality/{clustering_quality.json, cluster_label_review.json}
-    ├── odd/
-    │   ├── input/odd_all_trials.json
-    │   ├── output/{odd_boundary_export,odd_parameter_rules,odd_chat_briefing}.json
-    │   └── snapshots/odd_boundary_export.kNN<k>.json
-    ├── metadata/PAPER_SOURCE.json
-    └── logs/{split_analysis_summary.json, odd_chat_log.jsonl, *.log}
+└── odd/
+    ├── input/odd_all_trials.json
+    ├── output/{odd_boundary_export,odd_parameter_rules,odd_chat_briefing}.json
+    └── snapshots/odd_boundary_export.kNN<k>.json
 ```
 
 No `llm_inputs/` dump — prompts read artifacts on disk at call time.
@@ -120,16 +112,14 @@ HumanMessage   ← common_sense.txt + task template + on-disk placeholders [+ op
 | [`parameter_space_pair_prompt.txt`](prompt_templates/parameter_space_pair_prompt.txt) | `parameter-space-pairs` |
 | [`cluster_summary_prompt.txt`](prompt_templates/cluster_summary_prompt.txt) | `summary` |
 | [`cluster_reviewer_prompt.txt`](prompt_templates/cluster_reviewer_prompt.txt) | `label-review` |
-| [`cross_cluster_prompt.txt`](prompt_templates/cross_cluster_prompt.txt) | `cross-eval` |
 | [`odd_chat_system_prompt.txt`](prompt_templates/odd_chat_system_prompt.txt) | `odd-chat` |
 
 | Product | Fed to LLM |
 |---------|------------|
 | **medoid** | prompts + `clusterN/processed/context_medoid.md` + BEV JPGs |
 | **parameter-space-pairs** | prompts + `parameter_space_pairs/cA-cB/process/context.md` + `synced_bev/` + extracts from both clusters’ `medoid_trial.yaml` |
-| **cluster summary** | prompts + this cluster’s `medoid_trial.yaml` extract + `context_cluster.md` + touching `contrast.yaml` + the neighbor cluster’s `medoid_trial.yaml` extract. **No** other clusters’ labels/captions — each cluster is summarized independently, one call at a time |
-| **cluster label-review** | every cluster’s `label` + first 400-char `caption` excerpt + `risk_level`, already written to `cluster_summary.yaml` — **no** `medoid_trial.yaml` / `contrast.yaml` re-read |
-| **cross-eval** | text built from existing `cluster_summary.yaml` / `medoid_trial.yaml` / `contrast.yaml` (+ optional boundary `description.txt`) **and** a short selection-eval digest (`selection_score`, components, findings, merge_candidates from `cluster_selection_eval.json`) — **not** raw `cluster.json` rows |
+| **cluster summary** | prompts + this cluster’s `medoid_trial.yaml` extract + `context_cluster.md` (collision count only) + touching `contrast.yaml` + the neighbor cluster’s `medoid_trial.yaml` extract. **No** other clusters’ labels/captions — each cluster is summarized independently, one call at a time |
+| **cluster label-review** | every cluster’s full `cluster_summary.yaml` card + its medoid card, all in one call — **no** `contrast.yaml` re-read. The exact text is written to `cluster_analysis/context_label_review.md` before the call |
 
 ---
 
@@ -198,7 +188,7 @@ python -m llm_pipeline.cli cluster-interpret \
 | Input | Path |
 |-------|------|
 | this cluster’s medoid | `clusterN/output/medoid_trial.yaml` extract |
-| cluster context | `processed/context_cluster.md` |
+| collision count | `processed/context_cluster.md` — one line, collisions/trials (rate%) |
 | touching pairs | each touching `parameter_space_pairs/cA-cB/output/contrast.yaml` **and** the other side’s `clusterM/output/medoid_trial.yaml` extract |
 
 **Output:** `output/cluster_summary.yaml`. **`label` is LLM-authored**,
@@ -206,7 +196,7 @@ python -m llm_pipeline.cli cluster-interpret \
 `caption`. `motive_consistency_note` compares the caption to the medoid
 `resolution` and `motive_summary`. The pipeline does **not** overwrite
 `label`. It still sets `risk_level` from the collision rate and
-`distinct_from_neighbors` from the neighbor verdicts.
+`neighbor_behavior` by counting the copied pair calls.
 
 Also: `caption`, `neighbor_comparison[]` (`behavior_similarity` copied from
 the pair: `distinct`, `similar`, `inconclusive`, or `ambiguous` when the pair
@@ -220,21 +210,27 @@ python -m llm_pipeline.cli cluster-interpret \
 
 ### 4.4 Cluster label review — `--products label-review`
 
-Because `summary` labels each cluster independently, duplicate/near-duplicate names on
-clusters whose behavior actually differs. `label-review` is one LLM call
-per run that fixes both.
+`summary` names each cluster alone and without adjectives, so two clusters whose
+behavior differs can end up with the same or a near-same name. `label-review` is one
+LLM call per run. It adds one word to those names (for example `Proactive` vs `Late`,
+from the brake lead time). Every other name is left alone.
 
 **Gate:** at least 2 clusters with a (non-stub) `cluster_summary.yaml` on
 disk — checks every `cluster*` folder in `$RUN`, not just clusters touched by
 this invocation.
 
-**Input:** for every cluster — `label`, `risk_level`, and first 400-char
-`caption` excerpt. **No** BEV, no `medoid_trial.yaml` / `contrast.yaml`
-re-read.
+**Input:** for every cluster, all in one prompt — the full summary card (`label`,
+`risk_level`, full `caption`, notes, `neighbor_behavior`, `neighbor_comparison`) and the
+medoid card (`brake_t`, `peak_t`, outcome, collision line, timeline). **No** BEV, no
+`contrast.yaml` re-read.
+
+The exact text the model reads is written to `cluster_analysis/context_label_review.md`
+before the call (also on `--dry-run`), the same way `context_medoid.md` shows the
+medoid input.
 
 **Output:** may rewrite `label` on any `clusterN/output/cluster_summary.yaml`
 (adds a `label_review: {previous_label, reason, reviewed_at}` audit block on
-that file) and always writes `analysis/quality/cluster_label_review.json`
+that file) and always writes `cluster_analysis/cluster_label_review.json`
 — one row per cluster (`cluster_id`, `original_label`, `new_label`, `changed`,
 `reason`), whether or not it changed.
 
@@ -246,65 +242,26 @@ python -m llm_pipeline.cli cluster-interpret \
 python -m llm_pipeline.cli label-review --run-dir "$RUN" --model gemini-2.5-flash
 ```
 
-### 4.5 Selection-eval / cross-eval / clustering-quality
+### 4.5 Clustering score
 
-Three related artifacts judge **the partition**, not one trial. Silhouette is
-geometric; these layers are behavioral. Detail / dashboard field tutorial:
-[`docs/cluster_selection_evaluation.md`](docs/cluster_selection_evaluation.md).
-
-**Scope:** cross-eval = inter-cluster verdict **inside one `$RUN`**. Ranking
-different `k_cluster_s=…` folders uses each folder’s `clustering_quality.json`
-(“Other clusterings of this batch” on the cross-cluster tab). Silhouette is a
-geometry piece, not a separate ranking column.
+One rule-based number per clustering, no LLM. It ranks the different
+`k_cluster_s=…` folders of a batch against each other (“Other clusterings of
+this batch” on the Cluster analysis page). Silhouette is one piece of it, not a
+separate ranking column.
 
 ```text
-cluster.json + medoid YAML + pair.json  ──rule──►  cluster_selection_eval.json
-                                                      │ digest
-medoid / summary / contrast / boundary text  ──LLM──► cross_cluster_eval.json
-                                                      │
-cluster.json + optional LLM scores  ──rule──►  clustering_quality.json
-                                              (final_score is the geometry score; LLM ratings are stored beside it)
+clusterN/raw/cluster.json  ──rule──►  cluster_analysis/clustering_quality.json
 ```
 
-| Artifact | Kind | When |
-|----------|------|------|
-| `cross_cluster/input/cluster_selection_eval.json` | Rule | End of every `cluster-interpret`; CLI `selection-eval` |
-| `cross_cluster/output/cross_cluster_eval.json` | LLM (stub if dry-run) | `--products cross-eval`; CLI `cross-cluster-eval`; dashboard button |
-| `analysis/quality/clustering_quality.json` | Rule (+ optional blend) | After dataset build; after cross-eval; CLI |
+`score` weights: silhouette 0.25 · collision_spread 0.25 · ttc_spread 0.25 ·
+intra_consistency (tightness) 0.25. The file also stores the four sub-scores.
+`rank` is filled by `GET /api/cluster-evaluate` from `score`. The dashboard calls
+the number **geometry**. `dataset_builder` writes the file after a build. Rewrite
+it with `score_run_dir` from `llm_pipeline.clustering_quality_scorer`.
 
-**Selection checks** (`cluster_selection_eval.json`). Outcome purity and title
-distinctness are still computed, with equal weight, into `selection_score`.
-That number is a digest for the language-model prompt. The dashboard does not
-show it. The JSON key is still `motive_distinctness`. It counts summary titles,
-and uses the medoid resolution only when a cluster has no title. Pair outcome
-flips and the merge-candidate list are written for inspection. The digest sent
-to the language model is `digest_for_prompt()` — never raw `cluster.json`.
-
-**cross-eval prompt slots:** `{cluster_summaries}`, `{medoid_cards}`,
-`{parameter_space_pair_cards}`, `{neighbor_rollup}`, `{boundary_trial_pairs}`,
-`{deterministic_checks}`. Outputs `behavioral_separation_score`,
-`boundary_clarity_score` (1–10), `inter_notes`, `cluster_differences`, and
-`selection_verdict`. The reading names what clusters share and what trajectory,
-collision, or timing difference still separates them. It does not recommend a
-merge, a split, or a different number of clusters.
-
-**clustering_quality `rule_score` weights:** silhouette 0.25 · collision_spread 0.25 ·
-ttc_spread 0.25 · intra_consistency 0.25.
-`final_score` equals `rule_score`. The dashboard calls that number **geometry**.
-The language-model rating is the average of separation and boundary clarity,
-times 10, and is stored as `llm_score`. It does not move `final_score`.
-`rank` is filled by `GET /api/cluster-evaluate` from `final_score`, so the rank
-follows geometry. If the model omits a rating, the parser stores 5; that 5 is
-shown on the reading and does not change the geometry score.
-
-**`analysis/logs/split_analysis_summary.json`:** write-only receipt of the latest
-`cluster-interpret` call (paths written/skipped). Nothing reads it back.
-
-```bash
-python -m llm_pipeline.cli selection-eval --run-dir "$RUN"
-python -m llm_pipeline.cli cross-cluster-eval --run-dir "$RUN" --model gemini-2.5-flash
-# or:  … cluster-interpret --products cross-eval …
-```
+What the clusters do and how they differ is read from the pair cards
+(`behavior_similarity`), the cluster summaries (`neighbor_behavior`), and the
+label review (§4.4). The dashboard Report tab lists them side by side.
 
 ---
 
@@ -314,9 +271,9 @@ Analyze → **Report** loads `GET /api/cluster-run-report` (no LLM) from files o
 
 | Panel | Source | Notes |
 |-------|--------|-------|
-| Header chips | `clustering_quality.json` | **geometry** is `final_score`, which equals the geometry score. |
+| Header chips | `clustering_quality.json` | **geometry** is `score`. |
 | **Recommended Next Tests** | client heuristics on report DTO | Missing pair contrasts and inconclusive calls. A `similar` pair shares a behavior family and the same outcome; the contrast names the remaining trajectory difference. |
-| **ODD boundary / rules** | S2/S3 JSON under `analysis/odd/output/` | CART rules table; min–max kNN ≠ pair z-score distance |
+| **ODD boundary / rules** | S2/S3 JSON under `odd/output/` | CART rules table; min–max kNN ≠ pair z-score distance |
 
 Produce E’s files:
 
@@ -338,7 +295,7 @@ class, … are not in the trial table). See
 [`post_medoid_analysis_method_study.md`](post_medoid_analysis_method_study.md)
 §2.5 / §7.
 
-Paths: §2 layout under `analysis/odd/`. Numbers below are the shipped
+Paths: §2 layout under `odd/`. Numbers below are the shipped
 `results/batch8/6_cluster_s=0.6113` artifacts (kNN=10, 2 params:
 `OncomingSpeed`, `OncomingStartDelay`).
 
@@ -372,7 +329,7 @@ differs in KPI pass/fail (**collision boundary**) or in cluster label
 (**cluster boundary**). Those two lists must stay separate: a trial can be
 one, both, or neither.
 
-**Writes** (under `$RUN/analysis/odd/`):
+**Writes** (under `$RUN/odd/`):
 
 | File | Role |
 |------|------|
@@ -413,7 +370,7 @@ the export header `n_trials_without_cluster_label` is the honest count.
 many of that leaf’s trials sit on the S2 **collision** boundary
 (`boundary_trial_hits`).
 
-**Writes:** `$RUN/analysis/odd/output/odd_parameter_rules.json` (~3 KB).
+**Writes:** `$RUN/odd/output/odd_parameter_rules.json` (~3 KB).
 
 Example (batch8 k=6, 3869 trials, 1771 fail / 2098 pass, train acc 0.857,
 5-fold cv 0.842):
@@ -441,8 +398,8 @@ pair z-score. Do not quote a threshold the tree never emitted.
 ### S5a — `odd_briefing.py`
 
 No LLM. Assembles one compact `odd_chat_briefing.json` (~15 KB, target 8–15k
-tokens) from cluster summaries, pair folders, S2/S3, selection-eval
-findings / merge candidates. Long captions truncated. `missing[]` lists absent
+tokens) from cluster summaries, pair folders, S2/S3, and the geometry score.
+Long captions truncated. `missing[]` lists absent
 products so chat can say “unknown — run S3” instead of guessing.
 
 ### S5b — `odd_chat.py` (grounded Q&A — **not** full RAG)
@@ -468,14 +425,14 @@ Never raw trajectories / full BEV / full context timelines / live web.
 | `cluster N` / `cA-cB` | that cluster + touching pairs |
 | weak / failure / worst | top collision clusters + sample pairs |
 | fail condition / odd / limit | rules + boundary |
-| test next / coverage | boundary, rules, merge candidates |
-| merge / separat… | separation notes + pair calls + merge candidates |
+| test next / coverage | boundary, rules |
+| merge / separat… | cluster labels + `neighbor_behavior` + pair calls + geometry score |
 | (else) | run header + cluster id/label/rates |
 
 API key via CLI `--api-key` / env / dashboard ephemeral field (same pattern as
 other Analyze products); missing key → dry-run stub still logged.
 
-Persists `$RUN/analysis/logs/odd_chat_log.jsonl` (`conversation_id` partitions
+Persists `$RUN/conversation_log/odd_chat_log.jsonl` (`conversation_id` partitions
 chats). Dashboard: `GET/POST /api/odd-chat` → `scripts/run_odd_chat.sh`.
 
 **Would RAG help later?** Only if the corpus grows (many runs, paper text,
@@ -512,12 +469,10 @@ export GOOGLE_API_KEY="…"   # or OPENAI_API_KEY for gpt-*
 
 python -m llm_pipeline.cli cluster-interpret \
   --results-dir "$RUN" --batch-id 8 \
-  --products medoid|parameter-space-pairs|summary|label-review|cross-eval|all \
+  --products medoid|parameter-space-pairs|summary|label-review|all \
   [--clusters 0,2] [--pairs c0-c2] [--dry-run]
 
-python -m llm_pipeline.cli selection-eval --run-dir "$RUN"
 python -m llm_pipeline.cli label-review --run-dir "$RUN" --model gemini-2.5-flash
-python -m llm_pipeline.cli cross-cluster-eval --run-dir "$RUN" --model gemini-2.5-flash
 
 python -m llm_pipeline.cli odd-export|odd-rules|odd-briefing --run-dir "$RUN"
 python -m llm_pipeline.cli odd-chat --run-dir "$RUN" --question "…" [--dry-run]
@@ -542,12 +497,11 @@ python -m llm_pipeline.cli odd-chat --run-dir "$RUN" --question "…" [--dry-run
 
 | Module | Role |
 |--------|------|
-| `split_analysis.py` | Products; gates; summary LLM invents `label` per cluster, independently; `split_analysis_summary.json` |
+| `split_analysis.py` | Products; gates; summary LLM invents `label` per cluster, independently |
 | `cluster_aggregates.py` | Pass-1 aggregates → `cluster_aggregate.json` |
-| `cluster_label_reviewer.py` | Cross-cluster label QA — one LLM call, renames mechanism-chained / duplicate labels |
-| `cluster_selection_eval.py` | Purity and title-distinctness checks + digests |
-| `cross_cluster_evaluator.py` | Whole-partition LLM verdict |
-| `clustering_quality_scorer.py` | Rule (+ optional LLM blend) ranking score |
+| `cluster_cards.py` | Text cards the model reads: medoid card, neighbor pair cards |
+| `cluster_label_reviewer.py` | Label QA across clusters — one LLM call, adds one word to same / near-same labels; writes `context_label_review.md` |
+| `clustering_quality_scorer.py` | Geometry ranking score |
 | Analyzer `dataset_builder.py` / `parameter_space_pair_packs.py` | Packs, BEV, context rebuild |
 | `odd_export.py` / `odd_rules.py` | S2–S3 |
 | `odd_briefing.py` / `odd_chat.py` | S5a–S5b |

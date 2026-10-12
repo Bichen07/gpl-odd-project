@@ -58,11 +58,8 @@ const SORT_LABELS: Record<string, string> = {
 };
 
 interface CompositeScoreEntry {
-  final_score: number;
-  rule_score: number;
-  llm_score: number | null;
+  score: number;
   rank: number;
-  has_llm_eval: boolean;
   folder: string;
 }
 
@@ -861,8 +858,8 @@ export default function PerEgoSelection({
           return 0;
         }
         if (sortBy === "compositeScore") {
-          const scoreA = compositeScores[keyA]?.final_score ?? -Infinity;
-          const scoreB = compositeScores[keyB]?.final_score ?? -Infinity;
+          const scoreA = compositeScores[keyA]?.score ?? -Infinity;
+          const scoreB = compositeScores[keyB]?.score ?? -Infinity;
           return scoreB - scoreA;
         }
         let aV =
@@ -1941,16 +1938,12 @@ export default function PerEgoSelection({
                   const key = resultFolderKey(result, index);
                   const cs = compositeScores[key];
                   if (!cs) return null;
-                  const tooltip = cs.has_llm_eval
-                    ? `Geometry ${cs.rule_score?.toFixed(1)}. Language-model reading ${cs.llm_score?.toFixed(1)} sits beside it and does not change this score.`
-                    : `Geometry ${cs.rule_score?.toFixed(1)}. Language-model reading not run yet.`;
                   return (
-                    <Tooltip title={tooltip}>
+                    <Tooltip title={`Geometry score ${cs.score?.toFixed(1)}`}>
                       <Stack direction="row" alignItems="center" gap={0.5} sx={{ ml: 0.5 }}>
                         <Chip
-                          label={`${cs.final_score?.toFixed(1)} ★`}
+                          label={`${cs.score?.toFixed(1)} ★`}
                           size="small"
-                          color={cs.has_llm_eval ? "primary" : "default"}
                           sx={{ fontSize: "11px", height: "20px" }}
                         />
                         <Chip

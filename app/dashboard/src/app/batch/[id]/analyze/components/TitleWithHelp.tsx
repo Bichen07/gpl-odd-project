@@ -11,19 +11,21 @@ export default function TitleWithHelp({
 }: {
   title: string;
   help: ReactNode;
-  variant: "h4" | "h6";
+  variant: "h4" | "h6" | "subtitle1" | "overline";
 }) {
   const [open, setOpen] = useState(false);
+  const isOverline = variant === "overline";
   return (
     <>
       <Stack
         direction="row"
         alignItems="center"
         spacing={0.5}
-        sx={{ mb: variant === "h4" ? 0.5 : 1 }}
+        sx={{ mb: variant === "h4" ? 0.5 : isOverline ? 0 : 1 }}
       >
         <Typography
           variant={variant}
+          color={isOverline ? "text.secondary" : undefined}
           sx={variant === "h4" ? { fontWeight: 700 } : undefined}
         >
           {title}

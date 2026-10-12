@@ -40,7 +40,6 @@ const PROMPT_FILES: Record<string, string> = {
   medoid: "medoid_trial_prompt.txt",
   summary: "cluster_summary_prompt.txt",
   parameter_space_pair: "parameter_space_pair_prompt.txt",
-  cross_eval: "cross_cluster_prompt.txt",
 };
 
 function readJsonSafe(p: string | null): Record<string, unknown> | null {
@@ -526,8 +525,6 @@ export async function GET(req: NextRequest) {
     splitAnalysis: {
       clusters: splitClusters,
       icPairs,
-      crossEval: readJsonSafe(runArtifactPath(runDir, "crossEval")),
-      selectionEval: readJsonSafe(runArtifactPath(runDir, "selectionEval")),
       quality: readJsonSafe(runArtifactPath(runDir, "quality")),
     },
   });

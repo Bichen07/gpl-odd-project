@@ -325,6 +325,9 @@ def _agent_speed_actions(df: pd.DataFrame, junction_roads: Set[int]) -> List[Act
     lane = df["lane_id"].to_numpy(dtype=int)
     head = (df["heading"].to_numpy(dtype=float)
             if "heading" in df.columns else np.zeros(len(df)))
+    # esmini CSV heading is radians; same unit rule as collision_vehicle._heading_deg.
+    if len(head) and np.nanmax(np.abs(head)) <= 2 * np.pi + 0.5:
+        head = np.degrees(head)
     # Also accept track_id-only frames (after rename) for agent id lookup.
     agent_id = int(
         df["trackId"].iloc[0]
@@ -392,7 +395,7 @@ def _agent_speed_actions(df: pd.DataFrame, junction_roads: Set[int]) -> List[Act
     discrete += _same_lane_turn_actions(df, agent_id, role, lane_changes)
 
     # --- Route: one ENTER (with turn intent) + one EXIT per junction pass -
-    # heading is in degrees (esmini CCW); +Δ ⇒ left, −Δ ⇒ right.
+    # heading in degrees (converted above, CCW); +Δ ⇒ left, −Δ ⇒ right.
     if junction_roads:
         in_junc = np.array([int(r) in junction_roads for r in road])
         n = len(road)

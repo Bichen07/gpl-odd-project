@@ -40,7 +40,7 @@ different audiences. See the tree below for where each file is written.
 | **`description.txt`** | `description.py` | Humans / debug (see note) | Prose of **entire** log (keeps junctions) |
 | **`context_medoid.md`** | stamp select + sentences | Medoid LLM (+ BEV JPGs) | Timeline of **selected** stamps only |
 
-Missing an event in `context_medoid.md` ≠ Labeller failure — check filters **F1–F5**
+Missing an event in `context_medoid.md` ≠ Labeller failure — check filters **F1–F3**
 on the tree.
 
 **Note — vs `xosc_gen` (Steps 1 → 2 → 2.5 → LLM):**
@@ -54,8 +54,7 @@ on the tree.
 
 So `description.txt` is **not** the normal medoid LLM text input here (unlike
 xosc_gen). It is mainly for **human / debug**. Pipeline may fall back to it only
-if `context_medoid.md` (and legacy `context.md`) are missing; cross-eval may
-optionally read it for boundary pair sides. Primary LLM timeline =
+if `context_medoid.md` (and legacy `context.md`) are missing. Primary LLM timeline =
 `context_medoid.md`.
 
 ---
@@ -63,7 +62,7 @@ optionally read it for boundary pair sides. Primary LLM timeline =
 ## Dataflow map (where filters and stages sit)
 
 Orchestrator: `dataset_builder.py`. Read this tree first; details for `(1)–(4)` and
-**F1–F5** are in the sections immediately below.
+**F1–F3** are in the sections immediately below.
 
 ```text
 esmini CSV + map
@@ -81,9 +80,8 @@ esmini CSV + map
         ├─ (2) Add ± burst around COLLISION / NEAR_MISS        → detail: Stage (2)
         ├─ (3) Collect agent action boundaries, applying filters:
         │        F1 straight_junction               → detail: Filters
-        │        F2 npc_idle                        (these decide WHICH stamps exist)
-        │        F3 npc_stopped
-        │        F4 npc_collision_mirror
+        │        F2 npc_stopped                     (these decide WHICH stamps exist)
+        │        F3 npc_collision_mirror
         ├─ (4) Snap t → nearest traj frame; merge stamps < 0.1 s   → detail: Stage (4)
         │
         ├─ tier2_renderer + map_plotter             ← Step 4  (BEV for every selected stamp)
@@ -91,7 +89,7 @@ esmini CSV + map
         │     → processed/snapshots/llm_snapshots.json
         │
         └─ format_conflict_timeline_sentences (+ secondary_context)  ← Step 5
-              │  F5 secondary_agent_distance_gate         → detail: Filters
+              │  secondary-vehicle rule (not a filter)    → detail: Secondary-vehicle rule
               → processed/context_medoid.md         ONLY selected stamps
               → write_cluster_context_md            ← Step 6
                     → processed/context_cluster.md
@@ -108,7 +106,7 @@ esmini CSV + map
 
 ### Stage details `(1)–(4)` (inside Step 3)
 
-Stages **add** candidates; **F1–F4** drop some action boundaries.
+Stages **add** candidates; **F1–F3** drop some action boundaries.
 
 #### (1) Collect conflict anchors — `_conflict_anchors`
 
@@ -118,7 +116,7 @@ Step 1). This stage does **not** re-detect — it only turns `key_time` into sta
 | Type | How Labeller / `collision_vehicle` computes it (Step 1) | Stamp role |
 |------|--------------------------------------------------------|------------|
 | **`NEAR_MISS`** | Moving NPC; some frame has TTC &lt; 2.5 s while distance is closing. `key_time` = absolute min **center-to-center** distance. Dropped later if `min_distance_m` &gt; 5 m | peak (gets burst) |
-| **`COLLISION`** | Trial `collided` KPI / Payload collision event / **polygon gap** ≤ 0.5 m. `key_time` = contact moment. Also written as Ego (and NPC-mirror) `action: COLLISION` | peak (gets burst) |
+| **`COLLISION`** | Trial `collided` KPI / Payload collision event (simulator ground truth). **Polygon gap** ≤ 0.5 m is used only to pick the partner vehicle when the trial is already `collided`; it never creates a collision. `key_time` = contact moment. Also written as Ego (and NPC-mirror) `action: COLLISION` | peak (gets burst) |
 | **`CLOSEST_APPROACH`** | Moving NPC whose min **polygon gap** to Ego is &lt; 5 m, and that NPC is not already NEAR_MISS/COLLISION; keep up to 2 closest | interaction (no burst unless it is the only anchor) |
 
 **Polygon gap (clearance):** each vehicle is an oriented rectangle (length × width,
@@ -133,8 +131,8 @@ smallest body-to-body gap between Ego and that moving NPC was under 5 m
 
 #### (2) Add ± burst — only around geometry peaks
 
-**Keep this stage.** It is **not** the old F5 time window. Burst **adds** extra
-BEV/context samples around a peak; F5 used to **drop** far action stamps.
+**Keep this stage.** It is **not** the old time-window filter. Burst **adds** extra
+BEV/context samples around a peak; the old window used to **drop** far action stamps.
 
 - Burst types: `COLLISION`, `NEAR_MISS` only (`_BURST_TYPES`).
 - Offsets (s): `−2, −1, −0.5, −0.2, 0, +0.2, +0.5, +1` around that peak.
@@ -144,7 +142,7 @@ BEV/context samples around a peak; F5 used to **drop** far action stamps.
 
 #### (3) Collect agent action boundaries — `_noise_filtered_action_times`
 
-For each `agents[].actions[]` row that survives **F1–F4**, emit stamps at the
+For each `agents[].actions[]` row that survives **F1–F3**, emit stamps at the
 action’s time bounds for the **full trial** (no peak±window cut):
 
 | Action span in `action.yaml` | Stamps emitted |
@@ -153,7 +151,7 @@ action’s time bounds for the **full trial** (no peak±window cut):
 | Instantaneous (`duration ≈ 0`), e.g. ENTER_JUNCTION at one t | **One:** `{token}_{ACTION}` at that t |
 
 Example: Ego ACCELERATE `1.5–4.6` → `ego_start_ACCELERATE` @ 1.5 and
-`ego_end_ACCELERATE` @ 4.6 (if not filtered by F1–F4).
+`ego_end_ACCELERATE` @ 4.6 (if not filtered by F1–F3).
 
 #### (4) Snap + merge
 
@@ -170,24 +168,25 @@ Example: Ego ACCELERATE `1.5–4.6` → `ego_start_ACCELERATE` @ 1.5 and
 
 ---
 
-## Filters F1–F5 (detail for names on the tree)
+## Filters F1–F3 (detail for names on the tree)
 
-Applied when building the BEV / `context_medoid.md` stamp set.
+Applied inside `select_action_frames` (stage 3) when building the stamp set, so
+they decide which BEV JPGs and timeline lines exist.
 **Does not rewrite `action.yaml`.** `description.txt` still sees the full log.
 
-| ID | Name | Where on the tree | Kind |
-|----|------|-------------------|------|
-| F1 | `straight_junction` | under stage (3) | Drop noise |
-| F2 | `npc_idle` | under stage (3) | Drop noise |
-| F3 | `npc_stopped` | under stage (3) | Drop noise |
-| F4 | `npc_collision_mirror` | under stage (3) | Drop noise |
-| F5 | `secondary_agent_distance_gate` | under timeline sentences (Step 5) | Prose only — who appears on a line |
+| ID | Name | Drops |
+|----|------|-------|
+| F1 | `straight_junction` | straight junction enter / exit |
+| F2 | `npc_stopped` | non-ego `STOPPED` |
+| F3 | `npc_collision_mirror` | NPC-side copy of a `COLLISION` |
 
-**Why F5 is not under stage (3) with F1–F4:** F1–F4 run inside `select_action_frames`
-and decide the stamp list (hence BEV). F5 runs later in
-`format_conflict_timeline_sentences` and only adds secondary agents (e.g. Parking)
-to a line when within 40 m. Moving it before `tier2_renderer` would be wrong —
-it does not change which JPGs are rendered.
+**No `npc_idle` filter:** Labeller never emits `MAINTAIN_SPEED` (constant speed is
+the implicit baseline between maneuvers; see `taxonomy.Thresholds`). The selector
+still skips NPC `MAINTAIN_SPEED` only so that old logs (e.g. batch1) render cleanly.
+
+**Not a filter:** the secondary-vehicle rule (Step 5) removes no stamp and no JPG.
+It only decides which extra vehicle is described on a timeline line — see
+[Secondary-vehicle rule](#secondary-vehicle-rule-step-5).
 
 
 **Removed:** former `conflict_time_window` (peak−15 s / peak+8 s). CLI
@@ -201,15 +200,11 @@ it does not change which JPGs are rendered.
 | **Keep** | Turning junction: intent ≠ `GO_STRAIGHT` **or** `\|Δheading\| ≥ 25°` |
 | **Code** | `_is_straight_junction_action` |
 
-#### F2 — `npc_idle`
-
-Drop non-ego `MAINTAIN_SPEED`. Keep ego `MAINTAIN_SPEED` if Labeller emitted it.
-
-#### F3 — `npc_stopped`
+#### F2 — `npc_stopped`
 
 Drop non-ego `STOPPED`. Keep ego `STOPPED`.
 
-#### F4 — `npc_collision_mirror`
+#### F3 — `npc_collision_mirror`
 
 For one Ego–NPC crash, Labeller writes **two** `COLLISION` action rows at the
 same `t` (same contact, both sides):
@@ -225,11 +220,19 @@ same `t` (same contact, both sides):
 | **Keep** | Ego `COLLISION` (+ `interactions[]` COLLISION peak) |
 | **Note** | This pack only models **Ego-involved** collisions; not NPC–NPC without Ego |
 
-#### F5 — `secondary_agent_distance_gate`
+## Secondary-vehicle rule (Step 5)
 
-Extra agents (e.g. Parking) appear on a `context_medoid.md` line only if within
-**40 m** at that stamp. Does not remove ego/primary stamps.
-Code: `secondary_context.py`.
+Context builder only (`secondary_context.py`). The primary conflict vehicle
+(from the first COLLISION / NEAR_MISS, else the fallback) is on every line.
+Other vehicles are handled in two parts:
+
+| Part | Rule | Code |
+|------|------|------|
+| Pick (once per trial) | Not Ego, not primary. Qualifies if **≤ 40 m** at trial start, conflict peak, or an Ego deceleration; **or** a collision partner; **or** in Ego's forward corridor (60 m ahead, ±4 m). Rank: collision partner, then smallest boundary gap. Keep **≤ 2**. | `select_secondary_agents` |
+| Mention (per line) | A picked vehicle is described on a line only when **≤ 40 m** at that stamp. | `secondary_inline_clauses` |
+
+The BEV crop follows the primary vehicle, so a secondary vehicle can be
+off-frame; the text clause is how it still reaches the LLM.
 
 ---
 
@@ -238,10 +241,10 @@ Code: `secondary_context.py`.
 | `action.yaml` event | In context / BEV? | Why |
 |---------------------|-------------------|-----|
 | Ego `ENTER_JUNCTION` / `EXIT_JUNCTION` (straight) | **No** | F1 |
-| Ego `ACCELERATE` / `DECELERATE` | **Yes** | Passed F1–F4 |
+| Ego `ACCELERATE` / `DECELERATE` | **Yes** | Passed F1–F3 |
 | Ego `TURN_RIGHT` @ 19.0 | **Yes** | Full-trial bounds (no time window) |
-| CuttingIn `STOPPED` | **No** | F3 |
-| CuttingIn `LANE_CHANGE_*` / `TURN_*` | **Yes** | Passed F1–F4 |
+| CuttingIn `STOPPED` | **No** | F2 |
+| CuttingIn `LANE_CHANGE_*` / `TURN_*` | **Yes** | Passed F1–F3 |
 | `NEAR_MISS` + burst | **Yes** | Stages (1)–(2) |
 
 **Removed (do not reintroduce):** `DANGEROUS_CUT_IN` + old `post_peak_cut_in`;
@@ -256,7 +259,7 @@ former peak±15/8 time-window filter.
 | `taxonomy.py` / `labeller.py` | Vocabulary + detection → `action.yaml` |
 | `description.py` | Full-log prose → `description.txt` |
 | `conflict_frame_selector.py` | Stamp select + medoid timeline sentences |
-| `secondary_context.py` | F5 secondary agents on timeline lines |
+| `secondary_context.py` | Secondary-vehicle rule on timeline lines |
 | `tier2_renderer.py` / `map_plotter.py` | BEV JPGs at selected times |
 | `cluster_paths.py` | Nested write / nested-then-flat read |
 | `dataset_builder.py` | Orchestrates steps 1–6 |

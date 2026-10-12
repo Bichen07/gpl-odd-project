@@ -7,7 +7,6 @@ Writes the artifacts your existing analyzer / LLM expect:
     clustering/selectedClusteringResult.json
     manifest.json
     cluster<N>/cluster.json   (skeleton; BEV filled later via --from-run)
-    analysis/metadata/PAPER_SOURCE.json
 
 Paper defaults (IEEE ITS 2026 figures):
   Case 1 batch7 ITRI k=4, ITRILatest k=3
@@ -289,25 +288,6 @@ def _export_one(
     }
     (source_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2), encoding="utf-8"
-    )
-    paper_source_dir = run_dir / "analysis" / "metadata"
-    paper_source_dir.mkdir(parents=True, exist_ok=True)
-    (paper_source_dir / "PAPER_SOURCE.json").write_text(
-        json.dumps(
-            {
-                "paper": paper,
-                "batch_id": batch_id,
-                "ego_name": ego_name,
-                "k": k,
-                "clustering_index": idx,
-                "silhouette": sil,
-                "analysis_zip": str(zip_path.relative_to(REPO)),
-                "n_trial_index_mapped": len(tmap),
-                "n_collision_flags": len(flags),
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
     )
     return run_dir
 

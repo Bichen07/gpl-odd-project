@@ -449,14 +449,10 @@ def _frame_metric(frame: Dict[str, Any], key: str, *legacy: str) -> Any:
 def _impact_classification(
     frame: Dict[str, Any], vehicle_name: Optional[str]
 ) -> Optional[Dict[str, Any]]:
-    """Deterministic collision geometry from the COLLISION frame's kinematics.
+    """Recorded collision facts from the COLLISION frame (azimuth, sector, speeds, closing).
 
-    Answers "who hit whom, from which angle, at what speed" from the same
-    az/v_ego/v_vehicle/closing already computed upstream (see
-    ``conflict_frame_selector.SelectedFrame``) but never surfaced to the LLM.
-    This is handed to the LLM as ground truth (not inferred by it) so the
-    medoid/Parameter-space pair prompts can describe collisions precisely instead of
-    guessing from bare distance/ttc numbers.
+    These are measurements only. The model judges who struck whom and the
+    impact type from them, the position line, and the image.
     """
     az = _frame_metric(frame, "az", "az_deg")
     if az is None:
@@ -471,39 +467,13 @@ def _impact_classification(
     vehicle = display_agent_name(vehicle_name)
     v_ego = frame.get("v_ego")
     v_vehicle = frame.get("v_vehicle")
-    dv = None
+
+    # Facts only. Who struck whom, the impact type, and the contact corners are
+    # judged by the model from these numbers, the position line, and the image
+    # (see common_sense, Impact). No rule assigns them here.
+    detail = f"Collision with {vehicle} at azimuth {az:.1f}° ({sector})."
     if v_ego is not None and v_vehicle is not None:
-        dv = round(float(v_vehicle) - float(v_ego), 2)
-
-    # Naming: `striking_vehicle` = the one whose FRONT made contact (the mover
-    # that closed the gap); `struck_vehicle` = the one whose REAR/side was hit.
-    if sector in ("BEHIND", "BEHIND LEFT", "BEHIND RIGHT"):
-        impact_type = "rear-end"
-        striking_vehicle, struck_vehicle = vehicle, "Ego"
-        detail = f"{vehicle} approaches from behind (az={az:.1f}°) and strikes Ego's rear."
-    elif sector in ("FRONT", "FRONT LEFT", "FRONT RIGHT"):
-        impact_type = "rear-end"
-        striking_vehicle, struck_vehicle = "Ego", vehicle
-        detail = f"Ego is trailing {vehicle} (az={az:.1f}°) and strikes {vehicle}'s rear."
-    elif sector in ("LEFT", "RIGHT"):
-        impact_type = "side/lateral impact"
-        striking_vehicle = struck_vehicle = None
-        side = "left" if sector == "LEFT" else "right"
-        detail = (
-            f"{vehicle} contacts Ego's {side} side (az={az:.1f}°) — "
-            f"side-swipe or T-bone geometry, not a straight-line rear-end."
-        )
-    else:
-        impact_type = "unclear"
-        striking_vehicle = struck_vehicle = None
-        detail = f"Ambiguous impact geometry at az={az:.1f}°."
-
-    if dv is not None:
-        faster = vehicle if dv > 0.1 else ("Ego" if dv < -0.1 else "neither (~equal)")
-        detail += (
-            f" At impact Ego speed={v_ego:.2f} m/s, "
-            f"{vehicle} speed={v_vehicle:.2f} m/s (faster: {faster})."
-        )
+        detail += f" Ego speed={float(v_ego):.2f} m/s, {vehicle} speed={float(v_vehicle):.2f} m/s."
 
     return {
         "t": frame.get("t"),
@@ -514,36 +484,44 @@ def _impact_classification(
         "v_ego": v_ego,
         "v_vehicle": v_vehicle,
         "closing": _frame_metric(frame, "closing", "closing_mps"),
-        "impact_type": impact_type,
-        "striking_vehicle": striking_vehicle,
-        "struck_vehicle": struck_vehicle,
         "detail": detail,
     }
 
 
 def apply_collision_detail(parsed: Dict[str, Any], pack: Dict[str, Any]) -> Dict[str, Any]:
-    """Force ``collision_detail`` to match ``pack['impact']`` (deterministic GT).
+    """Build ``collision_detail``: the model's judgement plus the recorded sector.
 
-    The LLM is asked to copy ``impact_type`` / ``struck_by`` / ``bearing_sector``
-    verbatim and only author the one-sentence ``narrative`` — but LLM compliance
-    with "copy this field" instructions is not guaranteed, so the structured
-    fields are overwritten here the same way ``conflict_metrics`` already is.
-    Only the narrative sentence (if the LLM wrote one) is kept as-is.
+    The model writes ``impact_type``, ``striking_vehicle``, ``struck_vehicle``,
+    and ``narrative``. The pipeline adds ``bearing_sector`` (the azimuth bin at
+    the COLLISION stamp), which is a measurement. A trial without a COLLISION
+    stamp carries no ``collision_detail``.
     """
     impact = pack.get("impact") if isinstance(pack, dict) else None
     if not isinstance(impact, dict):
         parsed.pop("collision_detail", None)
         return parsed
     existing = parsed.get("collision_detail")
-    narrative = None
-    if isinstance(existing, dict):
-        narrative = existing.get("narrative")
+    existing = existing if isinstance(existing, dict) else {}
+
+    def _clean(value: Any) -> Optional[str]:
+        if value is None:
+            return None
+        text = str(value).strip()
+        if text.lower() in ("", "null", "none", "n/a", "unknown"):
+            return None
+        return text
+
+    striking = _clean(existing.get("striking_vehicle"))
+    struck = _clean(existing.get("struck_vehicle"))
+    if striking is not None and struck is not None and striking.lower() == struck.lower():
+        striking = struck = None
+    narrative = existing.get("narrative")
     if not narrative or not isinstance(narrative, str) or not narrative.strip():
         narrative = impact.get("detail")
     parsed["collision_detail"] = {
-        "impact_type": impact.get("impact_type"),
-        "striking_vehicle": impact.get("striking_vehicle"),
-        "struck_vehicle": impact.get("struck_vehicle"),
+        "impact_type": _clean(existing.get("impact_type")),
+        "striking_vehicle": striking,
+        "struck_vehicle": struck,
         "bearing_sector": impact.get("bearing_sector"),
         "narrative": narrative,
     }

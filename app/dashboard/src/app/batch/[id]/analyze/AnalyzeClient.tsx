@@ -37,7 +37,6 @@ import ModelSetup from "./panels/ModelSetup";
 import MedoidAnalysis from "./panels/MedoidAnalysis";
 import ParameterSpacePairs from "./panels/ParameterSpacePairs";
 import ClusterAnalysis from "./panels/ClusterAnalysis";
-import CrossClusterAnalysis from "./panels/CrossClusterAnalysis";
 import Report from "./panels/Report";
 import OddQA from "./panels/OddQA";
 
@@ -82,14 +81,6 @@ export default function AnalyzeClient({
   const [activeTab, setActiveTab] = useState<number>(0);
   const [evalConfigs, setEvalConfigs] = useState<ClusteringQuality[]>([]);
   const [evalLoading, setEvalLoading] = useState(false);
-  const [evalRunning, setEvalRunning] = useState(false);
-  const [evalError, setEvalError] = useState<string | null>(null);
-  const [evalLogs, setEvalLogs] = useState("");
-  const [evalLogFile, setEvalLogFile] = useState("");
-  const [evalCompleted, setEvalCompleted] = useState(0);
-  const [evalTotal, setEvalTotal] = useState(0);
-  const evalJobIdRef = useRef<string | null>(null);
-  const evalAbortRef = useRef<AbortController | null>(null);
 
   // --- prompts (editable) ---
   const [prompts, setPrompts] = useState<Record<string, string>>({});
@@ -180,109 +171,6 @@ export default function AnalyzeClient({
       .then((d) => setEvalConfigs(d.configs ?? []))
       .catch(() => {});
   }, [batchId]);
-
-  const stopCrossClusterEval = useCallback(async () => {
-    evalAbortRef.current?.abort();
-    const jobId = evalJobIdRef.current;
-    if (!jobId) return;
-    try {
-      await fetch("/api/cluster-evaluate/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "stop", jobId }),
-      });
-    } catch {
-      /* best-effort */
-    }
-  }, []);
-
-  const runCrossClusterEval = async () => {
-    if (!config?.folder || evalRunning) return;
-    setEvalRunning(true);
-    setEvalError(null);
-    setEvalLogs("");
-    setEvalLogFile("");
-    setEvalCompleted(0);
-    setEvalTotal(3); // selection-eval → LLM → rescore
-    evalJobIdRef.current = null;
-    const abort = new AbortController();
-    evalAbortRef.current = abort;
-    try {
-      const res = await fetch("/api/cluster-evaluate/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: abort.signal,
-        body: JSON.stringify({
-          batchId: Number(batchId),
-          folder: config.folder,
-          model,
-          apiKey: apiKey || undefined,
-        }),
-      });
-
-      if (!res.body || !res.headers.get("content-type")?.includes("ndjson")) {
-        const data = await res.json().catch(() => ({}));
-        const detail = [data.error, data.stderr].filter(Boolean).join("\n");
-        throw new Error(detail || `HTTP ${res.status}`);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buf = "";
-      let live = "";
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buf += decoder.decode(value, { stream: true });
-        let nl: number;
-        while ((nl = buf.indexOf("\n")) >= 0) {
-          const line = buf.slice(0, nl);
-          buf = buf.slice(nl + 1);
-          if (!line.trim()) continue;
-          let msg: Record<string, unknown>;
-          try {
-            msg = JSON.parse(line);
-          } catch {
-            continue;
-          }
-          if (msg.type === "start" && msg.jobId) {
-            evalJobIdRef.current = String(msg.jobId);
-          } else if (msg.type === "log" && typeof msg.data === "string") {
-            live += msg.data;
-            setEvalLogs(live);
-          } else if (msg.type === "progress") {
-            if (typeof msg.pct === "number") {
-              setEvalCompleted(Math.max(1, Math.round((msg.pct / 100) * 3)));
-            }
-          } else if (msg.type === "done") {
-            if (msg.logFile) setEvalLogFile(String(msg.logFile));
-            setEvalCompleted(3);
-            if (msg.stopped) {
-              setEvalError("Cross-cluster eval stopped by user.");
-            } else if (!msg.ok) {
-              setEvalError(
-                `Cross-cluster eval failed (exit ${msg.exitCode ?? "?"}). See log below.`,
-              );
-            }
-          }
-        }
-      }
-
-      const r2 = await fetch(`/api/cluster-evaluate?batchId=${encodeURIComponent(batchId)}`);
-      const d2 = await r2.json();
-      setEvalConfigs(d2.configs ?? []);
-    } catch (err) {
-      if ((err as Error)?.name === "AbortError") {
-        setEvalError("Cross-cluster eval stopped by user.");
-      } else {
-      setEvalError(String(err));
-      }
-    } finally {
-      setEvalRunning(false);
-      evalJobIdRef.current = null;
-      evalAbortRef.current = null;
-    }
-  };
 
   useEffect(() => {
     let cancelled = false;
@@ -511,7 +399,6 @@ export default function AnalyzeClient({
     setActiveClusters(clustersToRun);
     patchProductRun(product, {
       logs: "",
-      logFile: "",
       error: null,
       total,
       completed: 0,
@@ -600,7 +487,6 @@ export default function AnalyzeClient({
               logs: live,
               completed: countProductCompletions(product, live),
             };
-            if (msg.logFile) donePatch.logFile = String(msg.logFile);
             if (msg.stopped) {
               donePatch.error = "Analysis stopped by user.";
             } else if (!msg.ok) {
@@ -800,11 +686,10 @@ export default function AnalyzeClient({
             splitAnalysis?.icPairs?.length ? ` (${splitAnalysis.icPairs.length})` : ""
           }`}
         />
-        <Tab label="Cluster analysis" />
         <Tab
-          label={`Cross-cluster analysis${
-            currentQuality?.final_score != null
-              ? ` (score ${currentQuality.final_score.toFixed(1)})`
+          label={`Cluster analysis${
+            currentQuality?.score != null
+              ? ` (${currentQuality.score.toFixed(1)})`
               : ""
           }`}
         />
@@ -874,21 +759,6 @@ export default function AnalyzeClient({
           icPairsForPrereq={icPairsForPrereq}
           clustersMissingIcContrasts={clustersMissingIcContrasts}
           summaryBlocked={summaryBlocked}
-        />
-      )}
-
-      {activeTab === TAB.CROSS_CLUSTER && (
-        <CrossClusterAnalysis
-          config={config}
-          splitAnalysis={splitAnalysis}
-          evalRunning={evalRunning}
-          evalError={evalError}
-          evalLogs={evalLogs}
-          evalLogFile={evalLogFile}
-          evalCompleted={evalCompleted}
-          evalTotal={evalTotal}
-          runCrossClusterEval={runCrossClusterEval}
-          stopCrossClusterEval={stopCrossClusterEval}
           evalConfigs={evalConfigs}
         />
       )}

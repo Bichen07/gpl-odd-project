@@ -1,5 +1,7 @@
 # Medoid analysis method study
 
+> **Status:** written before the cross-cluster stage and the selection score were removed. Mentions of `cross-eval`, `selection-eval`, `cluster_selection_eval.*`, `cross_cluster_prompt.txt`, `final_score`, `rule_score`, and `llm_score` describe the earlier design.
+
 How we analyze one cluster medoid today, why `resolution` / `control_response` / `motive` still collide, and what 2024–2025 top-venue LLM papers do instead.
 
 Internal companions (not duplicated here):

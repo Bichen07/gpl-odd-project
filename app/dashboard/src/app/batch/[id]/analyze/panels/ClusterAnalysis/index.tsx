@@ -14,11 +14,12 @@ import {
 import type { Dispatch, SetStateAction } from "react";
 import type { AnalyzeProduct, ProductRunState } from "../../constants";
 import { PROMPT_KEYS } from "../../constants";
-import type { Config, SplitAnalysis } from "../../types";
+import type { ClusteringQuality, Config, SplitAnalysis } from "../../types";
 import AnalyzeRunConsole from "../../components/AnalyzeRunConsole";
 import PromptsCard from "../../components/PromptsCard";
 import SplitCardsPanel from "../../components/SplitCardsPanel";
 import TitleWithHelp from "../../components/TitleWithHelp";
+import ClusteringScore from "../ClusteringScore";
 
 export type ClusterAnalysisProps = {
   config: Config;
@@ -49,6 +50,7 @@ export type ClusterAnalysisProps = {
   icPairsForPrereq: unknown[];
   clustersMissingIcContrasts: { cluster: number }[];
   summaryBlocked: boolean;
+  evalConfigs: ClusteringQuality[];
 };
 
 export default function ClusterAnalysis({
@@ -75,9 +77,16 @@ export default function ClusterAnalysis({
   icPairsForPrereq,
   clustersMissingIcContrasts,
   summaryBlocked,
+  evalConfigs,
 }: ClusterAnalysisProps) {
   return (
     <Stack spacing={2}>
+      <ClusteringScore
+        config={config}
+        splitAnalysis={splitAnalysis}
+        evalConfigs={evalConfigs}
+      />
+
       <TitleWithHelp
         title="Cluster analysis"
         variant="h4"
@@ -91,8 +100,8 @@ export default function ClusterAnalysis({
             <Typography variant="body2" sx={{ mt: 1 }}>
               Select only clusters that are ready, then run <code>summary</code>. The output is
               saved as <code>clusterN/output/cluster_summary.yaml</code>; this is a per-cluster
-              explanation, not a judgment of the whole partition. Use the Cross-cluster analysis
-              tab for the partition-level verdict.
+              explanation, not a judgment of the whole partition. The label reviewer on the
+              Model setup tab compares the labels across clusters.
             </Typography>
           </>
         }
@@ -245,7 +254,6 @@ export default function ClusterAnalysis({
           title="Cluster summary analysis"
           running={runningProduct === "summary"}
           logs={productRuns.summary.logs}
-          logFile={productRuns.summary.logFile}
           error={productRuns.summary.error}
           completed={productRuns.summary.completed}
           total={productRuns.summary.total}
