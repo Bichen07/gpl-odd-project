@@ -41,8 +41,9 @@ ppt:
 | Deterministic       | 1. Preprocess           | What happened, and when?                            | none                                     |
 | LLM                 | 2. Medoid               | What does this trial do, and why?                   | medoid_trial + system + glossary         |
 | LLM                 | 3. Parameter pair       | similar inputs, different trajectory: what differs? | parameter_space_pair + system + glossary |
-| LLM                 | 4. Summary, then review | What is each cluster called?                        | cluster_summary, then cluster_reviewer   |
-| No new judgment     | 5. Report and Q&A       | Show the cards; answer from them                    | odd_chat for the question only           |
+| LLM                 | 4. Summary, then rename | What is each cluster called?                        | cluster_summary, then input_context_label_rename |
+| No LLM              | 5. Report               | Show the saved cards                                | none                                     |
+| LLM                 | 6. Q&A                  | Answer from the index, or one requested file        | odd_chat_system_prompt                   |
 
 
 Pages 7–9 are the context files. From page 11, each stage is two pages: the prompt, then the result.
@@ -85,12 +86,12 @@ Goal: 361 frames → timed events.
 
 | Action                  | Rule                                                                       |
 | ----------------------- | -------------------------------------------------------------------------- |
-| Accelerate / decelerate |                                                                            |
+| Accelerate / decelerate | \|a\| > 0.05 m/s², ≥ 0.5 s, \|Δv\| > 0.2 m/s                                 |
 | Emergency brake         | mean a ≤ −4 m/s²                                                           |
 | Stopped                 | v < 0.3 m/s, ≥ 1 s                                                         |
 | Lane change             | lane ID changes on same road; 1–3 s                                        |
-| Turn (same lane)        |                                                                            |
-| Enter / exit junction   | Ego enters or leaves a junction road. Left or right when the path says so. |
+| Turn (same lane)        | \|Δheading\| ≥ 15° for ≥ 1.5 s, same road and lane                         |
+| Enter / exit junction   | Ego enters or leaves a junction road. Left or right if \|Δheading\| > 40°, else straight |
 
 
 Constant speed is not an event: it is the baseline between actions.
@@ -144,7 +145,7 @@ Filters:
 
 | ID  | Drops                                          | Why                     |
 | --- | ---------------------------------------------- | ----------------------- |
-| F1  | Junction enter or exit while Ego goes straight | Heading does not change |
+| F1  | Junction enter or exit while Ego goes straight | \|Δheading\| < 25°      |
 | F2  | other vehicle: stopped                         | no decision             |
 | F3  | other vehicle's copy of a collision            | duplicate of Ego's      |
 
@@ -328,7 +329,7 @@ The pair line has no `lateral_speed` and no `heading_vs_road`. Time to collision
 page 10
 title: Shared prompts — system and glossary
 ppt:
-Both files are attached to the medoid, pair, and summary calls. The reviewer and Q&A do not load them.
+Both files are attached to the medoid, pair, and summary calls. The rename call and Q&A do not load them.
 
 `system_prompt.txt` — how every answer is written.
 
@@ -373,14 +374,14 @@ The model reads the sections in this order.
 | -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Your Task      | Analyze the medoid trial. Read the context file, the images, and the recorded numbers. Then explain why.                                                                                                         |
 | Collision      | If the outcome is collision: decide the impact type, the striking vehicle, and the struck vehicle at the collision stamp. A vehicle that is stopped is struck. Write one sentence that names the touching sides. |
-| Workflow       | List 6–12 facts from the file. Write pass first or yield first. Then the action, a quote, one reason.                                                                                                            |
+| Workflow       | List 6–12 facts from the file. Write pass first, yield, or unresolved. Then the action, a quote, one reason.                                                                                                     |
 | Word list      | slow down, speed up, hard brake, or maintain speed. Quote the speed from the line.                                                                                                                               |
 | Output         | Five fields only: who Ego responded to, the timeline, the collision sentence, the short summary, open questions.                                                                                                 |
 | Motive summary | 2–4 sentences. Not a second timeline.                                                                                                                                                                            |
 | Medoid context | The file from page 7, pasted at the end.                                                                                                                                                                         |
 
 
-Each row is one vehicle plus pass first, yield, or unresolved. Parking gets a row when Ego reacts to it. The model writes the impact type, the two vehicle names, and the collision sentence. The pipeline adds only `bearing_sector`, the azimuth bin at the collision stamp.
+Each row is one vehicle plus pass first, yield, or unresolved. Parking gets a row when Ego reacts to it. The model writes the impact type, the two vehicle names, and the collision sentence. The pipeline adds `trial_id`, `outcome`, `conflict_metrics`, and `bearing_sector`.
 
 notes:
 Intensity follows the speed change: about 2 m/s, 2–5 m/s, above 5 m/s. A resume with nobody ahead has no why. Evidence for a why is at or before that stamp. A cluster name such as Late Yield is written by the summary, not here.
@@ -395,8 +396,8 @@ File: `clusterN/output/medoid_trial.yaml`.
 
 | Field                         | What it tells                                                      |
 | ----------------------------- | ------------------------------------------------------------------ |
-| `agent_interactions`          | Ego responded:pass_first / yield / unresolved                     |
-| `decision_timeline`           | Each time stamp with the action description and reason intertrep   |
+| `agent_interactions`          | One row per vehicle Ego responded to: pass_first / yield / unresolved |
+| `decision_timeline`           | Each stamp: the action, the quoted numbers, and one why            |
 | `motive_summary`              | summarize the trial in 2–4 sentences                               |
 | `collision_detail`            | Collision only: impact type, striking and struck vehicle, sentence |
 | `open_questions`              | Empty unless the input information contradicts itself              |
@@ -414,10 +415,9 @@ The quote is `motive_summary` from `cluster0/output/medoid_trial.yaml`. The save
 
 ===
 
-page 13 title: 
-
-Parameter pair — the prompt ppt: 
-
+page 13
+title: Parameter pair — the prompt
+ppt:
 Goal: similar parameter inputs, different clusters from the whole-trajectory embedding. Find the trajectory difference.
 
 File: `parameter_space_pair_prompt.txt`, plus page 10.
@@ -427,9 +427,9 @@ Pair selection (z-score, closest pair, distance ≤ 0.1, align clocks) is done b
 | Section         | What it tells the model                                                                                                              |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | Your Task       | Similar inputs. Different trajectory. Find that trajectory difference.                                                               |
-| How to read     | Compare the information of pair. The cluster medoid output is a reference.                                                          |
-| Workflow        | Name the first time the two trajectories start to differ. Then pass first or yield for each side. Write the verdict last.            |
-| Behavior call   | distinct, similar, or inconclusive. Safe versus collision is enough for distinct.                                                    |
+| How to read     | The pair file is the only timeline. A medoid card is a later comment. Do not copy its pass or yield onto a side.                      |
+| Workflow        | Name the first time the two trajectories start to differ and stay apart. Then pass first, yield, or unresolved for each side. Write the verdict last. |
+| Behavior call   | distinct, similar, or inconclusive. Distinct: different family, or same family with different outcome, or a lasting ahead-versus-overlap split. Similar: same family and same outcome. |
 | Divergence hunt | Earliest time the trajectories start to differ and stay apart: a brake, the body gap, who is ahead, or the speed. Do not invent one. |
 | Pair context    | The file from page 9.                                                                                                                |
 | Medoid extracts | Each cluster's medoid card, pasted after. Comment only. Do not copy it onto a side.                                                  |
@@ -490,10 +490,10 @@ One call per cluster. It does not see the other names.
 
 | Section         | What it tells the model                                                    |
 | --------------- | -------------------------------------------------------------------------- |
-| Your Task       | Name the cluster. Compare the medoid and the pairs, then summarize the cluster behavior. |
-| Workflow        | Read the medoid, then each pair.            |
+| Your Task       | Name the cluster in 2–4 words, one mechanism, no degree word. A collision name is the impact and the two vehicles, striking first. |
+| Workflow        | Read the medoid, then each pair. Do not re-judge a pair. A boundary trial may differ from the medoid. |
 | Caption guide   | First the medoid. Then each pair: what is shared, and what differs.        |
-| Output          | The name and the caption. Python writes the neighbor list and distinct, similar, or mixed. |
+| Output          | The name, the caption, and the two consistency notes. Python writes the neighbor list and distinct, similar, mixed, or ambiguous. |
 
 
 The consistency note asks whether the collision count matches the medoid outcome.
@@ -532,32 +532,33 @@ These three files are the previous model run. The cluster file they read still h
 ===
 
 page 17
-title: Label review — the prompt
+title: Label rename — the input
 ppt:
-Goal: two clusters with the same name get one added word, taken from how their behavior differs.
+Goal: two clusters with the same name get one added adjective, taken from how their behavior differs.
 
-File: `cluster_reviewer_prompt.txt`.
-Its own system line asks for JSON. It does not load page 10.
+Input: `cluster_rename/input_context_label_rename.md`.
+Task text: `cluster_rename_prompt.txt`. It does not load page 10.
+
+The input file is organized from each cluster's `cluster_summary.yaml` and `medoid_trial.yaml`. The call reads that file.
 
 
 | Section       | What it tells the model                                                                                                 |
 | ------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Your Task     | Rename only when two names are the same or near-same and the behavior differs. Add one word. Do not add new evidence.   |
-| Workflow      | Mark shared names. Compare their cards. Same behavior: no change. Different: add one word you can quote from the cards. |
-| Cluster cards | For every cluster, in one prompt: the full summary card and the medoid card.                                            |
+| Your Task     | Rename only when two names are the same or near-same and the behavior differs. Add one adjective. Do not add new evidence. |
+| Workflow      | Mark shared names. Compare their cards. Same behavior: no change. Different: add one adjective you can quote from the cards. |
+| Cluster cards | The text of `input_context_label_rename.md`.                                                                            |
 | Output        | One row per cluster, same order.                                                                                        |
 
 
-The text the model reads is saved: `cluster_analysis/context_label_review.md`.
-
-The added word comes from the cards. Example: the longer gap between the brake and the conflict peak (peak_t minus brake_t) is `Proactive`, the shorter is `Late`.
+The added word is an adjective, not an adverb and not a new noun. Example: the longer gap between the brake and the conflict peak (peak_t minus brake_t) is `Proactive`, the shorter is `Late`.
 
 ===
 
 page 18
-title: Label review — the result
+title: Label rename — the output
 ppt:
-File: `cluster_analysis/cluster_label_review.json`.
+Output: `cluster_rename/output_cluster_label_review.json`.
+One call returns one row per cluster. Python writes that array. It is the model's reply, not a rule score.
 A changed name is also written back onto that cluster's summary.
 
 
@@ -580,53 +581,111 @@ This run: three rows, none changed.
 
 
 notes:
-The reviewer did not re-read the images or the pair cards.
+The rename call did not re-read the images or the pair cards. It read `input_context_label_rename.md`.
 
 ===
 
 page 19
-title: Report and Q&A — the prompt
+title: Report
 ppt:
-Goal: show the saved results, and answer a question from those results.
+No prompt. No model. The page reads the saved files and draws them.
 
 
-| Part   | Prompt                       | What the text requires                                            |
-| ------ | ---------------------------- | ----------------------------------------------------------------- |
-| Report | none                         | Assembled from the saved cards                                    |
-| Q&A    | `odd_chat_system_prompt.txt` | The briefing is the only source. Do not add a number.             |
-| Rules  | none in this call            | A tree of depth 3 or less, on speed and delay. This run: 8 rules. |
-
-
-The Q&A prompt is six rules, in order:
-
-1. Use only the briefing.
-2. If it is missing, name the step that would produce it.
-3. Keep a measured number separate from a model sentence.
-4. Do not call the rules the ODD.
-5. End with Sources.
-6. Prefer numbers.
-
-===
-
-page 20
-title: Report and Q&A — the result
-ppt:
-The report only shows the saved results. The answer to a question is one reply, and it ends with the sources it used.
-
-
-| Shown                         | Where it comes from        |
-| ----------------------------- | -------------------------- |
-| Cluster name, caption, risk   | `cluster_summary.yaml`     |
-| Medoid resolution and outcome | `medoid_trial.yaml`        |
-| Pair verdict                  | `contrast.yaml`            |
-| Collision rate, trial count   | `cluster.json`             |
-| Rules                         | `odd_parameter_rules.json` |
+| Shown | File |
+| ----- | ---- |
+| Cluster name, caption, risk | `clusterN/output/cluster_summary.yaml` |
+| Medoid resolution and outcome | `clusterN/output/medoid_trial.yaml` |
+| Pair verdict | `parameter_space_pairs/cA-cB/output/contrast.yaml` |
+| Collision rate, trial count | `clusterN/cluster.json` |
+| Rule table and boxes | `odd/output/odd_parameter_rules.json` |
+| Points on the plot | `odd/input/odd_all_trials.json` |
+| Boundary counts | `odd/output/odd_boundary_export.json` |
 
 
 A rule is a hypothesis on the sampled trials. This run's collision rule: start delay in (3.855, 4.388] and speed above 2.374, support 1688, precision 0.82.
 
+===
+
+page 20
+title: Q&A — what the model receives
+ppt:
+Two calls. The first call always gets a short index. If the index is enough, the model answers. If a fact is only in a file, the first reply is one JSON object, Python reads that file, and the second call answers.
+
+
+| Always sent | What it contains |
+| ----------- | ---------------- |
+| `odd_chat_system_prompt.txt` | Numbers only from the index or the one returned file. A leaf is a sampled rule, depth 1–5. End with Sources. |
+| The index | Cluster id, name, size, collision rate, medoid trial id. Pair folder. Rule id, predicate, support, precision. `missing`. |
+| The question | Plus the last 8 turns. The file from the previous question is not kept. |
+
+
+| One request | File Python reads | What comes back |
+| ----------- | ----------------- | --------------- |
+| `{"need":"medoid","cluster":0}` | `cluster0/output/medoid_trial.yaml` | `measurements`: trial id, brake time, time to collision, peak time, outcome. `medoid_model_sentences`: timeline, motive |
+| `{"need":"pair","folder":"c0-c2"}` | `parameter_space_pairs/c0-c2/output/contrast.yaml` | `measurements`: parameter distance, divergence time, both outcomes. `model_label`: behavior similarity and the reason |
+| `{"need":"trial","trial_id":"12198"}` | One row of `odd_all_trials.json` | OncomingSpeed, OncomingStartDelay, passed, cluster label |
+| `{"need":"summary","clusters":[1,2,3]}` | `clusterN/output/cluster_summary.yaml` | Caption, consistency note, risk, neighbor comparison. If that cluster's collision rate is 100, also that medoid's collision end: brake time, peak time, time to collision, impact |
+| `{"need":"bev","cluster":2}` | `cluster2/processed/snapshots/llm_snapshots.json` | Frame table: time, action label, distance, time to collision, ego speed. No image |
+
+
+A time or a brake is the medoid file. Whether two medoids are similar is the pair file. A parameter value is the trial row. A caption, or how a collision ends, is the summary. A frame time is the BEV table. The trial row has no timeline. An id that is not in this run returns "not available", and the answer says it does not know.
+
+The next sample is the collision sampled rule with the largest support. The model does not write a new scenario file.
+
+"What did the medoid do?" names no cluster. The model lists every cluster from the index and does not pick one timeline.
+
 notes:
-The report does not draw parameter ranges, TTC, or the consistency note. The rule numbers are from the batch 8 tree, which is fit on outcome, so the same eight rules appear for every partition of this batch.
+First check, before the fix. Two answers were incorrect. The other five numbers matched the files.
+
+| Question | Verdict | Why |
+| -------- | ------- | --- |
+| Cluster 2 size and rate | Correct | 1237 trials, collision rate 100 |
+| Cluster 0 first brake | Incorrect | 7.7 s and time to collision 2.22 are right. The answer called the medoid model's line "deterministic facts." |
+| Pair c0-c2 | Correct | Apart at 10.2 s, behavior distinct |
+| Medoid parameters | Correct | Delay 3.956, speed 2.561, passed, trial 12198 |
+| Trial 99999 | Correct | I don't know. That id is not in the trial table. |
+| What did the medoid do? | Incorrect | It listed six trial ids and did not say the resolution or the outcome. |
+| Largest collision rule | Correct | Sampled rule R4, support 1688, precision 0.8193 |
+
+The fix puts resolution and outcome on the index, splits a returned file into `measurements` and `medoid_model_sentences`, and puts the kNN boundary counts on the index. `collision_boundary_trials` is the boundary size, not the number of collisions.
+
+Second check, conversation `qa-check-s05947`, 11 of 11 correct.
+
+| Question | Verdict | Answer that matched the file |
+| -------- | ------- | ---------------------------- |
+| Cluster 2 size and rate | Correct | 1237 trials, collision rate 100 |
+| Cluster 0 first brake | Correct | Measurement brake_t 7.7 s and ttc 2.22 s, trial 12198. The medoid model's sentence says the brake is for CuttingIn. |
+| Cluster 2 medoid | Correct | Trial 7944, yield, collision. Measurement: brake 8.4 s, collision 10.56 s, ttc 1.93 s, side-swipe. The motive is the model's sentence. |
+| Pair c0-c2 | Correct | Measurement: apart at 10.2 s. The model's label is distinct. |
+| Medoid parameters | Correct | Trial 12198, speed 2.561, delay 3.956, passed |
+| Trial 99999 | Correct | I don't know. |
+| What did the medoid do? | Correct | All six: name, trial id, resolution, outcome. No invented timeline. |
+| What situation makes Ego fail? | Correct | Clusters 1, 2, and 3 are rate 100. Sampled rules R4 and R5. R4 support 1688. Not a certified ODD boundary. |
+| Is the collision region the ODD boundary? | Correct | Not a certified ODD boundary. kNN 10, 650 boundary trials of 3869. 650 is not the number of collisions. Largest collision sampled rule is R4. |
+| Cluster boundary | Correct | 904 trials on the cluster boundary. 869 trials have no cluster label. |
+| Largest collision rule | Correct | R4, support 1688, precision 0.8193, delay in (3.855, 4.388] and speed above 2.374 |
+
+File check, conversation `qa-check-files`. The earlier conversation `qa-check-s05947` was left as it is. 3 of 3 correct after the prompt told a similarity question to send only the pair request, and a failure question to send only the summary request. The first tries answered from the index and wrote "I need more information" instead of the JSON.
+
+Each answer chip is two lines: what the model asked for, and what Python sent.
+
+1. Question: What is different between cluster 0 and cluster 2? Are their medoid behaviors similar?
+   Asked: pair c0-c2.
+   Sent: pair c0-c2 — measurements, model label. From `parameter_space_pairs/c0-c2/output/contrast.yaml`.
+   Reply: Cluster 0 is yield and safe, rate 0. Cluster 2 is yield and collision, rate 100. The model's label is distinct. The divergence measurement is 10.2 s. Cluster 0 keeps CuttingIn ahead; cluster 2 is a side overlap.
+   Verdict: the pair was the right file. The reply matches the contrast. Correct.
+
+2. Question: What makes Ego fail? Is it a collision? What situation may lead to a collision of Ego? Which scenario do you recommend to simulate next?
+   Asked: summary clusters 1, 2, 3.
+   Sent: summary of cluster 1, 2, 3, plus each collision end. Caption, risk, and neighbor comparison from each `cluster_summary.yaml`. Collision end from each medoid, because the rate is 100.
+   Reply: Cluster 1 trial 12152, rear-end, brake 10.5 s, peak 9.7 s, ttc 2.59 s. Cluster 2 trial 7944, side-swipe, brake 8.4 s, peak 10.56 s, ttc 1.93 s. Cluster 3 trial 7752, corner contact, brake 8.1 s, peak 11.0 s, ttc 2.04 s. Next sample is sampled rule R4, support 1688, delay in (3.855, 4.388] and speed above 2.374. Not a certified ODD boundary. No new scenario file.
+   Verdict: the summary of the three rate-100 clusters was the right file, and the collision ends were attached. The times match the medoid files. Correct.
+
+3. Question: What do the BEV frames of cluster 2's medoid show at the collision?
+   Asked: bev cluster 2.
+   Sent: BEV frame table of cluster 2. Rows from `cluster2/processed/snapshots/llm_snapshots.json`. No jpg is in this run.
+   Reply: At 10.56 s the label is COLLISION_with_CuttingIn. Distance 3.07, ttc 9.78, ego speed 5.17. Trial 7944.
+   Verdict: the frame table was the right file. The row matches the snapshot. Correct.
 
 ===
 
@@ -694,8 +753,8 @@ ppt:
 | LLM text ≠ measurement        | c0–c2: c2 side called yield, copied from the c2 medoid; same trial = pass first in both k = 6 runs | claims must come from the pair                                     |
 | Resolution edge case          | c0: "pass first", but Ego brakes at 0.9 m                                                          | by the rule: yield                                                 |
 | Stop at contact missed        | Ego 3.0 → 0.2 m/s in 1.3 s, then hit; "stopped" needs ≥ 1 s                                        | yield-stop collision read as late yield                            |
-| Label review kept duplicates  | k = 6: two clusters both "Yield Collision" / "Rear-end Collision"                                  | that run's review saw captions only; it now reads full cards (not re-run) |
-| Hand-set thresholds           | 2.5 s, 0.5 s, 15° / 40°, 0.1                                                                       | not validated                                                      |
+| Label rename kept duplicates  | k = 6: two clusters both "Yield Collision" / "Rear-end Collision"                                  | that run saw captions only; it now reads `input_context_label_rename.md` (not re-run) |
+| Hand-set thresholds           | 2.5 s, 0.5 s, 15° / 25° / 40°, 0.1                                                                 | not validated                                                      |
 | Scope                         | one scenario, 2 parameters, k = 3 (+ k = 6 check)                                                  | no claim beyond this box                                           |
 
 
@@ -768,12 +827,12 @@ Exposes:
 | ----------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------ |
 | Stop at contact missed  | s 0.59 c3 medoid: 3.0 → 0.2 m/s in 1.3 s, hit at 0.2 m/s                                       | event "stopping at contact"                |
 | Label from one medoid   | c4 / c5 names opposite to member statistics                                                    | give summary the member speed drop         |
-| Review keeps duplicates | s 0.59: c2 = c3 "Yield Collision" (members stop 0.2% vs 88%). s 0.61: c3 renamed to c2's label | review reads statistics, not captions only |
+| Rename keeps duplicates | s 0.59: c2 = c3 "Yield Collision" (members stop 0.2% vs 88%). s 0.61: c3 renamed to c2's label | the input is now the full cards (page 17); this k = 6 run was not repeated |
 | Pass / yield unstable   | all 3 side flips in the cut-in collision cluster                                               | contact during overlap → unresolved        |
 | Rank follows tightness  | k = 6 > k = 3 only via tightness (0.47 vs 0.06)                                                | absolute tightness scale                   |
 
 
-Answer: yes, as a test. It confirms pass vs yield, finds the rear-end mechanism, and flags non-behavioral splits. Keep k = 3 as the main run until the stop event and the label review are fixed.
+Answer: yes, as a test. It confirms pass vs yield, finds the rear-end mechanism, and flags non-behavioral splits. Keep k = 3 as the main run until the stop event and the label rename are fixed.
 
 notes:
 Same input = identical trial pair, different cluster IDs per run. The verdict flip (one pair, distinct ↔ similar) follows a side flip: the same collision trial read as yield in one run, pass first in the other.

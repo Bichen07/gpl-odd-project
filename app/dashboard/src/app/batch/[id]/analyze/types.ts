@@ -144,6 +144,11 @@ export type ReportData = {
       precision: number;
       boundaryTrialHits: number | null;
     }>;
+    plot: {
+      xName: string;
+      yName: string;
+      points: Array<{ x: number; y: number; passed: boolean; cluster: number | null }>;
+    } | null;
   } | null;
 };
 
@@ -153,6 +158,9 @@ export type ChatTurn = {
   question: string;
   answer: string;
   citations: string[];
+  requested?: { need?: string; cluster?: number; folder?: string; trial_id?: string; clusters?: number[] } | null;
+  asked?: string | null;
+  sent?: string | null;
   model: string;
   dry_run?: boolean;
 };

@@ -1,0 +1,123 @@
+{
+  "conversation_id": "qa-check-s05947",
+  "title": "Q&A check s=0.5947",
+  "questions": [
+    {
+      "id": "cluster2_rate",
+      "question": "How many trials are in cluster 2, and what is its collision rate?",
+      "must_include": ["1237"],
+      "numbers": [{"value": 100, "places": 0}],
+      "must_not": ["the ODD", "99999", "deterministic"],
+      "expect_request": null
+    },
+    {
+      "id": "cluster0_brake",
+      "question": "At what time does cluster 0's medoid first brake for CuttingIn, and what is the estimated time to collision?",
+      "must_include": ["12198", "measurement", "model"],
+      "numbers": [
+        {"value": 7.7, "places": 1},
+        {"value": 2.22, "places": 2}
+      ],
+      "must_not": ["the ODD", "99999", "deterministic"],
+      "expect_request": {"need": "medoid", "cluster": 0}
+    },
+    {
+      "id": "cluster2_medoid",
+      "question": "Describe cluster 2's medoid. When does it brake, when is the collision, what is the time to collision, and what kind of impact?",
+      "must_include": ["7944", "side-swipe", "measurement", "model"],
+      "numbers": [
+        {"value": 8.4, "places": 1},
+        {"value": 10.56, "places": 2},
+        {"value": 1.93, "places": 2}
+      ],
+      "must_not": ["the ODD", "99999", "deterministic"],
+      "expect_request": {"need": "medoid", "cluster": 2}
+    },
+    {
+      "id": "pair_c0_c2",
+      "question": "For pair c0-c2, at what time do the two trajectories first stay apart, and is the behavior the same or distinct?",
+      "must_include": ["distinct", "model"],
+      "numbers": [{"value": 10.2, "places": 1}],
+      "must_not": ["the ODD", "99999", "deterministic"],
+      "expect_request": {"need": "pair", "folder": "c0-c2"}
+    },
+    {
+      "id": "medoid_params",
+      "question": "What are the OncomingSpeed and OncomingStartDelay of cluster 0's medoid trial, and did that trial pass?",
+      "must_include": ["pass", "measurement"],
+      "numbers": [
+        {"value": 3.956012641824782, "places": 3},
+        {"value": 2.5609433948993683, "places": 2}
+      ],
+      "must_not": ["the ODD", "99999", "deterministic"],
+      "expect_request": {"need": "trial", "trial_id": "12198"}
+    },
+    {
+      "id": "unknown_trial",
+      "question": "What is the OncomingSpeed of trial 99999?",
+      "must_include_any": ["don't know", "do not know", "not available", "not in this run", "unknown"],
+      "forbid_decimal": true,
+      "must_not": ["the ODD", "deterministic"],
+      "expect_request": {"need": "trial", "trial_id": "99999"}
+    },
+    {
+      "id": "which_medoid",
+      "question": "What did the medoid do?",
+      "must_include": ["Yield Safe", "yield", "pass_first", "collision", "safe"],
+      "trial_ids_at_least": {
+        "ids": ["12198", "12152", "7944", "7752", "11905", "12852"],
+        "count": 6
+      },
+      "must_not": ["the ODD", "99999", "2.22", "7.7", "10.56", "deterministic"],
+      "expect_request": null
+    },
+    {
+      "id": "ego_fail",
+      "question": "What situation makes Ego fail?",
+      "must_include": ["R4", "sampled", "Side-swipe", "Rear-end", "Corner"],
+      "numbers": [
+        {"value": 1688, "places": 0},
+        {"value": 100, "places": 0}
+      ],
+      "must_not": ["the ODD", "99999", "deterministic"],
+      "expect_request": null
+    },
+    {
+      "id": "odd_boundary",
+      "question": "Is the collision region the ODD boundary?",
+      "must_include": ["sampled", "certified ODD", "boundary", "not the number of collisions"],
+      "numbers": [
+        {"value": 650, "places": 0},
+        {"value": 3869, "places": 0},
+        {"value": 10, "places": 0}
+      ],
+      "must_not": ["650 collisions", "deterministic"],
+      "expect_request": null
+    },
+    {
+      "id": "cluster_boundary",
+      "question": "How many trials sit on the cluster boundary, and how many trials have no cluster label?",
+      "must_include": ["boundary"],
+      "numbers": [
+        {"value": 904, "places": 0},
+        {"value": 869, "places": 0}
+      ],
+      "must_not": ["the ODD", "deterministic"],
+      "expect_request": null
+    },
+    {
+      "id": "rule_r4",
+      "question": "Which sampled rule covers the most collision trials? Give its predicate, support, and precision.",
+      "must_include": ["R4", "sampled"],
+      "numbers": [
+        {"value": 1688, "places": 0},
+        {"value": 0.8193, "places": 2},
+        {"value": 3.855, "places": 3},
+        {"value": 4.388, "places": 3},
+        {"value": 2.374, "places": 3}
+      ],
+      "must_not": ["the ODD", "99999", "deterministic"],
+      "expect_request": null
+    }
+  ]
+}

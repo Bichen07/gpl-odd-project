@@ -32,7 +32,7 @@ import { runArtifactPath } from "@/app/api/_lib/runArtifactPaths";
 
 export const dynamic = "force-dynamic";
 
-const MAX_RUN_MS = 90 * 1000; // one grounded Q&A turn, not a whole analysis run
+const MAX_RUN_MS = 180 * 1000; // index call, then one optional file call
 const DEFAULT_CONVERSATION_ID = "default";
 
 type ChatLogEntry = {
@@ -41,6 +41,9 @@ type ChatLogEntry = {
   question: string;
   answer: string;
   citations: string[];
+  requested?: { need?: string; cluster?: number; folder?: string; trial_id?: string; clusters?: number[] } | null;
+  asked?: string | null;
+  sent?: string | null;
   model: string;
   dry_run: boolean;
   briefing_generated_at?: string | null;
@@ -51,6 +54,7 @@ type ConversationSummary = {
   title: string;
   updatedAt: string;
   turnCount: number;
+  pinned: boolean;
 };
 
 function findProjectRoot(start: string): string {
@@ -122,10 +126,60 @@ function writeTitle(runDir: string, conversationId: string, title: string): void
   fs.writeFileSync(p, JSON.stringify(titles, null, 2), "utf-8");
 }
 
+function pinsPath(runDir: string): string {
+  return path.join(path.dirname(runArtifactPath(runDir, "oddChatLog")), "odd_chat_pins.json");
+}
+
+function readPins(runDir: string): string[] {
+  const p = pinsPath(runDir);
+  if (!fs.existsSync(p)) return [];
+  try {
+    const parsed = JSON.parse(fs.readFileSync(p, "utf-8"));
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function writePins(runDir: string, pins: string[]): void {
+  const p = pinsPath(runDir);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(pins, null, 2), "utf-8");
+}
+
+function setPinned(runDir: string, conversationId: string, pinned: boolean): void {
+  const pins = readPins(runDir).filter((id) => id !== conversationId);
+  if (pinned) pins.unshift(conversationId);
+  writePins(runDir, pins);
+}
+
+function deleteConversation(runDir: string, conversationId: string): void {
+  const logPath = runArtifactPath(runDir, "oddChatLog");
+  if (fs.existsSync(logPath)) {
+    const kept = readChatLog(runDir).filter((entry) => entryConversationId(entry) !== conversationId);
+    fs.writeFileSync(
+      logPath,
+      kept.length ? `${kept.map((entry) => JSON.stringify(entry)).join("\n")}\n` : "",
+      "utf-8",
+    );
+  }
+  const titles = readTitles(runDir);
+  delete titles[conversationId];
+  fs.mkdirSync(path.dirname(titlesPath(runDir)), { recursive: true });
+  fs.writeFileSync(titlesPath(runDir), JSON.stringify(titles, null, 2), "utf-8");
+  writePins(
+    runDir,
+    readPins(runDir).filter((id) => id !== conversationId),
+  );
+}
+
 function summarizeConversations(
   entries: ChatLogEntry[],
   titles: Record<string, string>,
+  pins: string[],
 ): ConversationSummary[] {
+  const pinned = new Set(pins);
   const summaries = new Map<string, ConversationSummary>();
   for (const entry of entries) {
     const id = entryConversationId(entry);
@@ -139,10 +193,14 @@ function summarizeConversations(
         title: titles[id] || conversationTitle(entry.question),
         updatedAt: entry.timestamp,
         turnCount: 1,
+        pinned: pinned.has(id),
       });
     }
   }
-  return [...summaries.values()].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return [...summaries.values()].sort((a, b) => {
+    if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+    return b.updatedAt.localeCompare(a.updatedAt);
+  });
 }
 
 // GET — hydrate prior conversation (persisted in the run folder, not the browser).
@@ -171,7 +229,7 @@ export async function GET(req: NextRequest) {
   }
 
   const allHistory = readChatLog(runDir);
-  const conversations = summarizeConversations(allHistory, readTitles(runDir));
+  const conversations = summarizeConversations(allHistory, readTitles(runDir), readPins(runDir));
   const requestedConversationId = url.searchParams.get("conversationId")?.trim();
   const selectedConversationId =
     requestedConversationId || conversations[0]?.id || DEFAULT_CONVERSATION_ID;
@@ -187,7 +245,28 @@ export async function GET(req: NextRequest) {
   });
 }
 
-// PATCH — rename one conversation. The chat log stays append-only.
+function resolveChatTarget(body: Record<string, unknown>): {
+  runDir: string;
+  conversationId: string;
+} | NextResponse {
+  const batchId = String(body.batchId ?? "");
+  const folder = String(body.folder ?? "");
+  const conversationId =
+    typeof body.conversationId === "string" ? body.conversationId.trim() : "";
+  if (!/^\d+$/.test(batchId) || !folder) {
+    return NextResponse.json({ error: "batchId (int) and folder required" }, { status: 400 });
+  }
+  if (!/^[A-Za-z0-9_-]{1,100}$/.test(conversationId)) {
+    return NextResponse.json({ error: "conversationId is invalid" }, { status: 400 });
+  }
+  const runDir = resolveRunDir(batchId, folder);
+  if (!runDir) {
+    return NextResponse.json({ error: `Run directory not found: ${folder}` }, { status: 404 });
+  }
+  return { runDir, conversationId };
+}
+
+// PATCH — rename or pin one conversation. The chat log stays append-only.
 export async function PATCH(req: NextRequest) {
   let body: Record<string, unknown>;
   try {
@@ -195,26 +274,42 @@ export async function PATCH(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
-  const batchId = String(body.batchId ?? "");
-  const folder = String(body.folder ?? "");
-  const requestedConversationId =
-    typeof body.conversationId === "string" ? body.conversationId.trim() : "";
+  const target = resolveChatTarget(body);
+  if (target instanceof NextResponse) return target;
   const title = typeof body.title === "string" ? body.title.replace(/\s+/g, " ").trim() : "";
-  if (!/^\d+$/.test(batchId) || !folder) {
-    return NextResponse.json({ error: "batchId (int) and folder required" }, { status: 400 });
+  const hasPinned = typeof body.pinned === "boolean";
+  if (!title && !hasPinned) {
+    return NextResponse.json({ error: "title or pinned is required" }, { status: 400 });
   }
-  if (!/^[A-Za-z0-9_-]{1,100}$/.test(requestedConversationId)) {
-    return NextResponse.json({ error: "conversationId is invalid" }, { status: 400 });
-  }
-  if (!title || title.length > 80) {
+  if (title && title.length > 80) {
     return NextResponse.json({ error: "title must be 1–80 characters" }, { status: 400 });
   }
-  const runDir = resolveRunDir(batchId, folder);
-  if (!runDir) {
-    return NextResponse.json({ error: `Run directory not found: ${folder}` }, { status: 404 });
+  if (title) writeTitle(target.runDir, target.conversationId, title);
+  if (hasPinned) setPinned(target.runDir, target.conversationId, Boolean(body.pinned));
+  return NextResponse.json({
+    conversationId: target.conversationId,
+    title: title || readTitles(target.runDir)[target.conversationId] || "",
+    pinned: readPins(target.runDir).includes(target.conversationId),
+  });
+}
+
+// DELETE — drop one conversation's turns, title, and pin.
+export async function DELETE(req: NextRequest) {
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
-  writeTitle(runDir, requestedConversationId, title);
-  return NextResponse.json({ conversationId: requestedConversationId, title });
+  const target = resolveChatTarget(body);
+  if (target instanceof NextResponse) return target;
+  deleteConversation(target.runDir, target.conversationId);
+  const conversations = summarizeConversations(
+    readChatLog(target.runDir),
+    readTitles(target.runDir),
+    readPins(target.runDir),
+  );
+  return NextResponse.json({ conversationId: target.conversationId, conversations });
 }
 
 // POST — ask one grounded question; the CLI appends it to the persisted log itself.

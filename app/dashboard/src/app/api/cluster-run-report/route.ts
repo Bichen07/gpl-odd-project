@@ -21,6 +21,34 @@ import {
  * Reads only — no LLM calls, no file writes.
  */
 
+function rulePlot(
+  features: string[],
+  trialsDoc: Record<string, any> | null,
+): {
+  xName: string;
+  yName: string;
+  points: Array<{ x: number; y: number; passed: boolean; cluster: number | null }>;
+} | null {
+  if (features.length !== 2 || !trialsDoc) return null;
+  const [xName, yName] = features;
+  const points: Array<{ x: number; y: number; passed: boolean; cluster: number | null }> = [];
+  for (const trial of (trialsDoc.trials as any[]) ?? []) {
+    const params = trial?.parameters ?? {};
+    const x = params[xName];
+    const y = params[yName];
+    if (typeof x !== "number" || typeof y !== "number" || trial?.passed == null) continue;
+    const raw = trial.cluster_label;
+    const cluster = raw == null || raw === "" ? null : Number(raw);
+    points.push({
+      x: Math.round(x * 1000) / 1000,
+      y: Math.round(y * 1000) / 1000,
+      passed: Boolean(trial.passed),
+      cluster: cluster != null && Number.isFinite(cluster) ? cluster : null,
+    });
+  }
+  return points.length > 0 ? { xName, yName, points } : null;
+}
+
 function findProjectRoot(start: string): string {
   let current = start;
   for (let i = 0; i < 8; i += 1) {
@@ -130,6 +158,11 @@ type ReportDTO = {
       precision: number;
       boundaryTrialHits: number | null;
     }>;
+    plot: {
+      xName: string;
+      yName: string;
+      points: Array<{ x: number; y: number; passed: boolean; cluster: number | null }>;
+    } | null;
   } | null;
 };
 
@@ -309,6 +342,7 @@ export async function GET(req: NextRequest) {
           precision: r.precision,
           boundaryTrialHits: r.boundary_trial_hits ?? null,
         })),
+        plot: rulePlot(rulesJson.features ?? [], readJsonSafe(runArtifactPath(runDir, "oddAllTrials"))),
       }
     : null;
 

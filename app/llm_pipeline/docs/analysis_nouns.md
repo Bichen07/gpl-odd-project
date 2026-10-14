@@ -78,14 +78,14 @@ Prompt: `llm_pipeline/prompt_templates/cluster_summary_prompt.txt`. Writer: `spl
 
 ## 5. Label review
 
-Prompt: `llm_pipeline/prompt_templates/cluster_reviewer_prompt.txt`. Reader and writer: `llm_pipeline/python/llm_pipeline/cluster_label_reviewer.py`.
+Prompt: `llm_pipeline/prompt_templates/cluster_rename_prompt.txt`. Reader and writer: `llm_pipeline/python/llm_pipeline/cluster_label_reviewer.py`.
 
-One call over every cluster. It reads each summary card and medoid card, and renames only when two or more labels are the same or near-same and the cards show different behavior. It adds one word. It does not grade the clustering and it does not recommend a merge or a split.
+One call over every cluster. The input is `input_context_label_rename.md`, organized from each summary card and medoid card. It renames only when two or more labels are the same or near-same and the cards show different behavior. It adds one adjective. It does not grade the clustering and it does not recommend a merge or a split.
 
 | Field | Meaning | Where |
 | --- | --- | --- |
-| `context_label_review.md` | The exact text the model reads. | `cluster_analysis/context_label_review.md` |
-| `cluster_label_review.json` rows: `cluster_id`, `original_label`, `new_label`, `changed`, `reason` | One row per cluster. | `cluster_analysis/cluster_label_review.json` |
+| `input_context_label_rename.md` | Rename input. Organized from each cluster's summary card and medoid card. | `cluster_rename/input_context_label_rename.md` |
+| `output_cluster_label_review.json` rows: `cluster_id`, `original_label`, `new_label`, `changed`, `reason` | The model's rename list. One row per cluster. | `cluster_rename/output_cluster_label_review.json` |
 | `label_review: {previous_label, reason, reviewed_at}` | Audit block on a renamed `cluster_summary.yaml`. | `clusterN/output/cluster_summary.yaml` |
 
 Chat context uses the pair and summary keys: `odd_chat.py`, `prompt_templates/odd_chat_system_prompt.txt`.

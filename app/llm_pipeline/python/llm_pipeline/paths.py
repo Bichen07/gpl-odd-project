@@ -35,8 +35,8 @@ def prompt_templates_dir(start: Path) -> Path:
 
 _RUN_ARTIFACTS = {
     "quality": ("cluster_analysis", "clustering_quality.json"),
-    "label_review": ("cluster_analysis", "cluster_label_review.json"),
-    "label_review_context": ("cluster_analysis", "context_label_review.md"),
+    "label_review": ("cluster_rename", "output_cluster_label_review.json"),
+    "label_review_context": ("cluster_rename", "input_context_label_rename.md"),
     "odd_all_trials": ("odd/input", "odd_all_trials.json"),
     "odd_boundary_export": ("odd/output", "odd_boundary_export.json"),
     "odd_boundary_snapshot": ("odd/snapshots", None),
@@ -47,6 +47,8 @@ _RUN_ARTIFACTS = {
 
 _PREVIOUS_RUN_ARTIFACT_DIRS = {
     "quality": "quality",
+    "label_review": "cluster_analysis",
+    "label_review_context": "cluster_analysis",
     "odd_all_trials": "analysis/odd/input",
     "odd_boundary_export": "analysis/odd/output",
     "odd_boundary_snapshot": "analysis/odd/snapshots",

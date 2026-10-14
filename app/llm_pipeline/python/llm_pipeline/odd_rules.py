@@ -211,7 +211,7 @@ def train_rules(
                     "cv_folds": cv_folds if cv_acc is not None else None},
         "limitations": [
             "Auditable hypothesis about the sampled trials only, not a certified ODD boundary.",
-            "max_depth<=3 trades accuracy for readability by design (XAI interpretable-by-design choice).",
+            "A shallow tree trades accuracy for a readable predicate (XAI interpretable-by-design choice).",
             "Trained on ALL trials incl. non-clustered ones; boundary_trial_hits references the S2 kNN "
             "collision-boundary export (min-max L2), not the parameter-space-pair z-score distance.",
             "Class balance / sampling density directly reflects the scenario sampler, not real-world exposure.",

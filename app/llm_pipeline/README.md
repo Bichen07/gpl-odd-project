@@ -42,21 +42,24 @@ llm_pipeline.cli cluster-interpret
         ├─ medoid → medoid_trial.yaml
         ├─ parameter-space-pairs → contrast.yaml
         ├─ summary → cluster_summary.yaml            (each cluster independent)
-        └─ label-review (optional LLM, once) → cluster_analysis/context_label_review.md, renames, cluster_label_review.json
+        └─ label-review (optional LLM, once)
+              input  cluster_rename/input_context_label_rename.md
+              output cluster_rename/output_cluster_label_review.json
+              and, when a name changes, clusterN/output/cluster_summary.yaml
         │
         ▼
 odd-export → odd-rules → odd-briefing → odd-chat   (S2, S3, S5)
 ```
 
 `cluster-interpret` is the umbrella CLI. Products are selected with `--products`
-(default **`medoid` only**). Order when combined: **medoid → parameter-space-pairs → summary**.
+(default **`medoid` only**). Order when combined: **medoid → parameter-space-pairs → summary → label-review**.
 
 | `--products` / CLI | Needs first | Writes |
 | --- | --- | --- |
 | `medoid` | `$RUN/clusterN/processed/` | `clusterN/output/medoid_trial.yaml` |
 | `parameter-space-pairs` | both medoids + pack `process/context.md` + `synced_bev/` | `parameter_space_pairs/cA-cB/output/contrast.yaml` |
 | `summary` | medoid + every touching `contrast.yaml`; **each cluster run independently** (no cross-cluster read) | `clusterN/output/cluster_summary.yaml` (`label` = LLM) |
-| `label-review` | every requested cluster's `cluster_summary.yaml` + `medoid_trial.yaml` on disk; API key unless `--dry-run` | `cluster_analysis/context_label_review.md` (the text the model reads), may rename `label` in place, `cluster_analysis/cluster_label_review.json` |
+| `label-review` | `cluster_rename/input_context_label_rename.md` (built from each `cluster_summary.yaml` and `medoid_trial.yaml`); API key unless `--dry-run` | `cluster_rename/output_cluster_label_review.json`; may rename `label` in place |
 | `all` | — | all four products above |
 
 `$RUN/clusterN/raw/cluster.json` comes from clustering / `dataset_builder`, not the LLM pipeline. **Rule-only** — never pasted into an LLM prompt. Holds size, `collision_rate`, TTC/SPRET, `parameter_ranges`, medoid id, `intra_variance`.
@@ -79,7 +82,8 @@ $RUN/
 │       └── cluster_summary.yaml
 ├── clustering/selectedClusteringResult.json
 ├── conversation_log/odd_chat_log.jsonl
-├── cluster_analysis/{clustering_quality.json, cluster_label_review.json, context_label_review.md}
+├── cluster_analysis/clustering_quality.json
+├── cluster_rename/{input_context_label_rename.md, output_cluster_label_review.json}
 ├── trajectory_projection_pairs/cA-cB/   # MFPCA-near; no LLM product yet
 ├── parameter_space_pairs/cA-cB/
 │   ├── pair.json            # rule/UI metadata — not fed to pair LLM
@@ -111,7 +115,7 @@ HumanMessage   ← common_sense.txt + task template + on-disk placeholders [+ op
 | [`medoid_trial_prompt.txt`](prompt_templates/medoid_trial_prompt.txt) | `medoid` |
 | [`parameter_space_pair_prompt.txt`](prompt_templates/parameter_space_pair_prompt.txt) | `parameter-space-pairs` |
 | [`cluster_summary_prompt.txt`](prompt_templates/cluster_summary_prompt.txt) | `summary` |
-| [`cluster_reviewer_prompt.txt`](prompt_templates/cluster_reviewer_prompt.txt) | `label-review` |
+| [`cluster_rename_prompt.txt`](prompt_templates/cluster_rename_prompt.txt) | `label-review` |
 | [`odd_chat_system_prompt.txt`](prompt_templates/odd_chat_system_prompt.txt) | `odd-chat` |
 
 | Product | Fed to LLM |
@@ -119,7 +123,7 @@ HumanMessage   ← common_sense.txt + task template + on-disk placeholders [+ op
 | **medoid** | prompts + `clusterN/processed/context_medoid.md` + BEV JPGs |
 | **parameter-space-pairs** | prompts + `parameter_space_pairs/cA-cB/process/context.md` + `synced_bev/` + extracts from both clusters’ `medoid_trial.yaml` |
 | **cluster summary** | prompts + this cluster’s `medoid_trial.yaml` extract + `context_cluster.md` (collision count only) + touching `contrast.yaml` + the neighbor cluster’s `medoid_trial.yaml` extract. **No** other clusters’ labels/captions — each cluster is summarized independently, one call at a time |
-| **cluster label-review** | every cluster’s full `cluster_summary.yaml` card + its medoid card, all in one call — **no** `contrast.yaml` re-read. The exact text is written to `cluster_analysis/context_label_review.md` before the call |
+| **cluster label-review** | `cluster_rename/input_context_label_rename.md` in one call. That file is organized from each cluster’s summary card and medoid card. The call does not open `contrast.yaml` and does not attach BEV frames. |
 
 ---
 
@@ -194,9 +198,10 @@ python -m llm_pipeline.cli cluster-interpret \
 **Output:** `output/cluster_summary.yaml`. **`label` is LLM-authored**,
 2–4 words, one outcome archetype (`Late Yield` lives only here). The why is
 `caption`. `motive_consistency_note` compares the caption to the medoid
-`resolution` and `motive_summary`. The pipeline does **not** overwrite
-`label`. It still sets `risk_level` from the collision rate and
-`neighbor_behavior` by counting the copied pair calls.
+`resolution` and `motive_summary`. This stage writes `label` once and does
+not compare it with the other clusters. §4.4 may rename it later. This stage
+still sets `risk_level` from the collision rate and `neighbor_behavior` by
+counting the copied pair calls.
 
 Also: `caption`, `neighbor_comparison[]` (`behavior_similarity` copied from
 the pair: `distinct`, `similar`, `inconclusive`, or `ambiguous` when the pair
@@ -208,31 +213,27 @@ python -m llm_pipeline.cli cluster-interpret \
   --results-dir "$RUN" --batch-id 8 --products summary --clusters 0
 ```
 
-### 4.4 Cluster label review — `--products label-review`
+### 4.4 Cluster label rename — `--products label-review`
 
-`summary` names each cluster alone and without adjectives, so two clusters whose
-behavior differs can end up with the same or a near-same name. `label-review` is one
-LLM call per run. It adds one word to those names (for example `Proactive` vs `Late`,
-from the brake lead time). Every other name is left alone.
+`summary` writes each `label` alone: 2–4 words, plain nouns, no adjective, and no view of the other clusters. `label-review` is one LLM call for the whole run. It renames a label only when two or more names are the same, or too close to tell apart, and the cards show different behavior. It adds one adjective, puts that adjective first, and keeps the name to 5 words or fewer. Brake lead time is `peak_t − brake_t` on the medoid card: the longer lead is `Proactive`, the shorter is `Late`. The same behavior keeps the same name. Every other name stays as written.
 
-**Gate:** at least 2 clusters with a (non-stub) `cluster_summary.yaml` on
-disk — checks every `cluster*` folder in `$RUN`, not just clusters touched by
-this invocation.
+**Gate:** at least 2 `cluster*` folders whose `cluster_summary.yaml` is not a stub and has a non-empty `label`. The scan covers every cluster folder in `$RUN`, including clusters this command did not name. Fewer than 2 writes nothing.
 
-**Input:** for every cluster, all in one prompt — the full summary card (`label`,
-`risk_level`, full `caption`, notes, `neighbor_behavior`, `neighbor_comparison`) and the
-medoid card (`brake_t`, `peak_t`, outcome, collision line, timeline). **No** BEV, no
-`contrast.yaml` re-read.
+**Input:** `cluster_rename/input_context_label_rename.md`
 
-The exact text the model reads is written to `cluster_analysis/context_label_review.md`
-before the call (also on `--dry-run`), the same way `context_medoid.md` shows the
-medoid input.
+That file is the rename input. The pipeline organizes it from the two YAML files, one block per cluster, then the call reads it. `{cluster_cards}` in `prompt_templates/cluster_rename_prompt.txt` is this file.
 
-**Output:** may rewrite `label` on any `clusterN/output/cluster_summary.yaml`
-(adds a `label_review: {previous_label, reason, reviewed_at}` audit block on
-that file) and always writes `cluster_analysis/cluster_label_review.json`
-— one row per cluster (`cluster_id`, `original_label`, `new_label`, `changed`,
-`reason`), whether or not it changed.
+From `clusterN/output/cluster_summary.yaml`: `label`, `risk_level`, `caption`, `consistency_note`, `motive_consistency_note`, `neighbor_behavior`, and each `neighbor_comparison` (`neighbor_cluster`, pair folder, `behavior_similarity`, `reason`).
+
+From `clusterN/output/medoid_trial.yaml`: `agent_interactions`, `peak_t`, `brake_t`, `ttc`, `d`, `outcome`, the collision line when the trial collided, `timeline`, and `motive_summary`.
+
+The call does not attach BEV frames and does not open `contrast.yaml`. The file is written before the call, including `--dry-run`.
+
+**Output:** `cluster_rename/output_cluster_label_review.json`
+
+One LLM call returns a JSON array, one row per cluster. Python writes that array here. It is the model's reply, not a rule score. Each row has `original_label` (the name in `input_context_label_rename.md`) and `new_label` (the name the model returned). `changed` is true only when those two differ and the rename is applied. The file also stores `generated_at`, `n_changed`, and `token_usage`. `--dry-run` writes `changed: false` and `stub: true`, and does not rename.
+
+When a row has `changed: true`, Python overwrites `label` in that cluster's `cluster_summary.yaml` and adds `label_review: {previous_label, reason, reviewed_at}`. Unchanged summaries stay as they are.
 
 ```bash
 python -m llm_pipeline.cli cluster-interpret \
@@ -244,24 +245,22 @@ python -m llm_pipeline.cli label-review --run-dir "$RUN" --model gemini-2.5-flas
 
 ### 4.5 Clustering score
 
-One rule-based number per clustering, no LLM. It ranks the different
-`k_cluster_s=…` folders of a batch against each other (“Other clusterings of
-this batch” on the Cluster analysis page). Silhouette is one piece of it, not a
-separate ranking column.
+One rule-based number per clustering. No LLM call. It ranks the `<k>_cluster_s=…` folders of one batch. The Cluster analysis page shows that table as “Other clusterings of this batch”, with columns Rank, Config, k, and Geometry. Silhouette is one piece of Geometry, not its own column.
 
-```text
-clusterN/raw/cluster.json  ──rule──►  cluster_analysis/clustering_quality.json
-```
+**Input file:** `clusterN/raw/cluster.json`
 
-`score` weights: silhouette 0.25 · collision_spread 0.25 · ttc_spread 0.25 ·
-intra_consistency (tightness) 0.25. The file also stores the four sub-scores.
-`rank` is filled by `GET /api/cluster-evaluate` from `score`. The dashboard calls
-the number **geometry**. `dataset_builder` writes the file after a build. Rewrite
-it with `score_run_dir` from `llm_pipeline.clustering_quality_scorer`.
+**Output file:** `cluster_analysis/clustering_quality.json`
 
-What the clusters do and how they differ is read from the pair cards
-(`behavior_similarity`), the cluster summaries (`neighbor_behavior`), and the
-label review (§4.4). The dashboard Report tab lists them side by side.
+`score` is 0–100. Each piece has weight 0.25:
+
+- Silhouette uses `(s + 1) / 2`, with `s` on −1 to 1. The file also keeps `silhouette_raw`.
+- Collision-rate spread is the standard deviation of the clusters' collision rates divided by 50 percentage points, capped at 1.
+- Time-to-collision spread is the standard deviation of each cluster's mean time-to-collision divided by 3 s, capped at 1.
+- Tightness (`intra_consistency`) is, per cluster, 1 − (spread around the medoid ÷ the largest cluster spread), then averaged. The loosest cluster scores 0.
+
+The file stores `folder`, `k`, `silhouette` from the folder name, `score`, `rank`, and `sub_scores`. `score_run_dir` writes `rank` as null. `GET /api/cluster-evaluate` fills `rank` by sorting `score` descending. The dashboard label for `score` is **geometry**. `dataset_builder` calls `score_run_dir` after a build.
+
+The score does not read the pair cards or the summaries. Behavior stays on those cards: pair `behavior_similarity`, summary `neighbor_behavior`, and the label rename in §4.4. The Report page shows the geometry chip, the cluster labels, and each pair's separation reason.
 
 ---
 
@@ -500,7 +499,7 @@ python -m llm_pipeline.cli odd-chat --run-dir "$RUN" --question "…" [--dry-run
 | `split_analysis.py` | Products; gates; summary LLM invents `label` per cluster, independently |
 | `cluster_aggregates.py` | Pass-1 aggregates → `cluster_aggregate.json` |
 | `cluster_cards.py` | Text cards the model reads: medoid card, neighbor pair cards |
-| `cluster_label_reviewer.py` | Label QA across clusters — one LLM call, adds one word to same / near-same labels; writes `context_label_review.md` |
+| `cluster_label_reviewer.py` | Label rename across clusters — one LLM call, adds one adjective to same / near-same labels; input is `input_context_label_rename.md` |
 | `clustering_quality_scorer.py` | Geometry ranking score |
 | Analyzer `dataset_builder.py` / `parameter_space_pair_packs.py` | Packs, BEV, context rebuild |
 | `odd_export.py` / `odd_rules.py` | S2–S3 |
@@ -523,4 +522,6 @@ closing-rate TTC on medoid/pair context lines.
 Summary LLM invents each `label` independently, per cluster, from evidence
 against the closed 2–4 word style set in `common_sense.txt` — resembling
 these paper names is a side effect, not a target. `label-review` (§4.4) is
-the only stage allowed to compare labels across clusters and rename one.
+the only stage that compares labels across clusters. Its input is
+`cluster_rename/input_context_label_rename.md`. Its output is
+`cluster_rename/output_cluster_label_review.json`.

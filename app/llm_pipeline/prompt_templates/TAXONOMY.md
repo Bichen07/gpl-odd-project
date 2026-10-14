@@ -233,20 +233,20 @@ intentionally coarser than a full medoid timeline). It follows the same fill
 order and the same `control_response`↔motive consistency table as
 `medoid_trial_prompt.txt` (§3.2) — see §7.2 for a gap found and fixed here.
 
-### 3.7 Cross-cluster label review (`cluster_reviewer_prompt.txt`)
+### 3.7 Cross-cluster label rename (`cluster_rename_prompt.txt`)
 
 Runs **once per run**, after every requested cluster's `cluster_summary.yaml`
 exists, via `cluster_label_reviewer.py` (CLI: `label-review`; product flag
 `label-review`, included in `all`). Single LLM call, text-only, over every
 full summary card + medoid card for every cluster, all in one prompt. It only
 renames when two or more clusters share a name, or a near-same name, and their
-cards show different behavior. It adds one word drawn from that difference
+cards show different behavior. It adds one adjective drawn from that difference
 (for example `Proactive` vs `Late` from the brake lead time `peak_t − brake_t`).
 
 Renames patch `label` in place on `cluster_summary.yaml` and add a
 `label_review: {previous_label, reason, reviewed_at}` audit block; the full
 row set (changed and unchanged) is written to
-`cluster_analysis/cluster_label_review.json`.
+`cluster_rename/output_cluster_label_review.json`.
 
 ---
 

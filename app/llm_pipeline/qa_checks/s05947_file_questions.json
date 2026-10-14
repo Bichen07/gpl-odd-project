@@ -1,0 +1,36 @@
+{
+  "conversation_id": "qa-check-files",
+  "title": "Q&A file check",
+  "questions": [
+    {
+      "id": "c0_c2_similar",
+      "question": "What is different between cluster 0 and cluster 2? Are their medoid behaviors similar?",
+      "must_include": ["distinct", "model", "safe", "collision"],
+      "numbers": [{"value": 10.2, "places": 1}],
+      "must_not": ["deterministic"],
+      "expect_request": {"need": "pair", "folder": "c0-c2"}
+    },
+    {
+      "id": "ego_fail_next",
+      "question": "What makes Ego fail? Is it a collision? What situation may lead to a collision of Ego? Which scenario do you recommend to simulate next?",
+      "must_include": ["R4", "sampled", "side-swipe", "recommend"],
+      "numbers": [
+        {"value": 1688, "places": 0},
+        {"value": 10.56, "places": 2},
+        {"value": 4.388, "places": 3},
+        {"value": 3.855, "places": 3},
+        {"value": 2.374, "places": 3}
+      ],
+      "must_not": ["deterministic", "the ODD"],
+      "expect_request": {"need": "summary", "clusters": [1, 2, 3]}
+    },
+    {
+      "id": "bev_collision",
+      "question": "What do the BEV frames of cluster 2's medoid show at the collision?",
+      "must_include": ["COLLISION", "frame"],
+      "numbers": [{"value": 10.56, "places": 2}],
+      "must_not": ["deterministic"],
+      "expect_request": {"need": "bev", "cluster": 2}
+    }
+  ]
+}

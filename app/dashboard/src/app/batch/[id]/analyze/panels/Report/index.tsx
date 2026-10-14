@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   Alert,
   Box,
+  Button,
   Chip,
   CircularProgress,
   Paper,
@@ -13,9 +14,12 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import type { ReportData } from "../../types";
+import RuleBoundaryPlot from "./RuleBoundaryPlot";
 import { TAB } from "../../constants";
 import { riskColor } from "../../utils";
 
@@ -33,19 +37,71 @@ export default function Report({
   const [error, setError] = useState<string | null>(null);
   /** Expanded pair row folder — click again or another row to collapse. */
   const [expandedPair, setExpandedPair] = useState<string | null>(null);
+  const [showExportNote, setShowExportNote] = useState(false);
+  const [cartDepth, setCartDepth] = useState(3);
+  const [refitting, setRefitting] = useState(false);
+  const [refitError, setRefitError] = useState<string | null>(null);
 
-  useEffect(() => {
-    setLoading(true);
-    setError(null);
+  const loadReport = () =>
     fetch(`/api/cluster-run-report?batchId=${batchId}&folder=${encodeURIComponent(folder)}`)
       .then((r) => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
         return r.json();
       })
-      .then((d) => setData(d as ReportData))
+      .then((d: ReportData) => {
+        setData(d);
+        const saved = d.parameterRules?.maxDepth;
+        if (saved != null && saved >= 1 && saved <= 5) setCartDepth(saved);
+        return d;
+      });
+
+  useEffect(() => {
+    setLoading(true);
+    setError(null);
+    loadReport()
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false));
+    // loadReport closes over the current batch and folder.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchId, folder]);
+
+  const selectCartDepth = (depth: number) => {
+    if (refitting || depth === data?.parameterRules?.maxDepth) return;
+    setCartDepth(depth);
+    setRefitting(true);
+    setRefitError(null);
+    fetch("/api/odd-rules", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batchId, folder, maxDepth: depth }),
+    })
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+        setData((prev) =>
+          prev?.parameterRules
+            ? {
+                ...prev,
+                parameterRules: {
+                  ...prev.parameterRules,
+                  generatedAt: body.generatedAt ?? prev.parameterRules.generatedAt,
+                  maxDepth: body.maxDepth ?? depth,
+                  nTrialsUsed: body.nTrialsUsed ?? prev.parameterRules.nTrialsUsed,
+                  trainAcc: body.trainAcc ?? null,
+                  cvAcc: body.cvAcc ?? null,
+                  rules: body.rules ?? prev.parameterRules.rules,
+                },
+              }
+            : prev,
+        );
+      })
+      .catch((e) => {
+        setRefitError(String(e));
+        const saved = data?.parameterRules?.maxDepth;
+        if (saved != null) setCartDepth(saved);
+      })
+      .finally(() => setRefitting(false));
+  };
 
   if (loading) {
     return (
@@ -225,7 +281,7 @@ export default function Report({
       {/* ── D. Pair Evidence ──────────────────────────────────────────── */}
       <Paper variant="outlined" sx={{ p: 2 }}>
         <Typography variant="h6" gutterBottom>
-          Matched-Parameter ODD Evidence
+          Cluster boundary pair in Parameter space
         </Typography>
         <Stack direction="row" spacing={1} sx={{ mb: 2 }} flexWrap="wrap">
           <Chip
@@ -383,16 +439,26 @@ export default function Report({
                   />
                 )}
             </Stack>
-            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-              From <code>odd_boundary_export.json</code>
-              {data.boundaryExport.generatedAt
-                ? ` (generated ${new Date(data.boundaryExport.generatedAt).toLocaleString()})`
-                : ""}
-              . Same min–max normalized kd-tree metric as Explore &rsquo;s Filtering panel — not
-              comparable to parameter-space pair z-score distances. Can be (re)written from a
-              terminal via <code>python -m llm_pipeline.cli odd-export --run-dir …</code> instead
-              of the Explore UI button.
-            </Typography>
+            <Button
+              size="small"
+              variant="text"
+              onClick={() => setShowExportNote((open) => !open)}
+              sx={{ mb: 1, px: 0 }}
+            >
+              {showExportNote ? "Hide note" : "Show note"}
+            </Button>
+            {showExportNote && (
+              <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+                From <code>odd_boundary_export.json</code>
+                {data.boundaryExport.generatedAt
+                  ? ` (generated ${new Date(data.boundaryExport.generatedAt).toLocaleString()})`
+                  : ""}
+                . Same min–max normalized kd-tree metric as Explore &rsquo;s Filtering panel — not
+                comparable to parameter-space pair z-score distances. Can be (re)written from a
+                terminal via <code>python -m llm_pipeline.cli odd-export --run-dir …</code> instead
+                of the Explore UI button.
+              </Typography>
+            )}
           </>
         ) : (
           <Alert severity="info" sx={{ mb: 1 }}>
@@ -406,8 +472,29 @@ export default function Report({
 
         {data.parameterRules && data.parameterRules.rules.length > 0 ? (
           <>
-            <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2, mb: 1 }}>
-              <Chip size="small" label={`CART depth ≤ ${data.parameterRules.maxDepth ?? "—"}`} />
+            <Stack direction="row" spacing={1} flexWrap="wrap" alignItems="center" useFlexGap sx={{ mt: 2, mb: 1 }}>
+              <Chip size="small" label={`CART depth ${data.parameterRules.maxDepth ?? "—"}`} />
+              <ToggleButtonGroup
+                exclusive
+                size="small"
+                value={cartDepth}
+                aria-label="CART depth"
+                disabled={refitting}
+                onChange={(_event, value: number | null) => {
+                  if (value) selectCartDepth(value);
+                }}
+              >
+                {[1, 2, 3, 4, 5].map((depth) => (
+                  <ToggleButton key={depth} value={depth}>
+                    {depth}
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
+              {refitting && (
+                <Typography variant="caption" color="text.secondary">
+                  Fitting…
+                </Typography>
+              )}
               <Chip
                 size="small"
                 variant="outlined"
@@ -420,6 +507,19 @@ export default function Report({
                 <Chip size="small" variant="outlined" label={`cv acc ${data.parameterRules.cvAcc}`} />
               )}
             </Stack>
+            {refitError && (
+              <Alert severity="error" sx={{ mb: 1 }}>
+                {refitError}
+              </Alert>
+            )}
+            {data.parameterRules.plot && (
+              <RuleBoundaryPlot
+                xName={data.parameterRules.plot.xName}
+                yName={data.parameterRules.plot.yName}
+                points={data.parameterRules.plot.points}
+                rules={data.parameterRules.rules}
+              />
+            )}
             <Table size="small">
               <TableHead>
                 <TableRow>

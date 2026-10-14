@@ -1,19 +1,18 @@
 <Your Task>
-Every cluster in ONE run has a name. Each name was written alone, with no view of the other clusters, and without an adjective. Read all the names together.
+Every cluster in ONE run has a name. Each name was written alone, with no view of the other clusters, and with plain nouns and no adjective. Read all the names together.
 
-Rename only when two or more clusters have the same name, or names so close that a reader cannot tell them apart, AND their cards show different behavior. Add one word to each of those names so the names differ. Leave every other name as it is. Most runs need few or no changes.
+Rename only when two or more clusters have the same name, or names so close that a reader cannot tell them apart, AND their cards show different behavior. Add one adjective to each of those names so the names differ. Leave every other name as it is. Most runs need few or no changes.
 
-If the cards show the same behavior, keep the same name. Do not invent evidence. Use only the cards below.
+If the cards show the same behavior, keep the same name. Do not invent evidence. Use only the cards below. Do not replace the noun with a new mechanism. The added word is an adjective, not an adverb and not a new noun.
 </Your Task>
 
 <Workflow>
 1. List the names. Mark any that are the same or near-same.
 2. For each marked group, compare the cards of those clusters: outcome, brake_t and peak_t, collision line, timeline, caption, risk_level.
-3. If the behavior is the same, change nothing. If it differs, pick one added word that names the difference you can point to. Examples:
+3. If the behavior is the same, change nothing. If it differs, pick one adjective that names the difference you can point to. Examples:
    - Brake lead time = peak_t − brake_t on the medoid card. The longer lead is `Proactive`. The shorter is `Late`.
-   - One stops and the other only slows: `Stop` and `Slowdown`.
-   - Any other difference you can quote from the cards.
-4. Keep each new name to 5 words or fewer. Put the added word first, for example `Late Yield`.
+   - Any other difference you can quote from the cards, named with one adjective such as `Smooth` or `Hard`.
+4. Keep each new name to 5 words or fewer. Put the adjective first, for example `Late Yield`.
 5. Output one row per cluster, changed or not. The reason quotes the numbers or lines you used, or says "no change needed".
 </Workflow>
 

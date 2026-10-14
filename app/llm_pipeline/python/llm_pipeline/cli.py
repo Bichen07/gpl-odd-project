@@ -104,6 +104,16 @@ def main() -> None:
     oc.add_argument("--dry-run", action="store_true")
     oc.add_argument("--no-log", action="store_true", help="Do not append to odd_chat_log.jsonl")
 
+    # odd-chat-check: ask the saved questions and score the answers against the files.
+    ocheck = sub.add_parser(
+        "odd-chat-check",
+        help="Ask the ground-truth questions and score the answers",
+    )
+    ocheck.add_argument("--run-dir", required=True)
+    ocheck.add_argument("--questions", default=None, help="JSON file of questions and expected facts")
+    ocheck.add_argument("--model", default="gemini-2.5-flash")
+    ocheck.add_argument("--api-key", default=None)
+
     args = parser.parse_args()
     source = _source_path()
     if args.cmd == "label-review":
@@ -178,6 +188,17 @@ def main() -> None:
             log=not args.no_log,
         )
         out = _json.dumps(result, indent=2)
+    elif args.cmd == "odd-chat-check":
+        from .odd_chat_check import default_questions_path, run_check
+
+        questions = Path(args.questions) if args.questions else default_questions_path()
+        report = run_check(
+            Path(args.run_dir),
+            questions,
+            model=args.model,
+            api_key=args.api_key,
+        )
+        out = f"passed {report['passed']}/{report['passed'] + report['failed']}"
     elif args.cmd == "cluster-interpret":
         model = " ".join(getattr(args, "model", ["gemini-2.5-flash"]))
         dataset = getattr(args, "dataset", None)

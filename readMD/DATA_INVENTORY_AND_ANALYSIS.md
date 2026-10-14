@@ -882,7 +882,7 @@ the timeline through the critical moment rather than the cluster average alone.
 | `cluster_system_prompt.txt` | `system` | Pass 1 | Persona + output contract (CoT then YAML). |
 | `cluster_common_sense.txt` | `common_sense` | Pass 1 | Traffic-safety reference (right-of-way, TTC thresholds, behavior taxonomy). |
 | `cluster_interaction_prompt.txt` | `interaction` | Pass 1 | Main task. Placeholders: `{cluster_stats}` `{agent_actions_log}` `{map_description}`. |
-| `cluster_reviewer_prompt.txt` | `reviewer` | Pass 2 | Skeptical audit. Placeholders: `{cluster_stats}` `{agent_actions_log}` `{preliminary_yaml}`. |
+| `cluster_rename_prompt.txt` | `label-review` | one call per run | Adds one adjective when two names match and the cards differ. Placeholder: `{cluster_cards}`. |
 
 UI-edited prompt text is substituted with a brace-tolerant formatter, so example YAML/JSON inside
 a prompt no longer breaks `str.format`.

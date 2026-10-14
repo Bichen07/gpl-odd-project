@@ -9,7 +9,7 @@ Internal sources:
 - `[README.md](README.md)` §§1, 4.2–4.5, 6
 - `[prompt_templates/parameter_space_pair_prompt.txt](prompt_templates/parameter_space_pair_prompt.txt)`
 - `[prompt_templates/cluster_summary_prompt.txt](prompt_templates/cluster_summary_prompt.txt)`
-- `[prompt_templates/cluster_reviewer_prompt.txt](prompt_templates/cluster_reviewer_prompt.txt)`
+- `[prompt_templates/cluster_rename_prompt.txt](prompt_templates/cluster_rename_prompt.txt)`
 - Examples: `[results/batch8/6_cluster_s=0.6113/parameter_space_pairs/c0-c4/output/contrast.yaml](../../results/batch8/6_cluster_s=0.6113/parameter_space_pairs/c0-c4/output/contrast.yaml)`, `[results/batch8/6_cluster_s=0.6113/cluster1/output/cluster_summary.yaml](../../results/batch8/6_cluster_s=0.6113/cluster1/output/cluster_summary.yaml)`
 
 ---
@@ -540,7 +540,7 @@ Checked against the current functions. No writer change came out of this pass.
 | `cluster_selection_eval.medoid_card_block` | Prints `agent: resolution`, `t` + description, and `motive_summary`. If an old card has no description, it still prints a stamp motive token so that card remains readable. New writes do not create that token. | No |
 | `clustering_quality_scorer.compute_final_score` | Geometry is four equal pieces at 0.25: silhouette, collision-rate spread, time-to-collision spread, and tightness. The ranking number equals that geometry score. Language-model ratings are stored beside it and do not move it. | No |
 | `odd_briefing` | Writes `medoid_resolution` from the named-vehicle row. Does not invent `medoid_motive`. | No |
-| `cluster_reviewer_prompt.txt` | Rewrites a label that chains two mechanisms, or that duplicates another cluster’s name. It does not see the timeline or BEV. | No |
+| `cluster_rename_prompt.txt` | Rewrites a label that chains two mechanisms, or that duplicates another cluster’s name. It does not see the timeline or BEV. | No |
 
 ### 9.3 What each later stage may add
 

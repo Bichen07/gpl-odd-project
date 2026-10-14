@@ -13,9 +13,9 @@ brake lead time). Every other label is left alone. Renames are applied in
 place to ``cluster_summary.yaml``
 (``label`` is overwritten; the previous value + reason are kept in a
 ``label_review`` audit block), and the full row set is written to
-``cluster_analysis/cluster_label_review.json``. The exact card text the model
-receives is written to ``cluster_analysis/context_label_review.md`` before the
-call.
+``cluster_rename/output_cluster_label_review.json``. The call's input is
+``cluster_rename/input_context_label_rename.md``, built from the summary card and
+the medoid card before the call.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ try:
 except ImportError:  # pragma: no cover
     pass
 
-_REVIEWER_PROMPT_FILE = "cluster_reviewer_prompt.txt"
+_REVIEWER_PROMPT_FILE = "cluster_rename_prompt.txt"
 
 _SYSTEM_TEXT = (
     "You are an expert AV safety analyst auditing cluster names for "
@@ -220,7 +220,7 @@ def review_run_dir(
     dry_run: bool = False,
 ) -> Optional[Path]:
     """Review every cluster_summary.yaml ``label`` in one run; rename in place
-    where justified. Writes ``cluster_analysis/cluster_label_review.json``.
+    where justified. Writes ``cluster_rename/output_cluster_label_review.json``.
 
     Returns the output path, or ``None`` if there are fewer than 2 labeled
     clusters to compare (nothing to review).
@@ -233,9 +233,9 @@ def review_run_dir(
         print(f"[ClusterLabelReviewer] Need >=2 labeled clusters; found {len(rows)} — skipped")
         return None
 
-    cluster_cards = _format_cluster_cards(rows)
     context_path = run_artifact_path(run_dir, "label_review_context", write=True)
-    context_path.write_text(cluster_cards + "\n", encoding="utf-8")
+    context_path.write_text(_format_cluster_cards(rows) + "\n", encoding="utf-8")
+    cluster_cards = context_path.read_text(encoding="utf-8").rstrip("\n")
 
     model = normalize_model_name(model)
     if dry_run or not has_llm_credentials(model, api_key):

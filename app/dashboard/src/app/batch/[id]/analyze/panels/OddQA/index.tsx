@@ -7,23 +7,35 @@ import {
   Button,
   Chip,
   CircularProgress,
-  FormControl,
-  InputLabel,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  IconButton,
+  Menu,
   MenuItem,
   Paper,
-  Select,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import { Send } from "@mui/icons-material";
+import { MoreHoriz, PushPin, Send } from "@mui/icons-material";
 import type { ChatTurn } from "../../types";
+
+function requestedLabel(requested: ChatTurn["requested"]): string | null {
+  if (!requested?.need) return null;
+  if (requested.need === "medoid") return `asked medoid cluster ${requested.cluster}`;
+  if (requested.need === "pair") return `asked pair ${requested.folder}`;
+  if (requested.need === "trial") return `asked trial ${requested.trial_id}`;
+  return `asked ${requested.need}`;
+}
 
 type ConversationSummary = {
   id: string;
   title: string;
   updatedAt: string;
   turnCount: number;
+  pinned?: boolean;
 };
 
 // ─── ODD Q&A panel (S5 part 2) ─────────────────────────────────────────────
@@ -60,8 +72,13 @@ export default function OddChatPanel({
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
   const [pendingQuestion, setPendingQuestion] = useState<string | null>(null);
-  const [nameDraft, setNameDraft] = useState("New conversation");
-  const [renaming, setRenaming] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const [menuConversationId, setMenuConversationId] = useState<string | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameTarget, setRenameTarget] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const loadHistory = useCallback((selectedConversationId?: string | null) => {
@@ -92,18 +109,18 @@ export default function OddChatPanel({
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [history, asking]);
 
-  useEffect(() => {
-    const current = conversations.find((conversation) => conversation.id === conversationId);
-    setNameDraft(current?.title ?? "New conversation");
-  }, [conversationId, conversations]);
+  const menuConversation = conversations.find((conversation) => conversation.id === menuConversationId);
 
-  const saveName = async () => {
-    const title = nameDraft.replace(/\s+/g, " ").trim();
-    const activeConversationId = conversationId ?? "default";
-    if (!title || renaming) return;
-    const current = conversations.find((conversation) => conversation.id === activeConversationId);
-    if (current?.title === title) return;
-    setRenaming(true);
+  const closeMenu = () => {
+    setMenuAnchor(null);
+    setMenuConversationId(null);
+  };
+
+  const saveRename = async () => {
+    const title = renameValue.replace(/\s+/g, " ").trim();
+    const target = renameTarget;
+    if (!title || !target || busyId) return;
+    setBusyId(target);
     setAskError(null);
     try {
       const res = await fetch("/api/odd-chat", {
@@ -112,34 +129,91 @@ export default function OddChatPanel({
         body: JSON.stringify({
           batchId: Number(batchId),
           folder,
-          conversationId: activeConversationId,
+          conversationId: target,
           title,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
       setConversations((prev) => {
-        const exists = prev.some((conversation) => conversation.id === activeConversationId);
+        const exists = prev.some((conversation) => conversation.id === target);
         if (!exists) {
           return [
             {
-              id: activeConversationId,
+              id: target,
               title,
               updatedAt: new Date().toISOString(),
               turnCount: history.length,
+              pinned: false,
             },
             ...prev,
           ];
         }
         return prev.map((conversation) =>
-          conversation.id === activeConversationId ? { ...conversation, title } : conversation,
+          conversation.id === target ? { ...conversation, title } : conversation,
         );
       });
-      setNameDraft(title);
+      setRenameOpen(false);
+      setRenameTarget(null);
     } catch (e) {
       setAskError(e instanceof Error ? e.message : String(e));
     } finally {
-      setRenaming(false);
+      setBusyId(null);
+    }
+  };
+
+  const togglePin = async (target: string, pinned: boolean) => {
+    setBusyId(target);
+    setAskError(null);
+    try {
+      const res = await fetch("/api/odd-chat", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchId: Number(batchId),
+          folder,
+          conversationId: target,
+          pinned,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      await loadHistory(conversationId);
+    } catch (e) {
+      setAskError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    const target = deleteTarget;
+    if (!target || busyId) return;
+    setBusyId(target);
+    setAskError(null);
+    try {
+      const res = await fetch("/api/odd-chat", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchId: Number(batchId),
+          folder,
+          conversationId: target,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const next = (data.conversations ?? []) as ConversationSummary[];
+      setConversations(next);
+      setDeleteTarget(null);
+      if (conversationId === target) {
+        if (next[0]) loadHistory(next[0].id);
+        else startNewConversation();
+      }
+    } catch (e) {
+      setAskError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyId(null);
     }
   };
 
@@ -147,7 +221,6 @@ export default function OddChatPanel({
     const q = question.trim();
     if (!q || asking) return;
     const activeConversationId = conversationId ?? "default";
-    await saveName();
     if (!String(apiKey).trim()) {
       setAskError("Enter the API key in Model setup first.");
       onOpenSetup();
@@ -189,9 +262,22 @@ export default function OddChatPanel({
         : `conversation-${Date.now()}`;
     setConversationId(id);
     setHistory([]);
-    setNameDraft("New conversation");
     setAskError(null);
   };
+
+  const listedConversations: ConversationSummary[] =
+    conversationId && !conversations.some((conversation) => conversation.id === conversationId)
+      ? [
+          {
+            id: conversationId,
+            title: "New conversation",
+            updatedAt: new Date().toISOString(),
+            turnCount: 0,
+            pinned: false,
+          },
+          ...conversations,
+        ]
+      : conversations;
 
   return (
     <Paper variant="outlined" sx={{ p: 2 }}>
@@ -199,13 +285,11 @@ export default function OddChatPanel({
         ODD Q&amp;A
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Ask a question about this one run (e.g. &ldquo;What is the weakness of this AV
-        system?&rdquo;, &ldquo;Which condition leads to high failure probability?&rdquo;,
-        &ldquo;Why keep these clusters separate?&rdquo;). Answers are grounded only in this
-        run&rsquo;s deterministic stats + LLM-authored cluster/pair products (
-        <code>odd_chat_briefing.json</code>) — never invented. History below is stored in{" "}
-        <code>conversation_log/odd_chat_log.jsonl</code>, so it is still here next time this
-        dashboard is opened (by anyone), and is shared with the same command run from a terminal.
+        Ask a question about this one run. Each turn sends a short index from{" "}
+        <code>odd_chat_briefing.json</code>. If a fact is only in a file, the model asks
+        once for that medoid, pair, trial, summary, or BEV table. The chips under the answer say what was asked and what was sent.
+        History below is stored in <code>conversation_log/odd_chat_log.jsonl</code>, so it
+        is still here next time this dashboard is opened.
       </Typography>
 
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }} flexWrap="wrap">
@@ -223,48 +307,72 @@ export default function OddChatPanel({
         )}
       </Stack>
 
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }} flexWrap="wrap">
-        <Button size="small" variant="outlined" onClick={startNewConversation}>
-          New conversation
-        </Button>
-        <FormControl size="small" sx={{ minWidth: 220 }}>
-          <InputLabel id="odd-conversation-label">Conversation</InputLabel>
-          <Select
-            labelId="odd-conversation-label"
-            value={conversationId ?? ""}
-            label="Conversation"
-            onChange={(e) => loadHistory(e.target.value)}
-          >
-            {conversationId &&
-              !conversations.some((conversation) => conversation.id === conversationId) && (
-                <MenuItem value={conversationId}>{nameDraft || "New conversation"}</MenuItem>
-              )}
-            {conversations.map((conversation) => (
-              <MenuItem key={conversation.id} value={conversation.id}>
-                {conversation.title} ({conversation.turnCount} {conversation.turnCount === 1 ? "turn" : "turns"})
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <TextField
-          size="small"
-          label="Conversation name"
-          value={nameDraft}
-          onChange={(e) => setNameDraft(e.target.value)}
-          onBlur={() => {
-            void saveName();
+      <Box sx={{ display: "flex", gap: 1.5, alignItems: "stretch", minHeight: 480 }}>
+        <Box
+          sx={{
+            width: 260,
+            flexShrink: 0,
+            borderRight: "1px solid",
+            borderColor: "divider",
+            pr: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: 0.5,
           }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              void saveName();
-            }
-          }}
-          disabled={renaming}
-          sx={{ minWidth: 240, flexGrow: 1 }}
-        />
-      </Stack>
+        >
+          <Button size="small" variant="outlined" onClick={startNewConversation} sx={{ mb: 0.5 }}>
+            New chat
+          </Button>
+          <Box sx={{ overflowY: "auto", maxHeight: 560, display: "flex", flexDirection: "column", gap: 0.25 }}>
+            {listedConversations.map((conversation) => {
+              const selected = conversation.id === conversationId;
+              return (
+                <Box
+                  key={conversation.id}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    borderRadius: 1.5,
+                    bgcolor: selected ? "action.selected" : "transparent",
+                    "&:hover": { bgcolor: selected ? "action.selected" : "action.hover" },
+                  }}
+                >
+                  {conversation.pinned && (
+                    <PushPin sx={{ fontSize: 14, ml: 0.75, color: "text.secondary" }} />
+                  )}
+                  <Button
+                    size="small"
+                    onClick={() => loadHistory(conversation.id)}
+                    sx={{
+                      flex: 1,
+                      justifyContent: "flex-start",
+                      textTransform: "none",
+                      color: "text.primary",
+                      minWidth: 0,
+                      px: 1,
+                    }}
+                  >
+                    <Typography variant="body2" noWrap>
+                      {conversation.title}
+                    </Typography>
+                  </Button>
+                  <IconButton
+                    size="small"
+                    aria-label={`Actions for ${conversation.title}`}
+                    onClick={(event) => {
+                      setMenuAnchor(event.currentTarget);
+                      setMenuConversationId(conversation.id);
+                    }}
+                  >
+                    <MoreHoriz fontSize="small" />
+                  </IconButton>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
 
+        <Box sx={{ flex: 1, minWidth: 0 }}>
       {loadingHistory ? (
         <Stack alignItems="center" sx={{ py: 2 }}>
           <CircularProgress size={22} />
@@ -344,8 +452,17 @@ export default function OddChatPanel({
                       <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
                         {t.answer}
                       </Typography>
-                      <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 1 }}>
-                        {(t.citations ?? []).map((c, j) => (
+                      <Stack spacing={0.5} alignItems="flex-start" sx={{ mt: 1 }}>
+                        {t.asked && (
+                          <Chip label={t.asked} size="small" color="info" variant="outlined" />
+                        )}
+                        {t.sent && (
+                          <Chip label={t.sent} size="small" variant="outlined" />
+                        )}
+                        {!t.asked && requestedLabel(t.requested) && (
+                          <Chip label={requestedLabel(t.requested)} size="small" color="info" variant="outlined" />
+                        )}
+                        {!t.asked && (t.citations ?? []).map((c, j) => (
                           <Chip key={j} label={c} size="small" variant="outlined" />
                         ))}
                         {t.dry_run && (
@@ -434,6 +551,76 @@ export default function OddChatPanel({
           </Typography>
         </>
       )}
+        </Box>
+      </Box>
+
+      <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={closeMenu}>
+        <MenuItem
+          onClick={() => {
+            const current = conversations.find((conversation) => conversation.id === menuConversationId);
+            setRenameTarget(menuConversationId);
+            setRenameValue(current?.title ?? "New conversation");
+            setRenameOpen(true);
+            closeMenu();
+          }}
+        >
+          Change name
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            const target = menuConversationId;
+            const pinned = Boolean(menuConversation?.pinned);
+            closeMenu();
+            if (target) void togglePin(target, !pinned);
+          }}
+        >
+          {menuConversation?.pinned ? "Unpin" : "Pin"}
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            setDeleteTarget(menuConversationId);
+            closeMenu();
+          }}
+        >
+          Delete
+        </MenuItem>
+      </Menu>
+
+      <Dialog open={renameOpen} onClose={() => setRenameOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle>Change name</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            margin="dense"
+            label="Name"
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void saveRename();
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRenameOpen(false)}>Cancel</Button>
+          <Button onClick={() => void saveRename()} disabled={!renameValue.trim() || Boolean(busyId)}>
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
+        <DialogTitle>Delete this conversation?</DialogTitle>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
+          <Button color="error" onClick={() => void confirmDelete()} disabled={Boolean(busyId)}>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Paper>
   );
 }

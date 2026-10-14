@@ -10,7 +10,7 @@ Primary inputs (required upstream):
 
 **You invent `label`.** 2–4 words that say what this cluster did. One mechanism. The why belongs in `caption`.
 
-Use plain nouns and no adjective (not late, proactive, smooth, hard). You do not see the other clusters, so a degree word has nothing to compare against. A later review pass adds those words when two clusters share a name.
+Use plain nouns and no adjective (not late, proactive, smooth, hard). You do not see the other clusters, so a degree word has nothing to compare against. A later rename pass (`cluster_rename_prompt.txt`) adds one adjective when two clusters share a name.
 
 No collision: name the outcome, for example `Pass`, `Yield`, `Stop`, `Slowdown`.
 
