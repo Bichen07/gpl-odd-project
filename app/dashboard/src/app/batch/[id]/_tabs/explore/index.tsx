@@ -11,9 +11,13 @@ import {
 type Props = {
   batchId: string;
   savedFilename?: string;
+  ego?: string;
+  k?: string;
+  s?: string;
+  section?: string;
 };
 export default async function Explore(props: Props) {
-  const { batchId } = props;
+  const { batchId, ego, k, s, section } = props;
 
   let saves: SavedTrajectoryAnalysis = null;
   let batch: Batch = null;
@@ -35,5 +39,16 @@ export default async function Explore(props: Props) {
     console.error(err);
   }
 
-  return <Dock batchId={batchId} saves={saves} trials={trials} batch={batch} />;
+  return (
+    <Dock
+      batchId={batchId}
+      saves={saves}
+      trials={trials}
+      batch={batch}
+      ego={ego}
+      k={k}
+      s={s}
+      section={section}
+    />
+  );
 }

@@ -40,16 +40,37 @@ import ClusterAnalysis from "./panels/ClusterAnalysis";
 import Report from "./panels/Report";
 import OddQA from "./panels/OddQA";
 
+function tabFromSection(section?: string): number {
+  if (section === "medoid") return TAB.MEDOID;
+  if (section === "pairs") return TAB.PAIRS;
+  if (section === "score" || section === "cluster") return TAB.CLUSTER;
+  if (section === "report") return TAB.REPORT;
+  if (section === "qa") return TAB.ODD_QA;
+  return TAB.SETUP;
+}
+
 export default function AnalyzeClient({
   batchId,
   ego,
   k,
   s,
+  presentation = "page",
+  showMedoid = true,
+  showPairs = true,
+  showReport = true,
+  showScore = false,
+  section,
 }: {
   batchId: string;
   ego: string;
   k: string;
   s: string;
+  presentation?: "page" | "stack" | "tabs";
+  showMedoid?: boolean;
+  showPairs?: boolean;
+  showReport?: boolean;
+  showScore?: boolean;
+  section?: string;
 }) {
   const router = useRouter();
 
@@ -78,7 +99,8 @@ export default function AnalyzeClient({
   const [dryRun, setDryRun] = useState<boolean>(false);
 
   // --- evaluation tab ---
-  const [activeTab, setActiveTab] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState<number>(() => tabFromSection(section));
+  const [qaReload, setQaReload] = useState(0);
   const [evalConfigs, setEvalConfigs] = useState<ClusteringQuality[]>([]);
   const [evalLoading, setEvalLoading] = useState(false);
 
@@ -659,9 +681,12 @@ export default function AnalyzeClient({
       splitClustersForPrereq.every((c) => !c.readyForSummary));
   const anySummaryReady = splitClustersForPrereq.some((c) => c.readyForSummary);
 
+  const stack = presentation === "stack";
+  const showPageHeader = presentation === "page";
+
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
-      {/* Header */}
+    <Container maxWidth="xl" sx={{ py: showPageHeader ? 3 : 0, px: showPageHeader ? undefined : 0 }}>
+      {showPageHeader ? (
       <Stack direction="row" alignItems="center" spacing={2} sx={{ mb: 2 }}>
         <IconButton onClick={() => router.push(`/batch/${batchId}`)} aria-label="back">
           <ArrowBack />
@@ -673,8 +698,19 @@ export default function AnalyzeClient({
           </Typography>
         </Box>
       </Stack>
+      ) : null}
 
-      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto">
+      {stack ? null : (
+      <Tabs
+        value={activeTab}
+        onChange={(_, v) => {
+          setActiveTab(v);
+          if (v === TAB.ODD_QA) setQaReload((n) => n + 1);
+        }}
+        sx={{ mb: 2 }}
+        variant="scrollable"
+        scrollButtons="auto"
+      >
         <Tab label="Model setup" />
         <Tab
           label={`Medoid analysis${
@@ -694,11 +730,17 @@ export default function AnalyzeClient({
           }`}
         />
         <Tab label="Report" />
-        <Tab label="ODD Q&A" />
+        <Tab
+          label="ODD Q&A"
+          onClick={() => {
+            if (activeTab === TAB.ODD_QA) setQaReload((n) => n + 1);
+          }}
+        />
       </Tabs>
+      )}
 
 
-      {activeTab === TAB.SETUP && (
+      {!stack && activeTab === TAB.SETUP && (
         <ModelSetup
           provider={provider}
           model={model}
@@ -715,7 +757,8 @@ export default function AnalyzeClient({
         />
       )}
 
-      {activeTab === TAB.PAIRS && (
+      {((stack && showPairs) || (!stack && activeTab === TAB.PAIRS)) && (
+        <Box id="section-pairs" sx={{ mb: 2 }}>
         <ParameterSpacePairs
           prompts={prompts}
           setPrompts={setPrompts}
@@ -732,9 +775,11 @@ export default function AnalyzeClient({
           apiKey={apiKey}
           dryRun={dryRun}
         />
+        </Box>
       )}
 
-      {activeTab === TAB.CLUSTER && (
+      {((stack && showScore) || (!stack && activeTab === TAB.CLUSTER)) && (
+        <Box id="section-score" sx={{ mb: 2 }}>
         <ClusterAnalysis
           config={config}
           batchId={batchId}
@@ -761,9 +806,11 @@ export default function AnalyzeClient({
           summaryBlocked={summaryBlocked}
           evalConfigs={evalConfigs}
         />
+        </Box>
       )}
 
-      {activeTab === TAB.MEDOID && (
+      {((stack && showMedoid) || (!stack && activeTab === TAB.MEDOID)) && (
+        <Box id="section-medoid" sx={{ mb: 2 }}>
         <MedoidAnalysis
           config={config}
             prompts={prompts}
@@ -789,22 +836,26 @@ export default function AnalyzeClient({
           downloadYaml={downloadYaml}
           splitAnalysis={splitAnalysis}
         />
+        </Box>
       )}
 
-      {activeTab === TAB.REPORT && config && (
+      {((stack && showReport) || (!stack && activeTab === TAB.REPORT)) && config && (
+        <Box id="section-report" sx={{ mb: 2 }}>
         <Report
           batchId={batchId}
           folder={config.folder}
           onNavigateTab={setActiveTab}
         />
+        </Box>
       )}
 
-      {activeTab === TAB.ODD_QA && config && (
+      {!stack && activeTab === TAB.ODD_QA && config && (
         <OddQA
             batchId={batchId}
           folder={config.folder}
           apiKey={apiKey}
           model={model}
+          reloadToken={qaReload}
           onOpenSetup={() => setActiveTab(TAB.SETUP)}
         />
       )}

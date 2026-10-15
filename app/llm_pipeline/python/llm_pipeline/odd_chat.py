@@ -1,13 +1,13 @@
 """S5 (part 2/2) — ODD Q&A over one run.
 
-Every turn sends a short index from ``odd_chat_briefing.json``. The model may
-answer from that index, or reply with one JSON request for a medoid YAML, one
+Every turn sends a short slice of ``odd_chat_briefing.json``. There is no index
+file. The model may answer from that briefing, or reply with one JSON request for a medoid YAML, one
 pair ``contrast.yaml``, or one trial row from ``odd_all_trials.json``. Python
 reads that file and the model answers. This is the closed tool list from Yao
 et al. (ReAct, ICLR 2023), not a search over a corpus.
 
 Rules enforced here:
-  - Numbers come from the index or the one returned file.
+  - Numbers come from the briefing or the one returned file.
   - If the briefing marks something ``missing``, the answer must say unknown
     and repeat the step on that line.
   - A trial id, cluster, or pair folder that is not in this run returns
@@ -196,29 +196,79 @@ def _trim_history(history: List[Dict[str, str]], max_history_turns: int) -> List
     return history[-(max_history_turns * 2):] if history else []
 
 
+def load_cluster_summaries(run_dir: Path) -> List[Dict[str, Any]]:
+    """Caption cards from ``clusterN/output/cluster_summary.yaml``.
+
+    Token counts and the label-review note stay out. A missing file is skipped.
+    """
+    cards: List[Dict[str, Any]] = []
+    for path in sorted(Path(run_dir).glob("cluster*/output/cluster_summary.yaml")):
+        if not re.fullmatch(r"cluster\d+", path.parents[1].name):
+            continue
+        doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        if not isinstance(doc, dict):
+            continue
+        neighbors = []
+        for row in doc.get("neighbor_comparison") or []:
+            if not isinstance(row, dict):
+                continue
+            neighbors.append(
+                {
+                    "neighbor_cluster": row.get("neighbor_cluster"),
+                    "folder": row.get("parameter_space_pair_folder"),
+                    "behavior_similarity": row.get("behavior_similarity"),
+                    "reason": str(row.get("reason") or "").strip(),
+                }
+            )
+        cards.append(
+            {
+                "cluster": doc.get("cluster_id"),
+                "label": doc.get("label"),
+                "caption": str(doc.get("caption") or "").strip(),
+                "consistency_note": str(doc.get("consistency_note") or "").strip(),
+                "risk_level": doc.get("risk_level"),
+                "neighbor_comparison": neighbors,
+            }
+        )
+    return cards
+
+
 def build_messages(
     briefing: Dict[str, Any],
     question: str,
     history: List[Dict[str, str]],
     max_history_turns: int = 8,
     returned_file: Optional[str] = None,
+    cluster_summaries: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, str]]:
-    """Index on every turn. The returned file is attached only for the second call."""
+    """Briefing slice and cluster summaries on every turn. The returned file is attached only for the second call."""
     index = build_index(briefing)
     messages: List[Dict[str, str]] = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.append(
         {
             "role": "system",
-            "content": "INDEX (cluster id, name, size, collision rate, medoid trial id, "
+            "content": "BRIEFING (from analysis/odd/output/odd_chat_briefing.json. "
+            "Cluster id, clustering name, size, collision rate, medoid trial id, "
             "resolution, outcome, parameter ranges, pair folders, sampled rules, "
             "kNN boundary counts, and missing):\n" + json.dumps(index, indent=2),
         }
     )
+    if cluster_summaries:
+        messages.append(
+            {
+                "role": "system",
+                "content": "CLUSTER SUMMARIES (from clusterN/output/cluster_summary.yaml, "
+                "sent with every question). Use the summary label. A caption is the cluster story. "
+                "These cards do not replace a file request: a similarity question is still the pair JSON, "
+                "and a failure question is still the summary JSON, because the collision-end measurement "
+                "is not in this packet.\n" + json.dumps(cluster_summaries, indent=2),
+            }
+        )
     if returned_file is None:
         messages.append(
             {
                 "role": "system",
-                "content": "If the INDEX is enough, answer now. If a fact is missing, reply with "
+                "content": "If the BRIEFING is enough, answer now. If a fact is missing, reply with "
                 "only the JSON object from rule 7. A sentence that says you need more "
                 "information is wrong. A similarity question is the pair JSON. A question "
                 "about what makes Ego fail is the summary JSON.",
@@ -229,9 +279,10 @@ def build_messages(
             {
                 "role": "system",
                 "content": "A file has already been returned below. Answer in prose. Do not reply with JSON. "
-                "Use the word measurement for brake_t, ttc, peak_t, impact time, and critical_divergence.at. "
-                "Use the word model for a timeline description, a motive_summary, or behavior_similarity. "
-                "Example: Measurement: brake_t 7.7 s and ttc 2.22 s. The medoid model's sentence says the brake is for CuttingIn. "
+                "Summarize a timeline. Do not paste it. "
+                "Use the word measurement for one decisive brake_t, ttc, peak_t, impact time, or critical_divergence.at. "
+                "Use the word model for a short motive or behavior_similarity, paraphrased in one clause. "
+                "Example: Ego brakes for CuttingIn and still collides. Measurement: brake_t 7.7 s. "
                 "Do not use the word deterministic.",
             }
         )
@@ -282,8 +333,13 @@ def fetch_request(run_dir: Path, request: Dict[str, Any]) -> Tuple[Any, str, boo
             return _not_available("medoid")
         doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         metrics = doc.get("conflict_metrics") or {}
+        from .conversation_trials import cluster_frames
+
+        stored = cluster_frames(run_dir, cluster_id)
         body = {
             "cluster": cluster_id,
+            "images": stored["images"],
+            "build_trial_id": stored["build_trial_id"],
             "measurements": {
                 "trial_id": doc.get("trial_id") or metrics.get("trial_id"),
                 "brake_t": metrics.get("brake_t"),
@@ -459,11 +515,21 @@ def _fetch_bev(run_dir: Path, request: Dict[str, Any]) -> Tuple[Any, str, bool]:
         )
     if not frames:
         return _not_available("bev")
+    from .conversation_trials import cluster_frames
+
+    stored = cluster_frames(run_dir, cluster_id)
+    note = (
+        "BEV frame table. Jpg frames are attached."
+        if stored["images"]
+        else "BEV frame table. No image is stored for this run."
+    )
     return (
         {
             "cluster": cluster_id,
-            "note": "BEV frame table. No image is stored for this run.",
+            "note": note,
             "frames": frames,
+            "images": stored["images"],
+            "build_trial_id": stored["build_trial_id"],
         },
         f"bev cluster{cluster_id}",
         True,
@@ -501,35 +567,43 @@ def _normalize_request(request: Dict[str, Any]) -> Dict[str, Any]:
     return {"need": str(need or "")}
 
 
+def _plain_exchange(value: Any) -> str:
+    """Value inside ``asked:`` / ``send:``. Empty is the word null."""
+    if value is None:
+        return "null"
+    text = str(value).strip()
+    if not text or text.lower() == "null":
+        return "null"
+    text = re.sub(r"^(asked|sent|send)\s*:\s*", "", text, count=1, flags=re.IGNORECASE)
+    text = re.sub(r"^(asked|sent|send)\s+", "", text, count=1, flags=re.IGNORECASE)
+    return text.strip() or "null"
+
+
+def _display_exchange(asked: Any, sent: Any) -> Tuple[str, str]:
+    return f"asked: {_plain_exchange(asked)}", f"send: {_plain_exchange(sent)}"
+
+
 def _asked_and_sent(requested: Dict[str, Any], body: Any, ok: bool) -> Tuple[str, str]:
     need = requested.get("need")
     if need == "medoid":
         cluster_id = requested.get("cluster")
-        asked = f"asked: medoid cluster {cluster_id}"
         sent = (
-            f"sent: medoid of cluster {cluster_id} — measurements, medoid model sentences"
+            f"medoid of cluster {cluster_id} — measurements, medoid model sentences"
             if ok
-            else "sent: not available"
+            else "not available"
         )
-        return asked, sent
+        return f"medoid cluster {cluster_id}", sent
     if need == "pair":
         folder = requested.get("folder")
-        asked = f"asked: pair {folder}"
-        sent = (
-            f"sent: pair {folder} — measurements, model label"
-            if ok
-            else "sent: not available"
-        )
-        return asked, sent
+        sent = f"pair {folder} — measurements, model label" if ok else "not available"
+        return f"pair {folder}", sent
     if need == "trial":
         trial_id = requested.get("trial_id")
-        asked = f"asked: trial {trial_id}"
-        sent = f"sent: trial {trial_id}" if ok else "sent: not available"
-        return asked, sent
+        sent = f"trial {trial_id}" if ok else "not available"
+        return f"trial {trial_id}", sent
     if need == "summary":
         clusters = requested.get("clusters") or []
         joined = ", ".join(str(item) for item in clusters)
-        asked = f"asked: summary clusters {joined}"
         has_end = False
         if isinstance(body, dict):
             has_end = any(
@@ -537,22 +611,17 @@ def _asked_and_sent(requested: Dict[str, Any], body: Any, ok: bool) -> Tuple[str
                 for card in (body.get("clusters") or [])
             )
         if not ok:
-            sent = "sent: not available"
+            sent = "not available"
         elif has_end:
-            sent = f"sent: summary of cluster {joined}, plus each collision end"
+            sent = f"summary of cluster {joined}, plus each collision end"
         else:
-            sent = f"sent: summary of cluster {joined}"
-        return asked, sent
+            sent = f"summary of cluster {joined}"
+        return f"summary clusters {joined}", sent
     if need == "bev":
         cluster_id = requested.get("cluster")
-        asked = f"asked: bev cluster {cluster_id}"
-        sent = (
-            f"sent: BEV frame table of cluster {cluster_id}"
-            if ok
-            else "sent: not available"
-        )
-        return asked, sent
-    return f"asked: {need}", "sent: not available"
+        sent = f"BEV frame table of cluster {cluster_id}" if ok else "not available"
+        return f"bev cluster {cluster_id}", sent
+    return str(need or "null"), "not available"
 
 
 def _invoke(llm: Any, messages: List[Dict[str, str]]) -> str:
@@ -584,11 +653,26 @@ def answer(
     conversation_id: str = "default",
     dry_run: bool = False,
     log: bool = True,
+    attachment: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     run_dir = Path(run_dir)
     briefing = load_briefing(run_dir)
+    cluster_summaries = load_cluster_summaries(run_dir)
     history = history or []
-    messages = build_messages(briefing, question, history)
+    model_question = question
+    selection = None
+    if attachment and attachment.get("trial_ids"):
+        from .conversation_trials import describe_selection
+
+        selection = describe_selection(
+            run_dir,
+            [str(item) for item in attachment.get("trial_ids") or []],
+            str(attachment.get("source") or "lasso"),
+        )
+        model_question = question + "\n\n" + selection["prompt"]
+    messages = build_messages(
+        briefing, model_question, history, cluster_summaries=cluster_summaries
+    )
 
     if dry_run or not has_llm_credentials(model, api_key):
         text = (
@@ -598,10 +682,12 @@ def answer(
         )
         result = {
             "answer": text,
-            "citations": ["index"],
+            "citations": [],
             "requested": None,
-            "asked": None,
-            "sent": None,
+            "asked": "asked: null",
+            "sent": _display_exchange(None, selection["label"] if selection else None)[1],
+            "images": [],
+            "build_trial_ids": [],
             "model": model,
             "dry_run": True,
         }
@@ -612,27 +698,34 @@ def answer(
         requested = None
         asked = None
         sent = None
+        images: List[Dict[str, Any]] = []
+        build_trial_ids: List[str] = []
         citations = ["index"]
         if request is not None:
             requested = _normalize_request(request)
             body, citation, ok = fetch_request(run_dir, requested)
             asked, sent = _asked_and_sent(requested, body, ok)
+            if isinstance(body, dict):
+                images = [row for row in (body.get("images") or []) if isinstance(row, dict)]
+                if body.get("build_trial_id"):
+                    build_trial_ids = [str(body.get("build_trial_id"))]
             citations = [citation]
             follow = build_messages(
                 briefing,
-                question,
+                model_question,
                 history,
                 returned_file=_returned_file_text(body, ok),
+                cluster_summaries=cluster_summaries,
             )
             text = _invoke(llm, follow)
             if parse_request(text) is not None:
                 if not ok:
-                    asked = (
+                    missing = (
                         requested.get("trial_id")
                         or requested.get("folder")
                         or requested.get("cluster")
                     )
-                    text = f"I don't know. {asked} is not in this run."
+                    text = f"I don't know. {missing} is not in this run."
                 else:
                     follow.append(
                         {
@@ -644,12 +737,19 @@ def answer(
         else:
             text = first
         text = _drop_embedded_request(text)
+        if selection and sent:
+            sent = f"{_plain_exchange(sent)}; {_plain_exchange(selection['label'])}"
+        elif selection:
+            sent = selection["label"]
+        asked_line, sent_line = _display_exchange(asked, sent)
         result = {
             "answer": text,
-            "citations": citations,
+            "citations": [],
             "requested": requested,
-            "asked": asked,
-            "sent": sent,
+            "asked": asked_line,
+            "sent": sent_line,
+            "images": images,
+            "build_trial_ids": build_trial_ids,
             "model": model,
             "dry_run": False,
         }
@@ -675,6 +775,8 @@ def _append_log(
         "requested": result.get("requested"),
         "asked": result.get("asked"),
         "sent": result.get("sent"),
+        "images": result.get("images") or [],
+        "build_trial_ids": result.get("build_trial_ids") or [],
         "model": result.get("model"),
         "dry_run": result.get("dry_run"),
         "briefing_generated_at": briefing.get("generated_at"),

@@ -2,7 +2,7 @@
 
 Run: batch 8, k = 3, silhouette 0.8032. LLM: gemini-2.5-flash, temperature 0.1.
 Clustering (MFPCA + HDBSCAN, whole trajectory) is already done. These pages start after it.
-k = 6 check (same batch, silhouette 0.5947 and 0.6113, rebuilt 2026-10-02): pages 24–25.
+k = 6 check (same batch, silhouette 0.5947 and 0.6113, rebuilt 2026-10-02): pages 23–24. Q&A on s = 0.5947: page 20. Questions for review: page 26.
 
 - `ppt:` slide text.
 - `notes:` speaker only.
@@ -27,7 +27,7 @@ ppt:
 Principle: geometry decides, the LLM explains. The LLM never changes clusters or ranking.
 
 notes:
-Not a new clustering method. A reading layer on top. Standards comparison: page 26.
+Not a new clustering method. A reading layer on top. Standards comparison: page 25.
 
 ===
 
@@ -43,7 +43,7 @@ ppt:
 | LLM                 | 3. Parameter pair       | similar inputs, different trajectory: what differs? | parameter_space_pair + system + glossary |
 | LLM                 | 4. Summary, then rename | What is each cluster called?                        | cluster_summary, then input_context_label_rename |
 | No LLM              | 5. Report               | Show the saved cards                                | none                                     |
-| LLM                 | 6. Q&A                  | Answer from the index, or one requested file        | odd_chat_system_prompt                   |
+| LLM                 | 6. Q&A                  | Answer from the briefing, or one requested file     | odd_chat_system_prompt                   |
 
 
 Pages 7–9 are the context files. From page 11, each stage is two pages: the prompt, then the result.
@@ -609,14 +609,16 @@ A rule is a hypothesis on the sampled trials. This run's collision rule: start d
 page 20
 title: Q&A — what the model receives
 ppt:
-Two calls. The first call always gets a short index. If the index is enough, the model answers. If a fact is only in a file, the first reply is one JSON object, Python reads that file, and the second call answers.
+Two calls. The first call always gets `analysis/odd/output/odd_chat_briefing.json`. There is no index file. If that briefing is enough, the model answers. If a fact is only in another file, the first reply is one JSON object, Python reads that file, and the second call answers.
 
 
 | Always sent | What it contains |
 | ----------- | ---------------- |
-| `odd_chat_system_prompt.txt` | Numbers only from the index or the one returned file. A leaf is a sampled rule, depth 1–5. End with Sources. |
-| The index | Cluster id, name, size, collision rate, medoid trial id. Pair folder. Rule id, predicate, support, precision. `missing`. |
-| The question | Plus the last 8 turns. The file from the previous question is not kept. |
+| `odd_chat_system_prompt.txt` | Numbers only from the briefing or the one returned file. A leaf is a sampled rule, depth 1–5. End with Sources. |
+| `odd_chat_briefing.json` | Cluster id, clustering name, size, collision rate, medoid trial id, resolution, outcome, parameter ranges. Pair folder. Rule id, predicate, support, precision. `missing`. |
+| Cluster summaries | Every `clusterN/output/cluster_summary.yaml`, including the first turn of a new conversation. Label, caption, consistency note, risk, neighbor comparison. `llm_meta` and `label_review` are left out. |
+| The question | Plus the last 8 turns of this conversation only. The file from the previous question is not kept. |
+| A selection | Above 6 trials: 1 to 3 from each cluster that appears, by its share, including noise. Stored context first. This collision-boundary filter is 13 of 461. The conversation chip uses that same count. |
 
 
 | One request | File Python reads | What comes back |
@@ -628,64 +630,59 @@ Two calls. The first call always gets a short index. If the index is enough, the
 | `{"need":"bev","cluster":2}` | `cluster2/processed/snapshots/llm_snapshots.json` | Frame table: time, action label, distance, time to collision, ego speed. No image |
 
 
-A time or a brake is the medoid file. Whether two medoids are similar is the pair file. A parameter value is the trial row. A caption, or how a collision ends, is the summary. A frame time is the BEV table. The trial row has no timeline. An id that is not in this run returns "not available", and the answer says it does not know.
+A time or a brake is the medoid file. Whether two medoids are similar is the pair file. A parameter value is the trial row. A caption, or how a collision ends, is the summary. A frame time is the BEV table. A sampled trial context is a timeline. The answer summarizes it and does not copy the action stamps. An id that is not in this run returns "not available", and the answer says it does not know.
+
+Under every answer the panel shows two lines, and nothing else. An empty value is the word null.
+
+```
+asked: null
+send: 13 of 461 filter trials
+```
 
 The next sample is the collision sampled rule with the largest support. The model does not write a new scenario file.
 
-"What did the medoid do?" names no cluster. The model lists every cluster from the index and does not pick one timeline.
+"What did the medoid do?" names no cluster. The model lists every cluster from the briefing and does not pick one timeline.
 
-notes:
-First check, before the fix. Two answers were incorrect. The other five numbers matched the files.
+Fresh check, conversation `qa-check-current`. The earlier chat log, titles, and pins were cleared. Each question was asked with an empty history, model gemini-2.5-flash, temperature 0.1, run `results/batch8/6_cluster_s=0.5947`. A timeline answer is a short brief: what Ego did, how it ended, and at most one time and one distance. It does not paste `lateral_speed`, `heading_vs_road`, or an `At t=` line.
 
-| Question | Verdict | Why |
-| -------- | ------- | --- |
-| Cluster 2 size and rate | Correct | 1237 trials, collision rate 100 |
-| Cluster 0 first brake | Incorrect | 7.7 s and time to collision 2.22 are right. The answer called the medoid model's line "deterministic facts." |
-| Pair c0-c2 | Correct | Apart at 10.2 s, behavior distinct |
-| Medoid parameters | Correct | Delay 3.956, speed 2.561, passed, trial 12198 |
-| Trial 99999 | Correct | I don't know. That id is not in the trial table. |
-| What did the medoid do? | Incorrect | It listed six trial ids and did not say the resolution or the outcome. |
-| Largest collision rule | Correct | Sampled rule R4, support 1688, precision 0.8193 |
+1. Question: How many trials are in cluster 2, and what is its collision rate?
+   Asked: nothing.
+   Sent: nothing. The briefing is enough.
+   Reply: 1237 trials, collision rate 100. It also named the cluster "Ego Side-swipe CuttingIn".
+   Verdict: the two numbers match the briefing. The name does not. The briefing label is "Yield Collision". "Ego Side-swipe CuttingIn" is the summary label, and that file was not sent. Incorrect.
 
-The fix puts resolution and outcome on the index, splits a returned file into `measurements` and `medoid_model_sentences`, and puts the kNN boundary counts on the index. `collision_boundary_trials` is the boundary size, not the number of collisions.
-
-Second check, conversation `qa-check-s05947`, 11 of 11 correct.
-
-| Question | Verdict | Answer that matched the file |
-| -------- | ------- | ---------------------------- |
-| Cluster 2 size and rate | Correct | 1237 trials, collision rate 100 |
-| Cluster 0 first brake | Correct | Measurement brake_t 7.7 s and ttc 2.22 s, trial 12198. The medoid model's sentence says the brake is for CuttingIn. |
-| Cluster 2 medoid | Correct | Trial 7944, yield, collision. Measurement: brake 8.4 s, collision 10.56 s, ttc 1.93 s, side-swipe. The motive is the model's sentence. |
-| Pair c0-c2 | Correct | Measurement: apart at 10.2 s. The model's label is distinct. |
-| Medoid parameters | Correct | Trial 12198, speed 2.561, delay 3.956, passed |
-| Trial 99999 | Correct | I don't know. |
-| What did the medoid do? | Correct | All six: name, trial id, resolution, outcome. No invented timeline. |
-| What situation makes Ego fail? | Correct | Clusters 1, 2, and 3 are rate 100. Sampled rules R4 and R5. R4 support 1688. Not a certified ODD boundary. |
-| Is the collision region the ODD boundary? | Correct | Not a certified ODD boundary. kNN 10, 650 boundary trials of 3869. 650 is not the number of collisions. Largest collision sampled rule is R4. |
-| Cluster boundary | Correct | 904 trials on the cluster boundary. 869 trials have no cluster label. |
-| Largest collision rule | Correct | R4, support 1688, precision 0.8193, delay in (3.855, 4.388] and speed above 2.374 |
-
-File check, conversation `qa-check-files`. The earlier conversation `qa-check-s05947` was left as it is. 3 of 3 correct after the prompt told a similarity question to send only the pair request, and a failure question to send only the summary request. The first tries answered from the index and wrote "I need more information" instead of the JSON.
-
-Each answer chip is two lines: what the model asked for, and what Python sent.
-
-1. Question: What is different between cluster 0 and cluster 2? Are their medoid behaviors similar?
+2. Question: What is different between cluster 0 and cluster 2? Are their medoid behaviors similar?
    Asked: pair c0-c2.
-   Sent: pair c0-c2 — measurements, model label. From `parameter_space_pairs/c0-c2/output/contrast.yaml`.
-   Reply: Cluster 0 is yield and safe, rate 0. Cluster 2 is yield and collision, rate 100. The model's label is distinct. The divergence measurement is 10.2 s. Cluster 0 keeps CuttingIn ahead; cluster 2 is a side overlap.
-   Verdict: the pair was the right file. The reply matches the contrast. Correct.
+   Sent: pair c0-c2 — measurements, model label.
+   Reply: both are yield. Cluster 0 is safe, cluster 2 collides. The model's label is distinct. The divergence measurement is 10.2 s. Cluster 0 keeps CuttingIn ahead; cluster 2 is a side overlap. No kinematics dump.
+   Verdict: the pair was the right file, and those facts match `contrast.yaml`. The reply also calls them "Yield Safe" and "Ego Side-swipe CuttingIn", which are summary labels, not the briefing labels "Proactive Yield" and "Yield Collision". Correct on the pair. The names are not from the sent file.
 
-2. Question: What makes Ego fail? Is it a collision? What situation may lead to a collision of Ego? Which scenario do you recommend to simulate next?
+3. Question: What makes Ego fail? Is it a collision? Which scenario do you recommend to simulate next?
    Asked: summary clusters 1, 2, 3.
-   Sent: summary of cluster 1, 2, 3, plus each collision end. Caption, risk, and neighbor comparison from each `cluster_summary.yaml`. Collision end from each medoid, because the rate is 100.
-   Reply: Cluster 1 trial 12152, rear-end, brake 10.5 s, peak 9.7 s, ttc 2.59 s. Cluster 2 trial 7944, side-swipe, brake 8.4 s, peak 10.56 s, ttc 1.93 s. Cluster 3 trial 7752, corner contact, brake 8.1 s, peak 11.0 s, ttc 2.04 s. Next sample is sampled rule R4, support 1688, delay in (3.855, 4.388] and speed above 2.374. Not a certified ODD boundary. No new scenario file.
-   Verdict: the summary of the three rate-100 clusters was the right file, and the collision ends were attached. The times match the medoid files. Correct.
+   Sent: summary of cluster 1, 2, 3, plus each collision end.
+   Reply: all three are collisions. Cluster 1 is a rear-end, brake 10.5 s. Cluster 2 is a side-swipe, brake 8.4 s. Cluster 3 is a corner contact, brake 8.1 s. Next sample is sampled rule R4, support 1688, delay in (3.855, 4.388] and speed above 2.374. It does not say the rule is not a certified boundary.
+   Verdict: the summary was the right file. The brake times match the medoid collision ends. The missing boundary sentence is the miss. Incorrect on that sentence.
 
-3. Question: What do the BEV frames of cluster 2's medoid show at the collision?
-   Asked: bev cluster 2.
-   Sent: BEV frame table of cluster 2. Rows from `cluster2/processed/snapshots/llm_snapshots.json`. No jpg is in this run.
-   Reply: At 10.56 s the label is COLLISION_with_CuttingIn. Distance 3.07, ttc 9.78, ego speed 5.17. Trial 7944.
-   Verdict: the frame table was the right file. The row matches the snapshot. Correct.
+4. Question: Which clusters are in this collision-boundary selection, and which of the sent trials collide? Use only the trials that were sent.
+   Asked: nothing.
+   Sent: sent 13 of 461 filter trials. One to three trials from each cluster by share.
+   Reply: clusters 0, 1, 2, 3, 4, 5, and -1. The written analysis then covers only the collisions: clusters 1, 2, 3, and noise trial 7146. Clusters 0, 4, and 5 were sent and every one of those trials passed, so they dropped out of the analysis.
+   Verdict: the collision ids are right. The omission is the miss. The selection packet now carries one outcome line per cluster, and that question must stop after those lines.
+   Retest, conversation `qa-check-selection`: cluster 0 passed 6997, 7025, 7032. Cluster 1 collided 7021, 12152. Cluster 2 collided 6995, 7003, 7027. Cluster 3 collided 7752. Cluster 4 passed 6993, 7026. Cluster 5 passed 12852. Cluster -1 collided 7146. Every sent cluster is named.
+
+5. Question: For one colliding trial and one non-colliding trial in this selection, summarize what the stored context shows. Do not paste the timeline.
+   Asked: nothing. The trial timelines were already in the selection.
+   Sent: sent 13 of 461 filter trials.
+   Reply: trial 6997 ends safe after CuttingIn starts a right turn. Trial 12152 brakes and collides with CuttingIn at 14.64 s. No `lateral_speed` and no pasted `At t=` sentence. It cites more than one time.
+   Verdict: the two trials and the endings match the stored context. The one-time limit was not kept. Incorrect on that limit.
+
+6. Question: What is the OncomingSpeed of trial 99999?
+   Asked: trial 99999.
+   Sent: not available.
+   Reply: I don't know. 99999 is not in this run.
+   Verdict: Correct.
+
+Since that check, two rules changed. Cluster summaries go out with the briefing on every question, so a cluster is named from the summary label. A selection question names every cluster on the outcome list, including a cluster whose sent trials passed. The chip and the send line both use the sampler count, 13 of 461 for this filter.
 
 ===
 
@@ -718,52 +715,35 @@ The ranking number is geometry.
 Geometry 60.7 (rank).
 
 notes:
-Tightness is relative (page 23). The 50 percentage-point and 3 s divisors are chosen.
+Tightness is relative (page 24). The 50 percentage-point and 3 s divisors are chosen.
 
 ===
 
 page 22
-title: Contribution
+title: Contribution and weakness
 ppt:
 
 
-| Question                          | Answer                                                              |
-| --------------------------------- | ------------------------------------------------------------------- |
-| What stands for each cluster?     | medoid card, every claim tied to a stamp and image                  |
-| What separates neighbors?         | 2 matched pairs, both distinct                                      |
-| Which clusters are not neighbors? | c0–c1 (distance 0.63): no boundary claim                            |
-| Is a finer split real?            | k = 6: pair card marks the non-behavioral split "similar" (page 25) |
-| Does the LLM change clustering?   | no; rank = geometry (60.7)                                          |
+| Contribution | What it does |
+| ------------ | ------------ |
+| Behavior of the self-driving car | Says what Ego did in the encounter, and how that encounter ended. |
+| Automation on the senior result | The clusters and the scenario stay theirs. This layer writes the cards without a person reading every trial. |
+| Q&A for a deeper look | A question can open one medoid, one neighbor pair, or a sample of the boundary trials. The static card cannot. |
 
 
-Automatic and auditable: deterministic evidence, then constrained LLM reading.
+| Weakness | What is missing |
+| -------- | --------------- |
+| One scenario | No comparison across scenarios, and no separate analysis of each other agent. |
+| Two input variables | OncomingSpeed and OncomingStartDelay only. An ODD boundary spans scenery, weather, road, and traffic. Two variables cannot locate it. |
+| The automatic card is the medoid | Cluster 0 has 904 trials. 18 collide. The medoid does not, so the card never shows those 18. A boundary question reads 13 of 461 trials, not all of them. |
+
+
+notes:
+The senior pieces are Lin's scenario and Chiu's clustering. Page 25 is the standard comparison.
 
 ===
 
 page 23
-title: Weakness
-ppt:
-
-
-| Issue                         | Evidence                                                                                           | Consequence                                                        |
-| ----------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Tightness is relative         | spreads 2.02 / 2.31 / 2.19 → 0.06                                                                  | geometry 60.7 understated; k = 6 outranks k = 3 by this part alone |
-| Contact below resolution      | c1–c2: safe trial's body gap also 0.0 m                                                            | safe vs collision decided < 0.1 m                                  |
-| One medoid                    | c0: 18/904 collided, medoid safe                                                                   | minority unseen at k = 3; k = 6 shows it (page 25)                 |
-| LLM text ≠ measurement        | c0–c2: c2 side called yield, copied from the c2 medoid; same trial = pass first in both k = 6 runs | claims must come from the pair                                     |
-| Resolution edge case          | c0: "pass first", but Ego brakes at 0.9 m                                                          | by the rule: yield                                                 |
-| Stop at contact missed        | Ego 3.0 → 0.2 m/s in 1.3 s, then hit; "stopped" needs ≥ 1 s                                        | yield-stop collision read as late yield                            |
-| Label rename kept duplicates  | k = 6: two clusters both "Yield Collision" / "Rear-end Collision"                                  | that run saw captions only; it now reads `input_context_label_rename.md` (not re-run) |
-| Hand-set thresholds           | 2.5 s, 0.5 s, 15° / 25° / 40°, 0.1                                                                 | not validated                                                      |
-| Scope                         | one scenario, 2 parameters, k = 3 (+ k = 6 check)                                                  | no claim beyond this box                                           |
-
-
-notes:
-Tightness: 1 − 2.02/2.31 = 0.12, 0, 1 − 2.19/2.31 = 0.05 → mean 0.06. c1–c2: gap rounded to 0.1 m; rectangle ≠ simulator collision shape. Present it as a sensitive boundary, not a behavioral one.
-
-===
-
-page 24
 title: k = 6 check — two finer partitions
 ppt:
 Goal: same 3000 trials, k = 6. Does the reading still hold? Does it find anything new?
@@ -804,7 +784,7 @@ Without tightness = mean of silhouette, collision spread, TTC spread × 100.
 
 ===
 
-page 25
+page 24
 title: Does k = 6 help?
 ppt:
 
@@ -842,7 +822,7 @@ s 0.61 also marks c2–c5 and c3–c5 "similar" (all pass first + collision on t
 
 ===
 
-page 26
+page 25
 title: Against current ODD standards
 ppt:
 
@@ -864,6 +844,29 @@ Checked 2026-10-01.
 - ASAM OpenODD 1.0.0: [https://publications.pages.asam.net/standards/ASAM_OpenODD/ASAM_OpenODD/latest/specification/03_terms_and_definitions/03_terms_and_definitions.html](https://publications.pages.asam.net/standards/ASAM_OpenODD/ASAM_OpenODD/latest/specification/03_terms_and_definitions/03_terms_and_definitions.html)
 - ISO 21448:2022: [https://www.iso.org/standard/77490.html](https://www.iso.org/standard/77490.html)
 - SAE J3016: cited via the ASAM page.
+
+===
+
+page 26
+title: Questions for an ODD engineer
+ppt:
+The code does not answer these. They are for a test engineer or a professor. Each one is a choice this run already forces.
+
+
+| # | Question | What we would change |
+| --- | --- | --- |
+| 1 | The briefing calls cluster 2 "Yield Collision". The summary calls it "Ego Side-swipe CuttingIn". Which name belongs in the test report? | Use one name in both files, and stop sending the other. |
+| 2 | The collision-boundary filter has 461 trials. The answer reads 13, one to three from each cluster by share. Is that enough to discuss the boundary? | Say the other 448 were not read, or raise the sample. |
+| 3 | The offered next test is sampled rule R4: delay in (3.855, 4.388], speed above 2.374, support 1688, precision 0.82. Should the next batch be that leaf, or one of the three endings (rear-end, side-swipe, corner contact)? | Stop offering the largest leaf as the next scenario. |
+| 4 | 461 is a kNN neighborhood on the parameter plot, not 461 crashes. Clusters 0, 4, and 5 in the sample all passed. How should the screen say this so it is not read as a crash count? | Rename the button and the chip. |
+| 5 | This is one scenario and two parameters. Eight tree leaves are hypotheses, not an ODD boundary (page 25). What is the smallest addition that would let a reviewer treat a leaf as inside or outside the ODD? | Keep the leaf labeled as a sample, which is the rule now. |
+| 6 | A timeline answer keeps one time and drops the brake time and the gap. For trial 12152, is "Ego brakes and still collides" enough for a safety review? | Put the brake time back into the brief. |
+| 7 | Noise is 27 of the 461 and has no summary card. Trial 7146 collides. Should noise be explained, left out of the boundary talk, or clustered again? | Drop cluster −1 from the sample, or write it a card. |
+| 8 | k = 3 scores 60.7 and is the main story. k = 6 scores 70.5 only because tightness is relative, and it is the run that separates the rear-end. Which partition should the ODD discussion use? | Freeze one run in the report and say why. |
+
+
+notes:
+Do not ask them to rerun clustering. Geometry already ranked the partitions. Ask which explanation is allowed to stand on top of it.
 
 ===
 

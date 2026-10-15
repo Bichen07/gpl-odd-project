@@ -22,6 +22,7 @@ import { scaleOrdinal, scaleThreshold } from "@visx/scale";
 import { LegendThreshold } from "@visx/legend";
 import { toTitleSpaceCase } from "@/app/_shared/utils";
 import { interactionSlice } from "../../../../../redux/slices/interaction";
+import { TRIAL_DRAG_TYPE, useChatUi } from "../../../chatContext";
 import { ClusteringResult } from "@/app/_shared/graphql/queries/clustering";
 import { Trial } from "@/app/_shared/graphql/queries/trials";
 import { computeBoundaries } from "../../../../../lib/boundaryExport";
@@ -50,7 +51,7 @@ export default function Filtering() {
   // Default lowered 25 -> 10 (see implementation_plan.md §2.2 "S2 bugfix
   // pass" for the border/boundary-instance-detection rationale — small k
   // keeps the neighborhood local to the actual pass/fail surface).
-  const [kNN, setKNN] = useState(10);
+  const [kNN, setKNN] = useState(5);
   const [changeThreshold, setChangeThreshold] = useState(0);
 
   const [passFailChecked, setPassFailChecked] = useState<Set<string>>(
@@ -97,6 +98,7 @@ export default function Filtering() {
   const selectedTrialIds = useAppSelector(
     (state) => state.batch.selectedTrialIds,
   );
+  const chat = useChatUi();
   const filteredTrialIds = useAppSelector(
     (state) => state.batch.filteredTrialIds,
   );
@@ -825,6 +827,32 @@ export default function Filtering() {
           />
           <Typography fontWeight="bold">On Cluster Boundary</Typography>
         </Stack>
+        {(onPassFailBoundaryChecked || onClusterBoundaryChecked) &&
+          filteredTrialIds.length > 0 && (
+            <Button
+              size="small"
+              draggable
+              onDragStart={(event) => {
+                const payload = {
+                  trialIds: filteredTrialIds.map(String),
+                  source: "boundary" as const,
+                  total: filteredTrialIds.length,
+                };
+                event.dataTransfer.setData(TRIAL_DRAG_TYPE, JSON.stringify(payload));
+                event.dataTransfer.effectAllowed = "copy";
+              }}
+              onClick={() => {
+                chat.setAttachment({
+                  trialIds: filteredTrialIds.map(String),
+                  source: "boundary",
+                  total: filteredTrialIds.length,
+                });
+                chat.setOpen(true);
+              }}
+            >
+              Ask about {filteredTrialIds.length} boundary trials
+            </Button>
+          )}
         <Stack
           // direction="row"
           columnGap={1}
@@ -844,7 +872,7 @@ export default function Filtering() {
             K Nearest Neighbors: {kNN}
           </Typography>
           <Slider
-            defaultValue={10}
+            defaultValue={5}
             step={1}
             marks
             min={1}

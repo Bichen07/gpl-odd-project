@@ -74,8 +74,17 @@ export default function Contour({
     } = {};
 
     const createImages = async () => {
-      const promises: Promise<any>[] = [];
-      for (const [metricName, metric] of Object.entries(metrics ?? {})) {
+      const metricNames = new Set<string>([
+        ...Object.keys(metrics ?? {}),
+        ...Object.keys(trajectoryAnalysisResponse?.metricGridPredictions ?? {}),
+        ...Object.keys(trajectoryAnalysisResponse?.metricGridGradients ?? {}),
+      ]);
+      for (const metricName of metricNames) {
+        const metric = (metrics ?? {})[metricName] ?? {
+          kpi: { name: metricName, id: metricName, rule: "lessThan" },
+          min: null,
+          max: null,
+        };
         newMetricImages[metricName] = {};
 
         const plotData: {
@@ -285,26 +294,27 @@ export default function Contour({
             },
           };
 
-          await Plotly.newPlot(
-            egoName === "ITRI" ? "plotly_div" : "plotly_div2",
-            data,
-            layout
-          ).then(function (gd: any) {
-            promises.push(
-              Plotly.toImage(gd, {
-                format: "png",
-                height: 500,
-                width: 500,
-              }).then(function (url: string) {
-                const img = document.createElement("img");
-                img.src = url;
-                newMetricImages[metricName][gridMode] = img;
-              })
+          try {
+            const gd = await Plotly.newPlot(
+              egoName === "ITRI" ? "plotly_div" : "plotly_div2",
+              data,
+              layout
             );
-          });
-
-          await Promise.allSettled(promises);
-          promises.pop();
+            const url = await Plotly.toImage(gd, {
+              format: "png",
+              height: 500,
+              width: 500,
+            });
+            const img = document.createElement("img");
+            img.src = url;
+            newMetricImages[metricName][gridMode] = img;
+            const snapshot = Object.fromEntries(
+              Object.entries(newMetricImages).map(([name, modes]) => [name, { ...modes }])
+            );
+            setMetricImages(snapshot);
+          } catch (error) {
+            console.error(error);
+          }
         }
       }
       console.log(egoName);
@@ -313,7 +323,7 @@ export default function Contour({
     };
 
     createImages();
-  }, [parameters, metrics]);
+  }, [parameters, metrics, trajectoryAnalysisResponse]);
 
   const resizeObserver = useMemo(() => {
     return new ResizeObserver((entries) => {
@@ -338,8 +348,16 @@ export default function Contour({
 
   return (
     <>
-      <Box component="div" id="plotly_div" sx={{ display: "none" }}></Box>
-      <Box component="div" id="plotly_div2" sx={{ display: "none" }}></Box>
+      <Box
+        component="div"
+        id="plotly_div"
+        sx={{ position: "absolute", width: 500, height: 500, left: -10000, top: 0, overflow: "hidden" }}
+      />
+      <Box
+        component="div"
+        id="plotly_div2"
+        sx={{ position: "absolute", width: 500, height: 500, left: -10000, top: 0, overflow: "hidden" }}
+      />
     </>
   );
 }

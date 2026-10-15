@@ -103,6 +103,19 @@ def main() -> None:
                     help="Conversation id used to partition the persisted chat log")
     oc.add_argument("--dry-run", action="store_true")
     oc.add_argument("--no-log", action="store_true", help="Do not append to odd_chat_log.jsonl")
+    oc.add_argument("--attachment-json", default=None,
+                    help="JSON {trial_ids, source} for a plot selection")
+
+    ct = sub.add_parser(
+        "conversation-trials",
+        help="Look up or render frames for a sampled set of trials",
+    )
+    ct.add_argument("--run-dir", required=True)
+    ct.add_argument("--trial-ids", required=True, help="Comma-separated payload trial ids")
+    ct.add_argument("--build", action="store_true")
+    ct.add_argument("--sample-only", action="store_true", help="Return the selection label without building context")
+    ct.add_argument("--source", default="filter")
+    ct.add_argument("--batch-id", type=int, default=None)
 
     # odd-chat-check: ask the saved questions and score the answers against the files.
     ocheck = sub.add_parser(
@@ -176,6 +189,9 @@ def main() -> None:
         history = None
         if args.history_json and Path(args.history_json).is_file():
             history = _json.loads(Path(args.history_json).read_text(encoding="utf-8"))
+        attachment = None
+        if args.attachment_json and Path(args.attachment_json).is_file():
+            attachment = _json.loads(Path(args.attachment_json).read_text(encoding="utf-8"))
         result = answer(
             Path(args.run_dir),
             args.question,
@@ -186,7 +202,19 @@ def main() -> None:
             conversation_id=args.conversation_id,
             dry_run=args.dry_run,
             log=not args.no_log,
+            attachment=attachment,
         )
+        out = _json.dumps(result, indent=2)
+    elif args.cmd == "conversation-trials":
+        from .conversation_trials import build_trials, describe_selection, selection_label
+
+        ids = [part.strip() for part in str(args.trial_ids).split(",") if part.strip()]
+        if args.sample_only:
+            result = {"label": selection_label(Path(args.run_dir), ids, str(args.source or "filter"))}
+        elif args.build:
+            result = build_trials(Path(args.run_dir), ids, batch_id=args.batch_id)
+        else:
+            result = describe_selection(Path(args.run_dir), ids)
         out = _json.dumps(result, indent=2)
     elif args.cmd == "odd-chat-check":
         from .odd_chat_check import default_questions_path, run_check

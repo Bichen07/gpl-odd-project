@@ -328,7 +328,7 @@ export default function MedoidPanel({
       )}
 
       {contextText ? (
-        <Accordion disableGutters elevation={0} variant="outlined" defaultExpanded>
+        <Accordion key={c?.cluster ?? "none"} disableGutters elevation={0} variant="outlined">
           <AccordionSummary expandIcon={<ExpandMore />}>
             <Typography variant="subtitle2">
               Process context (<code>processed/context_medoid.md</code>)

@@ -1,4 +1,4 @@
-import AnalyzeClient from "./AnalyzeClient";
+import { redirect } from "next/navigation";
 
 export default async function Page({
   params,
@@ -9,12 +9,10 @@ export default async function Page({
 }) {
   const { id } = await params;
   const sp = (await searchParams) ?? {};
-  return (
-    <AnalyzeClient
-      batchId={String(id)}
-      ego={String(sp.ego ?? "ITRI")}
-      k={String(sp.k ?? "")}
-      s={String(sp.s ?? "")}
-    />
-  );
+  const query = new URLSearchParams();
+  if (sp.ego) query.set("ego", String(sp.ego));
+  if (sp.k) query.set("k", String(sp.k));
+  if (sp.s) query.set("s", String(sp.s));
+  query.set("section", "medoid");
+  redirect(`/batch/${id}?${query.toString()}`);
 }

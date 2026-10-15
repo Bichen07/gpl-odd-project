@@ -141,7 +141,7 @@ Reading for a person: k = 3 gives the three outcome families. k = 6 adds one rea
 
 ## 5. Checklist scored
 
-### 5.1 `medoid_analysis_method_study.md` section 8 (one trial)
+### 5.1 One trial
 
 | # | Claim | Before | Now | Evidence |
 | --- | --- | --- | --- | --- |
@@ -152,7 +152,7 @@ Reading for a person: k = 3 gives the three outcome families. k = 6 adds one rea
 | 5 | A brake with no supporting agent is allowed | Missing | **Missing** | No `anomalous` value; every decelerate is pushed onto a named agent. |
 | 6 | Prove the explanation is right | Missing | **Missing** | No human label or faithfulness score. Finding 1 in section 3 shows the need. |
 
-### 5.2 `post_medoid_analysis_method_study.md` section 8 (cluster, ODD, collision)
+### 5.2 Cluster, ODD, and collision
 
 | # | Claim | Before | Now | Evidence |
 | --- | --- | --- | --- | --- |

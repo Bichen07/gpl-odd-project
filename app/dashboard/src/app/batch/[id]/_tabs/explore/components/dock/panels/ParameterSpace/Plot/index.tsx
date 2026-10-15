@@ -54,6 +54,7 @@ import { interactionSlice } from "../../../../../redux/slices/interaction";
 import { Trial } from "@/app/_shared/graphql/queries/trials";
 
 const StyledToggleButtonGroup = styled(ToggleButtonGroup)(({ theme }) => ({
+  flexWrap: "wrap",
   [`& .${toggleButtonGroupClasses.grouped}`]: {
     margin: theme.spacing(0.5),
     border: 0,
@@ -81,7 +82,7 @@ export const colorModes = [
 export type ColorMode = (typeof colorModes)[number];
 
 const margin = {
-  top: 40,
+  top: 16,
   right: 20,
   left: 80,
   bottom: 60,
@@ -275,6 +276,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
   highlightRolesRef.current = highlightRolesByTrialId;
   const selectedTrialIdsRef = useRef(selectedTrialIds);
   selectedTrialIdsRef.current = selectedTrialIds;
+  const filteredTrialIdsRef = useRef(filteredTrialIds);
+  filteredTrialIdsRef.current = filteredTrialIds;
   const clusteringResultRef = useRef(clusteringResult);
   clusteringResultRef.current = clusteringResult;
 
@@ -625,9 +628,11 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       const currentSelection = selectedTrialIdsRef.current;
       const isHighlight = currentSelection.by === "highlight";
       const trialOrder = globalStorage.trialOrder[egoName] ?? [];
+      const visible = new Set((filteredTrialIdsRef.current ?? []).map(String));
       const reported = points
         .map((index) => trialOrder[index])
-        .filter((id): id is string => id != null && id !== "");
+        .filter((id): id is string => id != null && id !== "")
+        .filter((id) => visible.size === 0 || visible.has(String(id)));
 
       if (reported.length === 0) return;
 
@@ -1245,6 +1250,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
 
       let coords = coordinates as any;
 
+      const visible = new Set((filteredTrialIdsRef.current ?? []).map(String));
       const addedSelected: string[] = [];
 
       for (const ego of Object.keys(globalStorage.points)) {
@@ -1262,7 +1268,9 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
           const isPointInPolygon = pointInPolygon([point[0], point[1]], coords);
           if (isPointInPolygon) {
             // @ts-ignore
-            addedSelected.push(String(trials[i].id ?? "unknown"));
+            const trialId = String(trials[i].id ?? "unknown");
+            if (visible.size > 0 && !visible.has(trialId)) continue;
+            addedSelected.push(trialId);
           }
         }
       }
@@ -1347,21 +1355,35 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
       return;
     }
     try {
-      if (
-        showBg &&
-        selectedMetric.kpi.name in metricImages &&
-        metricImages[selectedMetric.kpi.name][gridMode] != null
-      ) {
-        safeScatterplotSet({
-          backgroundImage: metricImages[selectedMetric.kpi.name][gridMode].src,
-        });
-      } else {
-        safeScatterplotSet({ backgroundImage: null });
+      const names = [
+        selectedMetric.kpi.name,
+        selectedSafetyBoundaryMetric?.kpi?.name,
+      ];
+      let src: string | null = null;
+      if (showBg) {
+        for (const name of names) {
+          const image = name ? metricImages[name]?.[gridMode] : null;
+          if (image) {
+            src = image.src;
+            break;
+          }
+        }
+      }
+      if (src || !showBg || Object.keys(metricImages).length > 0) {
+        safeScatterplotSet({ backgroundImage: src });
       }
     } catch {
       // Instance already destroyed.
     }
-  }, [scatterplot, showBg, metricImages, selectedMetric, gridMode, safeScatterplotSet]);
+  }, [
+    scatterplot,
+    showBg,
+    metricImages,
+    selectedMetric,
+    selectedSafetyBoundaryMetric,
+    gridMode,
+    safeScatterplotSet,
+  ]);
 
   return (
     <Box
@@ -1370,7 +1392,8 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         width: "100%",
         height: "100%",
         overflow: "hidden",
-        position: "relative",
+        display: "flex",
+        flexDirection: "column",
       }}
       onMouseEnter={() => {
         dispatch(
@@ -1389,6 +1412,7 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         dispatch(interactionSlice.actions.record(panelName + ".mouse_leave"));
       }}
     >
+      <Box sx={{ flex: 1, minHeight: 0, position: "relative" }}>
       <Box
         component="div"
         id="parent-wrapper"
@@ -1724,17 +1748,19 @@ export default function Plot({ egoName = "ITRI" }: { egoName?: string }) {
         <canvas ref={canvasRef} />
       </Box>
 
-      <Contour setMetricImages={setMetricImages} egoName={egoName} />
+      <Contour key={`${egoName}-bg`} setMetricImages={setMetricImages} egoName={egoName} />
+      </Box>
 
       <Stack
         direction="row"
-        // columnGap={1}
         sx={{
-          position: "absolute",
-          top: "-10px",
-          overflowX: "scroll",
-          scrollbarWidth: "none",
+          order: -1,
+          position: "relative",
+          flexShrink: 0,
+          flexWrap: "wrap",
+          overflow: "visible",
           width: "100%",
+          zIndex: 2,
         }}
       >
         <Menu

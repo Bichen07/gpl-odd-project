@@ -1,21 +1,21 @@
 "use client";
 
 import "./rc-dock.css";
-import DockLayout, { PanelData, TabData } from "rc-dock";
-import { useRef, useState, createContext, useEffect } from "react";
+import type { DockLayout } from "rc-dock";
+import { useState, createContext, useEffect } from "react";
 import { Box } from "@mui/material";
-import layout from "./layout";
-import Saves from "./panels/Saves";
+import ScrollWorkspace from "./ScrollWorkspace";
+import ChatDrawer from "./ChatDrawer";
+import { ChatUiContext, OddChatSyncProvider, type TrialAttachment } from "./chatContext";
 import {
   Batch,
   SavedTrajectoryAnalysis,
 } from "@/app/_shared/graphql/queries/batches";
 import { store } from "../../redux/store";
 import { Provider } from "react-redux";
-import { InteractionCount } from "./interactionCount";
 import { A } from "ts-toolbelt";
 import { getTrials, Trial } from "@/app/_shared/graphql/queries/trials";
-import { useAppDispatch } from "../../redux/hooks";
+import { useAppDispatch, useAppSelector } from "../../redux/hooks";
 import { batchSlice, CriticalityMetric } from "../../redux/slices/batch";
 
 export const DockLayoutContext = createContext<DockLayout | null>(null);
@@ -25,41 +25,19 @@ type Props = {
   saves: SavedTrajectoryAnalysis;
   trials: A.Await<ReturnType<typeof getTrials>>;
   batch: Batch;
+  ego?: string;
+  k?: string;
+  s?: string;
+  section?: string;
 };
-export default function Dock({ batchId, saves, trials, batch }: Props) {
-  const dockLayoutRef = useRef<DockLayout>(null);
-  // rc-dock mutates layout styles on the client; mount after hydration to avoid
-  // SSR/client style mismatches and React 19 element.ref warnings during SSR.
+export default function Dock({ batchId, saves, trials, batch, ego, k, s, section }: Props) {
   const [mounted, setMounted] = useState(false);
-
-  const [dockLayoutRefState, setDockLayoutRefState] =
-    useState<DockLayout | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [attachment, setAttachment] = useState<TrialAttachment | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (!mounted || !dockLayoutRef.current) {
-      return;
-    }
-    setDockLayoutRefState(dockLayoutRef.current);
-  }, [mounted]);
-
-  useEffect(() => {
-    if (dockLayoutRef.current == null) {
-      return;
-    }
-    if (dockLayoutRef.current.find("saves")) {
-      return;
-    }
-    const newTab: TabData = {
-      id: "saves",
-      title: "Saves",
-      content: <Saves batchId={batchId} saves={saves} />,
-    };
-    dockLayoutRef.current?.dockMove(newTab, "1-misc-top", "middle");
-  }, [dockLayoutRefState, batchId, saves]);
 
   return (
     <Box
@@ -70,33 +48,57 @@ export default function Dock({ batchId, saves, trials, batch }: Props) {
         flexDirection: "column",
         height: "100vh",
         overflowY: "hidden",
-        ".dock-tabpane": {
-          overflowY: "auto",
-        },
       }}
     >
       <Provider store={store}>
-        <DockLayoutContext.Provider value={dockLayoutRefState}>
-          <DataLoader trials={trials} batch={batch} />
-          {mounted ? (
-            <DockLayout
-              ref={dockLayoutRef}
-              defaultLayout={layout}
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                right: 0,
-                bottom: 0,
-                fontFamily: "var(--font-roboto)",
-              }}
-            />
-          ) : null}
-        </DockLayoutContext.Provider>
-        {/* <InteractionCount batchId={batchId} /> */}
+        <ChatUiContext.Provider
+          value={{
+            open: chatOpen,
+            setOpen: setChatOpen,
+            attachment,
+            setAttachment,
+          }}
+        >
+          <OddChatSyncProvider>
+          <DockLayoutContext.Provider value={null}>
+            <DataLoader trials={trials} batch={batch} />
+            {mounted ? (
+              <Box sx={{ position: "absolute", inset: 0 }}>
+                <ScrollWorkspace
+                  batchId={batchId}
+                  saves={saves}
+                  ego={ego || "ITRI"}
+                  k={k || ""}
+                  s={s || ""}
+                  section={section}
+                />
+              </Box>
+            ) : null}
+            {mounted ? (
+              <SelectedRunChat batchId={batchId} ego={ego || "ITRI"} k={k || ""} s={s || ""} />
+            ) : null}
+          </DockLayoutContext.Provider>
+          </OddChatSyncProvider>
+        </ChatUiContext.Provider>
       </Provider>
     </Box>
   );
+}
+
+function SelectedRunChat({
+  batchId,
+  ego,
+  k,
+  s,
+}: {
+  batchId: string;
+  ego: string;
+  k: string;
+  s: string;
+}) {
+  const savedFolder = useAppSelector((state) => state.batch.clusterAnalysisByEgo?.[ego]?.folder ?? null);
+  const folder = k && s ? `${k}_cluster_s=${s}` : savedFolder;
+  return <ChatDrawer batchId={batchId} folder={folder} />;
 }
 
 function DataLoader({

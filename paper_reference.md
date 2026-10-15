@@ -241,7 +241,7 @@ Chiu [31].
 
 ### Schütt, Otten, Sax — Behavior clustering versus criticality clustering (IEEE ITSC 2023)
 
-Not in Chiu’s bibliography. Added in `post_medoid_analysis_method_study.md`. [arXiv:2306.12738](https://arxiv.org/abs/2306.12738)
+Not in Chiu’s bibliography. [arXiv:2306.12738](https://arxiv.org/abs/2306.12738)
 
 **Connection.** The published experiment closest to “cluster the concretes of one logical class.”
 
@@ -287,7 +287,7 @@ Chiu [9]. Neighbors in the same related-work block: Winkelmann et al. [10] (prob
 
 ## 7. This layer after the clustering is saved
 
-These papers are not in either senior bibliography. They were read while deciding what the language model is allowed to say about a saved run. Full cards are in `app/llm_pipeline/medoid_analysis_method_study.md` §4 and `post_medoid_analysis_method_study.md` §4.
+These papers are not in either senior bibliography. They were read while deciding what the language model is allowed to say about a saved run.
 
 | Paper | Use it for | Do not do |
 |---|---|---|

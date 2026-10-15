@@ -290,9 +290,7 @@ YAMLs. They answer a different question from the cluster stack: *where in the
 sampled scenario-parameter box do pass/fail (and cluster labels) change, and
 can an engineer read that as a few predicates?* That is **ODD-related evidence
 for one logical scenario**, not a SAE J3016 certificate (weather, map, road
-class, … are not in the trial table). See
-[`post_medoid_analysis_method_study.md`](post_medoid_analysis_method_study.md)
-§2.5 / §7.
+class, … are not in the trial table).
 
 Paths: §2 layout under `odd/`. Numbers below are the shipped
 `results/batch8/6_cluster_s=0.6113` artifacts (kNN=10, 2 params:

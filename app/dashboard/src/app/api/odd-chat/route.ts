@@ -93,6 +93,25 @@ function entryConversationId(entry: ChatLogEntry): string {
   return entry.conversation_id?.trim() || DEFAULT_CONVERSATION_ID;
 }
 
+function exchangeValue(value: string | null | undefined): string {
+  const text = (value ?? "").trim();
+  if (!text || text.toLowerCase() === "null") return "null";
+  const stripped = text
+    .replace(/^(asked|sent|send)\s*:\s*/i, "")
+    .replace(/^(asked|sent|send)\s+/i, "")
+    .trim();
+  return stripped || "null";
+}
+
+function presentTurn(entry: ChatLogEntry): ChatLogEntry {
+  return {
+    ...entry,
+    asked: `asked: ${exchangeValue(entry.asked)}`,
+    sent: `send: ${exchangeValue(entry.sent)}`,
+    citations: [],
+  };
+}
+
 function conversationTitle(question: string): string {
   const normalized = question.replace(/\s+/g, " ").trim();
   return normalized.length > 56 ? `${normalized.slice(0, 56)}…` : normalized || "New conversation";
@@ -231,11 +250,14 @@ export async function GET(req: NextRequest) {
   const allHistory = readChatLog(runDir);
   const conversations = summarizeConversations(allHistory, readTitles(runDir), readPins(runDir));
   const requestedConversationId = url.searchParams.get("conversationId")?.trim();
+  const newest = [...conversations].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
   const selectedConversationId =
-    requestedConversationId || conversations[0]?.id || DEFAULT_CONVERSATION_ID;
-  const history = allHistory.filter(
-    (entry) => entryConversationId(entry) === selectedConversationId,
-  );
+    requestedConversationId ||
+    (url.searchParams.get("latest") === "1" ? newest?.id : conversations[0]?.id) ||
+    DEFAULT_CONVERSATION_ID;
+  const history = allHistory
+    .filter((entry) => entryConversationId(entry) === selectedConversationId)
+    .map(presentTurn);
   return NextResponse.json({
     briefingAvailable,
     missing,
@@ -376,6 +398,12 @@ export async function POST(req: NextRequest) {
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "gpl-odd-chat-"));
   const historyPath = path.join(tmpDir, "history.json");
   fs.writeFileSync(historyPath, JSON.stringify(asMessages), "utf-8");
+  const attachment = body.attachment;
+  let attachmentPath: string | null = null;
+  if (attachment && typeof attachment === "object") {
+    attachmentPath = path.join(tmpDir, "attachment.json");
+    fs.writeFileSync(attachmentPath, JSON.stringify(attachment), "utf-8");
+  }
 
   const args = [
     path.join(projectRoot, "scripts", "run_odd_chat.sh"),
@@ -392,6 +420,7 @@ export async function POST(req: NextRequest) {
     "--temperature",
     "0.1",
   ];
+  if (attachmentPath) args.push("--attachment-json", attachmentPath);
 
   const env: NodeJS.ProcessEnv = { ...process.env, PYTHONUNBUFFERED: "1" };
   if (apiKey) {

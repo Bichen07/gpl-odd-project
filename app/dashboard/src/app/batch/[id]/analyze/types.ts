@@ -161,6 +161,8 @@ export type ChatTurn = {
   requested?: { need?: string; cluster?: number; folder?: string; trial_id?: string; clusters?: number[] } | null;
   asked?: string | null;
   sent?: string | null;
+  images?: { rel: string; t?: number | null; label?: string | null }[];
+  build_trial_ids?: string[];
   model: string;
   dry_run?: boolean;
 };

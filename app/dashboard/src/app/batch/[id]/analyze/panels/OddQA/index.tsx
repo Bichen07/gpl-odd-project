@@ -19,24 +19,19 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { MoreHoriz, PushPin, Send } from "@mui/icons-material";
+import { MoreHoriz, PushPin, Send, InfoOutlined, History } from "@mui/icons-material";
 import type { ChatTurn } from "../../types";
+import { useOddChatSync, type ConversationSummary, type TrialAttachment } from "../../../_tabs/explore/components/dock/chatContext";
 
-function requestedLabel(requested: ChatTurn["requested"]): string | null {
-  if (!requested?.need) return null;
-  if (requested.need === "medoid") return `asked medoid cluster ${requested.cluster}`;
-  if (requested.need === "pair") return `asked pair ${requested.folder}`;
-  if (requested.need === "trial") return `asked trial ${requested.trial_id}`;
-  return `asked ${requested.need}`;
+function exchangeValue(value: string | null | undefined): string {
+  const text = (value ?? "").trim();
+  if (!text) return "null";
+  const stripped = text
+    .replace(/^(asked|sent|send)\s*:\s*/i, "")
+    .replace(/^(asked|sent|send)\s+/i, "")
+    .trim();
+  return stripped || "null";
 }
-
-type ConversationSummary = {
-  id: string;
-  title: string;
-  updatedAt: string;
-  turnCount: number;
-  pinned?: boolean;
-};
 
 // ─── ODD Q&A panel (S5 part 2) ─────────────────────────────────────────────
 //
@@ -55,12 +50,21 @@ export default function OddChatPanel({
   apiKey,
   model,
   onOpenSetup,
+  attachment = null,
+  onClearAttachment,
+  compact = false,
+  reloadToken = 0,
 }: {
   batchId: string;
   folder: string;
   apiKey: string;
   model: string;
   onOpenSetup: () => void;
+  attachment?: TrialAttachment | null;
+  onClearAttachment?: () => void;
+  compact?: boolean;
+  /** Bumped when the ODD Q&A tab is opened or clicked again. Reloads the newest log. */
+  reloadToken?: number;
 }) {
   const [history, setHistory] = useState<ChatTurn[]>([]);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -78,36 +82,162 @@ export default function OddChatPanel({
   const [renameValue, setRenameValue] = useState("");
   const [renameTarget, setRenameTarget] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [building, setBuilding] = useState(false);
+  const [buildNote, setBuildNote] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [showAbout, setShowAbout] = useState(false);
+  const [flash, setFlash] = useState(false);
+  const [listAnchor, setListAnchor] = useState<HTMLElement | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const sync = useOddChatSync();
+  const [selectionLabel, setSelectionLabel] = useState<string | null>(null);
+  const seen = useRef(0);
+  const requestGen = useRef(0);
+  const reloading = useRef(false);
+  const folderKey = `${batchId}|${folder}`;
 
-  const loadHistory = useCallback((selectedConversationId?: string | null) => {
+  const share = useCallback((
+    id: string | null,
+    nextHistory: ChatTurn[],
+    nextConversations: ConversationSummary[],
+    extra: { briefingAvailable: boolean | null; missing: string[]; pendingQuestion: string | null },
+  ) => {
+    seen.current = sync.publish({
+      folderKey,
+      conversationId: id,
+      history: nextHistory,
+      conversations: nextConversations,
+      briefingAvailable: extra.briefingAvailable,
+      missing: extra.missing,
+      pendingQuestion: extra.pendingQuestion,
+    });
+  }, [folderKey, sync]);
+
+  const loadHistory = useCallback((selectedConversationId?: string | null, opts?: { latest?: boolean }) => {
+    const claimed = sync.claim();
+    const gen = ++requestGen.current;
     setLoadingHistory(true);
     const query = new URLSearchParams({
       batchId,
       folder,
     });
     if (selectedConversationId) query.set("conversationId", selectedConversationId);
+    if (opts?.latest) {
+      query.set("latest", "1");
+      reloading.current = true;
+    }
     fetch(`/api/odd-chat?${query.toString()}`)
       .then((r) => r.json())
       .then((d) => {
-        setBriefingAvailable(Boolean(d.briefingAvailable));
-        setMissing(d.missing ?? []);
-        setConversations(d.conversations ?? []);
-        setConversationId(d.conversationId ?? selectedConversationId ?? "default");
-        setHistory(d.history ?? []);
+        if (gen !== requestGen.current || sync.epochRef.current !== claimed) return;
+        const id = d.conversationId ?? selectedConversationId ?? "default";
+        const nextHistory = (d.history ?? []) as ChatTurn[];
+        const nextConversations = (d.conversations ?? []) as ConversationSummary[];
+        const nextMissing = (d.missing ?? []) as string[];
+        const available = Boolean(d.briefingAvailable);
+        setBriefingAvailable(available);
+        setMissing(nextMissing);
+        setConversations(nextConversations);
+        setConversationId(id);
+        setHistory(nextHistory);
+        setPendingQuestion(null);
+        share(id, nextHistory, nextConversations, {
+          briefingAvailable: available,
+          missing: nextMissing,
+          pendingQuestion: null,
+        });
+        if (opts?.latest) {
+          setFlash(true);
+          window.setTimeout(() => setFlash(false), 900);
+        }
       })
-      .catch(() => setBriefingAvailable(false))
-      .finally(() => setLoadingHistory(false));
-  }, [batchId, folder]);
+      .catch(() => {
+        if (gen !== requestGen.current || sync.epochRef.current !== claimed) return;
+        setBriefingAvailable(false);
+      })
+      .finally(() => {
+        if (opts?.latest && gen === requestGen.current) reloading.current = false;
+        if (gen === requestGen.current) setLoadingHistory(false);
+      });
+  }, [batchId, folder, share, sync]);
+
+  const syncRef = useRef(sync);
+  syncRef.current = sync;
+  const loadHistoryRef = useRef(loadHistory);
+  loadHistoryRef.current = loadHistory;
 
   useEffect(() => {
-    loadHistory();
-  }, [loadHistory]);
+    if (reloadToken > 0) {
+      loadHistoryRef.current(null, { latest: true });
+      return;
+    }
+    const snap = syncRef.current.snapshot;
+    if (snap.folderKey === folderKey && snap.seq > 0) {
+      seen.current = snap.seq;
+      setConversationId(snap.conversationId);
+      setHistory(snap.history);
+      setConversations(snap.conversations);
+      setBriefingAvailable(snap.briefingAvailable);
+      setMissing(snap.missing);
+      setPendingQuestion(snap.pendingQuestion);
+      setAsking(Boolean(snap.pendingQuestion));
+      setLoadingHistory(false);
+      return;
+    }
+    loadHistoryRef.current();
+  }, [folderKey, reloadToken]);
+
+  useEffect(() => {
+    const snap = sync.snapshot;
+    if (reloading.current) return;
+    if (snap.folderKey !== folderKey || snap.seq === 0 || snap.seq === seen.current) return;
+    seen.current = snap.seq;
+    setConversationId(snap.conversationId);
+    setHistory(snap.history);
+    setConversations(snap.conversations);
+    setBriefingAvailable(snap.briefingAvailable);
+    setMissing(snap.missing);
+    setPendingQuestion(snap.pendingQuestion);
+    setAsking(Boolean(snap.pendingQuestion));
+    setLoadingHistory(false);
+  }, [sync.snapshot, folderKey]);
 
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [history, asking]);
+
+  const attachmentKey = attachment
+    ? `${attachment.source}|${attachment.trialIds.join(",")}`
+    : "";
+  useEffect(() => {
+    if (!attachment || attachment.trialIds.length === 0) {
+      setSelectionLabel(null);
+      return;
+    }
+    let cancel = false;
+    setSelectionLabel(null);
+    fetch("/api/conversation-trials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        batchId: Number(batchId),
+        folder,
+        trialIds: attachment.trialIds,
+        source: attachment.source,
+        preview: true,
+      }),
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancel && typeof data.label === "string") setSelectionLabel(data.label);
+      })
+      .catch(() => {
+        if (!cancel) setSelectionLabel(null);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [attachmentKey, batchId, folder]);
 
   const menuConversation = conversations.find((conversation) => conversation.id === menuConversationId);
 
@@ -135,10 +265,12 @@ export default function OddChatPanel({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
-      setConversations((prev) => {
-        const exists = prev.some((conversation) => conversation.id === target);
-        if (!exists) {
-          return [
+      const exists = conversations.some((conversation) => conversation.id === target);
+      const next = exists
+        ? conversations.map((conversation) =>
+            conversation.id === target ? { ...conversation, title } : conversation,
+          )
+        : [
             {
               id: target,
               title,
@@ -146,12 +278,14 @@ export default function OddChatPanel({
               turnCount: history.length,
               pinned: false,
             },
-            ...prev,
+            ...conversations,
           ];
-        }
-        return prev.map((conversation) =>
-          conversation.id === target ? { ...conversation, title } : conversation,
-        );
+      setConversations(next);
+      sync.claim();
+      share(conversationId, history, next, {
+        briefingAvailable,
+        missing,
+        pendingQuestion,
       });
       setRenameOpen(false);
       setRenameTarget(null);
@@ -206,9 +340,16 @@ export default function OddChatPanel({
       const next = (data.conversations ?? []) as ConversationSummary[];
       setConversations(next);
       setDeleteTarget(null);
+      sync.claim();
       if (conversationId === target) {
         if (next[0]) loadHistory(next[0].id);
         else startNewConversation();
+      } else {
+        share(conversationId, history, next, {
+          briefingAvailable,
+          missing,
+          pendingQuestion: null,
+        });
       }
     } catch (e) {
       setAskError(e instanceof Error ? e.message : String(e));
@@ -230,6 +371,24 @@ export default function OddChatPanel({
     setAskError(null);
     setPendingQuestion(q);
     setQuestion("");
+    const listedNow = conversations.some((conversation) => conversation.id === activeConversationId)
+      ? conversations
+      : [
+          {
+            id: activeConversationId,
+            title: "New conversation",
+            updatedAt: new Date().toISOString(),
+            turnCount: history.length,
+            pinned: false,
+          },
+          ...conversations,
+        ];
+    sync.claim();
+    share(activeConversationId, history, listedNow, {
+      briefingAvailable,
+      missing,
+      pendingQuestion: q,
+    });
     try {
       const res = await fetch("/api/odd-chat", {
         method: "POST",
@@ -241,6 +400,9 @@ export default function OddChatPanel({
           question: q,
           model,
           apiKey: String(apiKey).trim(),
+          attachment: attachment
+            ? { trial_ids: attachment.trialIds, source: attachment.source }
+            : undefined,
         }),
       });
       const data = await res.json();
@@ -249,9 +411,41 @@ export default function OddChatPanel({
       await loadHistory(activeConversationId);
     } catch (e) {
       setAskError(e instanceof Error ? e.message : String(e));
+      share(activeConversationId, history, conversations, {
+        briefingAvailable,
+        missing,
+        pendingQuestion: null,
+      });
     } finally {
       setAsking(false);
       setPendingQuestion(null);
+    }
+  };
+
+  const buildFrames = async (trialIds: string[]) => {
+    const ids = trialIds.filter((id) => /^\d+$/.test(id));
+    if (!ids.length || building) return;
+    setBuilding(true);
+    setBuildNote(null);
+    setAskError(null);
+    try {
+      const res = await fetch("/api/conversation-trials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ batchId: Number(batchId), folder, trialIds: ids }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`);
+      const failed = (data.trials ?? []).filter((row: { ok?: boolean; error?: string }) => row.ok === false);
+      setBuildNote(
+        failed.length
+          ? failed.map((row: { trial_id?: string; error?: string }) => `${row.trial_id}: ${row.error}`).join(" ")
+          : `Stored frames for ${(data.trials ?? []).length} trial(s). Ask again to include a picture.`,
+      );
+    } catch (e) {
+      setAskError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBuilding(false);
     }
   };
 
@@ -260,9 +454,23 @@ export default function OddChatPanel({
       typeof globalThis.crypto?.randomUUID === "function"
         ? globalThis.crypto.randomUUID()
         : `conversation-${Date.now()}`;
+    const next = [
+      {
+        id,
+        title: "New conversation",
+        updatedAt: new Date().toISOString(),
+        turnCount: 0,
+        pinned: false,
+      },
+      ...conversations,
+    ];
+    sync.claim();
     setConversationId(id);
     setHistory([]);
+    setConversations(next);
     setAskError(null);
+    setPendingQuestion(null);
+    share(id, [], next, { briefingAvailable, missing, pendingQuestion: null });
   };
 
   const listedConversations: ConversationSummary[] =
@@ -280,18 +488,45 @@ export default function OddChatPanel({
       : conversations;
 
   return (
-    <Paper variant="outlined" sx={{ p: 2 }}>
-      <Typography variant="h6" gutterBottom>
-        ODD Q&amp;A
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Ask a question about this one run. Each turn sends a short index from{" "}
-        <code>odd_chat_briefing.json</code>. If a fact is only in a file, the model asks
-        once for that medoid, pair, trial, summary, or BEV table. The chips under the answer say what was asked and what was sent.
-        History below is stored in <code>conversation_log/odd_chat_log.jsonl</code>, so it
-        is still here next time this dashboard is opened.
-      </Typography>
+    <Paper
+      variant={compact ? "elevation" : "outlined"}
+      elevation={0}
+      sx={{
+        p: compact ? 0 : 2,
+        height: compact ? "100%" : undefined,
+        display: compact ? "flex" : "block",
+        flexDirection: "column",
+        bgcolor: compact ? "transparent" : undefined,
+        boxShadow: "none",
+      }}
+    >
+      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: compact ? 0.5 : 0 }}>
+        {!compact && (
+          <Typography variant="h6" sx={{ flex: 1 }}>
+            ODD Q&amp;A
+          </Typography>
+        )}
+        {compact && <Box sx={{ flex: 1 }} />}
+        <Button
+          size="small"
+          startIcon={<InfoOutlined />}
+          onClick={() => setShowAbout((open) => !open)}
+          aria-expanded={showAbout}
+        >
+          {showAbout ? "Hide" : "About"}
+        </Button>
+      </Stack>
+      {showAbout && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+          Ask a question about this one run. Each turn sends{" "}
+          <code>odd_chat_briefing.json</code>. If a fact is only in another file, the model asks
+          once for that medoid, pair, trial, summary, or BEV table. Under each answer, asked and send use the same two lines. An empty value is null.
+          History below is stored in <code>conversation_log/odd_chat_log.jsonl</code>, so it
+          is still here next time this dashboard is opened.
+        </Typography>
+      )}
 
+      {!compact && (
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }} flexWrap="wrap">
         <Chip size="small" label={`model: ${model}`} variant="outlined" />
         <Chip
@@ -306,8 +541,9 @@ export default function OddChatPanel({
           </Button>
         )}
       </Stack>
+      )}
 
-      <Box sx={{ display: "flex", gap: 1.5, alignItems: "stretch", minHeight: 480 }}>
+      <Box sx={{ display: "flex", gap: 1.5, alignItems: "stretch", flex: compact ? 1 : undefined, minHeight: compact ? 0 : undefined }}>
         <Box
           sx={{
             width: 260,
@@ -315,7 +551,7 @@ export default function OddChatPanel({
             borderRight: "1px solid",
             borderColor: "divider",
             pr: 1,
-            display: "flex",
+            display: compact ? "none" : "flex",
             flexDirection: "column",
             gap: 0.5,
           }}
@@ -323,7 +559,7 @@ export default function OddChatPanel({
           <Button size="small" variant="outlined" onClick={startNewConversation} sx={{ mb: 0.5 }}>
             New chat
           </Button>
-          <Box sx={{ overflowY: "auto", maxHeight: 560, display: "flex", flexDirection: "column", gap: 0.25 }}>
+          <Box sx={{ overflowY: "visible", display: "flex", flexDirection: "column", gap: 0.25 }}>
             {listedConversations.map((conversation) => {
               const selected = conversation.id === conversationId;
               return (
@@ -372,7 +608,55 @@ export default function OddChatPanel({
           </Box>
         </Box>
 
-        <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box sx={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column" }}>
+      {compact && (
+        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mb: 0.5 }}>
+          <Button size="small" onClick={startNewConversation}>
+            New chat
+          </Button>
+          <Button
+            size="small"
+            startIcon={<History />}
+            onClick={(event) => setListAnchor(event.currentTarget)}
+            aria-label="Conversation history"
+            aria-haspopup="menu"
+            aria-expanded={Boolean(listAnchor)}
+            sx={{ flex: 1, justifyContent: "flex-start", minWidth: 0, textTransform: "none" }}
+          >
+            <Typography variant="body2" noWrap>
+              {listedConversations.find((conversation) => conversation.id === conversationId)?.title ?? "History"}
+            </Typography>
+          </Button>
+          <Menu
+            anchorEl={listAnchor}
+            open={Boolean(listAnchor)}
+            onClose={() => setListAnchor(null)}
+            sx={{ zIndex: 1600 }}
+            slotProps={{ paper: { sx: { maxHeight: 320, width: 280 } } }}
+          >
+            {listedConversations.length === 0 && (
+              <MenuItem disabled>No conversations yet</MenuItem>
+            )}
+            {listedConversations.map((conversation) => (
+              <MenuItem
+                key={conversation.id}
+                selected={conversation.id === conversationId}
+                onClick={() => {
+                  setListAnchor(null);
+                  loadHistory(conversation.id);
+                }}
+              >
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                  {conversation.pinned && <PushPin sx={{ fontSize: 14, color: "text.secondary" }} />}
+                  <Typography variant="body2" noWrap>
+                    {conversation.title}
+                  </Typography>
+                </Stack>
+              </MenuItem>
+            ))}
+          </Menu>
+        </Stack>
+      )}
       {loadingHistory ? (
         <Stack alignItems="center" sx={{ py: 2 }}>
           <CircularProgress size={22} />
@@ -401,14 +685,21 @@ export default function OddChatPanel({
           <Box
             ref={logRef}
             sx={{
-              minHeight: 360,
-              maxHeight: 520,
-              overflowY: "auto",
+              flex: compact ? 1 : undefined,
+              minHeight: compact ? 0 : undefined,
+              maxHeight: compact ? "none" : "none",
+              overflowY: compact ? "auto" : "visible",
+              overflowX: "hidden",
               mb: 1.5,
               bgcolor: "grey.50",
+              animation: flash ? "oddQaFlash 0.9s ease" : undefined,
+              "@keyframes oddQaFlash": {
+                "0%": { backgroundColor: "#fff4cc" },
+                "100%": { backgroundColor: "#fafafa" },
+              },
               borderRadius: 2,
-              px: 2,
-              py: 2,
+              px: 1.25,
+              py: 1.25,
               display: "flex",
               flexDirection: "column",
               gap: 1.5,
@@ -420,11 +711,12 @@ export default function OddChatPanel({
               </Typography>
             ) : (
               history.map((t, i) => (
-                <Stack key={`${t.timestamp ?? "turn"}-${i}`} spacing={1.5}>
+                <Stack key={`${t.timestamp ?? "turn"}-${i}`} spacing={1.5} sx={{ width: "100%", minWidth: 0 }}>
                   <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
                     <Box
                       sx={{
-                        maxWidth: "75%",
+                        maxWidth: "85%",
+                        minWidth: 0,
                         px: 1.75,
                         py: 1.25,
                         borderRadius: "18px 18px 6px 18px",
@@ -432,7 +724,7 @@ export default function OddChatPanel({
                         color: "primary.contrastText",
                       }}
                     >
-                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
                         {t.question}
                       </Typography>
                     </Box>
@@ -440,7 +732,8 @@ export default function OddChatPanel({
                   <Box sx={{ display: "flex", justifyContent: "flex-start" }}>
                     <Box
                       sx={{
-                        maxWidth: "75%",
+                        maxWidth: "85%",
+                        minWidth: 0,
                         px: 1.75,
                         py: 1.25,
                         borderRadius: "18px 18px 18px 6px",
@@ -449,26 +742,46 @@ export default function OddChatPanel({
                         borderColor: "divider",
                       }}
                     >
-                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>
+                      <Typography variant="body2" sx={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>
                         {t.answer}
                       </Typography>
-                      <Stack spacing={0.5} alignItems="flex-start" sx={{ mt: 1 }}>
-                        {t.asked && (
-                          <Chip label={t.asked} size="small" color="info" variant="outlined" />
-                        )}
-                        {t.sent && (
-                          <Chip label={t.sent} size="small" variant="outlined" />
-                        )}
-                        {!t.asked && requestedLabel(t.requested) && (
-                          <Chip label={requestedLabel(t.requested)} size="small" color="info" variant="outlined" />
-                        )}
-                        {!t.asked && (t.citations ?? []).map((c, j) => (
-                          <Chip key={j} label={c} size="small" variant="outlined" />
-                        ))}
-                        {t.dry_run && (
-                          <Chip label="dry-run" size="small" color="warning" />
-                        )}
-                      </Stack>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, overflowWrap: "anywhere" }}>
+                        asked: {exchangeValue(t.asked)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: "block", overflowWrap: "anywhere" }}>
+                        send: {exchangeValue(t.sent)}
+                      </Typography>
+                      {t.dry_run && (
+                        <Chip label="dry-run" size="small" color="warning" sx={{ mt: 0.5 }} />
+                      )}
+                      {(t.images ?? []).length > 0 && (
+                        <Stack direction="row" spacing={0.5} sx={{ mt: 1, overflowX: "auto" }}>
+                          {(t.images ?? []).map((image) => (
+                            <Box key={image.rel} sx={{ width: 140, flexShrink: 0 }}>
+                              <Box
+                                component="img"
+                                alt={image.label || "BEV frame"}
+                                src={`/api/run-frame?batchId=${encodeURIComponent(batchId)}&folder=${encodeURIComponent(folder)}&rel=${encodeURIComponent(image.rel)}`}
+                                sx={{ width: "100%", borderRadius: 1, display: "block" }}
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                {image.t != null ? `${image.t} s ` : ""}
+                                {image.label}
+                              </Typography>
+                            </Box>
+                          ))}
+                        </Stack>
+                      )}
+                      {(t.images ?? []).length === 0 && (t.build_trial_ids ?? []).length > 0 && (
+                        <Button
+                          size="small"
+                          sx={{ mt: 1 }}
+                          disabled={building}
+                          onClick={() => void buildFrames(t.build_trial_ids ?? [])}
+                        >
+                          Build missing frames
+                        </Button>
+                      )}
                     </Box>
                   </Box>
                 </Stack>
@@ -516,6 +829,24 @@ export default function OddChatPanel({
             </Alert>
           )}
 
+          {attachment && (
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              <Chip
+                label={selectionLabel ?? `${attachment.total} ${attachment.source} trials`}
+                onDelete={onClearAttachment}
+                size="small"
+              />
+              <Button size="small" disabled={building} onClick={() => void buildFrames(attachment.trialIds)}>
+                {building ? "Building…" : "Build missing frames"}
+              </Button>
+            </Stack>
+          )}
+          {buildNote && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+              {buildNote}
+            </Typography>
+          )}
+
           <Stack direction="row" spacing={1} alignItems="flex-end">
             <TextField
               fullWidth
@@ -546,7 +877,7 @@ export default function OddChatPanel({
               {asking ? <CircularProgress size={18} color="inherit" /> : <Send fontSize="small" />}
             </Button>
           </Stack>
-          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: "block" }}>
+          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: compact ? "none" : "block" }}>
             Uses the model and API key from the Model setup tab (no second key field).
           </Typography>
         </>
