@@ -354,11 +354,72 @@ export const Trials: CollectionConfig = {
           required: true,
         },
         {
+          name: 'observation',
+          type: 'relationship',
+          relationTo: 'observations',
+          hasMany: false,
+          required: true,
+        },
+        {
+          name: 'source',
+          type: 'text',
+          required: true,
+        },
+        {
+          name: 'timeStatus',
+          type: 'select',
+          required: true,
+          options: [
+            { label: 'Recorded', value: 'recorded' },
+            { label: 'Derived', value: 'derived' },
+          ],
+        },
+        {
           name: 'previewImage',
           type: 'relationship',
           relationTo: 'media',
           hasMany: false,
         },
+      ],
+    },
+    {
+      name: 'capabilitySnapshot',
+      type: 'group',
+      fields: [
+        { name: 'schemaVersion', type: 'text' },
+        { name: 'resolverVersion', type: 'text' },
+        {
+          name: 'inputs',
+          type: 'array',
+          fields: [
+            { name: 'key', type: 'text', required: true },
+            { name: 'value', type: 'number' },
+            { name: 'unit', type: 'text' },
+            {
+              name: 'status',
+              type: 'select',
+              required: true,
+              options: [
+                { label: 'Recorded', value: 'recorded' },
+                { label: 'Derived', value: 'derived' },
+                { label: 'Configured', value: 'configured' },
+                { label: 'Assumed', value: 'assumed' },
+                { label: 'Unavailable', value: 'unavailable' },
+              ],
+            },
+            { name: 'sourcePath', type: 'text' },
+            { name: 'sourceSha256', type: 'text' },
+            { name: 'rationale', type: 'textarea' },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'analysisArtifacts',
+      type: 'group',
+      fields: [
+        { name: 'capabilityCardPath', type: 'text' },
+        { name: 'capabilityCardSha256', type: 'text' },
       ],
     },
     {

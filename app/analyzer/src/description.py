@@ -359,6 +359,7 @@ def build_description(
     snapshot_evidence: Optional[str] = None,
     traj_df: Any = None,
     map_tracks_csv: Optional[str] = None,
+    capability_card: Optional[Dict] = None,
 ) -> str:
     from kinematics_context import primary_vehicle_track_id, vehicle_name
 
@@ -368,6 +369,13 @@ def build_description(
     dur = action_data.get("duration", "?")
     parts.append(f"Scenario on map '{loc}', duration {dur}s.")
     parts.append("")
+
+    if capability_card is not None:
+        from capability_analysis import capability_summary
+        parts.append("## Capability and avoidability status")
+        parts.append("")
+        parts.append(capability_summary(capability_card))
+        parts.append("")
 
     vehicle_tid = primary_vehicle_track_id(action_data) if traj_df is not None else None
     pname = display_agent_name(vehicle_name(action_data, vehicle_tid))

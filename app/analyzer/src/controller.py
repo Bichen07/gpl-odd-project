@@ -48,6 +48,7 @@ import hdbscan
 import zipfile
 import io
 import json
+import yaml
 from sklearn.cluster import DBSCAN
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 from sklearn.decomposition import PCA
@@ -74,6 +75,7 @@ from shapely.ops import nearest_points, split
 from graphql import batch_query, trials_query
 from timer import Timer
 from env import PAYLOAD_API, PAYLOAD_GRAPHQL_API, PAYLOAD_API_KEY
+from repo_paths import RESULTS_DIR
 import analysis_progress
 from clustering_uniqueness import attach_uniqueness_to_mfpca_dict
 from predict import train_surrogate_model
@@ -1262,6 +1264,27 @@ def heading_vector_from_yaw(yaw):
 
 class TrajectoryAnalysisController(Controller):
     path = "/trajectory_analysis"
+
+    @get("/capability-card/{batch_id:int}/{run_folder:str}/{cluster_folder:str}")
+    async def capability_card(
+        self, batch_id: int, run_folder: str, cluster_folder: str
+    ) -> Dict[str, Any]:
+        """Read one generated capability card without executing analysis.
+
+        Folder components are constrained to names so this endpoint cannot read
+        arbitrary files outside the Analyzer results tree.
+        """
+        if run_folder != Path(run_folder).name or cluster_folder != Path(cluster_folder).name:
+            return {"status": "invalid_path"}
+        path = RESULTS_DIR / "batch{}".format(batch_id) / run_folder / cluster_folder / "processed" / "capability.yaml"
+        if not path.is_file():
+            return {"status": "unavailable", "reason": "capability_card_not_found"}
+        try:
+            with path.open(encoding="utf-8") as source:
+                card = yaml.safe_load(source) or {}
+        except (OSError, yaml.YAMLError):
+            return {"status": "unavailable", "reason": "capability_card_unreadable"}
+        return {"status": "ok", "card": card}
 
     @get("/progress")
     async def analysis_progress_status(self) -> Dict[str, Any]:

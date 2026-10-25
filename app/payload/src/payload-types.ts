@@ -298,10 +298,33 @@ export interface Trial {
         time: number;
         esminiSeconds: number;
         observationIndex: number;
+        observation: number | Observation;
+        source: string;
+        timeStatus: 'recorded' | 'derived';
         previewImage?: (number | null) | Media;
         id?: string | null;
       }[]
     | null;
+  capabilitySnapshot?: {
+    schemaVersion?: string | null;
+    resolverVersion?: string | null;
+    inputs?:
+      | {
+          key: string;
+          value?: number | null;
+          unit?: string | null;
+          status: 'recorded' | 'derived' | 'configured' | 'assumed' | 'unavailable';
+          sourcePath?: string | null;
+          sourceSha256?: string | null;
+          rationale?: string | null;
+          id?: string | null;
+        }[]
+      | null;
+  };
+  analysisArtifacts?: {
+    capabilityCardPath?: string | null;
+    capabilityCardSha256?: string | null;
+  };
   previewImage?: (number | null) | Media;
   testObjectives: {
     criticalityMetrics: {
@@ -835,8 +858,35 @@ export interface TrialsSelect<T extends boolean = true> {
         time?: T;
         esminiSeconds?: T;
         observationIndex?: T;
+        observation?: T;
+        source?: T;
+        timeStatus?: T;
         previewImage?: T;
         id?: T;
+      };
+  capabilitySnapshot?:
+    | T
+    | {
+        schemaVersion?: T;
+        resolverVersion?: T;
+        inputs?:
+          | T
+          | {
+              key?: T;
+              value?: T;
+              unit?: T;
+              status?: T;
+              sourcePath?: T;
+              sourceSha256?: T;
+              rationale?: T;
+              id?: T;
+            };
+      };
+  analysisArtifacts?:
+    | T
+    | {
+        capabilityCardPath?: T;
+        capabilityCardSha256?: T;
       };
   previewImage?: T;
   testObjectives?:

@@ -1932,6 +1932,7 @@ def process_medoid(
     trial_info = (trials_meta or {}).get(trial_id) if trials_meta else None
     trial_events = trial_info.get("events") if isinstance(trial_info, dict) else None
     action_yaml_path = write_path(cluster_dir, "action.yaml")
+    capability_yaml_path = write_path(cluster_dir, "capability.yaml")
     desc_path = write_path(cluster_dir, "description.txt")
     try:
         from labeller import label_trajectory, save_action_yaml
@@ -1951,6 +1952,15 @@ def process_medoid(
         )
         action_data_for_ctx = action_data
         save_action_yaml(action_data, action_yaml_path)
+        from capability_analysis import build_capability_card, save_capability_card
+        capability_card = build_capability_card(
+            trial_id=trial_id,
+            trajectory_path=trajectory_path,
+            trial_events=trial_events,
+            action_data=action_data,
+            capability_snapshot=(trial_info or {}).get("capabilitySnapshot") if isinstance(trial_info, dict) else None,
+        )
+        save_capability_card(capability_card, capability_yaml_path)
         # Enrich tables from labelled trajectory.csv (not raw esmini columns).
         traj_for_desc = pd.read_csv(trajectory_path)
         map_tracks_csv = map_tracks_path_for_dataset(dataset_name)
@@ -1959,13 +1969,14 @@ def process_medoid(
                 action_data,
                 traj_df=traj_for_desc,
                 map_tracks_csv=str(map_tracks_csv) if map_tracks_csv.is_file() else None,
+                capability_card=capability_card,
             ),
             desc_path,
         )
         if not map_yaml.is_file():
             print("  ⚠️  action/description built WITHOUT junction info — run "
                   "map assets first (--map-only)")
-        print(f"  ✓ Generated action.yaml + description.txt (prose)")
+        print(f"  ✓ Generated action.yaml + capability.yaml + description.txt (prose)")
     except Exception as e:
         print(f"  ⚠️  Action/description generation failed: {e}")
         traj_for_desc = None
@@ -2228,6 +2239,7 @@ def process_trial_to_dir(
     action_data = None
     traj_for_desc = None
     action_yaml_path = write_path(out_dir, "action.yaml")
+    capability_yaml_path = write_path(out_dir, "capability.yaml")
     desc_path = None if thin_parameter_space_side else write_path(out_dir, "description.txt")
     try:
         from labeller import label_trajectory, save_action_yaml
@@ -2247,6 +2259,14 @@ def process_trial_to_dir(
             conflict_relevance_m=conflict_relevance_m,
         )
         save_action_yaml(action_data, action_yaml_path)
+        from capability_analysis import build_capability_card, save_capability_card
+        capability_card = build_capability_card(
+            trial_id=str(trial_id),
+            trajectory_path=trajectory_path,
+            trial_events=trial_events,
+            action_data=action_data,
+        )
+        save_capability_card(capability_card, capability_yaml_path)
         if not thin_parameter_space_side:
             traj_for_desc = pd.read_csv(trajectory_path)
             map_tracks_csv = map_tracks_path_for_dataset(dataset_name)
@@ -2255,6 +2275,7 @@ def process_trial_to_dir(
                     action_data,
                     traj_df=traj_for_desc,
                     map_tracks_csv=str(map_tracks_csv) if map_tracks_csv.is_file() else None,
+                    capability_card=capability_card,
                 ),
                 desc_path,
             )

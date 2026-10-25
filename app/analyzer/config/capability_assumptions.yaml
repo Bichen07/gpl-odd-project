@@ -1,0 +1,9 @@
+schema_version: capability-assumptions/v1
+policy:
+  physical_defaults: prohibited
+  perception_proxy: prohibited
+  response_time_proxy: prohibited
+  missing_value_status: unavailable
+notes:
+  - This file intentionally supplies no vehicle, perception, friction, road-grade, or response-time values.
+  - Demonstrator sensitivity values may be used only in synthetic test fixtures, never in a real trial card.

@@ -48,6 +48,7 @@ _ARTIFACTS: dict[str, tuple[Kind, str]] = {
     "trajectory.csv": ("raw", "trajectory.csv"),
     "cluster.json": ("raw", "cluster.json"),
     "action.yaml": ("processed", "action.yaml"),
+    "capability.yaml": ("processed", "capability.yaml"),
     "description.txt": ("processed", "description.txt"),
     "context.md": ("processed", "context.md"),
     "context_medoid.md": ("processed", "context_medoid.md"),

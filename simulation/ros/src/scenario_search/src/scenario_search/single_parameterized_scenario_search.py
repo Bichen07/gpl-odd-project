@@ -753,6 +753,8 @@ class SingleParameterizedScenarioSearch:
                                             current_register_data["esmini_dat_id"]
                                         ),
                                     }
+                                    from scenario_search.capability_provenance import build_capability_snapshot
+                                    trial_db_data["capabilitySnapshot"] = build_capability_snapshot()
                                     new_trial_id = None
                                     new_trial = None
 

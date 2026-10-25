@@ -139,6 +139,10 @@ def parse_collision_from_events(
         ev_name = str(ev.get("name") or "")
         if not ev_name.startswith(_COLLISION_EVENT_PREFIX):
             continue
+        # Phase A events must be observation-linked recorded facts.  Older
+        # partial events fall through to the deterministic polygon resolver.
+        if ev.get("timeStatus", "recorded") != "recorded" or ev.get("observation") is None:
+            continue
         vehicle_name = ev_name[len(_COLLISION_EVENT_PREFIX) :]
         if not vehicle_name:
             continue

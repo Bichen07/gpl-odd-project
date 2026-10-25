@@ -30,6 +30,7 @@ from shapely.ops import nearest_points, split
 from shapely.prepared import prep
 from shapely.geometry import Polygon, LineString, Point as SPoint
 from scenario_search.scoring.third_party.TwoDimTTC import getpoints, mygetpoints
+from scenario_search.event_record import attach_observation_ids, snapshot_collision_event
 
 
 def predict_position(x, y, v, theta, t):
@@ -1167,6 +1168,21 @@ class ScenarioSampler:
             )
             observations_response.raise_for_status()
             print("successfully upload observations")
+            observations = observations_response.json()
+            if not isinstance(observations, list) or len(observations) != len(self.data):
+                raise ValueError(
+                    "Payload observation response cannot establish input-order event links"
+                )
+            persisted_events = attach_observation_ids(self.events, observations)
+            if persisted_events:
+                response = requests.patch(
+                    url=self.payload_api + "/trials/{}".format(trial_id),
+                    headers=self.headers,
+                    json={"events": clean_data(persisted_events)},
+                    verify=False,
+                )
+                response.raise_for_status()
+                print("successfully patch events to trial")
             # print("WATCH LAST OBSERVATION" * 100)
             # pprint(self.data[-1])
             # observations = observations_response.json()
@@ -1668,14 +1684,12 @@ class ScenarioSampler:
             #     pprint(self.latest_observations)
             #     self.collided_observation_recorded = True
 
-            self.events.append(
-                {
-                    "name": "collisionWith{}".format(agentName),
-                    "observation": self.current_observation,
-                    # "time": self.current_observation["time"],
-                    # "esminiSeconds": self.current_observation["esminiSeconds"],
-                    "time": 0,
-                    "esminiSeconds": 0,
-                    "observationIndex": len(self.data) - 1,
-                }
+            event = snapshot_collision_event(
+                agentName, self.current_observation, len(self.data) - 1
             )
+            if event is None:
+                rospy.logwarn(
+                    "Collision callback omitted: no positive observation timestamp is available"
+                )
+            else:
+                self.events.append(event)
