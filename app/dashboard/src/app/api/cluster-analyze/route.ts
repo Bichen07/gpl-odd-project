@@ -54,6 +54,7 @@ function readJsonSafe(p: string | null): Record<string, unknown> | null {
 // Keep this list to models that are currently served. gemini-2.0-flash was
 // retired by Google (404 "no longer available") and must not be offered.
 const MODELS = [
+  { id: "gpt-6-luna", provider: "OpenAI" },
   { id: "gemini-2.5-flash", provider: "Google" },
   { id: "gemini-2.5-pro", provider: "Google" },
   { id: "gemini-2.5-flash-lite", provider: "Google" },

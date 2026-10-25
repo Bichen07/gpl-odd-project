@@ -170,7 +170,7 @@ def run_check(
     run_dir: Path,
     questions_path: Path,
     *,
-    model: str = "gemini-2.5-flash",
+    model: str = "gpt-6-luna",
     api_key: Optional[str] = None,
 ) -> Dict[str, Any]:
     run_dir = Path(run_dir)

@@ -4,6 +4,8 @@
 **/.tmp
 **/*.bk
 # **/.env
+# Local secrets. Next.js loads these and does not commit them.
+.env*.local
 
 # dependencies
 /node_modules

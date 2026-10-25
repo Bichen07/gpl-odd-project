@@ -646,7 +646,7 @@ def answer(
     run_dir: Path,
     question: str,
     *,
-    model: str = "gemini-2.5-flash",
+    model: str = "gpt-6-luna",
     api_key: Optional[str] = None,
     temperature: float = 0.1,
     history: Optional[List[Dict[str, str]]] = None,

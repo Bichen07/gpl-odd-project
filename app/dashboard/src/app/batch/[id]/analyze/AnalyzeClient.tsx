@@ -92,7 +92,7 @@ export default function AnalyzeClient({
   const buildLogRef = useRef<HTMLPreElement>(null);
 
   // --- model setup ---
-  const [model, setModel] = useState<string>("gemini-2.5-flash");
+  const [model, setModel] = useState<string>("gpt-6-luna");
   const [apiKey, setApiKey] = useState<string>("");
   const [temperature, setTemperature] = useState<number>(0.1);
   const [review, setReview] = useState<boolean>(true);

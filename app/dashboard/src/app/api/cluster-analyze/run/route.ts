@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
 
   const batchId = String(body.batchId ?? "");
   const folder = String(body.folder ?? "");
-  const model = String(body.model ?? "gemini-2.5-flash");
+  const model = String(body.model ?? "gpt-6-luna");
   const apiKey = typeof body.apiKey === "string" ? body.apiKey : "";
   const temperature = typeof body.temperature === "number" ? body.temperature : 0.1;
   const dryRun = body.dryRun === true;

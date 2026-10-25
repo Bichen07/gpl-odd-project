@@ -351,7 +351,7 @@ export async function POST(req: NextRequest) {
   const conversationId = /^[A-Za-z0-9_-]{1,100}$/.test(requestedConversationId)
     ? requestedConversationId
     : DEFAULT_CONVERSATION_ID;
-  const model = typeof body.model === "string" && body.model ? body.model : "gemini-2.5-flash";
+  const model = typeof body.model === "string" && body.model ? body.model : "gpt-6-luna";
   const apiKey = typeof body.apiKey === "string" ? body.apiKey : "";
   const historyTurns = typeof body.historyTurns === "number" ? body.historyTurns : 8;
 

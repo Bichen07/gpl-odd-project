@@ -24,8 +24,8 @@ def main() -> None:
     ci.add_argument(
         "--model",
         nargs="+",
-        default=["gemini-2.5-flash"],
-        help="LLM model (default gemini-2.5-flash; GOOGLE_API_KEY for gemini-*)",
+        default=["gpt-6-luna"],
+        help="LLM model (default gpt-6-luna; OPENAI_API_KEY for gpt-*)",
     )
     ci.add_argument(
         "--products",
@@ -63,7 +63,7 @@ def main() -> None:
     lr = sub.add_parser("label-review", help="Review + rename cluster_summary.yaml labels across one run")
     lr.add_argument("--run-dir", required=True,
                     help="results/batch<id>/<k>_cluster_s=.../ directory to review")
-    lr.add_argument("--model", default="gemini-2.5-flash")
+    lr.add_argument("--model", default="gpt-6-luna")
     lr.add_argument("--api-key", default=None)
     lr.add_argument("--temperature", type=float, default=0.1)
     lr.add_argument("--dry-run", action="store_true")
@@ -94,7 +94,7 @@ def main() -> None:
     oc = sub.add_parser("odd-chat", help="S5 — ask one grounded question over odd_chat_briefing.json")
     oc.add_argument("--run-dir", required=True)
     oc.add_argument("--question", required=True)
-    oc.add_argument("--model", default="gemini-2.5-flash")
+    oc.add_argument("--model", default="gpt-6-luna")
     oc.add_argument("--api-key", default=None)
     oc.add_argument("--temperature", type=float, default=0.1)
     oc.add_argument("--history-json", default=None,
@@ -124,7 +124,7 @@ def main() -> None:
     )
     ocheck.add_argument("--run-dir", required=True)
     ocheck.add_argument("--questions", default=None, help="JSON file of questions and expected facts")
-    ocheck.add_argument("--model", default="gemini-2.5-flash")
+    ocheck.add_argument("--model", default="gpt-6-luna")
     ocheck.add_argument("--api-key", default=None)
 
     args = parser.parse_args()
@@ -134,7 +134,7 @@ def main() -> None:
 
         result_path = review_run_dir(
             Path(args.run_dir),
-            model=getattr(args, "model", "gemini-2.5-flash"),
+            model=getattr(args, "model", "gpt-6-luna"),
             temperature=getattr(args, "temperature", 0.1),
             api_key=getattr(args, "api_key", None),
             dry_run=getattr(args, "dry_run", False),
@@ -228,7 +228,7 @@ def main() -> None:
         )
         out = f"passed {report['passed']}/{report['passed'] + report['failed']}"
     elif args.cmd == "cluster-interpret":
-        model = " ".join(getattr(args, "model", ["gemini-2.5-flash"]))
+        model = " ".join(getattr(args, "model", ["gpt-6-luna"]))
         dataset = getattr(args, "dataset", None)
         batch_id = getattr(args, "batch_id", None)
         if not dataset and batch_id is not None:

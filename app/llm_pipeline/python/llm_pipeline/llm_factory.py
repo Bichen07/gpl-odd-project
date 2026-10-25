@@ -10,7 +10,7 @@ import os
 from typing import Any, Optional
 
 # Default for cluster interpretation CLI and ClusterInterpreter
-DEFAULT_MODEL = "gemini-2.5-flash"
+DEFAULT_MODEL = "gpt-6-luna"
 
 # Friendly aliases (lowercase keys) for CLI typos / spaced names
 _MODEL_ALIASES = {
@@ -31,7 +31,7 @@ def normalize_model_name(model: str) -> str:
     key = raw.lower()
     if key in _MODEL_ALIASES:
         return _MODEL_ALIASES[key]
-    # Already a valid API id (e.g. gemini-2.5-flash, gpt-4o)
+    # Already a valid API id (e.g. gemini-2.5-flash, gpt-6-luna)
     if key.startswith("gemini") and " " in key:
         # Last resort: user passed unquoted words — unlikely to be correct
         return key.replace(" ", "-")
@@ -84,19 +84,18 @@ def create_interpretation_llm(
     name = normalize_model_name(model_name)
     key = llm_api_key_for_model(name, api_key)
 
-    if name == "gpt-4o" or name.startswith("gpt-4"):
+    if is_openai_model(name):
         from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(
-            model=name,
-            api_key=key,
-            temperature=temperature,
-            max_tokens=max_tokens,
-        )
-    if name == "gpt-5" or name.startswith("gpt-5"):
-        from langchain_openai import ChatOpenAI
-
-        return ChatOpenAI(model=name, api_key=key, max_tokens=max_tokens)
+        kwargs: dict[str, Any] = {
+            "model": name,
+            "api_key": key,
+            "max_tokens": max_tokens,
+        }
+        # Reasoning models such as GPT-6 do not accept temperature.
+        if not name.startswith("gpt-6"):
+            kwargs["temperature"] = temperature
+        return ChatOpenAI(**kwargs)
 
     if name.startswith("gemini"):
         try:
