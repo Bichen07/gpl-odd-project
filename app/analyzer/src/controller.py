@@ -1286,6 +1286,23 @@ class TrajectoryAnalysisController(Controller):
             return {"status": "unavailable", "reason": "capability_card_unreadable"}
         return {"status": "ok", "card": card}
 
+    @get("/visibility-evidence/{batch_id:int}/{run_folder:str}/{cluster_folder:str}")
+    async def visibility_evidence(
+        self, batch_id: int, run_folder: str, cluster_folder: str
+    ) -> Dict[str, Any]:
+        """Read a generated visibility artifact without executing analysis."""
+        if run_folder != Path(run_folder).name or cluster_folder != Path(cluster_folder).name:
+            return {"status": "invalid_path"}
+        path = RESULTS_DIR / "batch{}".format(batch_id) / run_folder / cluster_folder / "processed" / "visibility.yaml"
+        if not path.is_file():
+            return {"status": "unavailable", "reason": "visibility_evidence_not_found"}
+        try:
+            with path.open(encoding="utf-8") as source:
+                evidence = yaml.safe_load(source) or {}
+        except (OSError, yaml.YAMLError):
+            return {"status": "unavailable", "reason": "visibility_evidence_unreadable"}
+        return {"status": "ok", "evidence": evidence}
+
     @get("/progress")
     async def analysis_progress_status(self) -> Dict[str, Any]:
         return analysis_progress.snapshot()

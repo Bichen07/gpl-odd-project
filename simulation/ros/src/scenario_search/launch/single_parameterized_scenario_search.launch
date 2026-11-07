@@ -5,6 +5,9 @@
     <arg name="enable_rss_check" default="false" />
     <arg name="enable_reference_preventable_judgement" default="false" />
     <arg name="sim_with_external" default="false" />
+    <arg name="headless" default="true" />
+    <!-- Preserve the previous safe default. Phase-A evidence runs opt in with false. -->
+    <arg name="disable_collision" default="true" />
 
     <arg name="sampling_suggestion_api" default="http://localhost:9009" />
     <arg name="batch_id" default="1" />
@@ -91,7 +94,7 @@
         <arg name="ego_position_seq" value="$(arg ego_position_seq)" />
         <arg name="run_once" value="true" />
         <arg name="disable_monitor" value="false" />
-        <arg name="disable_collision" value="true" />
+        <arg name="disable_collision" value="$(arg disable_collision)" />
         <arg name="headless" value="$(arg headless)" />
     </include>
 

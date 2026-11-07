@@ -1,15 +1,19 @@
 """Deterministic, non-legal collision capability artifacts for Phase A."""
 from __future__ import annotations
 
+import csv
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-import pandas as pd
 import yaml
 
 from capability_schema import PROHIBITED_CLAIMS, unavailable, validate_card
 from capability_sources import sha256_file, valid_persisted_collision
+from capability_assumptions import build_illustrative_assumption_profile
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def _status_value(key: str, value: Any, unit: str, status: str, source: str, rationale: str = "") -> Dict[str, Any]:
@@ -32,19 +36,42 @@ def _collision_from_action(action_data: Optional[Dict[str, Any]]) -> Optional[Di
     return None
 
 
-def _ego_speed_at_time(trajectory_path: Path, collision_time: Optional[float]) -> Optional[float]:
+def _ego_track_id(action_data: Optional[Dict[str, Any]]) -> Optional[str]:
+    for actor in (action_data or {}).get("agents", []):
+        if str(actor.get("role", "")).lower() == "ego" and actor.get("track_id") is not None:
+            return str(actor["track_id"])
+    return None
+
+
+def _source_path(path: Path) -> str:
+    """Use a checkout-portable provenance path whenever the source is in this repo."""
+    try:
+        return str(path.resolve().relative_to(REPO_ROOT))
+    except ValueError:
+        return str(path)
+
+
+def _ego_speed_at_time(
+    trajectory_path: Path, collision_time: Optional[float], ego_track_id: Optional[str] = None
+) -> Optional[float]:
     if collision_time is None or not trajectory_path.is_file():
         return None
     try:
-        df = pd.read_csv(trajectory_path)
-        if not {"name", "time", "speed"}.issubset(df.columns):
-            return None
-        ego = df[df["name"].astype(str).str.strip() == "Ego"]
-        if ego.empty:
-            return None
-        row = ego.iloc[(ego["time"].astype(float) - collision_time).abs().argsort().iloc[0]]
-        return round(float(row["speed"]), 4)
-    except Exception:
+        nearest = None
+        with trajectory_path.open(newline="", encoding="utf-8") as source:
+            for row in csv.DictReader(source):
+                has_actor_name = bool(str(row.get("name") or "").strip())
+                row_track_id = str(row.get("trackId") or row.get("track_id") or "").strip()
+                is_ego = str(row.get("name") or "").strip() == "Ego" if has_actor_name else row_track_id == str(ego_track_id)
+                if not is_ego:
+                    continue
+                sample_time = float(row["time"])
+                speed = float(row.get("speed") or row.get("velocity"))
+                candidate = (abs(sample_time - collision_time), speed)
+                if nearest is None or candidate[0] < nearest[0]:
+                    nearest = candidate
+        return round(nearest[1], 4) if nearest is not None else None
+    except (OSError, KeyError, TypeError, ValueError):
         return None
 
 
@@ -89,6 +116,10 @@ def build_capability_card(
     trial_events: Optional[Iterable[Dict[str, Any]]] = None,
     action_data: Optional[Dict[str, Any]] = None,
     capability_snapshot: Optional[Dict[str, Any]] = None,
+    analysis_context: Optional[Dict[str, Dict[str, Any]]] = None,
+    visibility_evidence: Optional[Dict[str, Any]] = None,
+    profile_sensitivity: Optional[Iterable[Dict[str, Any]]] = None,
+    include_illustrative_assumptions: bool = False,
 ) -> Dict[str, Any]:
     """Build an honest card; unresolved perception/capability stays unavailable."""
     trajectory = Path(trajectory_path)
@@ -122,9 +153,9 @@ def build_capability_card(
         unavailable("right_of_way", "No per-trial right-of-way source is recorded."),
         unavailable("lane_geometry", "No validated lane-geometry artifact is attached to this capability card."),
     ]
-    speed = _ego_speed_at_time(trajectory, time_value)
+    speed = _ego_speed_at_time(trajectory, time_value, _ego_track_id(action_data))
     if speed is not None:
-        inputs.append(_status_value("ego_speed_at_collision", speed, "m/s", "derived", str(trajectory), "Nearest recorded Ego trajectory sample at collision time."))
+        inputs.append(_status_value("ego_speed_at_collision", speed, "m/s", "derived", _source_path(trajectory), "Nearest recorded Ego trajectory sample at collision time."))
     else:
         inputs.append(unavailable("ego_speed_at_collision", "Trajectory cannot provide an Ego speed at a resolved collision time.", unit="m/s"))
     for item in (capability_snapshot or {}).get("inputs", []):
@@ -136,15 +167,39 @@ def build_capability_card(
         inputs.append(normalized)
 
     verdict = {"label": "insufficient_data", "reason_codes": ["perception_and_capability_provenance_missing"], "prohibited_claims": sorted(PROHIBITED_CLAIMS)}
+    context = dict(analysis_context or {})
+    context.setdefault(
+        "batch_id",
+        unavailable("batch_id", "Analyzer did not receive a source-backed batch identity."),
+    )
+    context.setdefault(
+        "scenario_archetype",
+        unavailable(
+            "scenario_archetype",
+            "Phase A does not infer a scenario archetype from a filename or trajectory.",
+        ),
+    )
+    opportunity = (visibility_evidence or {}).get("visibility_opportunity")
+    if not isinstance(opportunity, dict):
+        opportunity = unavailable(
+            "visibility_opportunity",
+            "No geometric visibility-evidence artifact is attached to this capability card.",
+            unit="s",
+        )
     card = {
         "schema_version": "capability-card/v1",
         "trial_id": str(trial_id),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "collision": {"actor": actor, "time": collision_time},
         "perception": {"first_detected": unavailable("first_detected", "No sensor event is recorded; first-in-range is intentionally not used as a proxy.", unit="s"), "method": "unavailable"},
+        "visibility": {"opportunity": opportunity},
+        "profile_sensitivity": list(profile_sensitivity or []),
+        "analysis_context": context,
         "inputs": inputs,
         "verdict": verdict,
     }
+    if include_illustrative_assumptions:
+        card["illustrative_assumptions"] = build_illustrative_assumption_profile(speed)
     return validate_card(card)
 
 
@@ -158,5 +213,8 @@ def save_capability_card(card: Dict[str, Any], path: str | Path) -> None:
 def capability_summary(card: Dict[str, Any]) -> str:
     verdict = (card.get("verdict") or {}).get("label", "insufficient_data")
     if verdict == "insufficient_data":
-        return "Capability/avoidability: insufficient data; perception and vehicle-capability values are unavailable for this trial."
+        suffix = ""
+        if card.get("illustrative_assumptions"):
+            suffix = " An illustrative sensitivity profile is attached but does not change this verdict."
+        return "Capability/avoidability: insufficient data; perception and vehicle-capability values are unavailable for this trial." + suffix
     return "Capability/avoidability engineering result: {}. This is not a legal-fault or certification conclusion.".format(verdict)

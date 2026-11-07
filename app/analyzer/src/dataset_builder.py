@@ -1932,6 +1932,7 @@ def process_medoid(
     trial_info = (trials_meta or {}).get(trial_id) if trials_meta else None
     trial_events = trial_info.get("events") if isinstance(trial_info, dict) else None
     action_yaml_path = write_path(cluster_dir, "action.yaml")
+    visibility_yaml_path = write_path(cluster_dir, "visibility.yaml")
     capability_yaml_path = write_path(cluster_dir, "capability.yaml")
     desc_path = write_path(cluster_dir, "description.txt")
     try:
@@ -1952,15 +1953,89 @@ def process_medoid(
         )
         action_data_for_ctx = action_data
         save_action_yaml(action_data, action_yaml_path)
+        from visibility_analysis import (
+            build_visibility_evidence,
+            evaluate_profile_response_window,
+            save_visibility_evidence,
+        )
+        ego_actor = next(
+            (str(agent.get("track_id")) for agent in action_data.get("agents", []) if str(agent.get("role")).lower() == "ego"),
+            "Ego",
+        )
+        collision_interaction = next(
+            (item for item in action_data.get("interactions", []) if item.get("type") == "COLLISION"),
+            {},
+        )
+        target_actor = collision_interaction.get("with_track_id")
+        if target_actor is not None:
+            target_actor = str(target_actor)
+        profile = (trial_info or {}).get("perceptionProfile") if isinstance(trial_info, dict) else None
+        geometry = (trial_info or {}).get("visibilityGeometry") if isinstance(trial_info, dict) else None
+        visibility_evidence = build_visibility_evidence(
+            trial_id=trial_id,
+            trajectory_path=trajectory_path,
+            ego_actor=ego_actor,
+            target_actor=target_actor,
+            profile=profile,
+            geometry=geometry,
+        )
+        save_visibility_evidence(visibility_evidence, visibility_yaml_path)
         from capability_analysis import build_capability_card, save_capability_card
+        collision_for_profile = {"status": "unavailable"}
+        derived_collision = collision_interaction.get("key_time")
+        if derived_collision is not None:
+            collision_for_profile = {"value": derived_collision, "status": "derived", "unit": "s"}
+        profile_sensitivity = (
+            [evaluate_profile_response_window(visibility=visibility_evidence, collision_time=collision_for_profile, profile=profile)]
+            if isinstance(profile, dict)
+            else []
+        )
         capability_card = build_capability_card(
             trial_id=trial_id,
             trajectory_path=trajectory_path,
             trial_events=trial_events,
             action_data=action_data,
             capability_snapshot=(trial_info or {}).get("capabilitySnapshot") if isinstance(trial_info, dict) else None,
+            visibility_evidence=visibility_evidence,
+            profile_sensitivity=profile_sensitivity,
+            analysis_context={
+                "batch_id": {
+                    "value": int(batch_id),
+                    "status": "derived",
+                    "source": "Analyzer medoid metadata",
+                    "rationale": "Selected medoid input identifies this batch; it is not a vehicle capability measurement.",
+                },
+                "scenario_archetype": {
+                    "status": "unavailable",
+                    "rationale": "No persisted scenario-archetype manifest is available in Phase A.",
+                },
+            },
         )
         save_capability_card(capability_card, capability_yaml_path)
+        if isinstance(trial_info, dict):
+            # A Payload-backed medoid is the only canonical Trial card.  Manual
+            # CSV rebuilds retain their local artifact but never overwrite a
+            # Trial's singular canonical-card reference.
+            from capability_persistence import persist_capability_card
+            from env import PAYLOAD_API, PAYLOAD_API_KEY
+
+            artifact_metadata = persist_capability_card(
+                trial_id,
+                capability_yaml_path,
+                payload_api=PAYLOAD_API,
+                payload_api_key=PAYLOAD_API_KEY,
+            )
+            print(
+                "  ✓ Persisted capability-card reference to Payload: {} ({})".format(
+                    artifact_metadata["capabilityCardPath"],
+                    artifact_metadata["capabilityCardSha256"],
+                )
+            )
+        else:
+            print(
+                "  ℹ️  Local-only capability card: no Payload-backed trial metadata; "
+                "not a canonical Phase A artifact."
+            )
         # Enrich tables from labelled trajectory.csv (not raw esmini columns).
         traj_for_desc = pd.read_csv(trajectory_path)
         map_tracks_csv = map_tracks_path_for_dataset(dataset_name)
@@ -1976,10 +2051,10 @@ def process_medoid(
         if not map_yaml.is_file():
             print("  ⚠️  action/description built WITHOUT junction info — run "
                   "map assets first (--map-only)")
-        print(f"  ✓ Generated action.yaml + capability.yaml + description.txt (prose)")
+        print(f"  ✓ Generated action.yaml + visibility.yaml + capability.yaml + description.txt (prose)")
     except Exception as e:
         print(f"  ⚠️  Action/description generation failed: {e}")
-        traj_for_desc = None
+        return False
 
     # 7. BEV snapshots from action.yaml timestamps only (xosc_gen Step 2.5)
     snaps_out = nested_snapshots_dir(cluster_dir)
@@ -2239,6 +2314,7 @@ def process_trial_to_dir(
     action_data = None
     traj_for_desc = None
     action_yaml_path = write_path(out_dir, "action.yaml")
+    visibility_yaml_path = write_path(out_dir, "visibility.yaml")
     capability_yaml_path = write_path(out_dir, "capability.yaml")
     desc_path = None if thin_parameter_space_side else write_path(out_dir, "description.txt")
     try:
@@ -2259,12 +2335,30 @@ def process_trial_to_dir(
             conflict_relevance_m=conflict_relevance_m,
         )
         save_action_yaml(action_data, action_yaml_path)
+        from visibility_analysis import build_visibility_evidence, save_visibility_evidence
+        ego_actor = next(
+            (str(agent.get("track_id")) for agent in action_data.get("agents", []) if str(agent.get("role")).lower() == "ego"),
+            "Ego",
+        )
+        collision_interaction = next(
+            (item for item in action_data.get("interactions", []) if item.get("type") == "COLLISION"),
+            {},
+        )
+        target_actor = collision_interaction.get("with_track_id")
+        visibility_evidence = build_visibility_evidence(
+            trial_id=str(trial_id),
+            trajectory_path=trajectory_path,
+            ego_actor=ego_actor,
+            target_actor=str(target_actor) if target_actor is not None else None,
+        )
+        save_visibility_evidence(visibility_evidence, visibility_yaml_path)
         from capability_analysis import build_capability_card, save_capability_card
         capability_card = build_capability_card(
             trial_id=str(trial_id),
             trajectory_path=trajectory_path,
             trial_events=trial_events,
             action_data=action_data,
+            visibility_evidence=visibility_evidence,
         )
         save_capability_card(capability_card, capability_yaml_path)
         if not thin_parameter_space_side:
@@ -2623,6 +2717,16 @@ def main():
     parser.add_argument(
         "--trials",
         help="Manual trial list: batch:index,batch:index,... (e.g., '1:100,1:200,1:300')",
+    )
+    parser.add_argument(
+        "--canonical-trial-id",
+        type=str,
+        default=None,
+        help=(
+            "Payload trial ID for exactly one --trials entry. Fetches that trial's "
+            "event/snapshot metadata and persists its canonical capability card. "
+            "Without this option, --trials produces a local-only artifact."
+        ),
     )
     parser.add_argument(
         "--snapshot-size",
@@ -3044,8 +3148,45 @@ def main():
 
     elif args.trials:
         print(f"\n📝 Using manually specified trials: {args.trials}")
+        trial_specs = [spec.strip() for spec in args.trials.split(",") if spec.strip()]
+        if args.canonical_trial_id and len(trial_specs) != 1:
+            parser.error("--canonical-trial-id requires exactly one --trials entry")
+        canonical_trial_info: Optional[Dict[str, Any]] = None
+        if args.canonical_trial_id:
+            try:
+                from env import PAYLOAD_API as CANONICAL_PAYLOAD_API, PAYLOAD_API_KEY
+
+                response = requests.get(
+                    f"{CANONICAL_PAYLOAD_API}/api/trials/{args.canonical_trial_id}?depth=0",
+                    headers={"Authorization": f"users API-Key {PAYLOAD_API_KEY}"},
+                    timeout=15,
+                )
+                response.raise_for_status()
+                canonical_trial_info = response.json()
+            except Exception as exc:
+                parser.error(
+                    "--canonical-trial-id could not fetch Payload trial {}: {}".format(
+                        args.canonical_trial_id, exc
+                    )
+                )
+            if not isinstance(canonical_trial_info, dict):
+                parser.error("--canonical-trial-id returned an invalid Payload trial document")
+            declared_batch = canonical_trial_info.get("batch")
+            if isinstance(declared_batch, dict):
+                declared_batch = declared_batch.get("id")
+            try:
+                requested_batch = int(trial_specs[0].split(":", 1)[0])
+                if int(declared_batch) != requested_batch:
+                    parser.error(
+                        "--canonical-trial-id belongs to batch {}, not requested batch {}".format(
+                            declared_batch, requested_batch
+                        )
+                    )
+            except (TypeError, ValueError):
+                parser.error("--canonical-trial-id has no verifiable Payload batch relationship")
+            trials_meta[str(args.canonical_trial_id)] = canonical_trial_info
         medoids = []
-        for i, trial_spec in enumerate(args.trials.split(",")):
+        for i, trial_spec in enumerate(trial_specs):
             parts = trial_spec.strip().split(":")
             batch_id_t, trial_index_t = int(parts[0]), int(parts[1])
             collided_flag = len(parts) > 2 and parts[2].lower() in ("1", "true", "collision", "collided")
@@ -3054,7 +3195,7 @@ def main():
                 continue
             medoids.append({
                 "cluster_label": str(i),
-                "trial_id": f"{batch_id_t}_{trial_index_t}",
+                "trial_id": str(args.canonical_trial_id or f"{batch_id_t}_{trial_index_t}"),
                 "batch_id": batch_id_t,
                 "trial_index": trial_index_t,
                 "size": 1,

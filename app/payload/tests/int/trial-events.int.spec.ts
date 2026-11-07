@@ -25,5 +25,8 @@ describe('Trial Phase A schemas', () => {
   it('publishes a compact snapshot and capability-card provenance fields', () => {
     expect(field('capabilitySnapshot')?.type).toBe('group')
     expect(field('analysisArtifacts')?.type).toBe('group')
+    const artifactFields = field('analysisArtifacts')?.fields ?? []
+    expect(artifactFields.find((item) => item.name === 'capabilityCardPath')?.type).toBe('text')
+    expect(artifactFields.find((item) => item.name === 'capabilityCardSha256')?.type).toBe('text')
   })
 })
